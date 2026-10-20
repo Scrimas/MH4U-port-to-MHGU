@@ -121,7 +121,10 @@ decision. Phase 1 study: [phase1-variant-map.md](phase1-variant-map.md). Process
     tangent, 32 B; 600 4U weapon arcs use it).
 - Not ported: the four other-line weapons whose recipes use a TS material (SA Vermilion Bloodaxe, HH Crabby Castanet,
   Parahazard Call+, event Hunter Master): their lines are not in GU.
-- Next: the board icon; then the first in-game test.
+- Music (C, static): 4U has no battle theme for em 22 or em 92 (ROM sound/bgm/battle: no bgm_em022 / em092), so
+  4U plays the area's battle music; GU's theme selector 0x4e60d4 sends em 67 to its default branch (stage theme,
+  jump-table entry 55 = 0x4e63c4) as well: Tigerstripe on the Dunes plays the Dunes battle theme in both games.
+- Next: the board / HUD icon (needs the user's HD UI files: with an install), then the first in-game test.
 
 ## Phase 5: tests (user sessions)
 Quest spawn, kill (TEST_HP_PCT=5), gear check, then the two-instance multiplayer test.
