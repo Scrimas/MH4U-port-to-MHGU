@@ -131,8 +131,8 @@ decision. Phase 1 study: [phase1-variant-map.md](phase1-variant-map.md). Process
   (models), Notes entry; Gogmazios quests on the Battlequarters again after the alias became the default.
 - Fixed: armor dye = 4U record +19 (gold 0x36; the Zamtrios X template's icy 0x0b made it silver; Gogma -> 4U's
   0x29, user); body / fat body = 4U E0 materials with their sphere maps (GU em019 E0 template; the puffed belly was
-  black); quest type 1 (the type-0 template cleared through the boss records = stand-in 0x43; the kill was counted,
-  objective 9/143 -> 29, no clear; Gogmazios' type-1 objective 109 -> 129 clears).
+  black); quest clear rule +0x1d = 0 (one hunt): the two-hunt template's 1 made the clear check wait for objective
+  1 too; the kill did complete objective 0 (9/143 -> 29). A first guess (quest type 1) changed nothing: reverted.
 - Open: quest 11493 is built with HP row 0 (5 %) for the check: rebuild at full HP (row 60) after the user's kill;
   remove the tally diagnostics (module/main.c stats_add / stats_exit) before a release; paralysis-ball shells
   (notes/shells.md, helper research); board icon (later, with the installer).
