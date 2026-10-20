@@ -126,5 +126,16 @@ decision. Phase 1 study: [phase1-variant-map.md](phase1-variant-map.md). Process
   jump-table entry 55 = 0x4e63c4) as well: Tigerstripe on the Dunes plays the Dunes battle theme in both games.
 - Next: the board / HUD icon (needs the user's HD UI files: with an install), then the first in-game test.
 
+### First in-game tests (2026-10-21, user)
+- OK: spawn through the stand-in, own files served (incl. carves), carves, break rewards, gear in the smithy
+  (models), Notes entry; Gogmazios quests on the Battlequarters again after the alias became the default.
+- Fixed: armor dye = 4U record +19 (gold 0x36; the Zamtrios X template's icy 0x0b made it silver; Gogma -> 4U's
+  0x29, user); body / fat body = 4U E0 materials with their sphere maps (GU em019 E0 template; the puffed belly was
+  black); quest type 1 (the type-0 template cleared through the boss records = stand-in 0x43; the kill was counted,
+  objective 9/143 -> 29, no clear; Gogmazios' type-1 objective 109 -> 129 clears).
+- Open: quest 11493 is built with HP row 0 (5 %) for the check: rebuild at full HP (row 60) after the user's kill;
+  remove the tally diagnostics (module/main.c stats_add / stats_exit) before a release; paralysis-ball shells
+  (notes/shells.md, helper research); board icon (later, with the installer).
+
 ## Phase 5: tests (user sessions)
 Quest spawn, kill (TEST_HP_PCT=5), gear check, then the two-instance multiplayer test.
