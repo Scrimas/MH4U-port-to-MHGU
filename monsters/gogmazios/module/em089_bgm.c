@@ -17,11 +17,14 @@
 #include <stdint.h>
 #include "game.h"
 #include "util.h"
+#include "alloc.h"
 
 enum { R0, R1, R2, R3, R4, R5, R12, LR };
 
-#define EM089_BGM_ID1   0x900u      /* = tools/snd_bgm.py */
-#define EM089_BGM_ID2   0x901u
+#define EM089_BGM_ID1   GOGMAZIOS_BGM_ID0   /* allocations.toml bgm_ids (tools/snd_bgm.py writes them) */
+#define EM089_BGM_ID2   GOGMAZIOS_BGM_ID1
+#define EM_TYPE_GOG     (GOGMAZIOS_EM_ID & 0xffu)
+#define EM_TYPE_STANDIN (GOGMAZIOS_STANDIN_ID & 0xffu)
 #define UNIT_MGR_PTR    0x1851fe0u  /* read by 0x4e6104 (GOT 0x1838bc0), passed to 0x5cf90 */
 #define UNIT_EM_TYPE    0xb5f4u     /* u8 em type of a monster unit (sSoundControl 0x4ed904 reads it) */
 #define EM089_F_PHASE2  (SIZE_uFestaEnemy + 0x25)   /* = em089_act.c F_SHAKE [4U work+0xca] */
@@ -43,8 +46,8 @@ int bgm_select_c(uint32_t *regs)
     uint32_t type = e[0] & 0xff;
     void *mgr = *(void **)MAIN(UNIT_MGR_PTR);
     void *mon = mgr ? unit_by_key(mgr, e[3]) : 0;
-    int gog = mon && FIELD(uint8_t, mon, UNIT_EM_TYPE) == 0x59;
-    if (!gog && type != 0x59 && !(type == 0x18 && gog_quest_index())) return 0;
+    int gog = mon && FIELD(uint8_t, mon, UNIT_EM_TYPE) == EM_TYPE_GOG;
+    if (!gog && type != EM_TYPE_GOG && !(type == EM_TYPE_STANDIN && gog_quest_index())) return 0;
     uint32_t id = (gog && FIELD(uint8_t, mon, EM089_F_PHASE2)) ? EM089_BGM_ID2 : EM089_BGM_ID1;
     if (!fileResource(0, EM089_FILE_BGM_STQR)) {     /* our STQR not loaded: keep GU's choice instead of silence */
         static uint32_t s_miss;

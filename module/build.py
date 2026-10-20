@@ -11,9 +11,10 @@ import os, re, shutil, struct, subprocess, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, os.path.join(ROOT, 'tools'))
-import nso, paths
+import alloc, nso, paths
 
 GOG = paths.monster('gogmazios')   # its module sources (module/), generated tables (gen/) and RomFS (romfs/)
+GOG_ALLOC = alloc.monster('gogmazios')   # its IDs (allocations.toml)
 MAIN_IMG = paths.GU_MAIN   # MHGU 1.4 main, flat
 MAIN_BUILD_ID = 'FB08F1D20FD1204FE7070672777F869B'
 MODULE_BASE = 0x2E19000   # subsdk1 lands where sdk was (Ryujinx log: image 3)
@@ -86,10 +87,10 @@ REG_TABLES = [
     ('reg_u16', 0x159FB3A, 138, 2, False),     # read at [index + 1]
     ('reg_mapicon', 0x1635354, 89, 4, False),  # map icon size class by EM NUMBER (0..88), via data word 0x183fff0
 ]
-MAPICON_EM089 = 18   # size class of Kushala / Chameleos / Teostra / Fatalis (notes/api-map.md)
+MAPICON_EM089 = GOG_ALLOC['mapicon_class']   # size class of Kushala / Chameleos / Teostra / Fatalis (notes/api-map.md)
 # UI icon index: atlas = i / 98 (HD_cmn_micon00/01), cell = i % 98 in 7 columns (0x56ef50, 0x560918 kind 3).
-# The game uses 0..140; 141 = micon01 cell 43, empty, filled by tools/ui_em089.py (romfs, 5 languages)
-ICON_EM089 = 146   # 141 / 143-145 are taken by the HD UI v4 cheat (Alatreon / Fatalis icons)
+# The game uses 0..140; 141 = micon01 cell 43, empty, filled by monsters/gogmazios/tools/ui_em089.py
+ICON_EM089 = GOG_ALLOC['ui_icon']   # 141 / 143-145 are taken by the HD UI v4 cheat (Alatreon / Fatalis icons)
 # (literal address, address of the pc-relative add/ldr using it, table symbol)
 LIT_PATCHES = [
     (0x50BD0, 0x50B74, 'reg_pairs'), (0x50BD4, 0x50B78, 'reg_pairs'), (0x50BD8, 0x50BB8, 'reg_pairs'),
@@ -103,25 +104,37 @@ LIT_PATCHES = [
     (0x55511C, 0x554DBC, 'notes_unlock'),     # Hunter's Notes unlock conditions (notes.c)
     (0x5B0CE4, 0x5B0B98, 'notes_order'),      # Hunter's Notes display order
 ]
-# Hunter's Notes tables copied with entry 123 in notes_em089.inc (tools/notes_em089.py): main address per symbol
+# Hunter's Notes tables copied with entry 123 in notes_em089.inc (notes_em089.py): main address per symbol
 NOTES_TABLES = {'notes_unlock': 0x162D1F8, 'notes_order': 0x1631EF4}
+# entry counts after the ported monsters (allocations.toml: registry indexes from 137, Notes entries from 123)
+REG_COUNT = 137 + len(alloc.monsters())
+NOTES_COUNT = 123 + sum('notes_entry' in m for m in alloc.monsters())
+assert NOTES_COUNT % 2 == 0, 'odd Notes count: re-check the unrolled loop 0x55FF3C (padding record)'
+
+
+def cmp_imm(word, imm):
+    """the same `cmp rN, #imm` with another 8-bit immediate"""
+    assert (word & 0xFFF0FF00) == 0xE3500000 and imm < 256, hex(word)
+    return (word & ~0xFF) | imm
+
+
 WORD_PATCHES = [
-    (0x50B94, 0xE3530089, 0xE353008A),         # id -> index search: cmp r3, #137 -> #138
-    (0x50C10, 0xE3510089, 0xE351008A),         # index -> id search: cmp r1, #137 -> #138
-    # Hunter's Notes list loops, 123 -> 124 entries (notes.c)
-    (0x24588C, 0xE354007B, 0xE354007C),        # talk condition 44: an entry is due
-    (0x247B2C, 0xE354007B, 0xE354007C),        # talk action 6: unlock every due entry
-    (0x5246BC, 0xE352007B, 0xE352007C),        # em ID -> unlocked? (unrolled by 2: reads the padding record)
-    (0x524750, 0xE35C007B, 0xE35C007C),        # em ID -> unlocked? (0x524728, same shape)
-    (0x55FF3C, 0xE352007A, 0xE352007C),        # count by type (unrolled: cmp r2, #122 -> #124, reads the padding)
-    (0x55FF84, 0xE35E007B, 0xE35E007C),        # n-th entry of a type
-    (0x5B0CB8, 0xE355007B, 0xE355007C),        # list screen: visible entries in display order
+    (0x50B94, 0xE3530089, cmp_imm(0xE3530089, REG_COUNT)),    # id -> index search: cmp r3, #137 -> #REG_COUNT
+    (0x50C10, 0xE3510089, cmp_imm(0xE3510089, REG_COUNT)),    # index -> id search: cmp r1, #137 -> #REG_COUNT
+    # Hunter's Notes list loops, 123 -> NOTES_COUNT entries (notes.c)
+    (0x24588C, 0xE354007B, cmp_imm(0xE354007B, NOTES_COUNT)),  # talk condition 44: an entry is due
+    (0x247B2C, 0xE354007B, cmp_imm(0xE354007B, NOTES_COUNT)),  # talk action 6: unlock every due entry
+    (0x5246BC, 0xE352007B, cmp_imm(0xE352007B, NOTES_COUNT)),  # em ID -> unlocked? (unrolled by 2: reads the padding)
+    (0x524750, 0xE35C007B, cmp_imm(0xE35C007B, NOTES_COUNT)),  # em ID -> unlocked? (0x524728, same shape)
+    (0x55FF3C, 0xE352007A, cmp_imm(0xE352007A, NOTES_COUNT)),  # count by type (unrolled: cmp r2, #122 -> #124, reads
+                                                               # the padding)
+    (0x55FF84, 0xE35E007B, cmp_imm(0xE35E007B, NOTES_COUNT)),  # n-th entry of a type
+    (0x5B0CB8, 0xE355007B, cmp_imm(0xE355007B, NOTES_COUNT)),  # list screen: visible entries in display order
 ]
 GOT_FILES = 0x1839618                          # data word -> reg_files, written by module_init
 CLONE_RATHIAN = 'CLONE_RATHIAN' in os.environ.get('GOG_DEFINES', '')
 NATIVE_DONOR = 'NATIVE_DONOR' in os.environ.get('GOG_DEFINES', '')   # test: donor's own manifest (game file IDs)
-DONOR_INDEX = 23   # Kushala Daora (em024_00): its data files are the placeholders in em089_00.arc
-                   # (keep in sync with EM089_DONOR_INDEX in em089.h)
+DONOR_INDEX = GOG_ALLOC['donor_index']   # Kushala Daora (em024_00): its data files are the placeholders in em089_00.arc
 
 
 def reg_tables_asm(img):
@@ -130,7 +143,8 @@ def reg_tables_asm(img):
     for sym, addr, n, size, ptr in REG_TABLES:
         if sym == 'reg_pairs':
             vals = ['0x%x' % w for w in struct.unpack_from('<%dI' % (2 * n), img, addr)]
-            vals += ['0x59', '137', '0xffffffff', '0xffffffff']   # new pair + sentinel (the search reads [138])
+            vals += ['0x%x' % GOG_ALLOC['em_id'], str(GOG_ALLOC['registry_index']),   # new pair + sentinel
+                     '0xffffffff', '0xffffffff']                                     # (the search reads [138])
         else:
             raw = [int.from_bytes(img[addr + i * size:addr + (i + 1) * size], 'little') for i in range(n)]
             if ptr:
@@ -237,6 +251,9 @@ def main():
         inc.append(trampoline(img, name, site))
     open(os.path.join(OUT, 'hooks.inc'), 'w').write('\n'.join(inc) + '\n')
     open(os.path.join(OUT, 'tables.S'), 'w').write(reg_tables_asm(img))
+    errs = alloc.check()
+    if errs: sys.exit('allocations.toml:\n  ' + '\n  '.join(errs))
+    open(os.path.join(OUT, 'alloc.h'), 'w').write(alloc.header())
 
     objs = []
     src_dirs = (HERE, os.path.join(GOG, 'module'))   # core, then the monster's sources (link order kept)

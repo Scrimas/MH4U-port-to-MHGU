@@ -94,7 +94,7 @@ int item_text_loaded_c(uint32_t *regs)
  * dtbparts record groups (em089_break.c). No GU record has Gogmazios' ID: the hook answers with em089's own record,
  * whatever the rank (G-only monster), also for EM089_SAVE_ID (main.c stats_add counts Gogmazios under it; no GU
  * record has it). Kushala (the quest's stand-in ID) never spawns in quests 11491 / 11492. */
-#define GOG_STANDIN 0x18u
+#define GOG_STANDIN GOGMAZIOS_STANDIN_ID
 int gog_quest_index(void);     /* stage.c: 1 / 2 = our quests, 0 = other */
 #define BUI_REC 468
 static uint8_t s_bui[BUI_REC];

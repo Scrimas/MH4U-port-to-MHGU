@@ -45,7 +45,7 @@ static uint32_t swap_id(uint32_t id)
  * Quest ID: gog_quest_id() (stage.c) = accepted quest [[0x188ae38]+0xd68] until the setup 0x3ade34, then the running
  * quest [[0x188ad90]+0xe0] (the spawn loader's r4 is that object; [quest+0xa4] is the parsed 272-byte questData
  * record, ID at +8, not +0xc). */
-#define GOG_STANDIN 0x18u
+#define GOG_STANDIN GOGMAZIOS_STANDIN_ID
 uint32_t gog_quest_id(void);   /* stage.c */
 int gog_quest_index(void);     /* stage.c: 1 = quest 11491, 2 = quest 11492 (same stand-in), 0 = other */
 static int gog_quest(void) { return gog_quest_index() != 0; }
@@ -176,7 +176,7 @@ int em_record_c(uint32_t *regs)
  * Hook 0x3a75fc, right after `bl 0x50b64`: only the index (r0) is remapped. The ID (r4) must stay 0x59: the
  * objective loop of the same function compares it with each objective's target (obj+0xf0, 0x3a7960) and marks the
  * hunt done there. Test 2026-10-20 10:24: remapping the ID at the entry tallied the kill but the quest never ended. */
-#define EM089_SAVE_INDEX 105u
+#define EM089_SAVE_INDEX GOGMAZIOS_SAVE_INDEX
 int stats_add_c(uint32_t *regs)
 {
     if (regs[R0] != EM089_INDEX) return 0;
@@ -189,8 +189,8 @@ int stats_add_c(uint32_t *regs)
 
 /* 0x55bda4(mgr, id) -> monsterName GMD entry, = 0x50b64(id) (entry k = registry index k). Entry 137 already
  * starts the GMD's second list (Rathian), so index 137 reads entry 105, the unused 'dummy1' that
- * tools/ui_em089.py renames to Gogmazios in the romfs copies. Replacement hook (build.py REPLACE_HOOKS). */
-#define EM089_NAME_ENTRY 105
+ * ui_em089.py renames to Gogmazios in the romfs copies. Replacement hook (build.py REPLACE_HOOKS). */
+#define EM089_NAME_ENTRY ((int)GOGMAZIOS_NAME_ENTRY)
 typedef int (*em_index_t)(uint32_t id);
 #define em_index FN(em_index_t, 0x50b64)
 int name_index_c(uint32_t *regs)

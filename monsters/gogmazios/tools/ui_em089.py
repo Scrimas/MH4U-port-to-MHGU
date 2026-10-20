@@ -33,9 +33,11 @@ GU_ROMFS = paths.GU_ROMFS
 SRC_4U = os.path.join(ROOT, 'dump/romfs/eng/data/core_common.arc')
 OUT = os.environ.get('UI_OUT', os.path.join(MON, 'romfs/nativeNX'))   # UI_OUT: dry run elsewhere
 LANGS = ('eng', 'fre', 'ger', 'ita', 'spa')
-ICON_UI_INDEX = 146                      # keep in sync with module/build.py ICON_EM089 (141, 143-145 = the user's
-                                         # HD UI v4 cheat: Alatreon / Fatalis icons)
-NAME_ENTRY, NAME = 105, 'Gogmazios'      # keep in sync with main.c EM089_NAME_ENTRY
+import alloc
+ALLOC = alloc.monster('gogmazios')
+ICON_UI_INDEX = ALLOC['ui_icon']         # allocations.toml (141, 143-145 = the user's HD UI v4 cheat: Alatreon /
+                                         # Fatalis icons)
+NAME_ENTRY, NAME = ALLOC['name_entry'], 'Gogmazios'   # allocations.toml (main.c EM089_NAME_ENTRY)
 SRC_CELL = (0, 0)                        # 4U atlas (row, col), 36-pixel cells: 4U has NO Gogmazios icon, its quests
                                          # use icon 0 = '?' (m11014 / m11035 u16 +0xE8 = 0; Kushala's m01002 = 33).
                                          # (0, 8) was a by-eye guess (another monster), replaced 2026-10-19

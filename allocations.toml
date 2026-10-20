@@ -1,0 +1,84 @@
+# allocations.toml : every game-wide ID a ported monster takes, in one place.
+# Checked by `python3 tools/alloc.py`; read by module/build.py (-> module/out/alloc.h for the C side) and by the
+# monster tools (tools/alloc.py). Rules:
+#   - a value comes from its [pools] range and no two monsters share one;
+#   - [[monster]] order = registry order: indexes are consecutive from 137, Hunter's Notes entries from 123, and the
+#     records a monster appends to GU tables ([monster.append]) follow those of the monsters before it;
+#   - IDs only ever grow: never move an installed monster's IDs (saves and quests keep them).
+# PEL record ids are not listed: they are local to the monster's own PEL file.
+
+[pools]                                 # what is free in MHGU 1.4, and where that was checked
+registry_index = [137, 160]             # GU uses 0..136; the relocated registry tables grow by one per monster
+em_number = [89, 255]                   # GU large monsters are ems 1..88 (registry pairs 0x1597ea4); a new variant
+                                        # of a GU em is fine too when that (variant << 8 | em) ID is free
+file_ids = [0x10700, 0x1ffff]           # past the game's file-ID table (IDs up to 0x106d0, file_id hook 0x152960)
+save_index = [105, 111]                 # unused registry slots dummy1..7 (IDs 0x1064..0x106a): save hunt / size arrays
+name_entry = [105, 111]                 # monsterName GMD entries 'dummy1'..'dummy7'
+ui_icon = [146, 195]                    # HD_cmn_micon01 cells after GU's 0..140 and the HD UI v4 cheat's 141, 143-145
+notes_entry = [123, 127]                # Hunter's Notes save map S+0x35b0: bits 123..127 unused
+quests = [11491, 11492]                 # checked free (no file, no list entry); check more before extending
+quest_slots = [1011009, 1011003]        # DUMMY quest_group placeholders known unused (list indexes 1412, 1407)
+items = [2977, 2990]                    # DUMMY materials (more needs ~24 code patches)
+decorations = [2889, 2899]              # DUMMY decorations (type 3)
+bgm_ids = [0x900, 0x9ff]                # stream sequence IDs absent from GU's bgm_bt (bgm_stqr hook)
+stage_folder = [28, 99]                 # stage folder numbers past GU's 0..27
+
+[[monster]]
+name = "gogmazios"                      # folder monsters/gogmazios
+title = "Gogmazios"
+em_id = 0x59
+registry_index = 137
+donor_index = 23                        # Kushala em024_00: placeholder data and per-index records (shareable)
+standin_id = 0x18                       # the quests' loader-visible boss (Kushala), swapped at spawn (shareable)
+mapicon_class = 18                      # map icon size class of Kushala / Chameleos / Teostra / Fatalis (shareable)
+file_ids = [0x10700, 0x1073f]           # 38 used
+save_index = 105
+name_entry = 105
+ui_icon = 146                           # quest board icon byte = ui_icon + 46 (the user's HD UI cheat)
+notes_entry = 123
+quests = [11491, 11492]                 # 4U m11014, m11035
+quest_slots = [1011009, 1011003]        # renamed to quests[0], quests[1]
+items = [2977, 2985]
+decorations = [2889, 2892]
+bgm_ids = [0x900, 0x901]                # phase 1, phase 2
+stage_alias = [26, 28]                  # Fortress (26) loads folder m28 (Battlequarters) while its quests run
+armor_models = [352, 353]
+
+[monster.weapon_models]                 # per weapon class (GU model numbers = 4U's)
+w00 = 97
+w01 = 97
+w02 = 99
+w03 = 82
+w04 = 40
+w06 = 47
+w07 = 79
+w08 = 77
+w09 = 82
+w10 = 75
+w11 = 87
+w12 = 71
+w13 = 25
+w14 = 27
+
+[monster.append]                        # records appended to GU's loaded tables (module/gear.c), per table
+armor_series = 2
+skill_tree = 1
+skill = 1
+decoration = 4
+kireaji = 3
+
+[monster.append.weapons]                # BaseData / MsgData / LevelData rows per class
+w00 = 2
+w01 = 2
+w02 = 2
+w03 = 2
+w04 = 1
+w06 = 1
+w07 = 2
+w08 = 2
+w09 = 2
+w10 = 2
+w11 = 2
+w12 = 2
+w13 = 3
+w14 = 2

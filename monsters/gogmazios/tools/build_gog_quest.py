@@ -58,12 +58,14 @@ from romfs import RomFS             # noqa: E402
 # 4U subquest: decimal digits, each a break group (1-6, module/em089_break.c: back = part 1 = group 3) or 7 = tail
 # sever (GU quests: 1 head, 7 tail, 17 head + sever, ...; the same digits 0x3a6f54 decodes). Was 5 (the chest) until
 # test 2026-10-20 10:01 showed the chest break completing it.
+import alloc                       # noqa: E402
+ALLOC = alloc.monster('gogmazios')  # quests, em_id, standin_id, ui_icon (allocations.toml)
 SOURCES = {
-    'm11014': dict(arc='quest00.arc', qid=11491, sub=3, rems=('rem_891014', 'rem_892014')),  # Wound Gogmazios's back
-    'm11035': dict(arc='quest01.arc', qid=11492, sub=7, rems=('rem_891035', 'rem_892035')),  # Sever Gogmazios's tail
+    'm11014': dict(arc='quest00.arc', qid=ALLOC['quests'][0], sub=3, rems=('rem_891014', 'rem_892014')),  # Wound
+    'm11035': dict(arc='quest01.arc', qid=ALLOC['quests'][1], sub=7, rems=('rem_891035', 'rem_892035')),  # Sever tail
 }
-EM_ID = 0x59
-BOSS_ID, BOSS_EM = 0x18, 24    # Kushala: the loader-visible stand-in, swapped to EM_ID at spawn (module/main.c)
+EM_ID = ALLOC['em_id']
+BOSS_ID, BOSS_EM = ALLOC['standin_id'], 24   # Kushala: the loader-visible stand-in, swapped to EM_ID at spawn (main.c)
 GU_ROMFS = paths.GU_ROMFS
 Q4U_DIR = os.path.join(ROOT, 'dump/romfs/loc/data')
 HRP_PER_Z = 1880 / 35400       # quest 11491's HRP (chosen at its creation) per zenny of reward, kept for quest 11492
@@ -182,7 +184,7 @@ def main():
     ap.add_argument('--hp-table', type=int, default=116,
                     help='boss vital (HP) table byte, default 116 (GU em_nando_tbl row with HP 4.3 = 4U m11014 row 98\'s '
                          'HP; GU row 98 has 3.4); a lower table = shorter tests')
-    ap.add_argument('--icon', type=int, default=192,
+    ap.add_argument('--icon', type=int, default=ALLOC['ui_icon'] + 46,
                     help='board icon byte qd+0xD6. GU 0x3a3178: bytes < 142 = UI index + 1 (24 = Kushala, verified); '
                          '142..186 = hyper icons (remap table + badge at 0x613318: 147 showed Hyper Khezu in test 3). '
                          'The user\'s HD UI v4 cheat (0x3a3188 / 0x613318 cave) adds bytes > 186 = UI index + 46, no '

@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include "util.h"
 #include "game.h"
+#include "alloc.h"
 
 #include "notes_em089.inc"
 
@@ -37,6 +38,6 @@ int notes_unlock_check_c(uint32_t *regs)
     if (regs[R0] != NOTES_COUNT || ++s_n > 10) return 0;
     uint8_t *save = *(uint8_t **)MAIN(0x1897f78);
     logf("gogport: hunter's notes: unlock check of entry %u (lr %x), quest 11491 cleared %d", regs[R0],
-         regs[LR] - MAIN_BASE, save ? questCleared(save + 0x42c, 11491) : -1);
+         regs[LR] - MAIN_BASE, save ? questCleared(save + 0x42c, GOGMAZIOS_QUEST0) : -1);
     return 0;
 }

@@ -1,11 +1,12 @@
 #pragma once
 #include "game.h"
+#include "alloc.h"          /* allocations.toml (tools/alloc.py) */
 
-#define EM089_ID    0x59u   /* (variant 0 << 8) | em 089: first free large-monster number in MHGU */
-#define EM089_INDEX 137u    /* first free slot of the 137-entry id -> index table */
-#define EM089_DONOR_INDEX 23u  /* Kushala (em024_00): placeholder data + per-index records (build.py DONOR_INDEX) */
-#define EM089_SAVE_ID 0x1064u  /* 'dummy1' = registry index 105 (unused by the game): Gogmazios' hunt / capture /
-                                  size records in the save's 137-entry arrays (main.c stats_add) */
+#define EM089_ID    GOGMAZIOS_EM_ID   /* (variant 0 << 8) | em 089: first free large-monster number in MHGU */
+#define EM089_INDEX GOGMAZIOS_INDEX   /* first free slot of the 137-entry id -> index table */
+#define EM089_DONOR_INDEX GOGMAZIOS_DONOR_INDEX  /* Kushala (em024_00): placeholder data + per-index records */
+#define EM089_SAVE_ID GOGMAZIOS_SAVE_ID   /* 'dummy1' = registry index 105 (unused by the game): Gogmazios' hunt /
+                                             capture / size records in the save's 137-entry arrays (main.c stats_add) */
 
 void em089_register_class(void);
 void em089_act_run(void *self);   /* em089_act.c: slot 125 body */

@@ -26,7 +26,9 @@ import arc
 EXE = os.path.join(ROOT, 'dump/exefs_v11/mem.bin')
 EXE_BASE, ITEM_TABLE = 0x100000, 0xf029e4
 LANGS = ('eng', 'fre', 'ger', 'ita', 'spa')     # order of em089_item_text in items.c
-GU_FIRST = 2977
+import alloc
+ALLOC = alloc.monster('gogmazios')
+GU_FIRST = ALLOC['items'][0]                    # allocations.toml items = [first, last]
 # (4U id, GU category)
 ITEMS = [(1528, 2),   # Battlement (scale)
          (1529, 3),   # Fortress (shell)
@@ -40,6 +42,8 @@ ITEMS = [(1528, 2),   # Battlement (scale)
 DUMMY_ICON, DUMMY_SELL = 1, 0            # what items.c expects in a DUMMY material slot
 # Arcane jewels: (4U id, GU id); category 0 and the DUMMY decoration's icon / sell checked by items.c
 DECOS = [(1838, 2889), (1839, 2890), (1840, 2891), (1841, 2892)]
+assert GU_FIRST + len(ITEMS) - 1 == ALLOC['items'][1], 'allocations.toml items does not match ITEMS'
+assert [g for _, g in DECOS] == list(range(ALLOC['decorations'][0], ALLOC['decorations'][1] + 1))
 DECO_DUMMY_ICON, DECO_DUMMY_SELL = 44, 40
 # the other 4U items of Gogmazios' carve and reward tables -> GU items of the same name, except Strong Armor Sphere
 # (4U rarity 8), which GU lacks: King Armor Sphere (GU rarity 8)

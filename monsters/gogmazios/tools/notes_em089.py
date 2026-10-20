@@ -33,7 +33,10 @@ from gear_em089 import text4u, c_bytes, c_str, LANGS
 OUT = os.path.join(MON, 'gen/notes_em089.inc')
 LIST, UNLOCK, ORDER, N = 0x162d9f0, 0x162d1f8, 0x1631ef4, 123
 EM4U = 89                                # 4U em number = emName / emExp index
-NAME_ENTRY, EM_ID, TYPE_ELDER = 105, 0x59, 13
+import alloc
+ALLOC = alloc.monster('gogmazios')
+NAME_ENTRY, EM_ID, TYPE_ELDER = ALLOC['name_entry'], ALLOC['em_id'], 13
+assert ALLOC['notes_entry'] == N, 'this tool appends the entry right after the GU list (first ported monster only)'
 THREAT = 8                               # G: 4U's own value not located; GU gives 8 to the final elders
 TEXT_FIRST = 220                         # = the HN_MonsterListMsg string count
 QUEST = 11491

@@ -21,17 +21,19 @@
 #include <stdint.h>
 #include "util.h"
 #include "game.h"
+#include "alloc.h"               /* allocations.toml: quests, quest_slots, stage_alias */
 
 enum { R0, R1, R2, R3, R4, R5, R12, LR, SP0 };   /* SP0 = first stack argument (p2) */
 
 #ifndef GOG_QUEST_ID
-#define GOG_QUEST_ID 11491u      /* tools/build_gog_quest.py: G4 Hub quest, module/romfs/nativeNX/loc/arc/quest/q0011491.arc */
+#define GOG_QUEST_ID GOGMAZIOS_QUEST0   /* build_gog_quest.py: G4 Hub quest, romfs/nativeNX/loc/arc/quest/q0011491.arc */
 #endif
-#define GOG_QUEST_SLOT 1011009u  /* quest_group DUMMY placeholder (list index 1412, unused G4 event slot) renamed to ours */
-#define GOG_QUEST2_ID 11492u     /* tools/build_gog_quest.py --source m11035: "Advanced: Act of Gog" */
-#define GOG_QUEST2_SLOT 1011003u /* the section's other DUMMY placeholder (list index 1407), renamed to quest 2 */
-#define STAGE_FORTRESS  26u
-#define STAGE_ALIAS     28u      /* folder number of our files: m28d, map_com\m28 */
+#define GOG_QUEST_SLOT GOGMAZIOS_QUEST_SLOT0  /* quest_group DUMMY placeholder (list index 1412, unused G4 event slot)
+                                                 renamed to ours */
+#define GOG_QUEST2_ID GOGMAZIOS_QUEST1        /* build_gog_quest.py --source m11035: "Advanced: Act of Gog" */
+#define GOG_QUEST2_SLOT GOGMAZIOS_QUEST_SLOT1 /* the section's other DUMMY placeholder (list index 1407) -> quest 2 */
+#define STAGE_FORTRESS  GOGMAZIOS_STAGE_FROM
+#define STAGE_ALIAS     GOGMAZIOS_STAGE_FOLDER   /* folder number of our files: m28d, map_com\m28 */
 #if !defined(NO_STAGE_ALIAS_UI) && !defined(STAGE_ALIAS_UI)
 #define STAGE_ALIAS_UI
 #endif

@@ -46,8 +46,10 @@ OUT_INC = os.path.join(MON, 'module/em089_files.inc')
 
 FILES_TABLE = 0x1732A68          # registry index -> manifest (51 x s32 file IDs)
 FILEID_TABLE = 0x15A0CE0         # file ID -> (path hash, type hash), 8 B, entry = ID
-FILE_ID_BASE = 0x10700           # first ID served by the module (the game's end at 0x106D0)
-DONOR, DONOR_INDEX = 'em024_00', 23   # Kushala Daora: elder dragon, 49 bones, 4 motion lists
+import alloc
+ALLOC = alloc.monster('gogmazios')
+FILE_ID_BASE, FILE_ID_LAST = ALLOC['file_ids']   # IDs served by the module (allocations.toml; the game's end at 0x106D0)
+DONOR, DONOR_INDEX = 'em024_00', ALLOC['donor_index']   # Kushala Daora: elder dragon, 49 bones, 4 motion lists
 
 T = dict(MOD=0x58A15856, MRL=0x2749C8A8, TEX=0x241F5DEB, LMT=0x76820D81, XFS=0x7CD0E77E, EMC=0x3AABBA02,
          BDD=0x1AC7B52D, DTB=0x59D9C3DA, EMD=0x0A0E48D4)
@@ -579,6 +581,7 @@ def main():
         for fid, p, t in new_files:
             if (p, t) == (path, typ): return fid
         fid = FILE_ID_BASE + len(new_files)
+        assert fid <= FILE_ID_LAST, 'file IDs past the allocations.toml range: widen file_ids'
         new_files.append((fid, path, typ)); return fid
     manifest = [-1] * 51
     src_of = {}

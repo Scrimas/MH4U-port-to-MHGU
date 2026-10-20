@@ -41,8 +41,8 @@ GOG_ROMFS = paths.romfs('gogmazios')
 OUT = os.path.join(GOG_ROMFS, 'nativeNX/sound/bgm')
 GU_BT = '/nativeNX/sound/bgm/battle/bgm_bt.stqr'
 
-EM089_BGM_ID1 = 0x900       # phase 1 (4U id 32)  -- module/em089_bgm.c uses the same values
-EM089_BGM_ID2 = 0x901       # phase 2 (4U id 33)
+import alloc
+EM089_BGM_ID1, EM089_BGM_ID2 = alloc.monster('gogmazios')['bgm_ids']   # phase 1 / 2 (4U ids 32 / 33): allocations.toml
 TRACKS = [   # (4U file, GU stream path, 4U dB from bgm_bat.stq, id)
     ('sound/bgm/battle/wav/bgm_em089.mca', 'sound\\bgm\\battle\\wav\\bgm_em089_Gogmazios1', 0.0, EM089_BGM_ID1),
     ('sound/bgm/battle/wav/bgm_em089_2.mca', 'sound\\bgm\\battle\\wav\\bgm_em089_Gogmazios2', -0.9, EM089_BGM_ID2),
