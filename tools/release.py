@@ -5,7 +5,7 @@ never be built in hosted CI: the converters read ~15 GB of 4U / GU data and the 
   release.py check           release checks on the current outputs (exit 1 on any failure)
   release.py package [DIR]   check, then zips + manifest.json into DIR (default dump/release/v<core version>)
   release.py all [DIR]       build + package
-  release.py publish DIR --repo OWNER/NAME [--yes]
+  release.py publish DIR --repo OWNER/NAME [--yes] [--draft]
                              create the GitHub release v<core version> with DIR's files (gh CLI); asks first unless
                              --yes. CI (.github/workflows/installer.yml) then attaches the installer apps to it.
 
@@ -163,18 +163,20 @@ def package(out):
     return out
 
 
-def publish(out, repo, yes):
+def publish(out, repo, yes, draft):
     c = core()
     tag = 'v%s' % c['version']
     files = [os.path.join(out, f) for f in sorted(os.listdir(out))]
     assert any(f.endswith('manifest.json') for f in files), 'no manifest.json in %s' % out
-    print('release %s on %s with %d files:' % (tag, repo, len(files)))
+    print('%srelease %s on %s with %d files:' % ('draft ' if draft else '', tag, repo, len(files)))
     for f in files: print('  ', os.path.basename(f))
     if not yes and input('publish? [y/N] ').strip().lower() != 'y':
         sys.exit('not published')
+    # a draft has no tag yet (GitHub creates it on publishing), so the tag workflow runs then; attach the installer
+    # apps to a draft by hand (gh workflow run installer.yml, then gh release upload)
     subprocess.run(['gh', 'release', 'create', tag, '--repo', repo, '--title', 'MH4U Port %s' % tag,
-                    '--notes', 'MH4U Port %s: install with the MH4U Port installer (attached by CI).' % tag] + files,
-                   check=True)
+                    '--notes', 'MH4U Port %s: install with the MH4U Port installer (attached by CI).' % tag]
+                   + (['--draft'] if draft else []) + files, check=True)
 
 
 def main():
@@ -194,7 +196,7 @@ def main():
         if '--repo' not in a:
             sys.exit('publish needs --repo OWNER/NAME')
         publish(a[1] if len(a) > 1 and not a[1].startswith('--') else default_out, a[a.index('--repo') + 1],
-                '--yes' in a)
+                '--yes' in a, '--draft' in a)
 
 
 if __name__ == '__main__':

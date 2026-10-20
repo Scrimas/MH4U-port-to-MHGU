@@ -12,7 +12,7 @@ pub const TITLE_ID: &str = "0100770008DD8000";
 /// GitHub repository whose latest release is installed (set MH4UPORT_REPO at build time to change it)
 pub const DEFAULT_REPO: &str = match option_env!("MH4UPORT_REPO") {
     Some(r) => r,
-    None => "Scrimas/MH4U_MHGU_port",
+    None => "Scrimas/MH4U-port-to-MHGU",
 };
 const RECORD: &str = "mh4uport-install.json";
 
