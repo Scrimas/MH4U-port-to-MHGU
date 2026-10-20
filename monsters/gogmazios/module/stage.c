@@ -13,7 +13,7 @@
  * Stage requests come from 0x50373c (stage = byte [[0x188ca48]+0x48], set at 0x6c0380 from the quest record of
  * quest ID [[0x188ae38]+0xd68]; release 0x503854).
  *
- * Defines: GOG_QUEST_ID = our quest's ID (task 3); TEST_STAGE_ALIAS = alias EVERY Fortress load (test builds only);
+ * Defines: TEST_STAGE_ALIAS = alias EVERY Fortress load (test builds only);
  *          STAGE_ALIAS_UI (default on, -DNO_STAGE_ALIAS_UI = off) = also redirect the mapUI arcs (kind 49, built by
  *          tools/mapui4u2gu.py) and swap the per-area map records (stage_maprec); STAGE_ALIAS_WHOLEMAP (default on,
  *          -DNO_STAGE_ALIAS_WHOLEMAP = off) = also the language map_com (kind 55, whole map, m28_<lang>.arc built by
@@ -21,17 +21,10 @@
 #include <stdint.h>
 #include "util.h"
 #include "game.h"
-#include "alloc.h"               /* allocations.toml: quests, quest_slots, stage_alias */
+#include "port.h"                /* quest ownership; allocations.toml stage_alias (alloc.h) */
 
 enum { R0, R1, R2, R3, R4, R5, R12, LR, SP0 };   /* SP0 = first stack argument (p2) */
 
-#ifndef GOG_QUEST_ID
-#define GOG_QUEST_ID GOGMAZIOS_QUEST0   /* build_gog_quest.py: G4 Hub quest, romfs/nativeNX/loc/arc/quest/q0011491.arc */
-#endif
-#define GOG_QUEST_SLOT GOGMAZIOS_QUEST_SLOT0  /* quest_group DUMMY placeholder (list index 1412, unused G4 event slot)
-                                                 renamed to ours */
-#define GOG_QUEST2_ID GOGMAZIOS_QUEST1        /* build_gog_quest.py --source m11035: "Advanced: Act of Gog" */
-#define GOG_QUEST2_SLOT GOGMAZIOS_QUEST_SLOT1 /* the section's other DUMMY placeholder (list index 1407) -> quest 2 */
 #define STAGE_FORTRESS  GOGMAZIOS_STAGE_FROM
 #define STAGE_ALIAS     GOGMAZIOS_STAGE_FOLDER   /* folder number of our files: m28d, map_com\m28 */
 #if !defined(NO_STAGE_ALIAS_UI) && !defined(STAGE_ALIAS_UI)
@@ -41,13 +34,9 @@ enum { R0, R1, R2, R3, R4, R5, R12, LR, SP0 };   /* SP0 = first stack argument (
 #define STAGE_ALIAS_WHOLEMAP
 #endif
 
-/* Quest ID sources (static trace, notes/stage.md section 9):
- *  - [[0x188ae38]+0xd68] = the ACCEPTED quest: written by the board accept 0x784e94 (0x784ec8), read by the quest
- *    start state machine 0x5d74 (q%07d.arc request 0x60d0, stage byte 0x6c0380 via 0x3bd2a8), and CLEARED at
- *    0x7608 right after the quest setup 0x3ade34 -> reads 0 from then on (the old logs).
- *  - [[0x188ad90]+0xe0] = the RUNNING quest: set by the setup 0x3ade34 (0x3adf1c, from questData record +8), cleared
- *    at quest end (0x39f230). The setup and the spawn loader 0x3adbcc work on this object (r4).
- * gog_quest_id() = the first while it is set, else the second: valid from accept to quest end. */
+/* Quest IDs (module/port.c port_quest_id, static trace in notes/stage.md section 9): [[0x188ae38]+0xd68] = the
+ * ACCEPTED quest until the setup 0x3ade34 clears it, then [[0x188ad90]+0xe0] = the RUNNING quest until quest end.
+ * Both are logged by the stage path hook. */
 #define QUESTSEL_PTR    0x188ae38u
 #define QUESTSEL_ID     0xd68u
 #define QUESTRUN_PTR    0x188ad90u
@@ -59,17 +48,13 @@ static uint32_t quest_id(uint32_t ptr_word, uint32_t field)
     return q ? FIELD(uint32_t, q, field) : 0;
 }
 
-uint32_t gog_quest_id(void)
-{
-    uint32_t id = quest_id(QUESTSEL_PTR, QUESTSEL_ID);
-    return id ? id : quest_id(QUESTRUN_PTR, QUESTRUN_ID);
-}
+uint32_t gog_quest_id(void) { return port_quest_id(); }
 
-/* 1 = quest 11491 (4U m11014), 2 = quest 11492 (4U m11035), 0 = another quest or none */
+/* 1 = quest 11491 (4U m11014), 2 = quest 11492 (4U m11035) while Gogmazios is installed, 0 = another quest or none */
 int gog_quest_index(void)
 {
-    uint32_t id = gog_quest_id();
-    return (GOG_QUEST_ID && id == GOG_QUEST_ID) ? 1 : id == GOG_QUEST2_ID ? 2 : 0;
+    int which, m = port_running_quest(&which);
+    return m == GOGMAZIOS_PORT ? which + 1 : 0;
 }
 
 int stage_alias_active(void)
@@ -209,68 +194,4 @@ int stage_gimmicks_c(uint32_t *regs)
     return 0;
 }
 
-/* ---- the extra quest (notes/stage.md section 8) ----
- * quest_group (loc/arc/village/common.arc) in memory: [[0x188ad90]+0xb4], count +0x64, entries +0x6c (12 B: +4 quest
- * ID, +8 group byte). The loader step 0x3b7de8 walks it and loads loose questData_%07d.ext for Hub G-rank IDs, then
- * 0x3bb318 sorts them onto the star boards. We rename unused DUMMY entries to our IDs (nothing real is replaced). */
-static void gog_quest_group(void)
-{
-    static const uint32_t slot[2] = {GOG_QUEST_SLOT, GOG_QUEST2_SLOT}, ours[2] = {GOG_QUEST_ID, GOG_QUEST2_ID};
-    uint32_t mgr = *(volatile uint32_t *)MAIN(QUESTRUN_PTR), grp, n, e, i, k;
-    if (!mgr || !(grp = FIELD(uint32_t, mgr, 0xb4))) return;
-    n = FIELD(uint32_t, grp, 0x64);
-    e = FIELD(uint32_t, grp, 0x6c);
-    if (!e) return;
-    for (i = 0; i < n; i++) {
-        volatile uint8_t *p = (volatile uint8_t *)(uintptr_t)(e + 12 * i);
-        uint32_t id = *(volatile uint32_t *)(p + 4);
-        for (k = 0; k < 2; k++) {
-            if (id != slot[k] || !ours[k]) continue;
-            *(volatile uint32_t *)(p + 4) = ours[k];
-            p[8] = 0;                                  /* group: regular */
-            logf("gogport: quest_group entry %u: %u -> %u", i, slot[k], ours[k]);
-        }
-    }
-}
-
-/* 0x3b7de8: quest list loader step (runs repeatedly; the rename is idempotent) */
-int quest_group_fix_c(uint32_t *regs)
-{
-    (void)regs;
-    gog_quest_group();
-    return 0;
-}
-
-/* 0x388d40(this): the results scene's clear write (results state machine 0x384848 -> 0x384af0 -> 0x384f8c): looks
- * the running quest [mgr+0xe0] up in the quest list and sets its bit in the cleared map [0x1897f78]+0x42c (0x523f30;
- * failed map +0x62c via 0x526b98 on state 4). The results scene loads its own fresh list (0x6a1f64 -> 0x3b190c) that
- * the loader-step rename never sees, so 11491 was not found and the clear went to bit 0 (quest-clear helper, C).
- * Renaming here puts it at index 1412 (11492 at 1407), the bit the village board and the Hunter's Notes read. */
-int quest_clear_fix_c(uint32_t *regs)
-{
-    (void)regs;
-    gog_quest_group();
-    return 0;
-}
-
-/* 0x3b2174(_, id) -> bool: "quest unlocked?" (script check_quest_unlocked has no rule for our ID) */
-int quest_unlocked_c(uint32_t *regs)
-{
-    if (regs[R1] != GOG_QUEST_ID && regs[R1] != GOG_QUEST2_ID) return 0;
-    regs[R0] = 1;
-    return 1;
-}
-
-/* 0x7ca340(out, const char *s, n): UTF-8 helper (8 callers), strlen(s) first. Abandoning the quest crashed here
- * with s = NULL while the quest setup had been skipped (null questLink, fixed in the arc layout). Safety net: a null
- * string becomes "" (the helper's own length-0 path), logged with the caller so a remaining source can be found. */
-int utf8_null_guard_c(uint32_t *regs)
-{
-    static const char empty[1];
-    static uint32_t s_n;
-    if (regs[R1]) return 0;
-    regs[R1] = (uint32_t)(uintptr_t)empty;
-    if (++s_n <= 20) logf("gogport: null string to 0x7ca340 from lr=%x (quest %u)", regs[LR] - MAIN_BASE,
-                          gog_quest_id());
-    return 0;
-}
+/* the quests themselves (board slots, unlock, clear write) are core: module/quest.c */

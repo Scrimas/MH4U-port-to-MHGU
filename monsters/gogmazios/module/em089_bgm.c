@@ -33,8 +33,8 @@ typedef void *(*unit_by_key_t)(void *mgr, uint32_t key);   /* unit whose rec+0x1
 #define unit_by_key FN(unit_by_key_t, 0x5cf90)
 typedef void *(*file_res_t)(void *unused, uint32_t file_id);   /* loaded resource by file ID (our file_id hook) */
 #define fileResource FN(file_res_t, 0x152960)
-/* = em089_files.inc EM089_FILE_BGM_STQR (that .inc defines globals and is included by main.c only): the arc entry
- * sound\bgm\battle\bgm_em089 (rSoundStreamRequest, tools/snd_bgm.py build_em089_stqr) */
+/* the arc entry sound\bgm\battle\bgm_em089 (rSoundStreamRequest, tools/snd_bgm.py build_em089_stqr): file ID from
+ * build_em089_arc.py (asserted there; IDs only ever grow), served by module/port.c from the data file */
 #define EM089_FILE_BGM_STQR 0x10725u
 
 int gog_quest_index(void);     /* stage.c: 1 / 2 = our quests 11491 / 11492, 0 = other */

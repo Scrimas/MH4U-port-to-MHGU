@@ -2,9 +2,8 @@
  * Stage 1: inert monster (base behaviour), so the spawn path, files and registration can be tested. */
 #include "game.h"
 #include "util.h"
-#include "em089.h"
-#include "em089_files.inc"   /* em089_manifest (reg_files[137]) + file-ID table, from tools/build_em089_arc.py */
-#include "em089_tar.h"       /* tar material animations (tar agent) */
+#include "em089.h"           /* its files: data file section FILE, served by module/port.c (file_id) */
+#include "em089_tar.h"      /* tar material animations (tar agent) */
 #include "em089_break.h"     /* part breaks, tail sever (break agent) */
 #include "em089_snd.h"       /* code-triggered sounds (sound agent) */
 #include "em089_efx.h"       /* effect posts, slot 75 (effects agent) */
@@ -125,24 +124,6 @@ static MtDTI *em089_get_dti(void *self)
 
 MtDTI *em089_dti(void) { return &g_em089_dti; }
 
-/* hook 0x152960(_, fileId) -> resource. The game indexes its (path hash, type) table with IDs up to 0x106d0,
- * then tail-calls mgr->vt[0x38/4](mgr, <that function>, hash, type); IDs from EM089_FILE_ID_BASE are ours. */
-int file_id_c(uint32_t *regs)
-{
-    uint32_t k = regs[1] - EM089_FILE_ID_BASE;
-    if (k >= EM089_FILE_COUNT) return 0;
-    void *mgr = *(void **)MAIN(0x2126a64);                /* behind GOT 0x1839450 */
-    typedef void *(*find_t)(void *, uint32_t, uint32_t, uint32_t);
-    find_t find = (*(find_t **)mgr)[0x38 / 4];
-    regs[0] = (uint32_t)find(mgr, (uint32_t)find, em089_files[k].hash, em089_files[k].type);
-    static uint32_t s_logged[(EM089_FILE_COUNT + 31) / 32], s_misses;
-    if (!(s_logged[k / 32] & (1u << (k % 32))) || (!regs[0] && ++s_misses <= 40)) {   /* first lookup, misses */
-        s_logged[k / 32] |= 1u << (k % 32);
-        logf("gogport: file %x (hash %x type %x) -> %x lr=%x", regs[1], em089_files[k].hash, em089_files[k].type,
-             regs[0], regs[7] - MAIN_BASE);
-    }
-    return 1;
-}
 void *em089_create_object(void) { return em089_new_instance(&g_em089_dti); }
 
 void em089_register_class(void)

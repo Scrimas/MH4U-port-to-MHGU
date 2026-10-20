@@ -10,6 +10,7 @@ set -u
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 R=$ROOT/ryuroot
 GAME=${GAME:-"$HOME/Switch Games/Monster Hunter Generations Ultimate  [0100770008dd8000][v0].nsp"}
+MOD="$R/mods/contents/0100770008dd8000/MH4U Port"     # = module/build.py MOD_NAME (PORT_ASSETS passes through)
 
 ryu_pids() {   # only Ryujinx processes running on our root dir (the gui launch's /proc/PID/exe is unreadable: cmdline)
     for p in /proc/[0-9]*; do
@@ -28,7 +29,7 @@ stop() {
 
 run() {   # foreground: launch via the Bash tool with run_in_background
     [ -n "$(ryu_pids)" ] && { echo "test Ryujinx already running"; exit 1; }
-    case " $* " in *" --nomod "*) rm -rf "$R/mods/contents/0100770008dd8000/Gogmazios Port";;
+    case " $* " in *" --nomod "*) rm -rf "$MOD";;
         *) python3 -I "$ROOT/module/build.py" install || exit 1;; esac
     mkdir -p "$R/run"
     SDL_VIDEO_DRIVER=offscreen SDL_AUDIO_DRIVER=pulseaudio exec ryujinx --no-gui --root-data-dir "$R" --enable-gdb-stub \
@@ -38,7 +39,7 @@ run() {   # foreground: launch via the Bash tool with run_in_background
 
 gui() {   # windowed run on hidden workspace 10 (headless mode aborts ~1.5 s in); killed if it lands elsewhere
     [ -n "$(ryu_pids)" ] && { echo "test Ryujinx already running"; exit 1; }
-    case " $* " in *" --nomod "*) rm -rf "$R/mods/contents/0100770008dd8000/Gogmazios Port";;
+    case " $* " in *" --nomod "*) rm -rf "$MOD";;
         *) python3 -I "$ROOT/module/build.py" install || exit 1;; esac
     hyprctl eval "hl.exec_cmd([[env AVALONIA_GLOBAL_SCALE_FACTOR=1.5 SDL_AUDIO_DRIVER=pulseaudio ryujinx --root-data-dir $R \"$GAME\"]], { workspace = '10 silent', no_initial_focus = true })" >/dev/null
     for i in $(seq 1 40); do

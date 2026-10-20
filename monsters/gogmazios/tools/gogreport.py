@@ -25,7 +25,8 @@ def handler_table():
 def main():
     path = sys.argv[1] if len(sys.argv) > 1 else max(glob.glob(LOGS), key=os.path.getmtime)
     lines = open(path, errors='replace').read().splitlines()
-    gog = [(l[:12], l.split('gogport: ', 1)[1]) for l in lines if 'gogport: ' in l]
+    gog = [(l[:12], re.split(r'(?:gog|mh4u)port: ', l, maxsplit=1)[1]) for l in lines
+           if re.search(r'(?:gog|mh4u)port: ', l)]
     print('log:', path)
     end = lines[-1][:12] if lines else '?'
 

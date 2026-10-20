@@ -1,6 +1,7 @@
-"""ui_em089.py : HUD icon + name of Gogmazios (registry index 137) as RomFS additions. See notes/data.md.
+"""ui_em089.py : name (data file section NAME, gen/NAME-ui.sec) and HUD icon art of Gogmazios (registry index 137).
+See notes/data.md.
 
-  ui_em089.py            write monsters/gogmazios/romfs/nativeNX/<lang>/GUI/... for eng fre ger ita spa
+  ui_em089.py            write the NAME section
   ui_em089.py preview    also save the patched atlases as PNG into the scratch dir given by $UI_PREVIEW
 
 Icon: reg_icon[137] (module/build.py ICON_EM089) = UI index 141. The icon setter 0x56ef50 picks atlas
@@ -12,9 +13,8 @@ Source: MH4U eng core_common.arc `cmn_micon_BM_MQ_NOMIP` cell (row 0, col 8), 36
 
 Name: monsterName_<lang>.gmd entry k = registry index k (0x55bc4c(mgr, 3, k)); entry 137 starts a second list
 (Rathian), so index 137 cannot use it. Entry 105 'dummy1' (index 105 = unused code 0x1064) becomes 'Gogmazios'
-and the module hook name_index (0x55bda4, id -> name index) maps 137 -> 105.
-GMD v0x010302: strings are the last <u32 @0x20> bytes, NUL-separated, no offset table -> only that size changes.
-Base: the v1.0 RomFS (MHGU_Editor scratch); v1.4's copies could not be read (no NCA keys here).
+and the module hook name_index (0x55bda4, id -> name index) maps 137 -> 105. The rename happens in the loaded GMD
+(module/items.c, string pointer replaced while it still reads 'dummy1'), so GU's v1.4 file stays in use.
 """
 import os, struct, sys
 import numpy as np
@@ -27,11 +27,10 @@ sys.path.insert(0, HERE)
 import paths
 sys.path.insert(0, paths.GU_PY)
 from romfs import RomFS
-import arcpack, tex
+import arcpack, portdata, tex
 
 GU_ROMFS = paths.GU_ROMFS
 SRC_4U = os.path.join(ROOT, 'dump/romfs/eng/data/core_common.arc')
-OUT = os.environ.get('UI_OUT', os.path.join(MON, 'romfs/nativeNX'))   # UI_OUT: dry run elsewhere
 LANGS = ('eng', 'fre', 'ger', 'ita', 'spa')
 import alloc
 ALLOC = alloc.monster('gogmazios')
@@ -75,48 +74,29 @@ def patch_atlas(t, x, y, icon):
     return out, tex.decode(out)
 
 
-def gmd_set(d, k, text):
-    assert d[:4] == b'GMD\0' and struct.unpack_from('<I', d, 4)[0] == 0x00010302
-    ss = struct.unpack_from('<I', d, 0x20)[0]
-    sc = struct.unpack_from('<I', d, 0x18)[0]
-    body = d[len(d) - ss:]
-    parts = body.split(b'\0')
-    assert len(parts) == sc + 1 and parts[-1] == b'', 'unexpected string section'
-    parts[k] = text.encode('utf-8')
-    nb = b'\0'.join(parts)
-    out = bytearray(d[:len(d) - ss] + nb)
-    struct.pack_into('<I', out, 0x20, len(nb))
-    return bytes(out)
 
 
 def main():
+    """NAME section: module/items.c renames monsterName entry NAME_ENTRY ('dummy1') in the loaded GMD, so no GMD copy
+    ships (two monsters would replace the same file). The loose HD_cmn_micon atlases are not written any more: GU
+    reads the icons from resident_<lang>.arc only (ui_icon_hdui.py patches the user's HD UI copy); `preview` still
+    saves the patched atlas as PNG."""
     rom = RomFS(GU_ROMFS)
-    icon = icon_4u()
-    atlas, x, y = gu_icon_cell(ICON_UI_INDEX)
     preview = os.environ.get('UI_PREVIEW') if 'preview' in sys.argv else None
     sys.path.insert(0, paths.GU_PY)
     import gmd
     for lang in LANGS:
-        rel = '%s/GUI/99_texture/HD_cmn_micon%02d_BM_MQ_NOMIP.tex' % (lang, atlas)
-        t = rom.read('/nativeNX/' + rel)
-        new, img = patch_atlas(t, x, y, icon)
-        old = tex.decode(t)
-        mask = np.ones(old.shape[:2], bool); mask[y:y + CELL, x:x + CELL] = False
-        assert (old[mask] == img[mask]).all(), 'pixels outside the cell changed'
-        os.makedirs(os.path.dirname(os.path.join(OUT, rel)), exist_ok=True)
-        open(os.path.join(OUT, rel), 'wb').write(new)
-        if preview: tex.save_png(img, os.path.join(preview, 'micon%02d_%s.png' % (atlas, lang)))
-
-        rel = '%s/GUI/06_msg/monsterName_%s.gmd' % (lang, lang)
-        d = rom.read('/nativeNX/' + rel)
-        s0 = gmd.gmd_strings(d)
+        s0 = gmd.gmd_strings(rom.read('/nativeNX/%s/GUI/06_msg/monsterName_%s.gmd' % (lang, lang)))
         assert s0[NAME_ENTRY] == 'dummy1', (lang, s0[NAME_ENTRY])
-        nd = gmd_set(d, NAME_ENTRY, NAME)
-        s1 = gmd.gmd_strings(nd)
-        assert s1[NAME_ENTRY] == NAME and all(a == b for i, (a, b) in enumerate(zip(s0, s1)) if i != NAME_ENTRY)
-        os.makedirs(os.path.dirname(os.path.join(OUT, rel)), exist_ok=True)
-        open(os.path.join(OUT, rel), 'wb').write(nd)
-        print('%s: icon -> micon%02d (%d, %d), name entry %d = %r' % (lang, atlas, x, y, NAME_ENTRY, NAME))
+    sec = portdata.Section('NAME')
+    sec.u32(NAME_ENTRY)
+    for lang in LANGS: sec.str(NAME)
+    print('wrote', portdata.write_section('gogmazios', sec, 'ui'), '(name entry %d = %r)' % (NAME_ENTRY, NAME))
+    if preview:
+        atlas, x, y = gu_icon_cell(ICON_UI_INDEX)
+        for lang in LANGS:
+            t = rom.read('/nativeNX/%s/GUI/99_texture/HD_cmn_micon%02d_BM_MQ_NOMIP.tex' % (lang, atlas))
+            tex.save_png(patch_atlas(t, x, y, icon_4u())[1], os.path.join(preview, 'micon%02d_%s.png' % (atlas, lang)))
 
 
 if __name__ == '__main__':

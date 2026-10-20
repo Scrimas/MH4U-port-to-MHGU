@@ -1,8 +1,9 @@
-"""gear_em089.py : Gogma armor (+ the Arcana skill) as records appended to GU's loaded tables -> gen/gear_em089.inc
-(module/gear.c). See notes/content-plan.md "Armor and weapons" / "Skills".
+"""gear_em089.py : Gogma armor (+ the Arcana skill and jewels) as records appended to GU's loaded tables -> data file
+sections TBLA / TXTA / SKIL (gen/*-armor.sec, tools/portdata.py; module/gear.c). See notes/content-plan.md "Armor and
+weapons" / "Skills".
 
-  gear_em089.py          write monsters/gogmazios/gen/gear_em089.inc
-  gear_em089.py show     print what would be written
+  gear_em089.py          write the sections
+  gear_em089.py show     print them only
 
 GU tables (file formats, MHGU_Editor docs/07 + this tool's checks; every new record starts from a GU record):
   armorSeriesData (resident.arc, 127 B): +0 u32 ID, +4 u16 sort, +6 5 x enabled part, +11 u16 model, +13 male,
@@ -47,7 +48,7 @@ sys.path.insert(0, os.path.join(ROOT, 'tools'))     # core converters + paths.py
 sys.path.insert(0, HERE)
 import paths
 sys.path.insert(0, paths.GU_EDITOR_TOOLS)
-import arc
+import arc, portdata
 import items_em089
 from items_em089 import lmd
 from build_assets import RomFS, arc as gu_arc, gmd
@@ -55,8 +56,17 @@ from build_assets import RomFS, arc as gu_arc, gmd
 GU_ROMFS = paths.GU_ROMFS
 EXE = os.path.join(ROOT, 'dump/exefs_v11/mem.bin')
 EXE_BASE = 0x100000
-OUT = os.path.join(MON, 'gen/gear_em089.inc')
 LANGS = items_em089.LANGS
+# GU table classes (main offsets: element alloc / free / ctor / parse, in-memory element size; module/gear.c)
+CLS_ARMOR_SERIES = (0xd4768, 0xd47a4, 0xd47d0, 0xd75fc, 140)
+CLS_ARMOR_CREATE = (0x4a7f4c, 0x4a7f88, 0x4a7fb4, 0x4a8c68, 48)
+CLS_ARMOR_PROCESS = (0x4a94f8, 0x4a9534, 0x4a9560, 0x4aa02c, 44)
+CLS_SKILL_TYPE = (0x4cd4e0, 0x4cd51c, 0x4cd548, 0x4cda28, 24)
+CLS_SKILL = (0x4cc3fc, 0x4cc438, 0x4cc464, 0x4ccc10, 24)
+CLS_DECO = (0x184140, 0x18417c, 0x1841a8, 0x184484, 12)
+CLS_DECO_CREATE = (0x4aacd4, 0x4aad10, 0x4aad3c, 0x4ab294, 20)
+# Enlightened Blade (4U: Awaken + Element Atk Up + Status Atk Up): GU skill checks answer yes for these (SKIL)
+SKILL_GRANTS = (76, 79)                  # Element Atk Up, Status Atk +1 (GU has no Awaken)
 
 SERIES_FIRST, TREE_ID, SKILL_ID = 1287, 206, 328
 TEMPLATE = (1054, 1055)                  # GU Akantor Mask X / Fangs X
@@ -132,9 +142,14 @@ def c_bytes(b, per=16):
     return ',\n'.join('    ' + ', '.join('0x%02x' % x for x in b[i:i + per]) for i in range(0, len(b), per))
 
 
-def c_str(s):
+def gu_str(s):
+    """4U gear / notes text as GU stores it (CRLF line breaks); markup tags refused"""
     if '\0' in s: sys.exit('4U text with a markup tag: %r' % s)
-    s = s.replace('\r\n', '\n').replace('\n', '\r\n')
+    return s.replace('\r\n', '\n').replace('\n', '\r\n')
+
+
+def c_str(s):
+    s = gu_str(s)
     return '"' + s.replace('\\', '\\\\').replace('"', '\\"').replace('\r', '\\r').replace('\n', '\\n') + '"'
 
 
@@ -147,7 +162,7 @@ def main():
     st4 = text4u('eng')['skillType']
     series = res['table\\armorSeriesData']
     assert struct.unpack_from('<I', series, 4)[0] == SERIES_FIRST
-    out = []
+    tables, texts = [], []          # TBLA / TXTA entries (tools/portdata.py)
 
     # ---- armor series: Blademaster, Gunner
     recs = []
@@ -173,11 +188,10 @@ def main():
         r[106] = DEF_GU[p[0]['defense']]
         r[108:113] = bytes(x['slots'] for x in p)
         recs.append(bytes(r))
-    out.append('#define GEAR_SERIES_FIRST %d   /* = the GU v1.0 armorSeriesData count */' % SERIES_FIRST)
-    out.append('static const uint8_t gear_armor_series[2 * 127] = {   /* Gogma Blademaster, Gunner */\n%s\n};'
-               % c_bytes(b''.join(recs)))
+    tables.append(dict(path='table\\armorSeriesData', cls=CLS_ARMOR_SERIES, rec_bytes=127, base=SERIES_FIRST,
+                       records=b''.join(recs)))                         # Gogma Blademaster, Gunner
 
-    # ---- names: 10 strings per series, 5 languages
+    # ---- names: 10 strings per series (Blademaster then Gunner: 5 names, 5 descriptions), 5 languages
     text = []
     for lang in LANGS:
         t = text4u(lang)
@@ -185,9 +199,8 @@ def main():
         for g in range(2):
             strs += [t[part + 'Name'][k0 + g] for part, _, k0 in PARTS_4U]
             strs += [t[part + 'Exp'][exp_4u(exe, EXP_4U[part], k0 + g)] for part, _, k0 in PARTS_4U]
-        text.append('    { /* %s */\n%s\n    },' % (lang, ',\n'.join('        ' + c_str(s) for s in strs)))
-    out.append('static const char *const gear_armor_text[%d][20] = {   /* Blademaster then Gunner: 5 names, 5 '
-               'descriptions */\n%s\n};' % (len(LANGS), '\n'.join(text)))
+        text.append([gu_str(s) for s in strs])
+    texts.append(('armorSeriesData', SERIES_FIRST * 10, text))
 
     # ---- create recipes, one per part
     crt = []
@@ -202,8 +215,11 @@ def main():
             struct.pack_into('<HB', r, 10 + 4 * k, names[name], cnt)   # the flag byte (+13 on the first) stays
         struct.pack_into('<H', r, 30, SCRAP)
         crt.append(bytes(r))
-    out.append('static const uint8_t gear_armor_create[5][42] = {   /* armorCreateA00..A04 */\n%s\n};'
-               % ',\n'.join('  {\n%s\n  }' % c_bytes(r) for r in crt))
+    # the counts GU's tables hold before the append (GU v1.0 RomFS = v1.4 as far as checked)
+    cnt = lambda d: struct.unpack_from('<I', d, 4)[0]
+    for part in range(5):
+        tables.append(dict(path='table\\armorCreateA%02d' % part, cls=CLS_ARMOR_CREATE, rec_bytes=42,
+                           base=cnt(bs['table\\armorCreateA%02d' % part]), records=crt[part]))
 
     # ---- level rows
     t = bs['table\\armorProcessA00']
@@ -222,28 +238,23 @@ def main():
                     struct.pack_into('<H', r, 10 + 3 * k, names[LEVEL_SWAP[it_names[item]]])
                 assert not item or 'Akantor' not in it_names.get(item, ''), it_names.get(item)
             lv.append(bytes(r))
-    out.append('#define GEAR_ARMOR_LEVELS %d\nstatic const uint8_t gear_armor_process[GEAR_ARMOR_LEVELS][38] = {\n%s\n};'
-               % (len(lv), ',\n'.join('  {\n%s\n  }' % c_bytes(r) for r in lv)))
-    # the counts module/gear.c expects before appending (GU v1.0 RomFS = v1.4 as far as checked)
-    cnt = lambda d: struct.unpack_from('<I', d, 4)[0]
-    out.append('static const uint16_t gear_create_count[5] = {%s};\n#define GEAR_PROCESS_COUNT %d'
-               % (', '.join(str(cnt(bs['table\\armorCreateA%02d' % p])) for p in range(5)), cnt(t)))
+    tables.append(dict(path='table\\armorProcessA00', cls=CLS_ARMOR_PROCESS, rec_bytes=38, base=cnt(t),
+                       records=b''.join(lv)))
 
     # ---- Arcana tree + Enlightened Blade
     tt = res['table\\skillTypeData']; ts = res['table\\skillData']
     assert struct.unpack_from('<I', tt, 4)[0] == TREE_ID and struct.unpack_from('<I', ts, 4)[0] == SKILL_ID
     tree = struct.pack('<IB7H', TREE_ID, 0, 0, 0, 0, SKILL_ID, SKILL_ID, SKILL_ID, SKILL_ID)
     skill = struct.pack('<I', SKILL_ID) + ts[8 + 18 * ELEMENTALITY + 4: 8 + 18 * (ELEMENTALITY + 1)]
-    out.append('#define GEAR_TREE_ID %d\n#define GEAR_SKILL_ID %d\n'
-               'static const uint8_t gear_skilltype[19] = {\n%s\n};\nstatic const uint8_t gear_skill[18] = {\n%s\n};'
-               % (TREE_ID, SKILL_ID, c_bytes(tree), c_bytes(skill)))
-    sk = []
-    for lang in LANGS:
-        t4 = text4u(lang)
-        sk.append('    {%s, %s, %s, %s},' % (c_str(t4['skillType'][ARCANA_4U]), c_str(t4['skillTypeExp'][ARCANA_4U]),
-                                            c_str(t4['skillName'][ENLIGHTENED_4U]), c_str(t4['skillExp'][ENLIGHTENED_4U])))
-    out.append('static const char *const gear_skill_text[%d][4] = {   /* tree name, tree description, skill name, '
-               'skill description */\n%s\n};' % (len(LANGS), '\n'.join(sk)))
+    tables.append(dict(path='table\\skillTypeData', cls=CLS_SKILL_TYPE, rec_bytes=19, base=TREE_ID, records=tree))
+    tables.append(dict(path='table\\skillData', cls=CLS_SKILL, rec_bytes=18, base=SKILL_ID, records=skill))
+    t4 = [text4u(lang) for lang in LANGS]     # tree name + description, skill name + description
+    texts.append(('skillTypeData', TREE_ID * 2, [[gu_str(t['skillType'][ARCANA_4U]),
+                                                  gu_str(t['skillTypeExp'][ARCANA_4U])] for t in t4]))
+    texts.append(('skillData', SKILL_ID * 2, [[gu_str(t['skillName'][ENLIGHTENED_4U]),
+                                              gu_str(t['skillExp'][ENLIGHTENED_4U])] for t in t4]))
+    skil = portdata.Section('SKIL')       # Enlightened Blade answers yes for SKILL_GRANTS (module/gear.c)
+    skil.u32(1, SKILL_ID, *(SKILL_GRANTS + (0xFFFFFFFF,) * (3 - len(SKILL_GRANTS))))
 
     # ---- Arcane jewels (items_em089.DECOS): decoData record k = item 2638 + k, so they append at the table's end
     dd, dc = res['table\\decoData'], bs['table\\decoCreate']
@@ -257,19 +268,14 @@ def main():
         crt += bytes(12 - 3 * len(DECO_RECIPES[k4]))
     assert all(struct.unpack_from('<H', dc, 8 + 16 * k + 2)[0] == DECO_RANK for k in range(cnt(dc))
                if struct.unpack_from('<H', dc, 8 + 16 * k)[0] in (names['Element Jwl 1'], names['Element Jwl 3']))
-    n = len(items_em089.DECOS)
-    out.append('#define GEAR_DECOS %d\n#define GEAR_DECO_COUNT %d\n#define GEAR_DECO_CREATE_COUNT %d\n'
-               'static const uint8_t gear_deco[GEAR_DECOS * 5] = {   /* decoData: size, tree, points, tree, points */\n'
-               '%s\n};\nstatic const uint8_t gear_deco_create[GEAR_DECOS * 16] = {   /* decoCreate */\n%s\n};'
-               % (n, cnt(dd), cnt(dc), c_bytes(deco, 5), c_bytes(crt)))
+    tables.append(dict(path='table\\decoData', cls=CLS_DECO, rec_bytes=5, base=cnt(dd), records=deco))
+    tables.append(dict(path='table\\decoCreate', cls=CLS_DECO_CREATE, rec_bytes=16, base=cnt(dc), records=crt))
 
-    src = '/* generated by tools/gear_em089.py from 4U v1.1 and GU v1.0 template records: do not edit */\n' + \
-          '\n'.join(out) + '\n'
+    secs = [portdata.tbla(tables), portdata.txta(texts), skil]
     if sys.argv[1:] == ['show']:
-        print(src)
+        for s in secs: print(s.tag, portdata.decode(s.tag, s.bytes()))
         return
-    open(OUT, 'w', encoding='utf-8').write(src)
-    print('wrote', OUT)
+    for s in secs: print('wrote', portdata.write_section('gogmazios', s, 'armor'))
 
 
 if __name__ == '__main__':
