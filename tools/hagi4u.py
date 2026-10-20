@@ -9,6 +9,10 @@ GU format (346 B, MHGU_Editor tools/monster_carves.py; rHagi load 0x39ad9c check
   s1 Low, s2 High, s4 G rank; a rank the monster is not in holds GU's filler (one First-aid Med 1716 at 100 %).
 4U v1.1 (dump/exefs_v11/mem.bin, loaded at 0x100000): body, tail and shiny arrays of 16-byte per-monster records
 {low, high, G, filler} pointing at tables in GU's own entry format (filler column = 4U's First-aid Med 769 or null).
+These records are slots of one pointer table (0x926044, 0x911f58): u32 [TABLES_4U + 4 * idx], idx = base + rank
+(1 low, 2 high, 3 G; the "filler" column is the next base's rank 0). Carve point c of monster em: 16-B records
+from u32 [CARVE_POINTS_4U + 4 * em], u16 +0 = base (carve_record_4u); shiny drop set s: base = u16 [SHINY_4U + 2 * em]
++ 4 * s (shiny_record_4u).
 """
 import os, struct, sys
 
@@ -20,6 +24,7 @@ KIND_BYTE = {'tail': 8 + 3 * 0, 'broken': 8 + 3 * 1, 'shiny': 8 + 3 * 2}   # set
 FILLER = 1716                                            # GU First-aid Med
 FILLER_4U = 769                                          # 4U First-aid Med
 SIZE, ENTRIES, SPARE = 346, 80, 14                       # u16 = used entries + 14, as GU's filler (2 + 14)
+TABLES_4U, CARVE_POINTS_4U, SHINY_4U = 0x1002a5c, 0x1003bec, 0x1003ddc
 
 
 def table_4u(exe, a):
@@ -35,6 +40,18 @@ def table_4u(exe, a):
 def record_4u(exe, rec):
     """a 16-byte per-monster record -> (low, high, G, filler) table addresses (0 = none)"""
     return struct.unpack_from('<4I', exe, rec - EXE_BASE)
+
+
+def carve_record_4u(exe, em, point=0):
+    """address of the record_4u record of 4U monster em's carve point `point`"""
+    pts = struct.unpack_from('<I', exe, CARVE_POINTS_4U + 4 * em - EXE_BASE)[0]
+    base = struct.unpack_from('<H', exe, pts + 16 * point - EXE_BASE)[0]
+    return TABLES_4U + 4 * (base + 1)
+
+
+def shiny_record_4u(exe, em, set_=0):
+    """address of the record_4u record of 4U monster em's shiny drop set `set_`"""
+    return TABLES_4U + 4 * (struct.unpack_from('<H', exe, SHINY_4U + 2 * em - EXE_BASE)[0] + 4 * set_ + 1)
 
 
 def hagi(tables, index):

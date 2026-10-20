@@ -86,10 +86,12 @@ def rem_4u(q, row, gu_item):
     groups, then each group's {u16 item, u8 count, u8 chance} entries closed by {0, 0, 0xFF}. A 4U row is one group;
     condition 1 = the plain groups of GU's rows A / B (q0011413 rem_130240 adds a condition-4 group, rem_230088 not).
     gu_item(4U id) -> GU id or None: a 4U item with no GU item is left out and its chance goes to the row's most likely
-    item (the row stays 100 %)."""
+    item (the row stays 100 %). 4U list flags: 0x8000, or 0x8003 on 130 of the 4U row-B lists (gathering items, ores,
+    spheres; meaning not traced) -> condition 1 too: GU's hunts put that kind of row B under condition 1 (G Zamtrios
+    11207: spheres, charms, jewels); GU's condition-2 rows B are on its other quest types."""
     lst = struct.unpack_from('<I', q, row)[0]
     flags, off = struct.unpack_from('<II', q, lst)
-    assert flags == 0x8000 and struct.unpack_from('<H', q, lst + 8)[0] == 0xFFFF, 'unexpected 4U reward list'
+    assert flags in (0x8000, 0x8003) and struct.unpack_from('<H', q, lst + 8)[0] == 0xFFFF, 'unexpected 4U reward list'
     ents, lost = [], 0
     while struct.unpack_from('<H', q, off)[0] != 0xFFFF:
         chance, item, count = struct.unpack_from('<HHH', q, off)

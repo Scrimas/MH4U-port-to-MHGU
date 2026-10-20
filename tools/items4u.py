@@ -134,19 +134,19 @@ class Materials:
 
 def breaks(exe, table, ptr, conds, gu_item):
     """4U break reward groups at `table` (checked against the pointer at `ptr`): 6-byte {u16 chance, u16 item, u16
-    count}, each group closed by 0xFFFF, one group per GU condition in `conds` -> [(GU cond, [(chance, count, GU
-    item)])]"""
+    count}, each group closed by 0xFFFF, one group per GU condition in `conds` (None: a 4U group GU has no part for,
+    left out) -> [(GU cond, [(chance, count, GU item)])]"""
     assert struct.unpack_from('<I', exe, ptr - EXE_BASE)[0] == table
     out, a = [], table - EXE_BASE
     for cond in conds:
         ents = []
         while struct.unpack_from('<H', exe, a)[0] != 0xFFFF:
             chance, item, count = struct.unpack_from('<HHH', exe, a)
-            ents.append((chance, count, gu_item(item)))
+            ents.append((chance, count, item))
             a += 6
         a += 2
         assert sum(e[0] for e in ents) == 100, ents
-        out.append((cond, ents))
+        if cond is not None: out.append((cond, [(c, n, gu_item(item)) for c, n, item in ents]))
     return out
 
 

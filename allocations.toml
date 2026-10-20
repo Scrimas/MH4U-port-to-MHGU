@@ -101,8 +101,8 @@ name_entry = 106
 notes_entry = 124
 items = [2986, 2990]                    # 4U 1357..1361 (T.Zamtrios Shard, Piel, Grandfin, Sawtooth+, Tailbrand)
 standin_id = 0x43                       # its quests name Zamtrios (loader-visible), swapped to 0x143 at spawn
-quests = [11493, 11494]                 # 4U m10821, m10830
-quest_slots = [1011048, 1011049]
+quests = [11493]                        # 4U m10821 (m10830 dropped: its frenzied spawn needs 4U's frenzy system)
+quest_slots = [1011048]
 # its own icon cell: with the quests' board icon (porting plan Phase 4); until then the registry shows Zamtrios'
 
 [monster.append]

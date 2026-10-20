@@ -23,9 +23,10 @@ em067_00 in the same quest. GU's class uEm067_00 runs it (variant byte 1, notes/
       body_data\\em067_01_bodydata   GU em067_00's minus the 2 records 4U em092 drops from em022's (bones 142, 131)
       dt_tune\\em067_01_dttune       GU em067_00's + the bytes where tools/dt_convert.py gives em092 != em022
       sound call / waves / bank / request   tools/snd4u2gu.py monster_entries (see sound())
+      hagi\\hagi_s0..s4_em067_01    carves: 4U G body / shiny tables in s4, GU's filler in s0..s3 (tools/hagi_em067_01.py)
   shared, GU em067_00 (original paths + file IDs): sound triggers (PTS c / u), PEL c, shell arc, attack data, hitsize,
-      cambodydata, dtbase, dtbparts, area data, carves (hagi): 4U em022 and em092 convert to the same attack / hit /
-      cambody / dtbase data (checked 2026-10-20), so GU's own tuning of them stays. Carves: plan Phase 4.
+      cambodydata, dtbase, dtbparts, area data: 4U em022 and em092 convert to the same attack / hit / cambody / dtbase
+      data (checked 2026-10-20), so GU's own tuning of them stays.
 Inputs besides the arcs: dump/converted/em092/dt_em022/ and dt_em092/ (build.sh step dt: tools/dt_convert.py in the
 MHGU_Editor venv, donor em067_00) and the 4U ROM (core effect arcs, Dunes area colours).
 """
@@ -58,7 +59,7 @@ P0 = 'enemy\\em067\\em067_00\\'  # GU variant 0
 P = 'enemy\\em067\\em067_01\\'   # ours
 BANKS = (0, 2, 3, 4)             # motion lists of em092 and em067_00 (neither has list 1): manifest field 4 + bank
 # manifest fields with our own file: IDs are given in this order (append only: IDs never move once shipped)
-OWN_ORDER = [0, 3, 4, 6, 7, 8, 11, 37, 17, 18, 20, 21, 22, 30, 33, 12, 13]
+OWN_ORDER = [0, 3, 4, 6, 7, 8, 11, 37, 17, 18, 20, 21, 22, 30, 33, 12, 13, 46, 47, 48, 49, 50]
 DT_DIR = os.path.join(ROOT, 'dump/converted/em092')           # build.sh step dt
 PEL_U = 'effect\\pel\\em\\em067_01u'
 PSL = 'effect\\psl\\enemy\\em067\\em067_01\\mot\\em067_01_%d'
@@ -273,6 +274,11 @@ def main():
                           (33, 'enemy\\dt_tune\\em067_01_dttune', dttune)):
         typ = ghash[fileid_entry(img, gman[k])][1]
         ents.append((path, typ, conv(gfile(k), notes)))
+        own[k] = (path, typ)
+    import hagi_em067_01                 # carves: 4U G body / shiny tables in s4, GU's filler in s0..s3
+    for k, data in hagi_em067_01.files().items():
+        path, typ = 'enemy\\hagi\\hagi_s%d_em067_01' % (k - 46), ghash[fileid_entry(img, gman[k])][1]
+        ents.append((path, typ, data))
         own[k] = (path, typ)
 
     # ---- the shared GU em067_00 files: everything but what ours replace and em067_00's model (MOD, MRL, textures)

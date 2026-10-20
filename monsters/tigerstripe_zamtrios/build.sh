@@ -31,11 +31,13 @@ step() {      # name: command line of one step
     arc)          python3 "$T/build_em067_01_arc.py" ;;                    # monster arc + manifest + FILE section
     name)         python3 "$T/name_em067_01.py" ;;                         # NAME (4U names, 5 languages)
     notes)        python3 "$T/notes_em067_01.py" ;;                        # Hunter's Notes entry 124
+    items)        python3 "$T/items_em067_01.py" ;;                        # ITEM (materials) + BUI (break rewards)
+    quest)        python3 "$T/build_em067_01_quest.py" ;;                  # 11493 (4U m10821)
     pack)         python3 tools/portdata.py pack tigerstripe_zamtrios ;;   # gen/*.sec -> gen/tigerstripe_zamtrios.bin
     *)            echo "unknown step $1"; return 2 ;;
     esac
 }
-ALL=(dt arc name notes pack)
+ALL=(dt arc name notes items quest pack)
 STEPS=("$@"); [ $# -eq 0 ] && STEPS=("${ALL[@]}")
 k=0; fails=0; t0=$(date +%s)
 for s in "${STEPS[@]}"; do

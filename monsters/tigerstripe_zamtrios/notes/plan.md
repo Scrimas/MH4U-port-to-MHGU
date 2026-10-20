@@ -11,7 +11,7 @@ decision. Phase 1 study: [phase1-variant-map.md](phase1-variant-map.md). Process
 | registry index | 138 | after Gogmazios 137 |
 | save slot / name entry | 106 / 106 | `dummy2` |
 | Notes entry | 124 | |
-| quests | 11493 / 11494 | 4U m10821 "Grand Finals Confrontation", m10830 "Advanced: Tiger-sharq" (free: no file, no list entry) |
+| quests | 11493 | 4U m10821 "Grand Finals Confrontation" (free: no file, no list entry). m10830 "Advanced: Tiger-sharq" dropped (frenzied spawn: GU has no frenzy; user 2026-10-20) |
 | quest board slots | Phase 4 | DUMMY placeholders (group 127), chosen as for Gogmazios (notes/stage.md section 8) |
 | materials | 2986..2990 | 4U 1357..1361: T.Zamtrios Shard, Piel, Grandfin, Sawtooth+, Tailbrand |
 | file IDs | own range after Gogmazios' | |
@@ -91,9 +91,19 @@ decision. Phase 1 study: [phase1-variant-map.md](phase1-variant-map.md). Process
   event download catalog), stand-in 0x43.
 - Finding for Gogmazios (not changed): its slots 1011009 / 1011003 are in the event download catalog 0x1595e98, so a
   save holding those downloaded events may clash with the renamed entries (to verify, user's call).
-- Waiting for the 4U content data (notes/content-data.md, helper): materials' categories, carves, break rewards,
-  quest rewards, armor / weapons / jewels. Then: items_em067_01.py, carves (hagi), quests (template: a GU Dunes G1
-  hunt; GU has no Zamtrios Dunes quest), gear.
+- 4U content data: notes/content-data.md (helper, 2026-10-20).
+- Quest stat rows (C, also fixed Gogmazios' quests): 4U +0x34 = {u16 size, u8, HP, attack, other, u8, u8} (spawn copy
+  0x68aa30 -> work +0x414..+0x416; HP 0x934084, attack 0x922d48, defense 0x922d78); +0xE8 = board icons.
+- Done (static): items_em067_01.py (ITEM: 5 materials, 4U prices, GU Zamtrios categories; BUI: 4U groups 0/2/3/4/5
+  -> GU conds 10/20/30/40/50, 4U group 1 = frenzy crystals left out), hagi_em067_01.py (own carve files s0..s4 in
+  the arc, IDs 0x10751..0x10755: 4U body table, 4U shiny table in both GU shiny sets), build_em067_01_quest.py
+  (11493: template q0011111 G1 Dunes; 4U spawn area 4 (-996, 57, 2142) = GU m05a04d floor y 57.2; rows 60/100/82
+  = GU rows with the same values; subquest code 2 = top fin; rows A / B from 4U, row B's 0x8003 list as condition
+  1; slots 2 / 3 the template's G1 coin tables; board icon = Zamtrios').
+- Lance line (Carnelian Lance -> Crystalis) to be ported with the 17 Kiranico weapons (user).
+- Open: no small monsters (4U spawns Bnahabra and Hermitaur, the text names them; GU has no Hermitaur); boss byte 8
+  = 2 and size table 5 copied from GU's G Zamtrios hunts (meaning not traced); capture rewards not looked at.
+- Next: gear (armor Zamtrios Z, 19 weapons), then the board icon.
 
 ## Phase 5: tests (user sessions)
 Quest spawn, kill (TEST_HP_PCT=5), gear check, then the two-instance multiplayer test.

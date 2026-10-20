@@ -3,7 +3,7 @@
  "id": "0x143",
  "registry_index": 138,
  "file_id_base": "0x10740",
- "file_count": 17,
+ "file_count": 22,
  "manifest": [
   {
    "field": 0,
@@ -290,38 +290,38 @@
   },
   {
    "field": 46,
-   "file_id": "0x87ec",
-   "path": "enemy\\hagi\\hagi_s0_em067_00",
+   "file_id": "0x10751",
+   "path": "enemy\\hagi\\hagi_s0_em067_01",
    "type": "0x33a84e14",
-   "source": "shared (GU em067_00, its file ID)"
+   "source": "converted (4U em092)"
   },
   {
    "field": 47,
-   "file_id": "0x87ed",
-   "path": "enemy\\hagi\\hagi_s1_em067_00",
+   "file_id": "0x10752",
+   "path": "enemy\\hagi\\hagi_s1_em067_01",
    "type": "0x33a84e14",
-   "source": "shared (GU em067_00, its file ID)"
+   "source": "converted (4U em092)"
   },
   {
    "field": 48,
-   "file_id": "0x87ee",
-   "path": "enemy\\hagi\\hagi_s2_em067_00",
+   "file_id": "0x10753",
+   "path": "enemy\\hagi\\hagi_s2_em067_01",
    "type": "0x33a84e14",
-   "source": "shared (GU em067_00, its file ID)"
+   "source": "converted (4U em092)"
   },
   {
    "field": 49,
-   "file_id": "0x87ef",
-   "path": "enemy\\hagi\\hagi_s3_em067_00",
+   "file_id": "0x10754",
+   "path": "enemy\\hagi\\hagi_s3_em067_01",
    "type": "0x33a84e14",
-   "source": "shared (GU em067_00, its file ID)"
+   "source": "converted (4U em092)"
   },
   {
    "field": 50,
-   "file_id": "0x87f0",
-   "path": "enemy\\hagi\\hagi_s4_em067_00",
+   "file_id": "0x10755",
+   "path": "enemy\\hagi\\hagi_s4_em067_01",
    "type": "0x33a84e14",
-   "source": "shared (GU em067_00, its file ID)"
+   "source": "converted (4U em092)"
   }
  ],
  "files": [
@@ -426,6 +426,36 @@
    "path": "sound\\se\\em\\em067_01\\snd_em067_01",
    "type": "0x1bcc4966",
    "path_hash": "0x216a6d79"
+  },
+  {
+   "file_id": "0x10751",
+   "path": "enemy\\hagi\\hagi_s0_em067_01",
+   "type": "0x33a84e14",
+   "path_hash": "0x75c90096"
+  },
+  {
+   "file_id": "0x10752",
+   "path": "enemy\\hagi\\hagi_s1_em067_01",
+   "type": "0x33a84e14",
+   "path_hash": "0x9a0b6ba8"
+  },
+  {
+   "file_id": "0x10753",
+   "path": "enemy\\hagi\\hagi_s2_em067_01",
+   "type": "0x33a84e14",
+   "path_hash": "0x713cd0ab"
+  },
+  {
+   "file_id": "0x10754",
+   "path": "enemy\\hagi\\hagi_s3_em067_01",
+   "type": "0x33a84e14",
+   "path_hash": "0x9efebb95"
+  },
+  {
+   "file_id": "0x10755",
+   "path": "enemy\\hagi\\hagi_s4_em067_01",
+   "type": "0x33a84e14",
+   "path_hash": "0x7c22a0ec"
   }
  ],
  "notes": [
@@ -467,6 +497,6 @@
   "dttune: GU em067_00 + 42 bytes of 4U em022 -> em092 differences (GU retuned 13 other bytes)",
   "kept effect\\pel\\em\\em067_00u although replaced: named by ['shell\\\\em\\\\em067_00_shell01\\\\em067_00_01', 'shell\\\\em\\\\em067_00_shell02\\\\em067_00_02', 'shell\\\\em\\\\em067_00_shell13\\\\em067_00_13']",
   "kept sound\\se\\em\\em067_00\\snd_em067_00 although replaced: named by ['shell\\\\em\\\\em067_00_shell02\\\\em067_00_02']",
-  "shared from em067_00: 517 files kept, 20 dropped (replaced or its model)"
+  "shared from em067_00: 512 files kept, 25 dropped (replaced or its model)"
  ]
 }
