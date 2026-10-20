@@ -29,11 +29,13 @@ step() {      # name: command line of one step
     case $1 in
     dt)           dt ;;                                                     # dump/converted/em092/dt_em0NN/
     arc)          python3 "$T/build_em067_01_arc.py" ;;                    # monster arc + manifest + FILE section
+    name)         python3 "$T/name_em067_01.py" ;;                         # NAME (4U names, 5 languages)
+    notes)        python3 "$T/notes_em067_01.py" ;;                        # Hunter's Notes entry 124
     pack)         python3 tools/portdata.py pack tigerstripe_zamtrios ;;   # gen/*.sec -> gen/tigerstripe_zamtrios.bin
     *)            echo "unknown step $1"; return 2 ;;
     esac
 }
-ALL=(dt arc pack)
+ALL=(dt arc name notes pack)
 STEPS=("$@"); [ $# -eq 0 ] && STEPS=("${ALL[@]}")
 k=0; fails=0; t0=$(date +%s)
 for s in "${STEPS[@]}"; do

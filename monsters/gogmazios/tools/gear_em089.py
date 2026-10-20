@@ -121,13 +121,7 @@ def gu_item_names(R):
     return names
 
 
-_T4 = {}
-def text4u(lang):
-    if lang not in _T4:
-        d = open(os.path.join(ROOT, 'dump/romfs/%s/data/core_common.arc' % lang), 'rb').read()
-        f = {e[0].split('\\')[-1]: arc.arc_read(d, e) for e in arc.arc_entries(d) if '\\msg\\' in e[0]}
-        _T4[lang] = {k.rsplit('_', 1)[0]: lmd(v) for k, v in f.items() if k.endswith('_' + lang)}
-    return _T4[lang]
+from items4u import msg4u as text4u, gu_text as gu_str     # 4U core_common msg files; gear / notes text rule
 
 
 def armor_4u(exe, ptab_index, k):
@@ -140,12 +134,6 @@ def armor_4u(exe, ptab_index, k):
 
 def c_bytes(b, per=16):
     return ',\n'.join('    ' + ', '.join('0x%02x' % x for x in b[i:i + per]) for i in range(0, len(b), per))
-
-
-def gu_str(s):
-    """4U gear / notes text as GU stores it (CRLF line breaks); markup tags refused"""
-    if '\0' in s: sys.exit('4U text with a markup tag: %r' % s)
-    return s.replace('\r\n', '\n').replace('\n', '\r\n')
 
 
 def c_str(s):

@@ -25,20 +25,8 @@ Sources:
                subquest "Wound Gogmazios's back"; m11035 (quest01.arc): fee 4600z, reward 45900z, sub 15300z, 50 min,
                "Sever Gogmazios's tail", 4U spawn byte 3 = 1 (module/em089_act.c spawn_b3). Same stage, spawn,
                stat rows.
-
-questData (329 B, little endian; MHXX rQuestData layout, mhff wiki):
-  +0x00 'KC' header (u32 0x434b0000, u32 1, u32 0)  +0x0C u32 quest id
-  +0x10 type  +0x11 board (10 = every board)  +0x12 stars (14 = G4)  +0x13 rank tier  +0x14 stage  +0x15 start area
-  +0x16 minutes  +0x17 carts  +0x1A BGM/flags (12 on the Kushala and Lao G4 quests, G)  +0x1F objective type (1 hunt)
-  +0x20 u16 target  +0x22 u16 count  +0x24 objective 2  +0x29 subquest (type, u16 target, u16 code: SOURCES)
-  +0x31 fee  +0x39 reward  +0x3D sub reward  +0x41 academy pts (reward x 0.08 in G)  +0x49 sub academy  +0x4D HRP
-  +0x51 sub HRP  +0x58 supply deliveries  +0x64 5 x 13 B boss {u16 em id, u8 subtype, u8 aura, u8 restore count,
-  u8 vital/attack/other table, u8 difficulty, u16 size %, u8 size table, u8 stamina}  +0xA5 small monster tables
-  +0xD6 5 icons  +0xDF 5 x {u32 GMD type 0x242bb29a, char[16] "<ID>_<lang>"}  +0x147 u16 flags (bit 7 = no rotation)
-questLink (308 B): 'KC' header, 13 x {u32 type, char[16] name}: 5 setEmMain, 3 emSetList, 5 rem, supp, questPlus.
-GMD (v0x10302): 'GMD\\0', u32 version, u32 lang 0, u32 unk (copied from the template), u64 0, u32 strings,
-  u32 labels 0, u32 string bytes, u32 name length, name\\0, UTF-8 strings. 7 strings: title, client, description,
-  other monsters, main objective, failure, subquest.
+Formats (questData, questLink, GMD, the v1.4 arc layout): tools/quest4u.py. questData +0x1A = 12 as on the Kushala and
+Lao G4 quests (G).
 """
 import argparse, os, struct, sys
 
@@ -49,8 +37,10 @@ sys.path.insert(0, os.path.join(ROOT, 'tools'))     # core converters + paths.py
 sys.path.insert(0, HERE)
 import paths                        # noqa: E402
 sys.path.insert(0, paths.GU_PY)
-import arcpack                      # noqa: E402
 import items_em089                  # noqa: E402
+import quest4u                      # noqa: E402
+from quest4u import (arc_files, text4u, ref, LANGS, T_SET, T_ESL, T_REM, T_SUPP, T_PLUS, T_GMD,  # noqa: E402
+                     REWARD_ROWS_4U, SUB_ROW_4U)
 from romfs import RomFS             # noqa: E402
 
 # 4U source quest -> GU quest (G4 Hub; 11491 / 11492 = the first free numbers after 11490, checked: no file, no list
@@ -72,83 +62,14 @@ HRP_PER_Z = 1880 / 35400       # quest 11491's HRP (chosen at its creation) per 
 TPL, TPL_POS = 11413, 11319
 TPL_ARENA = 11469              # G4 Arena quest (stage 9): --arena test map
 BQ_AREA, BQ_POS = 2, (0.0, 633.5, 0.0, 1510.8)    # --bq spawn (alias area 2 = 4U m19a03d)
-LANGS = ['eng', 'fre', 'ger', 'ita', 'spa']
-FILLER_LANGS = ['jpn', 'kor']      # arc padding only (v1.4 positional questLink lookup, see main())
-LANG4U = {'eng': 0, 'fre': 1, 'spa': 2, 'ger': 3, 'ita': 4}    # order of m11014's language tables (pointer at +0xBC)
-T_SET, T_ESL, T_REM, T_SUPP, T_PLUS, T_LINK, T_GMD, T_QD = (
-    0x2553701d, 0x32ca92f8, 0x5b3c302d, 0x54539aee, 0x26bec21c, 0x00e0bb1c, 0x242bb29a, 0x1bbfd18e)
-# rewards: 4U quest header +0x1C row A, +0x20 row B, +0x24 subquest -> list {u32 0x8000, u32 table} closed by 0xFFFF
-# (one entry each; the subquest list is row A's in both quests), table = 6-byte {u16 chance, u16 item, u16 count}
-# closed by 0xFFFF. 4U items -> GU: tools/items_em089.py gu_item. GU rem slots: 0 / 1 rows A / B, 2 / 3 rows C / D,
-# 4 the subquest's (MHGU_Editor docs/05); row C stays GU's G Hub Accolade XX table (rem_530072, as on every G4 Hub
-# quest), slot 4 = row A's table like 4U (and like GU's q0011413). rem_89xxxx: no GU quest uses that range.
-REWARD_ROWS_4U = (0x1C, 0x20)
-SUB_ROW_4U = 0x24
-
-
-def arc_files(data):
-    return {p: (t, d) for p, t, d in arcpack.read(data)[1]}
-
-
-def text4u(q):
-    """m11014's 5 language blocks -> {lang: [title, objective, failure, description, other, client, subquest]}"""
-    out = {}
-    langs = struct.unpack_from('<I', q, 0xBC)[0]          # -> 5 language tables (0xFBC in m11014)
-    for lang, k in LANG4U.items():
-        tab = struct.unpack_from('<I', q, langs + 4 * k)[0]
-        strs = []
-        for i in range(7):
-            o = struct.unpack_from('<I', q, tab + 4 * i)[0]
-            assert o < len(q) and not o & 1, (lang, i, o)
-            e = o
-            while q[e:e + 2] != b'\0\0':
-                e += 2
-                assert e < len(q), (lang, i)
-            strs.append(q[o:e].decode('utf-16-le').replace('\n', '\r\n'))
-        out[lang] = strs
-    return out
+# rewards (tools/quest4u.py rem_4u): one entry per 4U row; the subquest list is row A's in both quests. 4U items ->
+# GU: tools/items_em089.py gu_item. GU rem slots: 0 / 1 rows A / B, 2 / 3 rows C / D, 4 the subquest's (MHGU_Editor
+# docs/05); row C stays GU's G Hub Accolade XX table (rem_530072, as on every G4 Hub quest), slot 4 = row A's table
+# like 4U (and like GU's q0011413). rem_89xxxx: no GU quest uses that range.
 
 
 def rem_4u(q, row):
-    """one 4U reward row (quest header offset) -> GU rem, 184 B: f32 1.0, u32 1, 8 x {u8 condition, u8 entries}
-    groups, then each group's {u16 item, u8 count, u8 chance} entries closed by {0, 0, 0xFF}. A 4U row is one group;
-    condition 1 = the plain groups of GU's rows A / B (q0011413 rem_130240 adds a condition-4 group, rem_230088 not).
-    A 4U item with no GU item is left out and its chance goes to the row's most likely item (the row stays 100 %)."""
-    lst = struct.unpack_from('<I', q, row)[0]
-    flags, off = struct.unpack_from('<II', q, lst)
-    assert flags == 0x8000 and struct.unpack_from('<H', q, lst + 8)[0] == 0xFFFF, 'unexpected 4U reward list'
-    ents, lost = [], 0
-    while struct.unpack_from('<H', q, off)[0] != 0xFFFF:
-        chance, item, count = struct.unpack_from('<HHH', q, off)
-        gu = items_em089.gu_item(item)
-        if gu is None:
-            lost += chance
-            print('reward row %#x: 4U item %d has no GU item, its %d %% goes to the most likely item' % (row, item, chance))
-        else:
-            ents.append([gu, count, chance])
-        off += 6
-    max(ents, key=lambda e: e[2])[2] += lost
-    assert sum(e[2] for e in ents) == 100 and len(ents) <= 40, ents
-    body = b''.join(struct.pack('<HBB', *e) for e in ents)
-    d = struct.pack('<fI', 1.0, 1) + bytes([1, len(ents)]) + bytes(14) + body + struct.pack('<HBB', 0, 0, 0xFF)
-    return d + bytes(184 - len(d))
-
-
-def gmd(name, strings, unk):
-    body = b''.join(s.encode('utf-8') + b'\0' for s in strings)
-    n = name.encode('ascii')
-    return (b'GMD\0' + struct.pack('<IIIQIIII', 0x10302, 0, unk, 0, len(strings), 0, len(body), len(n))
-            + n + b'\0' + body)
-
-
-def gmd_unpack(d):
-    cnt, _, size, nl = struct.unpack_from('<IIII', d, 0x18)
-    return d[0x28:0x28 + nl].decode(), d[0x29 + nl:].split(b'\0')[:cnt], struct.unpack_from('<I', d, 0xC)[0]
-
-
-def ref(t, name):
-    n = name.encode('ascii'); assert len(n) < 16, name
-    return struct.pack('<I16s', t, n)
+    return quest4u.rem_4u(q, row, items_em089.gu_item)
 
 
 def bq_plus(d):
@@ -300,41 +221,10 @@ def main():
     link += b''.join(ref(T_REM, r) for r in REM) + ref(T_SUPP, 'supp_' + sid) + ref(T_PLUS, plus[-4:])
     assert len(link) == 308
 
-    # --- text
+    # --- text (4U, 5 languages) + arc layout + files (tools/quest4u.py)
     t4 = text4u(q4)
-    gmds = {}
-    for lang in LANGS:
-        title, obj, fail, desc, other, client, sub = t4[lang]
-        unk = gmd_unpack(tpl['%s\\quest\\questData\\questData_%07d_%s' % (lang, TPL, lang)][1])[2]
-        gmds[lang] = gmd('questData_' + sid, [title, client, desc, other, obj, fail, sub], unk)
-
-    # self-check: the GMD writer reproduces the template byte for byte
-    for lang in LANGS:
-        d = tpl['%s\\quest\\questData\\questData_%07d_%s' % (lang, TPL, lang)][1]
-        name, strs, unk = gmd_unpack(d)
-        assert gmd(name, [s.decode('utf-8') for s in strs], unk) == d, lang
-
-    ents = res + [('loc\\quest\\questLink\\questLink_' + sid, T_LINK, link)]
-    ents += [('%s\\quest\\questData\\questData_%s_%s' % (l, sid, l), T_GMD, gmds[l]) for l in LANGS]
-    # v1.4 positional layout: the quest start reads questData = arc entry [count-1] (0x3ba6dc) and questLink =
-    # entry [count-9] (0x3ba840, path must contain "Link"; v1.0 used [count-7]). The v1.0 template arcs have only
-    # 7 entries from questLink to questData, so 2 inert GMDs (English text, language folders the game never asks
-    # for) fill the gap; without them questLink is null and 0x3ade34 skips the whole quest setup.
-    ents += [('%s\\quest\\questData\\questData_%s_%s' % (l, sid, l), T_GMD, gmds['eng']) for l in FILLER_LANGS]
-    ents += [('loc\\quest\\questData\\questData_' + sid, T_QD, qd)]
-    assert len(ents) >= 9 and ents[-9][1] == T_LINK and 'Link' in ents[-9][0] and ents[-1][1] == T_QD
-    arc = arcpack.build(ents)
-    assert arc_files(arc) == {p: (t, d) for p, t, d in ents}
-
-    out = os.path.join(a.out, 'nativeNX')
-    files = {'loc/arc/quest/q%s.arc' % sid: arc,
-             'loc/quest/questData/questData_%s.ext' % sid: qd,
-             'loc/quest/questLink/questLink_%s.qdl' % sid: link}
-    files.update({'%s/quest/questData/questData_%s_%s.gmd' % (l, sid, l): gmds[l] for l in LANGS})
-    for rel, data in files.items():
-        p = os.path.join(out, rel); os.makedirs(os.path.dirname(p), exist_ok=True)
-        open(p, 'wb').write(data)
-        print('%6d %s' % (len(data), p))
+    gmds = quest4u.quest_gmds(tpl, TPL, sid, t4)
+    quest4u.write(a.out, quest4u.assemble(res, link, gmds, qd, sid))
     print('quest %d: stage %d, %d min, em %#x, "%s"' % (qid, qd[0x14], qd[0x16], EM_ID, t4['eng'][0]))
 
 

@@ -16,8 +16,13 @@ save_index = [105, 111]                 # unused registry slots dummy1..7 (IDs 0
 name_entry = [105, 111]                 # monsterName GMD entries 'dummy1'..'dummy7'
 ui_icon = [146, 195]                    # HD_cmn_micon01 cells after GU's 0..140 and the HD UI v4 cheat's 141, 143-145
 notes_entry = [123, 127]                # Hunter's Notes save map S+0x35b0: bits 123..127 unused
-quests = [11491, 11492]                 # checked free (no file, no list entry); check more before extending
-quest_slots = [1011009, 1011003]        # DUMMY quest_group placeholders known unused (list indexes 1412, 1407)
+quests = [11491, 11492, 11493, 11494]   # checked free (no file, no list entry); check more before extending
+quest_slots = [1011009, 1011003, 1011048, 1011049]   # quest_group group-127 entries renamed in memory. 1011048 /
+                                        # 1011049 (indexes 1449 / 1450, 2026-10-20): absent from the event download
+                                        # catalog 0x1595e98 (205 x {u32 quest, u32 serial}), so no save can hold them
+                                        # (their RomFS files exist, unused by our own IDs). 1011009 / 1011003 ARE in
+                                        # that catalog (to verify: a downloaded event quest of that ID would share
+                                        # the slot)
 items = [2977, 2990]                    # DUMMY materials (more needs ~24 code patches)
 decorations = [2889, 2899]              # DUMMY decorations (type 3)
 bgm_ids = [0x900, 0x9ff]                # stream sequence IDs absent from GU's bgm_bt (bgm_stqr hook)
@@ -66,6 +71,7 @@ skill_tree = 1
 skill = 1
 decoration = 4
 kireaji = 3
+notes_text = 2                          # HN_MonsterListMsg strings: description, tips page (tools/notes4u.py)
 
 [monster.append.weapons]                # BaseData / MsgData / LevelData rows per class
 w00 = 2
@@ -94,5 +100,10 @@ save_index = 106
 name_entry = 106
 notes_entry = 124
 items = [2986, 2990]                    # 4U 1357..1361 (T.Zamtrios Shard, Piel, Grandfin, Sawtooth+, Tailbrand)
-# with its quests (porting plan Phase 4): quests 11493 / 11494 (free, checked 2026-10-20), their board slots, the
-# Zamtrios stand-in (0x43) and its own icon cell; until then the registry shows Zamtrios' icon
+standin_id = 0x43                       # its quests name Zamtrios (loader-visible), swapped to 0x143 at spawn
+quests = [11493, 11494]                 # 4U m10821, m10830
+quest_slots = [1011048, 1011049]
+# its own icon cell: with the quests' board icon (porting plan Phase 4); until then the registry shows Zamtrios'
+
+[monster.append]
+notes_text = 1                          # description only (4U has no Tigerstripe tip; GU Zamtrios' is about ice)

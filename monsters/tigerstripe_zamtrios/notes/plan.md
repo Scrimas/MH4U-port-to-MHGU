@@ -52,6 +52,16 @@ decision. Phase 1 study: [phase1-variant-map.md](phase1-variant-map.md). Process
   - qe006 / qe013 effects ship under the same 4U paths in Gogmazios' arc (Battlequarters soil) and here (Dunes
     soil): in a quest with both, the first arc loaded wins.
 
+### First in-game test (when the user allows installs)
+- Build with GOG_DEFINES="TEST_SWAP TEST_SWAP_PORT=1" and play a quest on GU's Dunes (stage 5): every large
+  monster becomes Tigerstripe. A Dunes quest also answers the area-data risk below.
+- Read the log with monsters/tigerstripe_zamtrios/tools/tzreport.py (actions reaching no GU handler, variant-1
+  motions, file IDs); ask the user only about looks (model, tExtendMap, eye group 50, colours, effects' sand tint).
+- Area data risk (G): GU uses Zamtrios only on stages 9, 14 and 20 (questData scan 2026-10-20); its area_link /
+  area_select / area_patrol / map_info (XFS / MTD, shared from em067_00) may not cover stage 5. Stage arcs carry
+  their own enemy\area_patrol\_mapNN / area_select\_mapNN (Gogmazios notes/stage.md), maybe a fallback. If
+  Tigerstripe never changes area on the Dunes: borrow stage-5 data from a GU Dunes monster.
+
 ## Phase 3: behaviour gaps (only where GU's variant-1 code differs from 4U)
 1. Exact walk of em092's EMC (not the heuristic tokenizer): which gap actions are reachable.
 2. Shells: uShell012 subtypes 40..43 (+ the 2100 range rule), uShell016 subtypes 40 / 48.
@@ -60,6 +70,10 @@ decision. Phase 1 study: [phase1-variant-map.md](phase1-variant-map.md). Process
    id 8, uMhEftCtrl000 (13, 68), 0xc0aa20 skip).
 5. Multiplayer: hooks only adjust GU's own code paths; damage stays on the controlling machine; check each shell.
 
+### Phase 3 status
+- 3.3 done (static): module em067_01_gaps.c, hook 0x48c4f0 skips the 2/7 tremor post (return to 0xf6e5cc) for
+  variant 1, as 4U. The rest waits for the first test's action log (which gap actions the EMC really reaches).
+
 ## Phase 4: content
 1. Move the Gogmazios content tools (items, gear, Notes, quests) into shared tools with per-monster inputs;
    Gogmazios' data file stays byte-identical.
@@ -67,6 +81,19 @@ decision. Phase 1 study: [phase1-variant-map.md](phase1-variant-map.md). Process
    jewels if any use its materials, Notes entry, name, icon, 2 G1 quests on Dunes (day).
 3. Music: GU's Zamtrios theme expected to apply through its em-type check (confirm 4U uses the same theme);
    sounds from em092.
+
+### Phase 4 status
+- Shared tools (Gogmazios outputs byte-identical: every gen/*.sec, gear_hooks.txt, 16 quest files): tools/items4u.py
+  (materials, break rewards, 4U text readers msg4u / gu_text), tools/notes4u.py (Notes entry, text base from
+  [monster.append] notes_text), tools/quest4u.py (4U quest text / rewards, GMD writer, v1.4 arc layout).
+- Tigerstripe: NAME (4U emName[92], 5 languages), Notes entry 124 (4U emExp[92], no tips page, type 6, threat 6,
+  after Zamtrios, unlocked by 11493); allocations: quests 11493 / 11494, board slots 1011048 / 1011049 (not in the
+  event download catalog), stand-in 0x43.
+- Finding for Gogmazios (not changed): its slots 1011009 / 1011003 are in the event download catalog 0x1595e98, so a
+  save holding those downloaded events may clash with the renamed entries (to verify, user's call).
+- Waiting for the 4U content data (notes/content-data.md, helper): materials' categories, carves, break rewards,
+  quest rewards, armor / weapons / jewels. Then: items_em067_01.py, carves (hagi), quests (template: a GU Dunes G1
+  hunt; GU has no Zamtrios Dunes quest), gear.
 
 ## Phase 5: tests (user sessions)
 Quest spawn, kill (TEST_HP_PCT=5), gear check, then the two-instance multiplayer test.
