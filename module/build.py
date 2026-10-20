@@ -352,6 +352,7 @@ def main():
     with open(os.path.join(OUT, 'symbols.txt'), 'w') as f:
         for k, v in sorted(syms.items(), key=lambda kv: kv[1]):
             f.write('%08x %08x %s\n' % (MODULE_BASE + v, v, k))
+    open(os.path.join(OUT, 'defines.txt'), 'w').write(' '.join(EXTRA_DEFINES) + '\n')   # tools/release.py: none
     print('built', len(data), 'bytes; hooks', ', '.join('%s@%x' % h for h in HOOKS))
     for k in ('g_init_magic', 'g_hook_count'):
         if k in syms: print('  %s = 0x%x' % (k, MODULE_BASE + syms[k]))
