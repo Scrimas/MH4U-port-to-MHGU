@@ -4,11 +4,31 @@ Written 2026-10-19 from the Gogmazios (4U em089) port; content side (Phase 5b) a
 Dalamadur, but everything here applies to any 4U-only monster. GU = MHGU 1.4 main offsets (runtime = 0x704000 + offset); 4U = MH4U v1.1 (EUR) code.bin addresses.
 Mark every fact you write down as C (confirmed in code or data), S (strong) or G (guess).
 
+## Repository layout (since 2026-10-20)
+| path | what |
+|---|---|
+| `allocations.toml` | every game-wide ID a monster takes (em ID, registry index, file IDs, save slot, name / Notes entries, quests and board slots, DUMMY items, BGM IDs, stage folder, gear models, appended record counts) + the free pools; `python3 tools/alloc.py [show]` checks it |
+| `module/` | core module: hook framework (build.py), `port.c` (monsters, data files, installed check, file IDs), `quest.c`, `items.c`, `gear.c`, `notes.c`, `main.c` (shared hooks) |
+| `tools/` | core converters and helpers; `paths.py` (GU scratch / MHGU_Editor locations, overridable), `portdata.py` (data file writer / reader), `alloc.py` |
+| `notes/` | core notes (this guide, registry, enemy-class, port, api-map, assets, data, gear-weapons, installer) |
+| `monsters/<name>/` | one monster: `module/` (its C code, compiled into the core module), `tools/`, `notes/`, `package.toml` (version, C prefix), `build.sh` (every generator, in order) |
+| `monsters/<name>/gen/`, `romfs/` | gitignored game data: its data file `<name>.bin` (+ the `.sec` sections) and its converted RomFS (= its assets) |
+
+Gogmazios files named below as `tools/*_em089.py`, `tools/build_gog_quest.py`, `tools/gogreport.py`,
+`module/em089*.c`, `module/stage*.c` or `notes/{port-checklist,stage,content-plan,em089-behaviour}.md` now live in
+`monsters/gogmazios/{tools,module,notes}/` under the same names. Older notes keep the old paths.
+
+How a monster plugs in (module/port.h): its tools write its data file (tables + text, never compiled into the core);
+every registered monster's data file always installs, so appended gear IDs never move; the monster is INSTALLED when
+its assets are present (its monster arc), which turns on its quests, spawning and quest-time hooks. The core hooks
+loop over the monsters; a hook site used by one monster only (e.g. Gogmazios' stage gimmicks) keeps its handler in
+that monster's module code.
+
 ## 0. Read first
 1. This guide.
-2. `notes/port-checklist.md`: the full Gogmazios log, more than 3000 lines. Do not read it end to end; `rg` it by
-   4U / GU address or topic. Warning: some `[ ]` / `[~]` lines went stale when later work landed. Check the code
-   before trusting a "stubbed" or "not ported" line.
+2. `monsters/gogmazios/notes/port-checklist.md`: the full Gogmazios log, more than 3000 lines. Do not read it end to
+   end; `rg` it by 4U / GU address or topic. Warning: some `[ ]` / `[~]` lines went stale when later work landed.
+   Check the code before trusting a "stubbed" or "not ported" line.
 3. Topic notes:
    - `notes/registry.md`: the per-index tables a new monster index needs.
    - `notes/enemy-class.md`: the class chain, the DTI and ctor pattern, and vtable slots.
@@ -16,9 +36,11 @@ Mark every fact you write down as C (confirmed in code or data), S (strong) or G
    - `notes/api-map.md`: the 4U -> GU function and record mapping.
    - `notes/assets.md`: file formats.
    - `notes/data.md`: the data fields of the monster arc.
-   - `notes/stage.md`: the arena and stage alias, plus the quest.
-   - `notes/content-plan.md`: save slot, rewards, gear, skills, Hunter's Notes, quests (the content side, Phase 5b).
-   - `notes/gear-weapons.md`: the weapon table formats and the choices behind tools/gear_weapons_em089.py.
+   - `monsters/gogmazios/notes/stage.md`: the arena and stage alias, plus the quest.
+   - `monsters/gogmazios/notes/content-plan.md`: save slot, rewards, gear, skills, Hunter's Notes, quests (the content
+     side, Phase 5b).
+   - `notes/gear-weapons.md`: the weapon table formats and the choices behind gear_weapons_em089.py.
+   - `notes/installer.md`: package layout and the warnings the installer must show.
 4. The user's rules (section 1) and the memory files listed in MEMORY.md.
 
 ## 1. Ground rules (the user's, keep them)
@@ -57,20 +79,25 @@ pairs where possible (tools/dt_vote.py, dt_map.py, snd4u2gu.py selftest), then a
 ## 3. What a port consists of
 1. **Monster arc** `nativeNX/arc/enemy/emNNN_00.arc` plus its 0xCC-byte file manifest (51 fields: models, MRL,
    LMT x4, XFS, EMC, attack / hit / body data, dtbase / dttune / dtbparts, effects PEL / PSL, sound call / bank /
-   request, LCM, ...). File IDs are served by the `file_id` hook from a module range (EM089_FILE_ID_BASE). Builder:
-   `tools/build_em089_arc.py` (writes the arc, `tools/em089_manifest.json` and `module/em089_files.inc`).
-2. **Module** (subsdk1, `module/`, `python3 module/build.py [install]`): the class (DTI + a copy of uFestaEnemy's
-   286-slot vtable with overrides), the registry relocation for the new index, hooks, and every behaviour /
-   shell / effect / sound port. AArch32. Hooks displace two instructions into a trampoline; these must not be
-   pc-relative or branches (build.py checks). The trampoline saves r0-r5, r12, lr at regs[0..7] and the caller's
-   stack args start at regs[8]; a handler can rewrite them. A handler returning nonzero replaces the function
-   (REPLACE_HOOKS).
-3. **RomFS additions** (`module/romfs/...`): HUD icon + name (tools/ui_em089.py), BGM (tools/snd_bgm.py), quest arc
-   (tools/build_gog_quest.py), the stage alias arcs if the 4U arena is ported (tools/stage4u2gu.py), the map UI
-   (tools/mapui4u2gu.py), and the gear models (tools/armor4u2gu.py, tools/weapon4u2gu.py).
+   request, LCM, ...). File IDs are served by the `file_id` hook (module/port.c) from the monster's range
+   (allocations.toml file_ids) and its data file section FILE (manifest + file table). Builder:
+   `monsters/gogmazios/tools/build_em089_arc.py` (writes the arc, `em089_manifest.json` and gen/FILE.sec).
+2. **Module** (subsdk1, `module/` + every `monsters/<name>/module/`, `python3 module/build.py [install]`): the class
+   (DTI + a copy of uFestaEnemy's 286-slot vtable with overrides), the registry relocation (one entry per
+   allocations.toml monster), hooks, and every behaviour / shell / effect / sound port. AArch32. Hooks displace two
+   instructions into a trampoline; these must not be pc-relative or branches (build.py checks). The trampoline saves
+   r0-r5, r12, lr at regs[0..7] and the caller's stack args start at regs[8]; a handler can rewrite them. A handler
+   returning nonzero replaces the function (REPLACE_HOOKS).
+3. **RomFS additions** = the monster's assets (`monsters/<name>/romfs/...`): BGM (tools/snd_bgm.py), quest arc
+   (build_gog_quest.py), the stage alias arcs if the 4U arena is ported (tools/stage4u2gu.py), the map UI
+   (tools/mapui4u2gu.py), and the gear models (tools/armor4u2gu.py, tools/weapon4u2gu.py). Never a copy of a GU
+   file: another monster would ship the same path (build.py install refuses it); patch the loaded resource instead
+   (the monster name is a NAME section applied to the loaded monsterName GMD).
 4. **Content** (Phase 5b): the monster's save slot, materials, carves / rewards, armor, weapons, skill and
-   decorations, Hunter's Notes entry and quests. Data tables are patched in memory at load (module/items.c,
-   gear.c, notes.c), never shipped as resident arcs: UI mods replace resident.arc / resident_<lang>.arc (the
+   decorations, Hunter's Notes entry and quests. The tools write them into the data file
+   (`nativeNX/mh4uport/<name>.bin`, tools/portdata.py: sections ITEM, BUI, TBLA, TXTA, NOTE, NAME, SKIL, PWLF, FILE);
+   the core patches the loaded tables (module/items.c, gear.c, notes.c), never ships resident arcs: UI mods
+   replace resident.arc / resident_<lang>.arc (the
    user's HD UI v4 does), and shipping blacksmith.arc from the v1.0 RomFS could undo update changes.
 
 ## 4. Pipeline, in order
@@ -107,21 +134,23 @@ pairs where possible (tools/dt_vote.py, dt_map.py, snd4u2gu.py selftest), then a
 | effects EFL / EAN / MEF -> GU EFL + PEL / PSL | tools/efl4u2gu.py | PEL records in extra_records(); PSL from LMT event group 2 |
 | sounds MADP / SNDB / SREQ -> GU types | tools/snd4u2gu.py | rules from Capcom's own monster pairs (selftest) |
 | BGM | tools/snd_bgm.py | MCA -> Opus + own STQR in the monster arc, hook bgm_stqr |
-- The arc builder's rules: only one agent rebuilds the arc at a time (`ARC LOCK:` line in notes/port-checklist.md),
-  and the file table em089_files.inc may only GAIN entries (keep existing file IDs stable).
+- The arc builder's rules: only one agent rebuilds the arc at a time (`ARC LOCK:` line in the monster's checklist),
+  and its file table (FILE section) may only GAIN entries (keep existing file IDs stable, inside its file_ids range).
 - Check the model scale (Gogmazios 2.5, dtbase +0x15). Joint matrices include it.
 
 ### Phase 3: register the class
-- The registry tables indexed by monster index are relocated into the module with one extra entry (build.py
-  REG_TABLES, LIT_PATCHES; notes/registry.md). The id <-> index searches are bounded by `cmp #137`, patched to #138
-  (WORD_PATCHES 0x50B94 / 0x50C10).
-  **A second new monster needs index 138**: grow every REG_TABLES copy by one more entry, patch the bounds to #139,
-  keep the sentinel pair after the last entry, extend reg_mapicon (indexed by em NUMBER) and reg_u16 (read at
-  [index + 1]). Choose a free GU em number (> 89), never the 4U number.
-- Hooks to extend per monster: em_create (factory), quest_prep / em_arc_request (arc path), em_record, file_id
-  (each monster needs its own file ID range), name_index (GMD name entry), stats_add / stats_hunted (quest tally),
-  bgm_select / bgm_stqr.
-- Class: `module/em089.c` is the template. ctor = uFestaEnemy ctor + our vtable + EN_WORK = record + 96; own fields
+- Add the monster to allocations.toml (next registry index, its pools' next free values; `tools/alloc.py` checks)
+  and give it `monsters/<name>/package.toml` with `code` = its C prefix (`<code>_register_class`, `g_<code>_dti`).
+  build.py then grows every registry copy (REG_TABLES, one entry per monster, sentinel pair after the last,
+  reg_u16 read at [index + 1], reg_mapicon by em NUMBER for a new number), patches the id <-> index bounds
+  (`cmp #137` -> 137 + monsters, WORD_PATCHES 0x50B94 / 0x50C10) and the Notes bounds, and generates the descriptor
+  table (out/port_monsters.c, module/port.h). Choose a free GU em number (> 89) or a free variant of a GU em,
+  never the 4U number.
+- The shared hooks already serve every monster from its descriptor: em_create / quest_prep (stand-in swap while its
+  quest runs), em_arc_request (arc preload), em_record (donor record), file_id, name_index, stats_add / stats_hunted /
+  save_hunts, quest board / unlock / clear, break rewards, items, gear, Notes. Monster-specific hook sites (BGM,
+  stage alias) stay in the monster's code; a second user of the same site turns its handler into a core dispatcher.
+- Class: `monsters/gogmazios/module/em089.c` is the template. ctor = uFestaEnemy ctor + our vtable + EN_WORK = record + 96; own fields
   after SIZE_uFestaEnemy. Overridden slots (game.h names): 125 ACTION (= 4U slot 44 dispatch), 119 STATE_FRAME
   (4U slot 40), 129 ACTION_START (4U 47), 127 ACTION_REMAP, 130 MOTION_FRAME, 132 PARTS_FRAME (4U 50), 133 AI_COND
   (4U 51, AI opcode 0x6f conditions), 118 SPAWN_SETUP, 253 THINK_BLOCKED, 168 (4U 75). 4U slot 64 (on-break)
@@ -187,25 +216,32 @@ testable alone (the user checks the smithy or one quest).
   entry (test 10:24: kill tallied, quest never completed). Readers: stats_hunted 0x3a3930, save_hunts 0x523104
   (Notes page, 8 more callers). Size records 0x526f48 index a pointer table without a bound: keep them off.
 - **Items.** Free item IDs: the "DUMMY" materials 2977..2990 and DUMMY decorations 2889..2899 (type 3). Appending
-  past 2990 needs ~24 code patches. tools/items_em089.py -> items.c patches the loaded rItemData (0x19237c) and the
-  itemData_<lang> GMD strings (0xb83c48, every rGUIMessage load passes there: gear.c and notes.c hook their own
-  GMDs off it). 4U and GU share icon and colour numbers; 4U item record +10 of a decoration = decoration index + 1.
-- **Table appends.** module/gear.c tbl_append: every GU table class shares one generated loader; tools/
+  past 2990 needs ~24 code patches. items_em089.py -> section ITEM -> items.c patches the loaded rItemData
+  (0x19237c) and the itemData_<lang> GMD strings (0xb83c48, every rGUIMessage load passes there: the TXTA text
+  appends and the monster name hang off it too). 4U and GU share icon and colour numbers; 4U item record +10 of a
+  decoration = decoration index + 1.
+- **Table appends.** module/gear.c tbl_append: every GU table class shares one generated loader;
   gear_weapons_em089.gu_class(name, f32 version) finds its load exit (load + 0x3c), element alloc / free / ctor /
-  parse and in-memory size, checked instruction by instruction. The append runs the GAME's parser on file-format
-  records and refuses when the loaded count is not the v1.0 count (another mod changed it). gmd_append does the same
-  for strings. Convert hex carefully when copying gu_class output (a decimal -> hex slip put one hook 0x40 off; the
-  build caught it: "branch ... targets ... inside the patch").
+  parse and in-memory size, checked instruction by instruction. The tools write each appended block as a TBLA entry
+  (path suffix, class, record size, records, `base` = the count the table must hold before it); the core runs the
+  GAME's parser on the file-format records and refuses when the count differs (another mod, or a missing earlier
+  block). Blocks go in allocations.toml order, so a later monster's base = GU's count + the counts of the monsters
+  before it ([monster.append]; IDs never move once released). gmd_append does the same for strings (TXTA). Convert
+  hex carefully when copying gu_class output (a decimal -> hex slip put one hook 0x40 off; the build caught it:
+  "branch ... targets ... inside the patch"). A new table class needs its load-exit hook in build.py HOOKS or
+  module/gear_hooks.txt.
 - **Carves and drops.** tools/hagi_em089.py -> hagi s4 (G rank; s0..s3 GU filler). GU picks the shiny table set by
   enemy vtable slot 149 (0xac0ec -> hagi byte 14 + set); 4U picks it in common code 0x930bdc by em number. Port
   per-monster drop sets as a slot-149 override (em089_drop_set). Break rewards: hook 0x3a3874 answers the monster's
   own bui record (conditions = table 0x162a736 by break group).
 - **Quests.** tools/build_gog_quest.py --source <4U quest> (fee, rewards, HRP, subquest = GU type 8, digit = break
-  group or 7 tail sever); board slots by renaming DUMMY quest_group entries (stage.c gog_quest_index); 4U spawn
-  byte 3 sits where GU keeps the Hyper flag: keep GU's 0 and return 4U's value from code.
+  group or 7 tail sever); board slots by renaming DUMMY quest_group entries (allocations.toml quest_slots,
+  module/quest.c, only while the monster is installed); 4U spawn byte 3 sits where GU keeps the Hyper flag: keep
+  GU's 0 and return 4U's value from code.
 - **Armor / weapons.** tools/gear_em089.py (armor series 127 B + create / level rows + skill tree / skill +
   Arcane decorations) and tools/gear_weapons_em089.py (14 classes: Base / Level / Msg / Create / Process,
-  sharpness, bowgun ammo, bow coatings; one load-exit hook per table class, module/gear_hooks.txt). A smithy entry
+  sharpness, bowgun ammo, bow coatings; one load-exit hook per table class, module/gear_hooks.txt; a weapon
+  model's motion-set fix is a PWLF entry, a compound skill a SKIL entry). A smithy entry
   is listed once its first recipe material (flag byte 2) is owned (GU rule, test 10:39). Models keep their 4U
   numbers (GU did the same, and 4U-only numbers are free). Weapon motion sets (rPlayerWeaponList mGmkMotNo) may need
   a fix per model (gear_pwl 0x272910). Skills with no GU equivalent: new tree / skill records plus a has-skill hook
@@ -216,13 +252,17 @@ testable alone (the user checks the smithy or one quest).
   decoCreate rows bit-mapped in the save (288 bits, 275 used). Many 4U G decorations (Arcane, Honed, Cutting...)
   are reward-only in 4U: check the 4U recipe table (0xf553e0) before porting a recipe, and say so when a recipe is a
   port choice.
-- **Hunter's Notes.** module/notes.c + tools/notes_em089.py: three 123-entry tables (list 0x162d9f0 via data word
-  0x183ec4c, unlock conditions 0x162d1f8, display order 0x1631ef4) copied with one more entry, 7 loop bounds patched
-  (build.py WORD_PATCHES; two loops are unrolled by two and read one record past the end: keep a padding record),
-  save bits 123..127 free. Texts: description = 4U emExp[em number], tips page = 4U HunterNote tip under its title.
+- **Hunter's Notes.** module/notes.c + notes_em089.py (section NOTE: list record, unlock record, anchor entry; texts
+  as a TXTA append of HN_MonsterListMsg): three 123-entry tables (list 0x162d9f0 via data word 0x183ec4c, unlock
+  conditions 0x162d1f8, display order 0x1631ef4) copied from GU's at module_init with one entry per monster
+  (notes_entry = 123 + registry position), 7 loop bounds patched (build.py WORD_PATCHES; two loops are unrolled by
+  two and read one record past the end: a padding record follows; an odd total needs the unrolled 0x55FF3C
+  re-checked, build.py asserts), save bits 123..127 free (5 monsters at most). Texts: description = 4U emExp[em
+  number], tips page = 4U HunterNote tip under its title.
 - **Gear models.** tools/armor4u2gu.py (player bones 0-19 identical in both games, 20+ = cloth bones driven by the
   CTC; MRL templates from Capcom's own 4U -> GU pairs) and tools/weapon4u2gu.py (same pipeline + material
-  animations). Converted arcs go to module/romfs/nativeNX/arc/player/com/{m,f}/<model>/ and arc/weapon/wNN/.
+  animations). Converted arcs go to monsters/<name>/romfs/nativeNX/arc/player/com/{m,f}/<model>/ and
+  arc/weapon/wNN/ (its assets: notes/installer.md has the warning about gear without its monster).
   GU adds edge meshes (zero-area quads on hard edges, format 0x0CB68015) that 4U lacks: mod4u2gu
   convert(edges=True), same rule for armor and weapons (none on vertex-colour glow meshes). 4U glow meshes with
   vertex colour (0x7BA7401B) become GU 0xCBF6C01A (vcolour=True). Weapon drawMode 0xECD3 -> 0xECF3 when the GU
@@ -233,13 +273,17 @@ testable alone (the user checks the smithy or one quest).
   request IDs come from 4U. mSndMaterial (bone / iron hit set) has no 4U source. `check` / `selftest` verify.
 
 ### Phase 6: test loop
+0. Rebuild the monster's data and assets from the dumps: `monsters/<name>/build.sh` (every generator in order, then
+   `tools/portdata.py pack`; one line per step).
 1. Build both variants and check for 0 warnings:
    `python3 module/build.py`, and with defines, e.g. `GOG_DEFINES="GOG_STAGE_ALIAS TEST_HP_PCT=55 TEST_RAGE=60"`.
 2. Install only on the user's go:
-   `GOG_DEFINES=... GOG_MOD_ROOT=$HOME/.config/Ryujinx/mods python3 module/build.py install`.
-3. The user plays and closes. Read the log with `python3 tools/gogreport.py` (extend it for the new monster's
-   lines) and ask only about visuals.
-4. Uninstall: `rm -rf ~/.config/Ryujinx/mods/contents/0100770008dd8000/"<mod name>"`.
+   `GOG_DEFINES=... GOG_MOD_ROOT=$HOME/.config/Ryujinx/mods python3 module/build.py install` (exefs + every data
+   file + the assets of PORT_ASSETS = comma-separated names, default all, `none` = none) into the mod folder
+   "MH4U Port".
+3. The user plays and closes. Read the log with `python3 monsters/gogmazios/tools/gogreport.py` (extend it for the
+   new monster's lines; core lines start with `mh4uport:`) and ask only about visuals.
+4. Uninstall: `rm -rf ~/.config/Ryujinx/mods/contents/0100770008dd8000/"MH4U Port"`.
 Automated smoke runs without the user: tools/ryutest.sh. `build.py install` without GOG_MOD_ROOT installs into the
 isolated ryuroot/; `ryutest.sh gui` boots it windowed on hidden workspace 10 (headless `run` aborts ~1.5 s in) and
 its log (written to ~/.config/Ryujinx/Logs) shows the boot-time table patches (items, armor / skill / weapon /
@@ -309,9 +353,10 @@ Stop it with `ryutest.sh stop` (matches the cmdline: the gui process's /proc exe
 - Size: a very large monster means many bones, hitzones and break parts, possibly special camera code (4U LCM ids
   and the camera-event path 0x93457c -> GU 0xaa418, see em089_act.c) and special collision. Check its emd / etd
   layouts against emdata4u.py before building data.
-- Registry: it would be the second new monster (index 138, a free em number > 89), see Phase 3.
-- Content for a second monster (Phase 5b): its own save slot (dummy2 = index 106, id 0x1065) in the stats_add /
-  stats_hunted / save_hunts remaps; the next free DUMMY items (2986.. materials, 2893.. decorations); Notes entry
-  124 (grow the three Notes copies and the 7 bounds to 125, keep the padding record, save bit 124); its own quest
-  IDs and DUMMY quest_group slots; the gear tools are Gogmazios-specific (series 1287 / 1288, weapon IDs = the v1.0
-  counts): a second monster appends after them, so every "expected count" check moves.
+- Registry and content for a second monster: one allocations.toml entry (index 138, Notes entry 124, save slot 106 /
+  id 0x1065, name entry 106, the next DUMMY items 2986.. and decorations 2893.., its own file ID range, BGM IDs,
+  UI icon cell) and its package.toml; the core needs no edit for those (Phase 3). Still open per monster: its quest
+  IDs and DUMMY quest_group slots (only 11491 / 11492 and slots 1011009 / 1011003 are checked free: check more and
+  extend the pools), and its gear tools: the Gogmazios ones compute IDs as the v1.0 counts, a second monster's must
+  start at GU's count + alloc.offset(name, table) (allocations.toml [monster.append], frozen once released).
+- Its own folder monsters/<name>/ with a build.sh like Gogmazios'.
