@@ -31,6 +31,11 @@ Rules (port choices made for Gogmazios, kept for every monster):
   - Template: a GU pair of the same tier: max level, limit levels, defense table, colours, sound, look.
   - Defense: 4U defense x the GU / 4U ratio of the matching GU set (the monster's choice, spec defense).
   - Model: 4U's own numbers (GU keeps 4U model numbers; arcs from tools/armor4u2gu.py).
+  - Colour (C, 2026-10-21): 4U armor record +19 = an index into GU's table\\equipBaseColorData (125 RGB, resident.arc),
+    and GU's series record keeps it as the default dye of both colour slots (+116, +119): Zamtrios 0x2b, Zamtrios X
+    0x0b, Akantor X 0x0a, Kirin 0x29, Tigrex 0x16 equal in both games. 4U armor textures are grey metal tinted by
+    it (Zamtrios Z 0x36 = ff 91 41 gold; the template's 0x0b turned it icy silver, test 2026-10-21), so the default
+    is 4U's index (spec colour='template' keeps the template's).
   - Levels: the template's level rows (spheres), its monster materials swapped for ours.
 """
 import os, struct, sys
@@ -72,7 +77,7 @@ def armor_4u(exe, ptab_index, k):
     o = struct.unpack_from('<I', exe, 0xf58868 + 4 * ptab_index - EXE_BASE)[0] - EXE_BASE + 40 * k
     r = exe[o:o + 40]
     return dict(rare=r[5] + 1, defense=r[7], price=struct.unpack_from('<I', r, 8)[0],
-                res=list(struct.unpack_from('5b', r, 12)), slots=r[17],
+                res=list(struct.unpack_from('5b', r, 12)), slots=r[17], colour=r[19],
                 skills=[(r[30 + 2 * j], struct.unpack_from('b', r, 31 + 2 * j)[0]) for j in range(5) if r[30 + 2 * j]])
 
 
@@ -114,7 +119,7 @@ def armor(spec, R=None, exe=None):
         r = bytearray(series[8 + 127 * tpl_ids[g]: 8 + 127 * (tpl_ids[g] + 1)])
         p = [armor_4u(exe, pt, k0 + g) for (_, pt), k0 in zip(PARTS, spec['parts'])]
         assert all(x['rare'] == p[0]['rare'] and x['price'] == p[0]['price'] and x['res'] == p[0]['res'] and
-                   x['defense'] == p[0]['defense'] for x in p), p
+                   x['defense'] == p[0]['defense'] and x['colour'] == p[0]['colour'] for x in p), p
         struct.pack_into('<I', r, 0, first + g)
         struct.pack_into('<H', r, 4, first + g)                      # sort after every GU series
         struct.pack_into('<H', r, 11, spec['model'][g])
@@ -129,6 +134,8 @@ def armor(spec, R=None, exe=None):
                 struct.pack_into('<Hb', r, 28 + 15 * part + 3 * j, tree, pts)
         r[103] = p[0]['rare'] - 1
         r[106] = spec['defense'][p[0]['defense']]
+        if spec.get('colour', '4u') == '4u':        # default dye of both colour slots = 4U's tint (COLOUR notes)
+            r[116] = r[119] = p[0]['colour']
         r[108:113] = bytes(x['slots'] for x in p)
         recs.append(bytes(r))
     tables.append(dict(path='table\\armorSeriesData', cls=CLS_ARMOR_SERIES, rec_bytes=127, base=first,

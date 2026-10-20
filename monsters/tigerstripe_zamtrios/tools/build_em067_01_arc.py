@@ -40,8 +40,8 @@ sys.path.insert(0, os.path.join(ROOT, 'tools'))     # core converters + paths.py
 import paths
 sys.path.insert(0, paths.GU_PY)
 from romfs import RomFS
-import alloc, arcpack, ctr, efl4u2gu, emc, emdata4u, lcm4u2gu, mod as modlib, mod4u2gu, mrl, mrl_build, portdata, \
-    snd4u2gu, tex
+import alloc, arcpack, ctr, efl4u2gu, emc, emdata4u, lcm4u2gu, mod as modlib, mod4u2gu, mrl, mrl_anim, mrl_build, \
+    portdata, snd4u2gu, tex
 
 NAME = 'tigerstripe_zamtrios'
 ALLOC = alloc.monster(NAME)
@@ -112,15 +112,36 @@ def model(S, rom, notes):
                 tex_paths.append(gp); tex_index[gp] = len(tex_paths)
             slots[slot] = tex_index[gp]
         # template as em089's: blended -> 'add', emissive (4U CBMaterialStd emission > 0, diffuse 0) -> 'unlit',
-        # else the lit 'solid' (em092 has no normal map). 4U tExtendMap (body em092_05, fat body em092_07) has no
-        # slot in these templates: dropped, as em089's (look to check in game).
+        # else the lit 'solid' (em092 has no normal map). A lit 4U 'E0' material with a tExtendMap (body em092_05,
+        # fat body em092_07: sphere-map lighting textures) -> 'solid_sphere' with it as tSphereMap, as Capcom's
+        # converted 4U monsters (mrl_build notes); test 2026-10-21: the plain 'solid' left the puffed belly black.
         std = struct.unpack_from('<8f', mm['block'], 0x60)
         key = 'add' if 'BSAddAlpha' in states or 'BSBlendAlpha' in states else \
               'unlit' if max(std[0:3]) > 0 and max(std[4:7]) == 0 else 'solid'
+        ext = [v for n, t, v in mm['params'] if n == 'tExtendMap' and v]
+        consts = {}
+        if key == 'solid' and ext:
+            key = 'solid_sphere'
+            ext_tex = r4['textures'][ext[0] - 1][1]
+            if ext_tex not in gu_tex:
+                path = P + 'mod\\em067_01_' + ext_tex.split('em092_')[-1]
+                out.append((path, T['TEX'], tex.encode_gu(tex.decode(S[(ext_tex, T['TEX'])]), 'bc3')))
+                gu_tex[ext_tex] = path
+            if gu_tex[ext_tex] not in tex_index:
+                tex_paths.append(gu_tex[ext_tex]); tex_index[gu_tex[ext_tex]] = len(tex_paths)
+            slots['tSphereMap'] = tex_index[gu_tex[ext_tex]]
+            # 4U CBMaterialStd albedo / diffuse / emission (mrl_anim.static_constants); not its diffuse alpha (0 on
+            # these opaque 4U materials, GU fTransparency would hide them), specular a neutral 0.5 (4U 1.0, em019's
+            # template 0.7 / 0.3 / 0.3)
+            std_off = [v for n, t, v in mm['params'] if t == 1 and n == 'CBMaterialStd'][0]
+            consts = {k: v for k, v in mrl_anim.static_constants(mm['block'][std_off:], 1.0).items()
+                      if k in (('$Globals', 'fAlbedoColor'), ('CBMaterial', 'fDiffuseColor'), ('$Globals', 'fEmissionColor'))}
+            consts[('$Globals', 'fSpecularColor')] = (0.5, 0.5, 0.5)
         mtype = MTYPE.get(mname, int(re.search(r'_m(\d\d)_', mname).group(1)))
         extra = dict(mtype=mtype, bias=(mm['words'][7] >> 16) & 0xF)
-        mats.append((mname, key, slots, [s for s in states if s.startswith('RS')], {}, extra))
-        notes.append('material %s: template %s, type %d, %s' % (mname, key, mtype, src_tex.split('\\')[-1]))
+        mats.append((mname, key, slots, [s for s in states if s.startswith('RS')], consts, extra))
+        notes.append('material %s: template %s, type %d, %s%s' % (mname, key, mtype, src_tex.split('\\')[-1],
+                                                                ', sphere %s' % ext_tex.split('\\')[-1] if ext and key == 'solid_sphere' else ''))
     mod_bytes = mod4u2gu.convert(d4)
     mrl_bytes = mrl_build.build(rom, mats, tex_paths)
     assert [m[0] for m in mats] == modlib.parse(mod_bytes)['material_names'], 'MOD / MRL material lists differ'

@@ -31,6 +31,11 @@ TEMPLATES = {
     # tSpecularMap = its BM+A). Until 2026-10-17 'solid' was em004_00 mat 0, which is an UNLIT material
     # (fEmissionColor 1, fDiffuseColor 0, fSpecularColor 0): the em089 body rendered flat/washed out and fogged.
     'solid':    ('/nativeNX/arc/enemy/em030_00.arc', 'enemy\\em030\\em030_00\\mod\\em030_00', 0),  # tAlbedo, tSpecular
+    # 4U 'XfB__E0__' materials (lit by their tExtendMap sphere texture): Capcom's own conversion of that preset,
+    # em019_00 mat 0 'XfB__E0__m00_body' (tAlbedo, tSpecular, tSphereMap = the 4U extend texture, IASkinTB2wt; 25 GU
+    # enemy materials share the setup). Tigerstripe's body / fat body (test 2026-10-21: without it the puffed belly
+    # rendered black on its shadow side).
+    'solid_sphere': ('/nativeNX/arc/enemy/em019_00.arc', 'enemy\\em019\\em019_00\\mod\\em019_00', 0),
     # unlit/emissive (4U emission 1, diffuse 0: em089's eye material)
     'unlit':    ('/nativeNX/arc/enemy/em004_00.arc', 'enemy\\em004\\em004_00\\mod\\em004_00', 0),  # tAlbedo, tSpecular
     'add':      ('/nativeNX/arc/enemy/em037_00.arc', 'enemy\\em037\\em037_00\\mod\\em037_00', 3),  # BSAddAlpha: tAlbedo, tSpecular

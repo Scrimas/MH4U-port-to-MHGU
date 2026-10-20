@@ -10,7 +10,8 @@ Armor (choices, user 2026-10-20):
   - 4U "Zamtrios Z" (G rank, the only series made from Tigerstripe materials), Blademaster head / body / arms / waist
     / legs 528 / 532 / 516 / 516 / 524 (Gunner + 1). GU has Zamtrios and Zamtrios X only.
   - Template GU Zamtrios Helm X / Cap X (851 / 852, rarity 8 like 4U's set): max level, limit levels, defense table,
-    colours, sound, scraps given (Heavy Zamtrios Scrap); level rows' Hyper Zamtrios Piel -> T.Zamtrios Piel.
+    sound, scraps given (Heavy Zamtrios Scrap); level rows' Hyper Zamtrios Piel -> T.Zamtrios Piel. Default dye =
+    4U's colour 0x36 (gold ff 91 41; the template's icy 0x0b made it silver, test 2026-10-21).
   - Defense: 4U 86 / 46 x GU / 4U Zamtrios X (102 / 84, 61 / 45) -> 104 / 62.
   - Skills by name (Stam Recov, Rec Speed, Tremor Res, Bleeding); 4U FreeElemnt (Awaken, 5 points on the set, no
     skill at 5) has no GU tree: left out.

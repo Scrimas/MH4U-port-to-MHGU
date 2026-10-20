@@ -66,7 +66,8 @@ ARMOR = dict(
              [('Gogmazios Fortress', 5), ('Gogmazios Battlement', 4), ('Gogmazios Offenders', 5), ('Lrg ElderDragon Bone', 6)]],
     scrap=2985,                          # Gogmazios Scrap+ (items_em089), given back like the template's scraps
     level_swap={'Great Wyvern Crystal': 'Wartorn Dragonsphire'},   # template level-row materials -> Gogmazios
-    template_word='Akantor')
+    template_word='Akantor',
+    colour='template')                   # Akantor X's dye 0x0a (tested look, 2026-10-20); 4U Gogma's is 0x29
 # Arcane jewels. 4U decoration table 0xf578dc: 8-B records {u16 item, u8 size, u8 tree, s8 points, u8 tree, s8 points,
 # u8 0}, record = the item record's u16 at +10, minus 1 (C). 4U has NO recipe for them: they are among the 93
 # decorations absent from 4U's decoration recipe table (0xf553e0, 229 x 24 B) and come from weighted reward lists

@@ -459,8 +459,8 @@
   }
  ],
  "notes": [
-  "material XfB__E0__m00_body: template solid, type 0, em092_01_BM",
-  "material XfB__E0__m00_fatbig: template solid, type 1, em092_03_BM",
+  "material XfB__E0__m00_body: template solid_sphere, type 0, em092_01_BM, sphere em092_05_BM",
+  "material XfB__E0__m00_fatbig: template solid_sphere, type 1, em092_03_BM, sphere em092_07_BM",
   "material XfB_0__m02_eye: template unlit, type 2, em092_01_BM",
   "material XfB_0__m03_virs: template add, type 3, em092_06_BM",
   "parts states: 33 (GU layout), groups dropped (not in em092): [2, 3, 4, 7, 21, 22, 23, 26, 27, 28, 29, 102, 103, 105, 107, 109], hidden at spawn: [50]",

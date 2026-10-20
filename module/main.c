@@ -154,6 +154,14 @@ int stats_add_c(uint32_t *regs)
     /* kind = r2 at the entry, spilled to [sp+0x3c]; the caller's sp is just above the 8 saved registers */
     logf("mh4uport: %s quest-end tally kind %u -> save slot %x (index %u)", port_monsters[m].name,
          FIELD(uint32_t, regs, 32 + 0x3c), port_monsters[m].save_id, port_monsters[m].save_index);
+    /* diagnostic (Tigerstripe's kill left its hunt open, test 2026-10-21): the ID the objective loop compares (r4),
+     * the quest state byte (+0x50: 3..9 skip the done mark at 0x3a7a10) and the 3 objectives (+0xec + 12 k: flags,
+     * u16 target, u16 count left) */
+    uint32_t q = regs[R5];
+    logf("mh4uport: tally id %x state %u objectives %x/%x/%u %x/%x/%u %x/%x/%u", regs[R4], FIELD(uint8_t, q, 0x50),
+         FIELD(uint32_t, q, 0xec), FIELD(uint16_t, q, 0xf0), FIELD(uint16_t, q, 0xf2),
+         FIELD(uint32_t, q, 0xf8), FIELD(uint16_t, q, 0xfc), FIELD(uint16_t, q, 0xfe),
+         FIELD(uint32_t, q, 0x104), FIELD(uint16_t, q, 0x108), FIELD(uint16_t, q, 0x10a));
     return 0;
 }
 

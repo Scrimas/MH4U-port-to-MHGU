@@ -61,12 +61,12 @@ int stage_alias_active(void)
 {
 #ifdef TEST_STAGE_ALIAS
     return 1;
-#elif defined(GOG_STAGE_ALIAS)
+#elif !defined(NO_GOG_STAGE_ALIAS)
+    /* on by default since 2026-10-21: the quests are built for the alias (build_gog_quest.py --bq, its default), so
+     * a build without it sent them to the plain Fortress (test 2026-10-21). GOG_STAGE_ALIAS is still accepted. */
     return gog_quest_index() != 0;
 #else
-    /* off by default: Battlequarters geometry over the Fortress collision gave invisible walls (in-game test
-     * 2026-10-17). Collision + area info are converted now (m28.arc): test with GOG_DEFINES=GOG_STAGE_ALIAS and the
-     * quest built with `build_gog_quest.py --bq` (notes/stage.md section 10) */
+    /* NO_GOG_STAGE_ALIAS: for quests built with --legacy / --siege / --plain (Fortress data) */
     return 0;
 #endif
 }

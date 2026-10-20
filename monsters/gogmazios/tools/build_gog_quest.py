@@ -5,7 +5,8 @@
   --source: the 4U quest, m11014 "Advanced: Quagmire Quarrel" -> 11491 (default), m11035 "Advanced: Act of Gog" ->
   11492 (SOURCES). Build both after a change to the shared code.
   --bq (= the DEFAULT when no variant flag is given) = Battlequarters alias variant (stage 26, camp start, no siege,
-  Gogmazios in alias area 2 at (633.5, 0, 1510.8)); needs module/stage.c built with -DGOG_STAGE_ALIAS.
+  Gogmazios in alias area 2 at (633.5, 0, 1510.8)); module/stage.c applies the alias by default (-DNO_GOG_STAGE_ALIAS
+  turns it off for the Fortress-data variants).
   setEmMain: +0x0C u32 area, +0x10 f32 angle, x, y, z.
 
 Writes (default DIR = monsters/gogmazios/romfs, mirror of the game RomFS):
