@@ -891,6 +891,13 @@ Question: is EFL unit +0x18 bits 12-15 (kept 4U value) a darkening blend that GU
     NOW (user: use his own) build_gog_quest.py writes HP row 116 (GU row with HP 4.3 = 4U row 98's; GU row 98 has
     3.4) and attack / other row 98 (6.3 / 0.75 as 4U; status fields = GU's row 98: 2.9 / 2.5 / 2.0 / 2.0 / 2.8 vs
     4U 3.4 / 2.5 / 2.0 / 2.0 / 2.6, no GU row matches 4U's exactly). Quest rebuilt (bytes 01 74 62 62 checked).
+  - **2026-10-20 correction (C):** 98 was the 4U board-icon field (+0xE8, 98 = no icon), not the stat rows. The rows
+    are at 4U +0x34 {u16 size, u8, HP, attack, other, u8, u8} (copied to monster work +0x414..+0x416 at 0x68aa30;
+    HP 0x934084, attack 0x922d48, defense 0x922d78). m11014 65 / 109 / 79 (HP 2.05, attack 8.2, def 0.8; statuses
+    1.5 / 1.5 / 1.15 / 1.3 / 1.15), m11035 69 / 115 / 83 (2.17, 10, 0.8); GU's rows of the same numbers hold the same
+    values. User (same day): use them -> build_gog_quest.py reads them (tools/quest4u.py stats_4u). The old build had
+    about 2.1x 4U's HP and 77 % (11491) / 63 % (11492) of its attack, which fits the user's "doesn't attack hard
+    enough".
   - Powers: attackdata record +4 (u16 2) = power -> slot +0x38 (0x168c68); Kushala's 4U and GU records are
     identical, so GU did not rescale powers; em089's are 60 / 75 / 90 (Kushala 35-65). Body hits: power * owner rate
     (0x169548 -> 0x173c74); shells: power * owner rate at arm (0x4a2998).

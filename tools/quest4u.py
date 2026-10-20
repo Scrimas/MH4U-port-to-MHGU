@@ -19,7 +19,8 @@ Quest arc (loc/arc/quest/q<ID>.arc): v1.4 finds questLink at entry [count-9] and
 4U quest (loc/data/questNN.arc loc\\quest\\mNNNNN, 'v005'): 5 language tables (pointer +0xBC: eng fre spa ger ita),
   7 strings each; reward rows: header +0x1C row A, +0x20 row B, +0x24 subquest -> list {u32 0x8000, u32 table}
   closed by 0xFFFF, table = 6-byte {u16 chance, u16 item, u16 count} closed by 0xFFFF; fee / reward / sub reward
-  +0xA4 / +0xA8 / +0xAC, minutes +0xB4, quest number +0xC0, stage +0xC4.
+  +0xA4 / +0xA8 / +0xAC, minutes +0xB4, quest number +0xC0, stage +0xC4; boss stats +0x34 (stats_4u); +0xE8 5 x u16
+  board icons (98 = none), not stat rows.
 """
 import os, struct, sys
 
@@ -36,10 +37,29 @@ T_SET, T_ESL, T_REM, T_SUPP, T_PLUS, T_LINK, T_GMD, T_QD = (
     0x2553701d, 0x32ca92f8, 0x5b3c302d, 0x54539aee, 0x26bec21c, 0x00e0bb1c, 0x242bb29a, 0x1bbfd18e)
 REWARD_ROWS_4U = (0x1C, 0x20)
 SUB_ROW_4U = 0x24
+STATS_4U = 0x34
+NANDO_4U = 0xf3a330                # 4U em_nando_tbl, 32-B rows {HP, attack, other: defense + 5 status} (f32)
 
 
 def arc_files(data):
     return {p: (t, d) for p, t, d in arcpack.read(data)[1]}
+
+
+def stats_4u(q, R):
+    """a 4U quest's boss stat rows (HP, attack, other) for the GU boss record, R = GU RomFS. 4U +0x34 = {u16 size %,
+    u8, u8 HP, u8 attack, u8 other, u8, u8}; the spawn copies the three rows in this order to monster work +0x414..
+    +0x416 (0x68aa30), read by the HP setup 0x934084 (column 0), attack 0x922d48 (column 1), defense 0x922d78 and the
+    status code 0x91ca94 (columns 2..7). GU's em_nando_tbl (resident.arc, 16-B header) holds most of 4U's rows under
+    the same numbers but not all (row 98: HP 4.3 in 4U, 3.4 in GU): checked here column by column."""
+    from items4u import EXE, EXE_BASE
+    rows = tuple(q[STATS_4U + 3:STATS_4U + 6])
+    exe = open(EXE, 'rb').read()
+    gu = {p: d for p, t, d in arcpack.read(R.read('/nativeNX/loc/arc/resident.arc'))[1]}['enemy\\resident\\em_nando_tbl']
+    for row, cols in zip(rows, ((0,), (1,), range(2, 8))):
+        r4 = struct.unpack_from('<8f', exe, NANDO_4U - EXE_BASE + 32 * row)
+        rg = struct.unpack_from('<8f', gu, 16 + 32 * row)
+        assert all(r4[c] == rg[c] for c in cols), ('GU row differs from 4U', row, r4, rg)
+    return rows
 
 
 def text4u(q):

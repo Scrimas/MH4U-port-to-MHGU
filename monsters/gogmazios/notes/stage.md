@@ -312,8 +312,8 @@ report dump/stage_alias_report.json, texture cache dump/stage_cache/.
   Self-checks: the GMD writer reproduces the template's files, the arc reads back identical.
 - Content: template = Kushala G4 Hub q0011413 ("Steel Yourself", plain hunt) diffed byte by byte; stage 26, start in
   camp, 50 min, 3 carts, every board, hunt 0x59 x1, no subquest; fee 3600z / reward 35400z from 4U m11014, HRP 1880,
-  academy 2832 (chosen); stat tables 116/98/98 difficulty 1 (4U m11014 row 98 of em_nando_tbl, HP byte = GU row 116 with 4U's HP 4.3;
-  was Kushala G4's 91/108/93), size fixed 100 %
+  academy 2832 (chosen); stat tables = the 4U quest's rows (m11014 65/109/79, m11035 69/115/83, since 2026-10-20;
+  before: 116/98/98 read from the 4U icon field, port-checklist.md), difficulty 1, size fixed 100 %
   (no size data for index 137), board icon Kushala's (24); generic G rewards (spheres/bones); supply box from the
   template; text = 4U m11014 in 5 languages ("Advanced: Quagmire Quarrel", client "His Immenseness").
 - Spawn: setEmMain `b_m26em089_00` = area 1 with Lao-Shan's Fortress floats (-124, 15776, 0, 16592) (layout of the

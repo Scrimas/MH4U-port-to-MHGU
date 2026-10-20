@@ -102,9 +102,9 @@ def main():
     ap.add_argument('--bq', action='store_true',
                     help='Battlequarters alias (stage 26 + module/stage.c GOG_STAGE_ALIAS): start in camp, no siege '
                          '(questPlus_0000), Gogmazios in alias area 2 (= 4U arena m19a03d) at 4U m11014\'s spawn')
-    ap.add_argument('--hp-table', type=int, default=116,
-                    help='boss vital (HP) table byte, default 116 (GU em_nando_tbl row with HP 4.3 = 4U m11014 row 98\'s '
-                         'HP; GU row 98 has 3.4); a lower table = shorter tests')
+    ap.add_argument('--hp-table', type=int,
+                    help='boss vital (HP) table byte, default the 4U quest\'s (m11014 65 = HP x 2.05, m11035 69 = '
+                         'x 2.17); a lower table = shorter tests')
     ap.add_argument('--icon', type=int, default=ALLOC['ui_icon'] + 46,
                     help='board icon byte qd+0xD6. GU 0x3a3178: bytes < 142 = UI index + 1 (24 = Kushala, verified); '
                          '142..186 = hyper icons (remap table + badge at 0x613318: 147 showed Hyper Khezu in test 3). '
@@ -176,10 +176,12 @@ def main():
     # boss record = Kushala (0x18), a stand-in kept out of the quest setup's per-monster tables; module/main.c swaps
     # 0x18 -> 0x59 at spawn prep / creation for this quest only (quest ID [[0x188ad90]+0xe0]), as the TEST_SWAP builds
     # did. (The empty monster list of the first tests was the null questLink, see the arc layout below.)
-    # stat tables = rows of em_nando_tbl (GU loc resident.arc, 4U copy at 0xf3a330, same 32-B rows {HP, attack,
-    # defense, ...}): 4U m11014 / m11035 use row 98 for all three (HP 4.3, attack 6.3, defense 0.75); GU's row 98
-    # has the same attack / defense but HP 3.4 -> HP byte = GU row 116 (HP 4.3), attack and other = row 98
-    boss = struct.pack('<HBBBBBBBHBB', BOSS_ID, 0, 0, 1, a.hp_table, 98, 98, 1, 100, 0, 3)
+    # stat tables = rows of em_nando_tbl, the 4U quest's (tools/quest4u.py stats_4u): m11014 65 / 109 / 79 (HP 2.05,
+    # attack 8.2, defense 0.8), m11035 69 / 115 / 83 (2.17, 10, 0.8). Until 2026-10-20 the builder used 116 / 98 / 98
+    # (HP 4.3, attack 6.3, defense 0.75), read from the 4U board icons (+0xE8, 98 = no icon).
+    hp, atk, other = quest4u.stats_4u(q4, R)
+    if a.hp_table is not None: hp = a.hp_table
+    boss = struct.pack('<HBBBBBBBHBB', BOSS_ID, 0, 0, 1, hp, atk, other, 1, 100, 0, 3)
     qd[0x64:0x64 + 65] = boss + bytes(52)
     qd[0xD6:0xDB] = bytes([a.icon, 0, 0, 0, 0])    # board icon, default Kushala's 24 (= UI index 23 + 1, G)
     for i, lang in enumerate(LANGS):
