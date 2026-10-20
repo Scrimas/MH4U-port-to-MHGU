@@ -154,33 +154,8 @@ int stats_add_c(uint32_t *regs)
     /* kind = r2 at the entry, spilled to [sp+0x3c]; the caller's sp is just above the 8 saved registers */
     logf("mh4uport: %s quest-end tally kind %u -> save slot %x (index %u)", port_monsters[m].name,
          FIELD(uint32_t, regs, 32 + 0x3c), port_monsters[m].save_id, port_monsters[m].save_index);
-    /* diagnostic (Tigerstripe's kill left its hunt open, test 2026-10-21): the ID the objective loop compares (r4),
-     * the quest state byte (+0x50: 3..9 skip the done mark at 0x3a7a10) and the 3 objectives (+0xec + 12 k: flags,
-     * u16 target, u16 count left) */
-    uint32_t q = regs[R5];
-    logf("mh4uport: tally id %x state %u objectives %x/%x/%u %x/%x/%u %x/%x/%u caller %x", regs[R4],
-         FIELD(uint8_t, q, 0x50), FIELD(uint32_t, q, 0xec), FIELD(uint16_t, q, 0xf0), FIELD(uint16_t, q, 0xf2),
-         FIELD(uint32_t, q, 0xf8), FIELD(uint16_t, q, 0xfc), FIELD(uint16_t, q, 0xfe),
-         FIELD(uint32_t, q, 0x104), FIELD(uint16_t, q, 0x108), FIELD(uint16_t, q, 0x10a),
-         FIELD(uint32_t, regs, 32 + 100 + 32) - MAIN_BASE);   /* lr pushed at the entry, above the 100-B frame */
-    /* the quest's monster list of player 0 (0x3aa4ac: +0x6d4 key, +0x6d8 u16 ID from the spawn record, +0x6da) */
-    for (int k = 0; k < 4; k++)
-        if (FIELD(uint32_t, q, 0x6d4 + 16 * k))
-            logf("mh4uport: tally list %u: key %x id %x byte %u", k, FIELD(uint32_t, q, 0x6d4 + 16 * k),
-                 FIELD(uint16_t, q, 0x6d8 + 16 * k), FIELD(uint8_t, q, 0x6da + 16 * k));
-    return 0;
-}
-
-/* diagnostic, the same tally's exit (0x3a7f00, r5 = quest object): the objectives after its loop */
-int stats_exit_c(uint32_t *regs)
-{
-    static uint32_t s_n;
-    if (port_running_quest(0) < 0 || ++s_n > 12) return 0;
-    uint32_t q = regs[R5];
-    logf("mh4uport: tally exit state %u objectives %x/%x/%u %x/%x/%u %x/%x/%u", FIELD(uint8_t, q, 0x50),
-         FIELD(uint32_t, q, 0xec), FIELD(uint16_t, q, 0xf0), FIELD(uint16_t, q, 0xf2),
-         FIELD(uint32_t, q, 0xf8), FIELD(uint16_t, q, 0xfc), FIELD(uint16_t, q, 0xfe),
-         FIELD(uint32_t, q, 0x104), FIELD(uint16_t, q, 0x108), FIELD(uint16_t, q, 0x10a));
+    /* the quest clears when its rule's objectives are done (quest+0xe8 from questData +0x1d; check 0x3a027c): a
+     * one-hunt quest needs +0x1d = 0 (Tigerstripe test 2026-10-21, monsters/tigerstripe_zamtrios/notes/plan.md) */
     return 0;
 }
 
