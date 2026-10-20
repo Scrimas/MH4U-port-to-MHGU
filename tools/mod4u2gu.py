@@ -97,6 +97,10 @@ def read_4u_vertices(d, m, x):
         b = np.concatenate([v[:, 24:26], np.zeros((len(v), 2), np.uint8)], 1).astype(np.int64)
         w = np.concatenate([v[:, 26:28], np.zeros((len(v), 2), np.uint8)], 1).astype(np.float64) / 255.0
         tan = np.zeros((len(v), 4), np.int8)
+    elif x['fmt'] == 0x43FB3015 and st == 32:                  # 2 weights + tangent: the 36-B layout minus b2 b3 w2 w3
+        b = np.concatenate([v[:, 24:26], np.zeros((len(v), 2), np.uint8)], 1).astype(np.int64)
+        w = np.concatenate([v[:, 26:28], np.zeros((len(v), 2), np.uint8)], 1).astype(np.float64) / 255.0
+        tan = v[:, 28:32].view(np.int8)
     elif x['fmt'] == RIGID_4U and st == 24:
         return pos, nrm, uv, None, None, np.zeros((len(v), 4), np.int8)
     else:

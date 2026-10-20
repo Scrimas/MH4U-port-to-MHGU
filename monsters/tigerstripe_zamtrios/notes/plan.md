@@ -100,10 +100,28 @@ decision. Phase 1 study: [phase1-variant-map.md](phase1-variant-map.md). Process
   (11493: template q0011111 G1 Dunes; 4U spawn area 4 (-996, 57, 2142) = GU m05a04d floor y 57.2; rows 60/100/82
   = GU rows with the same values; subquest code 2 = top fin; rows A / B from 4U, row B's 0x8003 list as condition
   1; slots 2 / 3 the template's G1 coin tables; board icon = Zamtrios').
-- Lance line (Carnelian Lance -> Crystalis) to be ported with the 17 Kiranico weapons (user).
 - Open: no small monsters (4U spawns Bnahabra and Hermitaur, the text names them; GU has no Hermitaur); boss byte 8
   = 2 and size table 5 copied from GU's G Zamtrios hunts (meaning not traced); capture rewards not looked at.
-- Next: gear (armor Zamtrios Z, 19 weapons), then the board icon.
+- Gear (user choices 2026-10-20; tools/gear_em067_01.py on the new shared tools/gear4u.py + tools/weapons4u.py,
+  Gogmazios' gear sections and gear_hooks.txt byte-identical after the move):
+  - armor Zamtrios Z (series 1289 / 1290, template GU Zamtrios X 851 / 852): defense 86 / 46 scaled like Zamtrios X
+    -> 104 / 62; FreeElemnt (no GU tree) dropped; Meaty Piel -> Meaty Hide+; level-row Hyper Zamtrios Piel ->
+    T.Zamtrios Piel; template scraps (Heavy Zamtrios Scrap) kept; models 436 / 437 (tools/armor4u2gu.py).
+  - 19 weapons (Kiranico's 17 + Carnelian Lance -> Crystalis), own lines (create, then upgrades); Paralysis (Lance's
+    hidden 4U value made visible); bows from kiranico's page data (Blast arc shot, Spread/Rapid charges, coatings
+    Power / Poison / Para / Paint); IG Culldrone; recipe substitutes: Rhenoplos Bone -> Large Herbivore Bone,
+    B.Diablos Cortex -> Diablos Cortex, D.S.Queen Pectus+ -> S.Queen Pectus+, Blackcurl Stouthorn -> Diablos
+    Hardhorn, B.Tigrex Hardfang -> Tigrex Hardfang, Dire Blastheart -> Tigrex Mantle; 13 4U sharpness bars appended.
+  - sounds: each 4U weapon arc holds its line's parent set (Lance 90: lan049), GU ships them all: mSrqrNo = that set
+    (44 / 55 / 49 / 35 / 43 / 30 / 38 / 21 / 12), no sound arc written (GU's unused snd/090.arc left alone).
+  - motion sets (pl_wNN at the 9 model numbers) all point at existing gNN arcs: no PWLF fix (skeleton fit: smithy test).
+  - converters extended (Gogmazios' arcs byte-identical): armor4u2gu ships 4U env textures GU dropped (env_p052 /
+    env_p076) and has the weapon converter's relaxed template match; weapon4u2gu ignores MRL params whose texture
+    index is past the list (a float misread as a slot); mod4u2gu reads 4U vertex format 0x43FB3015 (2 weights +
+    tangent, 32 B; 600 4U weapon arcs use it).
+- Not ported: the four other-line weapons whose recipes use a TS material (SA Vermilion Bloodaxe, HH Crabby Castanet,
+  Parahazard Call+, event Hunter Master): their lines are not in GU.
+- Next: the board icon; then the first in-game test.
 
 ## Phase 5: tests (user sessions)
 Quest spawn, kill (TEST_HP_PCT=5), gear check, then the two-instance multiplayer test.

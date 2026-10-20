@@ -18,7 +18,8 @@ identical bones / bounding box / material names):
   meshes get one (9260 / 9296) and 98.8 % of Capcom's quad triangles are reproduced. Mesh numbers / table order
   then follow Capcom's. --no-edges gives the previous output.
 - own textures: 4U BM (ETC1A4 128x128, 4 mips) -> GU BC3 with the full mip chain; BM+A = the BM alpha as BC4
-  (Capcom: BM+A == BM alpha, corr 0.997). Common textures (env_pNNN_BM, m_/f_skin_BM) = GU's own copies.
+  (Capcom: BM+A == BM alpha, corr 0.997). Common textures (env_pNNN_BM, m_/f_skin_BM) = GU's own copies
+  (one GU dropped: the 4U arc's copy as BC3, same path).
 - MRL: per 4U material, the GU material Capcom made from the identical 4U parameter block (texture indices
   ignored; 2456 of 2604 4U keys give exactly one GU block), else from the nearest 4U block with the same states,
   texture-slot set and material type. GU material type (w6 bits 21-28) = 4U type >> 2 (sym 3, skin 2, else 0).
@@ -130,7 +131,23 @@ def pick_template(idx, m):
         plain = (tuple('RSMesh' if x.startswith('RSMeshBias') else x for x in s[0]),) + s[1:]
         cand = [e for e in idx if e['sig'] == plain and len(e['floats']) == len(fl)]
         how = 'nearest, RS state from 4U'
+    # no pair with these exact states (e.g. 4U Zamtrios Z f_helm436: BSBlendAlpha + DSZTestWrite + IABGBase): same
+    # blend state + texture slots + type, then same blend state + type; DS and RS taken from 4U (as weapon4u2gu.py)
+    st = lambda sig, k: [x for x in sig[0] if x.startswith(k)][:1]
+    for lvl, core in (('BS/DS/slots/type', lambda g: (st(g, 'BS'), st(g, 'DS'), g[1], g[2])),
+                      ('BS/slots/type', lambda g: (st(g, 'BS'), g[1], g[2])),
+                      ('BS/type', lambda g: (st(g, 'BS'), g[2]))):
+        if cand: break
+        same = [e for e in idx if core(e['sig']) == core(s)]
+        cand = [e for e in same if len(e['floats']) == len(fl)] or same
+        how = 'relaxed %s, DS+RS states from 4U' % lvl
     if not cand: raise SystemExit('no GU template with signature %s' % (s,))
+    if len({len(e['floats']) for e in cand}) > 1 or len(cand[0]['floats']) != len(fl):
+        cand = [e for e in cand if len(e['floats']) == len(cand[0]['floats'])]
+        n = min(len(fl), len(cand[0]['floats']))
+        d = [float(np.abs(np.nan_to_num(e['floats'][:n] - fl[:n])).sum()) for e in cand]
+        i = int(np.argmin(d))
+        return cand[i], '%s (L1 %.3f over %d, constant block sizes differ)' % (how, d[i], len(cand))
     d = [float(np.abs(np.nan_to_num(e['floats'] - fl)).sum()) for e in cand]
     i = int(np.argmin(d))
     return cand[i], '%s (L1 %.3f over %d)' % (how, d[i], len(cand))
@@ -147,8 +164,6 @@ def gu_common(paths):
         if '/arc/player/com/' not in k or not k.endswith('.arc'): continue
         for p, th, d in entries(r.read(k)):
             if th == T_TEX and p in want and p not in out: out[p] = d
-    missing = want - set(out)
-    if missing: raise SystemExit('GU has no %s' % sorted(missing))
     return out
 
 
@@ -182,7 +197,13 @@ def convert(src, idx, ctc=True, xfs_from=354, edges=True, log=print):
         gtex.append((p + '+A', tex.encode_gu(np.ascontiguousarray(a), 'bc4')))
     common = [p for th, p in r4['textures'] if th and '\\common\\' in p]
     gc = gu_common(common)
-    gtex += [(p, gc[p]) for p in common]
+    for p in common:
+        if p in gc:
+            gtex.append((p, gc[p]))
+        else:          # GU dropped this env texture: ship the 4U one (BC3, same path), as tools/weapon4u2gu.py
+            if p not in tex4: raise SystemExit('GU has no %s and the 4U arc does not carry it' % p)
+            gtex.append((p, tex.encode_gu(tex.decode(tex4[p]), 'bc3')))
+            log('  %s: not in GU, converted from 4U' % p)
     tpath = [p for p, _ in gtex]
     ti = lambda p: tpath.index(p) + 1
     mats = []
@@ -212,6 +233,11 @@ def convert(src, idx, ctc=True, xfs_from=354, edges=True, log=print):
         rs = [x for x in m['states'] if x and x.startswith('RSMeshBias')]
         if 'RS state from 4U' in how:     # GU w7 bits 16-19 = N of RSMeshBiasN (mrl_build W7_BIAS_SHIFT)
             states, extra['bias'] = (rs[0],), int(rs[0][len('RSMeshBias'):])
+        if 'DS+RS states from 4U' in how:
+            ds = [x for x in m['states'] if x and x.startswith('DS')]
+            r4s = [x for x in m['states'] if x and x.startswith('RSMesh') and not x.startswith('RSMeshC')]
+            states = tuple(ds[:1] + r4s[:1])
+            extra['bias'] = int(r4s[0][len('RSMeshBias'):]) if r4s and r4s[0].startswith('RSMeshBias') else 0
         mats.append((names[m['name']], key, slots, states, {}, extra))
         log('  %-34s <- %s %s mat %d  [%s] type %d' % (names[m['name']], t['gu'][0].split('com/')[1], t['gu'][1].split('\\')[-1],
                                                      t['gu'][2], how, mtype))

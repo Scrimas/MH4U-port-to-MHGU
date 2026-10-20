@@ -67,6 +67,8 @@ w14 = 27
 
 [monster.append]                        # records appended to GU's loaded tables (module/gear.c), per table
 armor_series = 2
+armor_create = 1                        # per armorCreateA00..A04
+armor_process = 5                       # armorProcessA00 level rows (the template's)
 skill_tree = 1
 skill = 1
 decoration = 4
@@ -104,6 +106,33 @@ standin_id = 0x43                       # its quests name Zamtrios (loader-visib
 quests = [11493]                        # 4U m10821 (m10830 dropped: its frenzied spawn needs 4U's frenzy system)
 quest_slots = [1011048]
 # its own icon cell: with the quests' board icon (porting plan Phase 4); until then the registry shows Zamtrios'
+armor_models = [436, 437]               # 4U Zamtrios Z Blademaster / Gunner (unused in GU)
+
+[monster.weapon_models]                 # per weapon class (GU model numbers = 4U's; unused in GU)
+w01 = 104
+w02 = 106
+w03 = 90                                # sounds: GU's set 049 (as 4U); GU's unused snd/090.arc is left alone
+w08 = 84
+w09 = 89
+w10 = 83
+w11 = 95
+w13 = 38
+w14 = 34
 
 [monster.append]
+armor_series = 2
+armor_create = 1
+armor_process = 6                       # Zamtrios X's level rows
+kireaji = 13
 notes_text = 1                          # description only (4U has no Tigerstripe tip; GU Zamtrios' is about ice)
+
+[monster.append.weapons]
+w01 = 2
+w02 = 2
+w03 = 2
+w08 = 2
+w09 = 2
+w10 = 2
+w11 = 2
+w13 = 3
+w14 = 2

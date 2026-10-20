@@ -68,11 +68,14 @@ def normalize_4u(d, keep_colour=True):
     mesh order, index values rebased (4U indices are absolute within a stream). keep_colour: each 0x7BA7401B mesh
     keeps its 32-B vertices, appended after that stream as its own block (vertexStart 0, streamOff = block offset,
     indices local), for mod4u2gu.convert(vcolour=True) -> GU 0xCBF6C01A; else cut to 28 B (colour dropped).
+    A 0x43FB3015 mesh (32 B = 0xD6784014 + tangent) next to 0xD6784014 ones (sou_l,r095: own stream at streamOff 0)
+    is cut to its 28-B 0xD6784014 part the same way (tangent dropped, as on the other meshes).
     Unchanged if already uniform."""
     m = modlib.parse(d)
     ms = m['mesh_list']
     if all(x['fmt'] == 0xD6784014 and x['streamOff'] == 0 for x in ms) or \
-            not all(x['fmt'] in (0xD6784014, 0x7BA7401B) for x in ms):
+            all(x['fmt'] == 0x43FB3015 and x['streamOff'] == 0 for x in ms) or \
+            not all(x['fmt'] in (0xD6784014, 0x7BA7401B, 0x43FB3015) for x in ms):
         return d
     vb = bytearray(); ib = bytearray(m['ib']); recs = [None] * len(ms)
     colour = [j for j, x in enumerate(ms) if keep_colour and x['fmt'] == 0x7BA7401B]
@@ -298,7 +301,11 @@ def convert(nn, src, idx, model=None, log=print):
             mrl_build.TEMPLATES[key] = t['gu'][:2] + (t['gu'][2],)
             gw, gblock, ganim, gm = gu_material(t)
             if ganim: _ANIMATED[key] = (gw, gblock, ganim)
-            p4 = {p[0]: r4['textures'][p[2] - 1][1] for p in m['params'] if p[1] == 3 and p[2] and r4['textures'][p[2] - 1][0]}
+            bad = [p for p in m['params'] if p[1] == 3 and p[2] > len(r4['textures'])]
+            if bad: log('  material %08x: params %s are no texture slots (index past the %d textures), ignored'
+                        % (m['name'], [(p[0], p[2]) for p in bad], len(r4['textures'])))
+            p4 = {p[0]: r4['textures'][p[2] - 1][1] for p in m['params']
+                  if p[1] == 3 and 0 < p[2] <= len(r4['textures']) and r4['textures'][p[2] - 1][0]}
             alb = gpath(p4['tAlbedoMap'])
             gs ={p[0]: p[2] for p in gm['mats'][t['gu'][2]]['params'] if p[1] == 3}
             spec_plusA = 'tSpecularMap' in gs and gm['textures'][gs['tSpecularMap'] - 1][1].endswith('+A')
