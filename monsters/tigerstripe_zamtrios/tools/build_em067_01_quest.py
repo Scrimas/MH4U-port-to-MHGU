@@ -73,6 +73,10 @@ def main():
     assert len(qd) == 329 and qd[0x12] == 11 and qd[0x14] == STAGE and qd[0x11] == 10
     tpl_reward, tpl_hrp = struct.unpack_from('<I', qd, 0x39)[0], struct.unpack_from('<I', qd, 0x4D)[0]
     struct.pack_into('<I', qd, 0x0C, QID)
+    # quest type 1 (single large-monster hunt, as Gogmazios' quests and 196 GU one-boss hunts; the template's 0): the
+    # objective init 0x3abea4 gives a type-1 hunt flag 0x100, which ends the quest when the kill completes it; type 0
+    # ends through the boss records, whose ID is the stand-in, not 0x143 (test 2026-10-21: kill counted, no clear)
+    qd[0x10] = 1
     qd[0x16] = struct.unpack_from('<I', q4, 0xB4)[0]       # 50 min (4U)
     qd[0x1F] = 1; struct.pack_into('<HH', qd, 0x20, EM_ID, 1)
     qd[0x24:0x29] = bytes(5)                               # no second objective (the template's Monoblos)
