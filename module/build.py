@@ -19,9 +19,23 @@ MONSTERS = alloc.monsters()        # registry order (allocations.toml): registry
 
 
 def package(m):
-    """monsters/<name>/package.toml: version, code = C prefix (<code>_register_class, g_<code>_dti)"""
+    """monsters/<name>/package.toml: version, code = C prefix (<code>_register_class, g_<code>_dti), gu_class = name
+    of the GU class that runs the monster instead (its donor's: a GU variant, e.g. uEm067_00 for em067_01)"""
     with open(os.path.join(paths.monster(m['name']), 'package.toml'), 'rb') as f:
         return tomllib.load(f)
+
+
+def gu_class_dti(m, raw):
+    """the donor's class DTI (main address) for a gu_class monster, checked against the name in package.toml"""
+    want = package(m)['gu_class']
+    dti = raw[m['donor_index']]
+    pkl = os.path.join(paths.GU_SCRATCH, 'dti.pkl')            # MHGU_Editor: DTI address -> {(name, ...)}
+    if os.path.exists(pkl):
+        import pickle
+        names = {n for n, _ in pickle.load(open(pkl, 'rb')).get(dti, ())}
+        if want not in names: sys.exit('%s: donor %d runs %s, not gu_class %s' % (m['name'], m['donor_index'],
+                                                                               names or '?', want))
+    return dti
 
 
 MAIN_IMG = paths.GU_MAIN   # MHGU 1.4 main, flat
@@ -76,6 +90,8 @@ HOOKS = [
     ('gear_skill_type', 0x4CEE64), ('gear_skill', 0x4CE98C),   # table load exits (r4 = res): Gogma records appended
     ('gear_deco', 0x191A20), ('gear_deco_create', 0x4C0CB0),   # rDecoData / rDecoCreateData: the Arcane jewels
     ('gear_has_skill', 0xE0DA0),   # (skills, id) -> has skill: Enlightened Blade counts as Element / Status Atk Up
+    ('em067_01_act', 0xF78F98),    # uEm067_00 slot 125 action dispatcher: Tigerstripe (variant 1) action / motion
+                                   # log (monsters/tigerstripe_zamtrios/module/em067_01_diag.c)
 ]
 # weapon / sharpness table load exits (gear.c GEAR_HOOK wrappers, out/gear_hooks.inc), "name 0xSITE", written by
 # monsters/gogmazios/tools/gear_weapons_em089.py (gu_class finds and checks each class's site)
@@ -120,7 +136,9 @@ NOTES_TABLES = {'notes_unlock': 0x162D1F8, 'notes_order': 0x1631EF4}
 # entry counts after the ported monsters (allocations.toml: registry indexes from 137, Notes entries from 123)
 REG_COUNT = 137 + len(alloc.monsters())
 NOTES_COUNT = 123 + sum('notes_entry' in m for m in alloc.monsters())
-assert NOTES_COUNT % 2 == 0, 'odd Notes count: re-check the unrolled loop 0x55FF3C (padding record)'
+# 0x55FF3C: entry 0, then pairs (i + 1, i + 2) until i == bound, so entries 0..bound and the bound must be even:
+# GU 123 entries -> 122; an even count -> the count (entries 0..count: the last is the padding record notes.c keeps)
+NOTES_PAIR_BOUND = NOTES_COUNT - NOTES_COUNT % 2
 
 
 def cmp_imm(word, imm):
@@ -135,10 +153,9 @@ WORD_PATCHES = [
     # Hunter's Notes list loops, 123 -> NOTES_COUNT entries (notes.c)
     (0x24588C, 0xE354007B, cmp_imm(0xE354007B, NOTES_COUNT)),  # talk condition 44: an entry is due
     (0x247B2C, 0xE354007B, cmp_imm(0xE354007B, NOTES_COUNT)),  # talk action 6: unlock every due entry
-    (0x5246BC, 0xE352007B, cmp_imm(0xE352007B, NOTES_COUNT)),  # em ID -> unlocked? (unrolled by 2: reads the padding)
+    (0x5246BC, 0xE352007B, cmp_imm(0xE352007B, NOTES_COUNT)),  # em ID -> unlocked? (unrolled by 2: an even count reads the padding)
     (0x524750, 0xE35C007B, cmp_imm(0xE35C007B, NOTES_COUNT)),  # em ID -> unlocked? (0x524728, same shape)
-    (0x55FF3C, 0xE352007A, cmp_imm(0xE352007A, NOTES_COUNT)),  # count by type (unrolled: cmp r2, #122 -> #124, reads
-                                                               # the padding)
+    (0x55FF3C, 0xE352007A, cmp_imm(0xE352007A, NOTES_PAIR_BOUND)),  # count by type (unrolled by two, see above)
     (0x55FF84, 0xE35E007B, cmp_imm(0xE35E007B, NOTES_COUNT)),  # n-th entry of a type
     (0x5B0CB8, 0xE355007B, cmp_imm(0xE355007B, NOTES_COUNT)),  # list screen: visible entries in display order
 ]
@@ -165,7 +182,9 @@ def reg_tables_asm(img):
                 vals = ['0x%x' % v for v in raw]
             for k, m in enumerate(MONSTERS):
                 donor = 0 if CLONE_RATHIAN else m['donor_index']
-                if sym == 'reg_dti':
+                if sym == 'reg_dti' and 'gu_class' in package(m) and not CLONE_RATHIAN:
+                    vals.append('0x%x' % (MAIN_BASE + gu_class_dti(m, raw)))
+                elif sym == 'reg_dti':
                     vals.append(vals[0] if CLONE_RATHIAN else 'g_%s_dti' % package(m)['code'])
                 elif sym == 'reg_files':
                     vals.append('port_manifests + %d' % (51 * 4 * k))   # donor's, then the data file's (port.c)
@@ -176,8 +195,8 @@ def reg_tables_asm(img):
                     if em >= len(vals):                # a new em number: its own size class (a GU one keeps GU's)
                         vals += ['0'] * (em + 1 - len(vals))
                         vals[em] = str(m['mapicon_class'])
-                elif sym == 'reg_icon' and not CLONE_RATHIAN:
-                    vals.append(str(m['ui_icon']))     # own icon cell (monsters/<name>/tools/ui_*.py)
+                elif sym == 'reg_icon' and not CLONE_RATHIAN and 'ui_icon' in m:
+                    vals.append(str(m['ui_icon']))     # own icon cell (monsters/<name>/tools/ui_*.py), else the donor's
                 else:
                     vals.append(vals[donor])
         directive = '.hword' if size == 2 else '.word'
@@ -191,14 +210,15 @@ def monsters_c():
     """port_monsters.c: the registered monsters for the core (port.h)"""
     out = ['/* port_monsters.c: generated by module/build.py from allocations.toml + package.toml -- do not edit */',
            '#include "port.h"']
-    out += ['void %s_register_class(void);' % package(m)['code'] for m in MONSTERS]
+    own = [m for m in MONSTERS if 'gu_class' not in package(m)]      # gu_class monsters register no class
+    out += ['void %s_register_class(void);' % package(m)['code'] for m in own]
     out.append('const struct port_monster port_monsters[] = {')
     for m in MONSTERS:
         q, s = (m.get('quests', []) + [0, 0])[:2], (m.get('quest_slots', []) + [0, 0])[:2]
-        out.append('    {"%s", 0x%x, %d, %d, 0x%x, %d, 0x%x, %d, %d, {%d, %d}, {%d, %d}, %s_register_class},' % (
+        out.append('    {"%s", 0x%x, %d, %d, 0x%x, %d, 0x%x, %d, %d, {%d, %d}, {%d, %d}, %s},' % (
             m['name'], m['em_id'], m['registry_index'], m['donor_index'], m.get('standin_id', 0), m['save_index'],
             0x1064 + m['save_index'] - 105, m['name_entry'], m['notes_entry'], q[0], q[1], s[0], s[1],
-            package(m)['code']))
+            '%s_register_class' % package(m)['code'] if m in own else '0'))
     return '\n'.join(out + ['};']) + '\n'
 
 OUT = os.path.join(HERE, 'out')

@@ -29,6 +29,18 @@ def parse(d):
     return ver, groups
 
 
+def to_gu(b):
+    """4U EMC has 23 groups, GU 21; 4U's last two are empty. Keep every offset: rows 21-22 become padding."""
+    magic, ver, ng, _ = struct.unpack_from('<4sIII', b, 0)
+    assert magic == b'EMC\0' and ver == 0x20120804 and ng == 23
+    for g in (21, 22):
+        assert struct.unpack_from('<I', b, 16 + 16 * g)[0] == 0, 'group %d not empty' % g
+    b = bytearray(b)
+    struct.pack_into('<I', b, 8, 21)
+    b[16 + 16 * 21:16 + 16 * 23] = bytes(32)
+    return bytes(b)
+
+
 def refs(code):
     """heuristic: `00 cat num` with cat < 14 at a token start, and `14 nn`."""
     nat, calls = [], []

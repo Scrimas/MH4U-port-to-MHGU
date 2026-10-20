@@ -82,3 +82,17 @@ w11 = 2
 w12 = 2
 w13 = 3
 w14 = 2
+
+[[monster]]
+name = "tigerstripe_zamtrios"           # folder monsters/tigerstripe_zamtrios (4U em092)
+title = "Tigerstripe Zamtrios"
+em_id = 0x143                           # Zamtrios (em 67) variant 1: GU's own class runs it (package.toml gu_class)
+registry_index = 138
+donor_index = 56                        # Zamtrios em067_00: its class, cro, flags, per-index records, map icon
+file_ids = [0x10740, 0x1077f]
+save_index = 106
+name_entry = 106
+notes_entry = 124
+items = [2986, 2990]                    # 4U 1357..1361 (T.Zamtrios Shard, Piel, Grandfin, Sawtooth+, Tailbrand)
+# with its quests (porting plan Phase 4): quests 11493 / 11494 (free, checked 2026-10-20), their board slots, the
+# Zamtrios stand-in (0x43) and its own icon cell; until then the registry shows Zamtrios' icon

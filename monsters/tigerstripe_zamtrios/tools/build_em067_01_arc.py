@@ -1,0 +1,346 @@
+"""build_em067_01_arc.py : build nativeNX/arc/enemy/em067_01.arc (Tigerstripe Zamtrios = GU Zamtrios variant 1,
+ID 0x143) + its data file section FILE.
+
+  build_em067_01_arc.py      build, verify, then write (paths in monsters/tigerstripe_zamtrios/):
+      romfs/nativeNX/arc/enemy/em067_01.arc
+      tools/em067_01_manifest.json         (51 manifest fields, file IDs, sources)
+      gen/FILE.sec                         (data file section FILE: manifest + file table, tools/portdata.py)
+
+Layout = GU's own variant arcs (em001_02.arc): the variant's own files under enemy\\em067\\em067_01\\..., the files it
+shares with variant 0 under em067_00's paths and file IDs, so the arc works alone and shares those resources with an
+em067_00 in the same quest. GU's class uEm067_00 runs it (variant byte 1, notes/phase1-variant-map.md).
+  own, converted from MH4U em092.arc:
+      mod\\em067_01 MOD + MRL       tools/mod4u2gu.py; MRL from GU templates (tools/mrl_build.py)
+      mod\\em067_01_NN_BM (+A)      albedo textures (BC3) + GU specular maps made from their alpha
+      mod\\em067_01 XFS             GU em067_00's 33 parts states, kept for em092's mesh groups
+      mot\\em067_01_0/2/3/4         4U motion lists (LMT 67, unchanged): GU's variant-1 code asks for em092's motions
+      mot\\em067_01_cam             4U camera list (tools/lcm4u2gu.py)
+      cmd_tbl\\em067_01_cmdtbl      4U command table, GU group count (tools/emc.py to_gu)
+      effects                       tools/efl4u2gu.py effect_set: em092's EFLs (+ the qe families its MEF names) under
+                                    their 4U paths, PEL u list 1 from its MEF (the 4U ids its motions' PSLs name), list
+                                    2 = GU em067_00u's (GU's class posts GU ids), PSL per motion list from its LMTs;
+                                    area colour = the Dunes' (its 4U quests' stage 17)
+      body_data\\em067_01_bodydata   GU em067_00's minus the 2 records 4U em092 drops from em022's (bones 142, 131)
+      dt_tune\\em067_01_dttune       GU em067_00's + the bytes where tools/dt_convert.py gives em092 != em022
+      sound call / waves / bank / request   tools/snd4u2gu.py monster_entries (see sound())
+  shared, GU em067_00 (original paths + file IDs): sound triggers (PTS c / u), PEL c, shell arc, attack data, hitsize,
+      cambodydata, dtbase, dtbparts, area data, carves (hagi): 4U em022 and em092 convert to the same attack / hit /
+      cambody / dtbase data (checked 2026-10-20), so GU's own tuning of them stays. Carves: plan Phase 4.
+Inputs besides the arcs: dump/converted/em092/dt_em022/ and dt_em092/ (build.sh step dt: tools/dt_convert.py in the
+MHGU_Editor venv, donor em067_00) and the 4U ROM (core effect arcs, Dunes area colours).
+"""
+import json, os, re, struct, sys, zlib
+import numpy as np
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+MON = os.path.dirname(HERE)                         # monsters/tigerstripe_zamtrios
+ROOT = os.path.dirname(os.path.dirname(MON))
+sys.path.insert(0, os.path.join(ROOT, 'tools'))     # core converters + paths.py
+import paths
+sys.path.insert(0, paths.GU_PY)
+from romfs import RomFS
+import alloc, arcpack, ctr, efl4u2gu, emc, emdata4u, lcm4u2gu, mod as modlib, mod4u2gu, mrl, mrl_build, portdata, \
+    snd4u2gu, tex
+
+NAME = 'tigerstripe_zamtrios'
+ALLOC = alloc.monster(NAME)
+FILE_ID_BASE, FILE_ID_LAST = ALLOC['file_ids']      # IDs served by the module (allocations.toml)
+SRC_4U = os.path.join(ROOT, 'dump/romfs/data/em092.arc')
+GU_ARC = '/nativeNX/arc/enemy/em067_00.arc'
+OUT_ARC = os.path.join(MON, 'romfs/nativeNX/arc/enemy/em067_01.arc')
+OUT_JSON = os.path.join(HERE, 'em067_01_manifest.json')
+FILES_TABLE = 0x1732A68          # registry index -> manifest (51 x s32 file IDs)
+FILEID_TABLE = 0x15A0CE0         # file ID -> (path hash, type hash), 8 B, entry = ID
+T = dict(MOD=0x58A15856, MRL=0x2749C8A8, TEX=0x241F5DEB, LMT=0x76820D81, XFS=0x7CD0E77E, EMC=0x3AABBA02,
+         LCM=0x39C52040)
+P4 = 'enemy\\em092\\'            # 4U source paths
+P0 = 'enemy\\em067\\em067_00\\'  # GU variant 0
+P = 'enemy\\em067\\em067_01\\'   # ours
+BANKS = (0, 2, 3, 4)             # motion lists of em092 and em067_00 (neither has list 1): manifest field 4 + bank
+# manifest fields with our own file: IDs are given in this order (append only: IDs never move once shipped)
+OWN_ORDER = [0, 3, 4, 6, 7, 8, 11, 37, 17, 18, 20, 21, 22, 30, 33, 12, 13]
+DT_DIR = os.path.join(ROOT, 'dump/converted/em092')           # build.sh step dt
+PEL_U = 'effect\\pel\\em\\em067_01u'
+PSL = 'effect\\psl\\enemy\\em067\\em067_01\\mot\\em067_01_%d'
+BODYDATA_DROP = {12: 142, 13: 131}  # em022 / GU bodydata record -> its bone A: the records em092 does not have
+# Material type (MRL w6 bits 21-28) = the 'mNN' of the 4U name, except the fat body: GU renamed Zamtrios'
+# 'XfB__E0__m00_fatbig' (4U em022 and em092) to 'XfB__E0__m01_fatbig' (em067_00 MRL w6 type 1; its other types
+# follow the names: body 0, eye 2), so GU's class may address it by type 1 (S: not traced in the code).
+MTYPE = {'XfB__E0__m00_fatbig': 1}
+# 4U group 50 (eye + m03_virs material; 4U row: shown only while condition 10 holds) is not in GU's model, so no GU
+# state names it: hidden in the base state, as GU Zamtrios never shows it.
+HIDDEN_GROUPS = (50,)
+
+
+def phash(path):
+    return zlib.crc32(path.encode('ascii')) ^ 0xFFFFFFFF
+
+
+def manifest_of(img, index):
+    return list(struct.unpack_from('<51i', img, struct.unpack_from('<I', img, FILES_TABLE + 4 * index)[0]))
+
+
+def fileid_entry(img, fid):
+    return struct.unpack_from('<II', img, FILEID_TABLE + 8 * fid)
+
+
+def model(S, rom, notes):
+    """em092 MOD + MRL + textures -> [(path, type, data)], the parsed 4U MOD. MRL before MOD, as in GU's arcs: a model
+    fetches its materials by path while it loads (a MOD packed first loads without them: em089 test 2026-10-17)."""
+    src = P4 + 'mod\\em092'
+    d4 = S[(src, T['MOD'])]
+    m4, r4 = modlib.parse(d4), mrl.read(S[(src, T['MRL'])])
+    out, gu_tex, tex_paths, tex_index, mats = [], {}, [], {}, []
+    for mname in m4['material_names']:
+        mm = [x for x in r4['mats'] if x['name'] == mrl_build.name_hash(mname)]
+        assert len(mm) == 1, mname
+        mm = mm[0]
+        states = [s for s in mm['states'] if s]
+        albedo = [v for n, t, v in mm['params'] if n == 'tAlbedoMap'][0]
+        src_tex = r4['textures'][albedo - 1][1]
+        if src_tex not in gu_tex:
+            # GU specular map '<BM>+A' = the BM alpha (4U specular mask) in R, G, B, alpha 255 (build_em089_arc.py)
+            t = tex.decode(S[(src_tex, T['TEX'])])
+            s = np.empty_like(t); s[..., 0] = s[..., 1] = s[..., 2] = t[..., 3]; s[..., 3] = 255
+            path = P + 'mod\\em067_01_' + src_tex.split('em092_')[-1]
+            out += [(path, T['TEX'], tex.encode_gu(t, 'bc3')), (path + '+A', T['TEX'], tex.encode_gu(s, 'bc3'))]
+            gu_tex[src_tex] = path
+        slots = {}
+        for slot, gp in (('tAlbedoMap', gu_tex[src_tex]), ('tSpecularMap', gu_tex[src_tex] + '+A')):
+            if gp not in tex_index:
+                tex_paths.append(gp); tex_index[gp] = len(tex_paths)
+            slots[slot] = tex_index[gp]
+        # template as em089's: blended -> 'add', emissive (4U CBMaterialStd emission > 0, diffuse 0) -> 'unlit',
+        # else the lit 'solid' (em092 has no normal map). 4U tExtendMap (body em092_05, fat body em092_07) has no
+        # slot in these templates: dropped, as em089's (look to check in game).
+        std = struct.unpack_from('<8f', mm['block'], 0x60)
+        key = 'add' if 'BSAddAlpha' in states or 'BSBlendAlpha' in states else \
+              'unlit' if max(std[0:3]) > 0 and max(std[4:7]) == 0 else 'solid'
+        mtype = MTYPE.get(mname, int(re.search(r'_m(\d\d)_', mname).group(1)))
+        extra = dict(mtype=mtype, bias=(mm['words'][7] >> 16) & 0xF)
+        mats.append((mname, key, slots, [s for s in states if s.startswith('RS')], {}, extra))
+        notes.append('material %s: template %s, type %d, %s' % (mname, key, mtype, src_tex.split('\\')[-1]))
+    mod_bytes = mod4u2gu.convert(d4)
+    mrl_bytes = mrl_build.build(rom, mats, tex_paths)
+    assert [m[0] for m in mats] == modlib.parse(mod_bytes)['material_names'], 'MOD / MRL material lists differ'
+    out += [(P + 'mod\\em067_01', T['MRL'], mrl_bytes), (P + 'mod\\em067_01', T['MOD'], mod_bytes)]
+    return out, m4
+
+
+def parts_xfs(gu_xfs, groups, notes):
+    """GU em067_00's parts states (rMonsterPartsManager XFS) for em092's mesh groups. 4U em092's visibility rows are
+    a subset of em022's, identical for every group they share, so the GU states mean the same for those groups."""
+    r, states = emdata4u.parse_xfs_states(gu_xfs)
+    data, nobj = emdata4u.xfs_states(states)
+    assert data == gu_xfs[r:], 'XFS round trip differs: emdata4u.xfs_states no longer matches GU files'
+    kept = [[(g, v) for g, v in st if g in groups] for st in states]
+    unnamed = sorted(set(groups) - {g for st in states for g, _ in st} - set(HIDDEN_GROUPS))
+    assert not unnamed, 'em092 groups without a GU state: %s' % unnamed
+    kept[0] += [(g, 0) for g in HIDDEN_GROUPS if g in groups]
+    data, nobj = emdata4u.xfs_states(kept)
+    head = bytearray(gu_xfs[:r])
+    struct.pack_into('<I', head, 8, nobj)
+    dropped = sorted({g for st in states for g, _ in st} - set(groups))
+    notes.append('parts states: %d (GU layout), groups dropped (not in em092): %s, hidden at spawn: %s' % (
+        len(kept), dropped, list(HIDDEN_GROUPS)))
+    return bytes(head) + data
+
+
+def dunes_soil(notes):
+    """RGBA area colour for the effects: the per-channel median of the 4U Dunes hunting areas' area_color_soil
+    (stage\\m17d\\m17aNNd\\sdl\\m17aNNd-col, areas 1..11; same 455-byte SDL layout as the Battlequarters' m19a03d-col
+    whose soil efl4u2gu documents, colour at +0xd0). GU has no area tint: one colour is baked in."""
+    m19 = os.path.join(ROOT, 'dump/m19_unpacked/m19a03/stage/m19d/m19a03d/sdl/m19a03d-col.4c0db839')
+    ref = open(m19, 'rb').read()
+    names = re.findall(rb'[ -~]{4,}', ref)
+    n, _ = ctr.main_ncch(efl4u2gu.ROM_4U)
+    fs = n.romfs_reader()
+    cols = []
+    for a in range(1, 12):
+        _, ents = arcpack.read(fs.read('/loc/data/m17a%02d.arc' % a))
+        d = [d for p, t, d in ents if p == 'stage\\m17d\\m17a%02dd\\sdl\\m17a%02dd-col' % (a, a)][0]
+        assert len(d) == len(ref) and re.findall(rb'[ -~]{4,}', d) == names, 'm17a%02dd-col layout' % a
+        cols.append([round(255 * x) for x in struct.unpack_from('<4f', d, 0xd0)])
+    soil = bytes(sorted(c[i] for c in cols)[len(cols) // 2] for i in range(4))
+    notes.append('effect area colour: Dunes soil median %s (areas 1..11: %s)' % (tuple(soil), cols))
+    return soil
+
+
+def effects(gu_pel_u, notes):
+    """em092's effects (tools/efl4u2gu.py effect_set) -> [(path, type, data)]. MEF groups: 92 = its own EFL family,
+    others = the 4U common qe families (qe000 / 006 / 008 / 013 exist in the core arcs)."""
+    groups = {92: 'effect\\efl\\em\\em092\\em092_%03d'}
+    groups.update({g: 'effect\\efl\\qe\\qe%03d\\qe%03d_%%03d' % (g, g) for g in (0, 6, 8, 13)})
+    spec = dict(arc=SRC_4U, stage_unpacked=[], mef='effect\\mef\\em\\em092_0', em_efl='effect\\efl\\em\\em092\\',
+                groups=groups, extra=[], lmts=[(P4 + 'mot\\em092_%d' % b, PSL % b) for b in BANKS], pel=PEL_U,
+                soil=dunes_soil(notes), list2=efl4u2gu.pel_lists(gu_pel_u)[2])
+    log = []
+    out = efl4u2gu.effect_set(spec, log)
+    notes.append('effects: %d entries (tools/efl4u2gu.py effect_set)' % len(out))
+    notes += ['  ' + l for l in log if not l.startswith('EFL ')]
+    return [(p, t, d) for (p, t), d in out.items()]
+
+
+def sound(rom, notes):
+    """em092's sound call, waves, bank and request (tools/snd4u2gu.py monster_entries) -> ([(path, type, data)],
+    {field: (path, type)}). Common-bank requests from GU em067_00 (same numbers in every GU monster), plus the ones GU's
+    Zamtrios adds (800-827, 9999: its class may post them). GU's own-bank additions 212 / 220 / 221 / 230 have no
+    em092 wave group: not ported (silent if GU's code posts them). Request numbers otherwise line up: em092 holds all
+    of em022's (GU's code posts em022 numbers) + 6 of its own."""
+    spec = dict(name='em092', src=SRC_4U, p4_wave='sound\\se\\em\\em092\\wave\\', pg_wave='sound\\se\\em\\em067_01\\wav\\',
+                p4_bank='sound\\se\\em\\em092\\snd_em092', pg_bank='sound\\se\\em\\em067_01\\snd_em067_01',
+                p4_call='sound\\call\\em\\em092', pg_call='sound\\call\\em\\em067_01', donor_arc=GU_ARC,
+                donor_name='GU em067_00', donor_extra=True)
+    log = []
+    out = snd4u2gu.monster_entries(spec, rom=rom, log=log)
+    snd4u2gu.verify(out, spec)
+    notes += log
+    return out, {12: (spec['pg_call'], snd4u2gu.TG['CALL']), 13: (spec['pg_bank'], snd4u2gu.TG['REQ'])}
+
+
+def bodydata(gu, notes):
+    """GU em067_00's bodydata minus the records em092 lacks (4U em022 -> em092 drops exactly those, the others are
+    identical in 4U; GU retuned values in the shared ones, which stay)."""
+    d22 = emdata4u.bodydata(emdata4u.load_4u('em022')['emd'], 8)
+    d92 = emdata4u.bodydata(emdata4u.load_4u('em092')['emd'], 8)
+    rec = lambda b: [b[16 + 44 * k:60 + 44 * k] for k in range(struct.unpack_from('<I', b, 8)[0])]
+    r22, r92, rg = rec(d22), rec(d92), rec(gu)
+    assert len(rg) == len(r22) and [r for k, r in enumerate(r22) if k not in BODYDATA_DROP] == r92
+    for k, bone in BODYDATA_DROP.items():
+        assert struct.unpack_from('<H', rg[k], 0)[0] == bone == struct.unpack_from('<H', r22[k], 0)[0], k
+    keep = [r for k, r in enumerate(rg) if k not in BODYDATA_DROP]
+    head = bytearray(gu[:16])
+    struct.pack_into('<I', head, 8, len(keep))
+    tail = gu[16 + 44 * len(rg):]
+    notes.append('bodydata: GU em067_00 minus records %s (bones %s)' % (sorted(BODYDATA_DROP),
+                                                                        sorted(BODYDATA_DROP.values())))
+    return bytes(head) + b''.join(keep) + tail
+
+
+def dttune(gu, notes):
+    """GU em067_00's dttune + the bytes where tools/dt_convert.py (donor em067_00) gives em092 != em022: Tigerstripe's
+    4U differences on GU's own Zamtrios tuning (GU's retuned bytes and these never overlap: asserted)."""
+    c22 = open(os.path.join(DT_DIR, 'dt_em022', 'dttune.bin'), 'rb').read()
+    c92 = open(os.path.join(DT_DIR, 'dt_em092', 'dttune.bin'), 'rb').read()
+    assert len(c22) == len(c92) == len(gu)
+    delta = [i for i in range(len(gu)) if c22[i] != c92[i]]
+    retuned = {i for i in range(len(gu)) if c22[i] != gu[i]}
+    assert not retuned & set(delta), 'GU retuned bytes Tigerstripe changes: %s' % sorted(retuned & set(delta))
+    out = bytearray(gu)
+    for i in delta: out[i] = c92[i]
+    notes.append('dttune: GU em067_00 + %d bytes of 4U em022 -> em092 differences (GU retuned %d other bytes)' % (
+        len(delta), len(retuned)))
+    return bytes(out)
+
+
+def main():
+    img = open(paths.GU_MAIN, 'rb').read()
+    rom = RomFS(paths.GU_ROMFS)
+    _, src = arcpack.read(open(SRC_4U, 'rb').read())
+    S = {(p, t): d for p, t, d in src}
+    _, gents = arcpack.read(rom.read(GU_ARC))
+    ghash = {(phash(p), t): (p, t) for p, t, _ in gents}
+    gman = manifest_of(img, ALLOC['donor_index'])
+    notes = []
+
+    # ---- our own files
+    own, ents = {}, []
+    files, m4 = model(S, rom, notes)
+    ents += files
+    own[0] = (P + 'mod\\em067_01', T['MOD'])
+    gu_xfs = [d for p, t, d in gents if (p, t) == (P0 + 'mod\\em067_00', T['XFS'])][0]
+    groups = sorted({x['group'] for x in m4['mesh_list']})
+    ents.append((P + 'mod\\em067_01', T['XFS'], parts_xfs(gu_xfs, groups, notes)))
+    own[3] = (P + 'mod\\em067_01', T['XFS'])
+    for b in BANKS:
+        ents.append((P + 'mot\\em067_01_%d' % b, T['LMT'], S[(P4 + 'mot\\em092_%d' % b, T['LMT'])]))
+        own[4 + b] = (P + 'mot\\em067_01_%d' % b, T['LMT'])
+    ents.append((P + 'mot\\em067_01_cam', T['LCM'], lcm4u2gu.convert(S[(P4 + 'mot\\e092_cam', T['LCM'])])))
+    own[11] = (P + 'mot\\em067_01_cam', T['LCM'])
+    ents.append(('enemy\\cmd_tbl\\em067_01_cmdtbl', T['EMC'], emc.to_gu(S[(P4 + 'data\\em092_cmd', T['EMC'])])))
+    own[37] = ('enemy\\cmd_tbl\\em067_01_cmdtbl', T['EMC'])
+    G = {(p, t): d for p, t, d in gents}
+    gfile = lambda k: G[ghash[fileid_entry(img, gman[k])]]          # GU em067_00's file of manifest field k
+    efx = effects(gfile(17), notes)
+    ents += efx
+    own[17] = (PEL_U, efl4u2gu.T['PEL'])
+    for b in BANKS:
+        own[18 + b] = (PSL % b, efl4u2gu.T['PSL'])
+    files, fields = sound(rom, notes)
+    ents += files
+    own.update(fields)
+    for k, path, conv in ((30, 'enemy\\body_data\\em067_01_bodydata', bodydata),
+                          (33, 'enemy\\dt_tune\\em067_01_dttune', dttune)):
+        typ = ghash[fileid_entry(img, gman[k])][1]
+        ents.append((path, typ, conv(gfile(k), notes)))
+        own[k] = (path, typ)
+
+    # ---- the shared GU em067_00 files: everything but what ours replace and em067_00's model (MOD, MRL, textures)
+    replaced = {ghash[fileid_entry(img, gman[k])] for k in own if gman[k] != -1}
+    drop = replaced | {(p, t) for p, t, _ in gents if p.startswith(P0 + 'mod\\')}
+    while True:                                  # a file a kept one names by path stays (e.g. em067_00u: GU shells)
+        kept = [(p, t, d) for p, t, d in gents if (p, t) not in drop]
+        named = {(p, t) for p, t in drop if any(p.encode('ascii') in kd for _, _, kd in kept)}
+        if not named: break
+        for p, t in sorted(named):
+            notes.append('kept %s although replaced: named by %s' % (p, [kp for kp, _, kd in kept
+                                                                         if p.encode('ascii') in kd][:4]))
+        drop -= named
+    ents += kept
+    notes.append('shared from em067_00: %d files kept, %d dropped (replaced or its model)' % (len(kept), len(drop)))
+
+    # ---- manifest: own fields -> our IDs (field order: IDs only ever grow), the rest = em067_00's IDs
+    new_files, manifest, src_of = [], list(gman), {}
+    assert set(own) <= set(OWN_ORDER), 'add new own fields at the end of OWN_ORDER: %s' % (set(own) - set(OWN_ORDER))
+    for k in [k for k in OWN_ORDER if k in own]:
+        fid = FILE_ID_BASE + len(new_files)
+        assert fid <= FILE_ID_LAST, 'file IDs past the allocations.toml range: widen file_ids'
+        new_files.append((fid,) + own[k])
+        manifest[k] = fid
+        src_of[k] = 'converted (4U em092)'
+    for k in range(51):
+        if k not in own and manifest[k] != -1: src_of[k] = 'shared (GU em067_00, its file ID)'
+
+    # ---- verify before writing anything
+    arc = arcpack.build(ents)
+    ver, back = arcpack.read(arc)
+    assert ver == 0x11 and len(back) == len(ents)
+    assert len({(p, t) for p, t, _ in back}) == len(back), 'duplicate entries'
+    present = {(phash(p), t) for p, t, _ in back}
+    for fid, p, t in new_files:
+        assert (phash(p), t) in present, p
+    for k in range(51):
+        if manifest[k] != -1 and manifest[k] < FILE_ID_BASE:
+            assert fileid_entry(img, manifest[k]) in present, (k, hex(manifest[k]))
+    for p, t, d in back:
+        if p.startswith(P) and t == T['MOD']: modlib.parse(d)
+        if p.startswith(P) and t == T['TEX']: tex.decode(d)
+
+    # ---- write
+    os.makedirs(os.path.dirname(OUT_ARC), exist_ok=True)
+    open(OUT_ARC, 'wb').write(arc)
+    fields = []
+    for k in range(51):
+        fid = manifest[k]
+        if fid == -1:
+            fields.append(dict(field=k, file_id=-1)); continue
+        p, t = new_files[fid - FILE_ID_BASE][1:] if fid >= FILE_ID_BASE else ghash[fileid_entry(img, fid)]
+        fields.append(dict(field=k, file_id='0x%x' % fid, path=p, type='0x%08x' % t, source=src_of[k]))
+    json.dump(dict(monster='em067_01 (Tigerstripe Zamtrios)', id='0x%x' % ALLOC['em_id'],
+                   registry_index=ALLOC['registry_index'], file_id_base='0x%x' % FILE_ID_BASE,
+                   file_count=len(new_files), manifest=fields,
+                   files=[dict(file_id='0x%x' % f, path=p, type='0x%08x' % t, path_hash='0x%08x' % phash(p))
+                          for f, p, t in new_files], notes=notes), open(OUT_JSON, 'w'), indent=1)
+    # FILE section: the registry manifest of its index and the (path hash, type) of each of our file IDs
+    sec = portdata.Section('FILE')
+    sec.u32(FILE_ID_BASE, len(new_files), *[x & 0xFFFFFFFF for x in manifest])
+    for fid, p, t in new_files:
+        sec.u32(phash(p), t)
+    print('wrote', portdata.write_section(NAME, sec))
+    print('arc: %d entries, %.1f MB -> %s' % (len(ents), len(arc) / 1e6, OUT_ARC))
+    print('own file IDs 0x%x..0x%x (%d)' % (FILE_ID_BASE, FILE_ID_BASE + len(new_files) - 1, len(new_files)))
+    for n in notes: print(' ', n)
+
+
+if __name__ == '__main__':
+    main()

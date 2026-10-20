@@ -37,7 +37,7 @@ void module_init(void)
         const uint32_t *donor = ((const uint32_t **)MAIN(GU_FILES))[port_monsters[m].donor_index];
 #endif
         for (int k = 0; k < 51; k++) port_manifests[m][k] = donor[k];
-        port_monsters[m].register_class();
+        if (port_monsters[m].register_class) port_monsters[m].register_class();   /* 0: a GU class runs it */
     }
     redirect("file manifest", 0x1839618, GU_FILES, reg_files);   /* ~40 readers, indexes 137.. */
     redirect("map icon size", 0x183fff0, 0x1635354, reg_mapicon); /* cUIOQuestMapIcon 0x61a994, by em number */
@@ -46,10 +46,14 @@ void module_init(void)
 }
 
 #ifdef TEST_SWAP
-/* test builds only: every large monster of a quest becomes the first ported monster */
+/* test builds only: every large monster of a quest becomes ported monster TEST_SWAP_PORT (registry order, 0 =
+ * the first; GOG_DEFINES="TEST_SWAP TEST_SWAP_PORT=1") */
+#ifndef TEST_SWAP_PORT
+#define TEST_SWAP_PORT 0
+#endif
 static uint32_t swap_id(uint32_t id)
 {
-    uint32_t t = port_monsters[0].em_id;
+    uint32_t t = port_monsters[TEST_SWAP_PORT].em_id;
     return (id < 0x1000 && id != t) ? t : id;
 }
 #endif

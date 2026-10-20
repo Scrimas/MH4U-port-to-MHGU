@@ -35,10 +35,14 @@ uint32_t port_manifests[PORT_N][51] __attribute__((aligned(4)));
 
 static char *put(char *p, const char *s) { while (*s) *p++ = *s++; *p = 0; return p; }
 
-static int str_eq(const char *a, const char *b)
+/* the header's char name[16] = the monster's name, cut to 16 bytes (NUL-padded when shorter: tools/portdata.py) */
+static int header_name_eq(const char *h, const char *name)
 {
-    while (*a && *a == *b) a++, b++;
-    return *a == *b;
+    for (int i = 0; i < 16; i++) {
+        if (h[i] != name[i]) return 0;
+        if (!h[i]) return 1;
+    }
+    return 1;
 }
 
 static void sleep_ns(uint32_t ns)          /* svcSleepThread */
@@ -54,7 +58,7 @@ static int valid(int m, const uint8_t *d, uint32_t size)
     const struct port_monster *p = &port_monsters[m];
     uint32_t n = size >= 32 ? FIELD(uint16_t, d, 6) : 0;
     if (size < 32 || FIELD(uint32_t, d, 0) != 0x5034484du || FIELD(uint16_t, d, 4) != FORMAT ||
-        !str_eq((const char *)d + 8, p->name) || FIELD(uint32_t, d, 28) != p->em_id || 32 + 12 * n > size) {
+        !header_name_eq((const char *)d + 8, p->name) || FIELD(uint32_t, d, 28) != p->em_id || 32 + 12 * n > size) {
         logf("mh4uport: %s data: bad header (format %u, em %x), not used", p->name, size >= 32 ? d[4] : 0,
              size >= 32 ? FIELD(uint32_t, d, 28) : 0);
         return 0;

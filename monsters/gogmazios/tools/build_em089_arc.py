@@ -32,7 +32,7 @@ sys.path.insert(0, HERE)
 import paths
 sys.path.insert(0, paths.GU_PY)
 from romfs import RomFS
-import arcpack, mod as modlib, mod4u2gu, tex, mrl, mrl_build, mrl_anim, emdata4u, portdata
+import arcpack, mod as modlib, mod4u2gu, tex, mrl, mrl_build, mrl_anim, emdata4u, portdata, emc
 import lcm4u2gu                   # 4U camera list (LCM v4) -> GU v5 (behaviour agent, field 11)
 
 GU_ROMFS = paths.GU_ROMFS
@@ -316,18 +316,6 @@ def shell_family(dents):
         SHELL_DST, len(out), SHELL_SRC, SHELL_REC_4U, r4, rgu)
 
 
-def emc_to_gu(b):
-    """4U EMC has 23 groups, GU 21; 4U's last two are empty. Keep every offset: rows 21-22 become padding."""
-    magic, ver, ng, _ = struct.unpack_from('<4sIII', b, 0)
-    assert magic == b'EMC\0' and ver == 0x20120804 and ng == 23
-    for g in (21, 22):
-        assert struct.unpack_from('<I', b, 16 + 16 * g)[0] == 0, 'group %d not empty' % g
-    b = bytearray(b)
-    struct.pack_into('<I', b, 8, 21)
-    b[16 + 16 * 21:16 + 16 * 23] = bytes(32)
-    return bytes(b)
-
-
 def main():
     use_gog_emc = '--cmdtbl' in sys.argv and sys.argv[sys.argv.index('--cmdtbl') + 1] == 'gog'
     kushala_model = '--kushala-model' in sys.argv
@@ -459,7 +447,7 @@ def main():
 
     # ---- 4U command table in GU group layout (not in the manifest unless --cmdtbl gog)
     gog_emc_path = 'enemy\\cmd_tbl\\em089_00_cmdtbl_4u'
-    entries.append((gog_emc_path, T['EMC'], emc_to_gu(S[('enemy\\em089\\data\\em089_cmd', T['EMC'])])))
+    entries.append((gog_emc_path, T['EMC'], emc.to_gu(S[('enemy\\em089\\data\\em089_cmd', T['EMC'])])))
 
     # ---- donor placeholders, renamed
     _, emdata = arcpack.read(open(EM_DATA_4U, 'rb').read())

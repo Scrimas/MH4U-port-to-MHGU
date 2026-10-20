@@ -6,8 +6,9 @@
 
 Every registered monster's data file always ships (allocations.toml order = append order, so gear IDs never move);
 whether a monster is installed is decided by its assets (module/port.c). Format 1, little endian, 4-aligned:
-  header 32 B   char magic[4] "MH4P", u16 format, u16 sections, char name[16], u32 version (major << 16 | minor << 8 |
-                patch, package.toml), u32 em_id
+  header 32 B   char magic[4] "MH4P", u16 format, u16 sections, char name[16] (cut to 16 bytes, no NUL then: the
+                core compares those 16 bytes and em_id), u32 version (major << 16 | minor << 8 | patch, package.toml),
+                u32 em_id
   directory     sections x {char tag[4], u32 offset, u32 size} (offsets from the file start)
   sections      strings are NUL-terminated UTF-8 inside the section, referenced by u32 offsets from the section start
 Sections (written by the monster tools, consumed by module/*.c):

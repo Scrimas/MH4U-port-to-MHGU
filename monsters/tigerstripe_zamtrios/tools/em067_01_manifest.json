@@ -1,0 +1,472 @@
+{
+ "monster": "em067_01 (Tigerstripe Zamtrios)",
+ "id": "0x143",
+ "registry_index": 138,
+ "file_id_base": "0x10740",
+ "file_count": 17,
+ "manifest": [
+  {
+   "field": 0,
+   "file_id": "0x10740",
+   "path": "enemy\\em067\\em067_01\\mod\\em067_01",
+   "type": "0x58a15856",
+   "source": "converted (4U em092)"
+  },
+  {
+   "field": 1,
+   "file_id": -1
+  },
+  {
+   "field": 2,
+   "file_id": -1
+  },
+  {
+   "field": 3,
+   "file_id": "0x10741",
+   "path": "enemy\\em067\\em067_01\\mod\\em067_01",
+   "type": "0x7cd0e77e",
+   "source": "converted (4U em092)"
+  },
+  {
+   "field": 4,
+   "file_id": "0x10742",
+   "path": "enemy\\em067\\em067_01\\mot\\em067_01_0",
+   "type": "0x76820d81",
+   "source": "converted (4U em092)"
+  },
+  {
+   "field": 5,
+   "file_id": -1
+  },
+  {
+   "field": 6,
+   "file_id": "0x10743",
+   "path": "enemy\\em067\\em067_01\\mot\\em067_01_2",
+   "type": "0x76820d81",
+   "source": "converted (4U em092)"
+  },
+  {
+   "field": 7,
+   "file_id": "0x10744",
+   "path": "enemy\\em067\\em067_01\\mot\\em067_01_3",
+   "type": "0x76820d81",
+   "source": "converted (4U em092)"
+  },
+  {
+   "field": 8,
+   "file_id": "0x10745",
+   "path": "enemy\\em067\\em067_01\\mot\\em067_01_4",
+   "type": "0x76820d81",
+   "source": "converted (4U em092)"
+  },
+  {
+   "field": 9,
+   "file_id": -1
+  },
+  {
+   "field": 10,
+   "file_id": -1
+  },
+  {
+   "field": 11,
+   "file_id": "0x10746",
+   "path": "enemy\\em067\\em067_01\\mot\\em067_01_cam",
+   "type": "0x39c52040",
+   "source": "converted (4U em092)"
+  },
+  {
+   "field": 12,
+   "file_id": "0x1074f",
+   "path": "sound\\call\\em\\em067_01",
+   "type": "0x10ebe843",
+   "source": "converted (4U em092)"
+  },
+  {
+   "field": 13,
+   "file_id": "0x10750",
+   "path": "sound\\se\\em\\em067_01\\snd_em067_01",
+   "type": "0x1bcc4966",
+   "source": "converted (4U em092)"
+  },
+  {
+   "field": 14,
+   "file_id": "0x7e32",
+   "path": "sound\\pts\\em\\em067_00c",
+   "type": "0x4541367c",
+   "source": "shared (GU em067_00, its file ID)"
+  },
+  {
+   "field": 15,
+   "file_id": "0x7e33",
+   "path": "sound\\pts\\em\\em067_00u",
+   "type": "0x4541367c",
+   "source": "shared (GU em067_00, its file ID)"
+  },
+  {
+   "field": 16,
+   "file_id": "0x7e2c",
+   "path": "effect\\pel\\em\\em067_00c",
+   "type": "0x5a525c16",
+   "source": "shared (GU em067_00, its file ID)"
+  },
+  {
+   "field": 17,
+   "file_id": "0x10748",
+   "path": "effect\\pel\\em\\em067_01u",
+   "type": "0x5a525c16",
+   "source": "converted (4U em092)"
+  },
+  {
+   "field": 18,
+   "file_id": "0x10749",
+   "path": "effect\\psl\\enemy\\em067\\em067_01\\mot\\em067_01_0",
+   "type": "0x254309c9",
+   "source": "converted (4U em092)"
+  },
+  {
+   "field": 19,
+   "file_id": -1
+  },
+  {
+   "field": 20,
+   "file_id": "0x1074a",
+   "path": "effect\\psl\\enemy\\em067\\em067_01\\mot\\em067_01_2",
+   "type": "0x254309c9",
+   "source": "converted (4U em092)"
+  },
+  {
+   "field": 21,
+   "file_id": "0x1074b",
+   "path": "effect\\psl\\enemy\\em067\\em067_01\\mot\\em067_01_3",
+   "type": "0x254309c9",
+   "source": "converted (4U em092)"
+  },
+  {
+   "field": 22,
+   "file_id": "0x1074c",
+   "path": "effect\\psl\\enemy\\em067\\em067_01\\mot\\em067_01_4",
+   "type": "0x254309c9",
+   "source": "converted (4U em092)"
+  },
+  {
+   "field": 23,
+   "file_id": -1
+  },
+  {
+   "field": 24,
+   "file_id": -1
+  },
+  {
+   "field": 25,
+   "file_id": "0x7e34",
+   "path": "arc\\shell\\em\\em067_00_shell",
+   "type": "0x73850d05",
+   "source": "shared (GU em067_00, its file ID)"
+  },
+  {
+   "field": 26,
+   "file_id": "0x7e35",
+   "path": "enemy\\hit_data\\em067_00_attackdata",
+   "type": "0x70bb64ba",
+   "source": "shared (GU em067_00, its file ID)"
+  },
+  {
+   "field": 27,
+   "file_id": -1
+  },
+  {
+   "field": 28,
+   "file_id": "0x7e36",
+   "path": "enemy\\hit_data\\em067_00_hitsize",
+   "type": "0x5653c1b0",
+   "source": "shared (GU em067_00, its file ID)"
+  },
+  {
+   "field": 29,
+   "file_id": -1
+  },
+  {
+   "field": 30,
+   "file_id": "0x1074d",
+   "path": "enemy\\body_data\\em067_01_bodydata",
+   "type": "0x1ac7b52d",
+   "source": "converted (4U em092)"
+  },
+  {
+   "field": 31,
+   "file_id": "0x7e38",
+   "path": "enemy\\cam_body_data\\em067_00_cambodydata",
+   "type": "0x1ac7b52d",
+   "source": "shared (GU em067_00, its file ID)"
+  },
+  {
+   "field": 32,
+   "file_id": "0x7e39",
+   "path": "enemy\\dt_base\\em067_00_dtbase",
+   "type": "0x59d9c3da",
+   "source": "shared (GU em067_00, its file ID)"
+  },
+  {
+   "field": 33,
+   "file_id": "0x1074e",
+   "path": "enemy\\dt_tune\\em067_01_dttune",
+   "type": "0x48e8ac29",
+   "source": "converted (4U em092)"
+  },
+  {
+   "field": 34,
+   "file_id": "0x7e3b",
+   "path": "enemy\\dt_base\\em067_00_dtbparts",
+   "type": "0x1bbc291e",
+   "source": "shared (GU em067_00, its file ID)"
+  },
+  {
+   "field": 35,
+   "file_id": -1
+  },
+  {
+   "field": 36,
+   "file_id": -1
+  },
+  {
+   "field": 37,
+   "file_id": "0x10747",
+   "path": "enemy\\cmd_tbl\\em067_01_cmdtbl",
+   "type": "0x3aabba02",
+   "source": "converted (4U em092)"
+  },
+  {
+   "field": 38,
+   "file_id": "0x7e3d",
+   "path": "enemy\\dou_mou_ka\\em067_00_doumouka",
+   "type": "0x1f149aec",
+   "source": "shared (GU em067_00, its file ID)"
+  },
+  {
+   "field": 39,
+   "file_id": "0x7e3e",
+   "path": "enemy\\dou_mou_ka\\em067_00_doumouka_G",
+   "type": "0x1f149aec",
+   "source": "shared (GU em067_00, its file ID)"
+  },
+  {
+   "field": 40,
+   "file_id": "0x7e3f",
+   "path": "enemy\\area_link\\em067_00",
+   "type": "0x4bf84f6f",
+   "source": "shared (GU em067_00, its file ID)"
+  },
+  {
+   "field": 41,
+   "file_id": "0x7e40",
+   "path": "enemy\\area_eat\\em067_00",
+   "type": "0x56d892d0",
+   "source": "shared (GU em067_00, its file ID)"
+  },
+  {
+   "field": 42,
+   "file_id": "0x7e41",
+   "path": "enemy\\map_info\\em067_00",
+   "type": "0x197e4d7a",
+   "source": "shared (GU em067_00, its file ID)"
+  },
+  {
+   "field": 43,
+   "file_id": "0x7e42",
+   "path": "enemy\\area_select\\em067_00",
+   "type": "0x15e98d21",
+   "source": "shared (GU em067_00, its file ID)"
+  },
+  {
+   "field": 44,
+   "file_id": "0x7e43",
+   "path": "enemy\\area_patrol\\em067_00",
+   "type": "0x0947f3c8",
+   "source": "shared (GU em067_00, its file ID)"
+  },
+  {
+   "field": 45,
+   "file_id": -1
+  },
+  {
+   "field": 46,
+   "file_id": "0x87ec",
+   "path": "enemy\\hagi\\hagi_s0_em067_00",
+   "type": "0x33a84e14",
+   "source": "shared (GU em067_00, its file ID)"
+  },
+  {
+   "field": 47,
+   "file_id": "0x87ed",
+   "path": "enemy\\hagi\\hagi_s1_em067_00",
+   "type": "0x33a84e14",
+   "source": "shared (GU em067_00, its file ID)"
+  },
+  {
+   "field": 48,
+   "file_id": "0x87ee",
+   "path": "enemy\\hagi\\hagi_s2_em067_00",
+   "type": "0x33a84e14",
+   "source": "shared (GU em067_00, its file ID)"
+  },
+  {
+   "field": 49,
+   "file_id": "0x87ef",
+   "path": "enemy\\hagi\\hagi_s3_em067_00",
+   "type": "0x33a84e14",
+   "source": "shared (GU em067_00, its file ID)"
+  },
+  {
+   "field": 50,
+   "file_id": "0x87f0",
+   "path": "enemy\\hagi\\hagi_s4_em067_00",
+   "type": "0x33a84e14",
+   "source": "shared (GU em067_00, its file ID)"
+  }
+ ],
+ "files": [
+  {
+   "file_id": "0x10740",
+   "path": "enemy\\em067\\em067_01\\mod\\em067_01",
+   "type": "0x58a15856",
+   "path_hash": "0x97537ba2"
+  },
+  {
+   "file_id": "0x10741",
+   "path": "enemy\\em067\\em067_01\\mod\\em067_01",
+   "type": "0x7cd0e77e",
+   "path_hash": "0x97537ba2"
+  },
+  {
+   "file_id": "0x10742",
+   "path": "enemy\\em067\\em067_01\\mot\\em067_01_0",
+   "type": "0x76820d81",
+   "path_hash": "0x4c047d47"
+  },
+  {
+   "file_id": "0x10743",
+   "path": "enemy\\em067\\em067_01\\mot\\em067_01_2",
+   "type": "0x76820d81",
+   "path_hash": "0xa20a1c6b"
+  },
+  {
+   "file_id": "0x10744",
+   "path": "enemy\\em067\\em067_01\\mot\\em067_01_3",
+   "type": "0x76820d81",
+   "path_hash": "0xd50d2cfd"
+  },
+  {
+   "file_id": "0x10745",
+   "path": "enemy\\em067\\em067_01\\mot\\em067_01_4",
+   "type": "0x76820d81",
+   "path_hash": "0x4b69b95e"
+  },
+  {
+   "file_id": "0x10746",
+   "path": "enemy\\em067\\em067_01\\mot\\em067_01_cam",
+   "type": "0x39c52040",
+   "path_hash": "0xb0934fad"
+  },
+  {
+   "file_id": "0x10747",
+   "path": "enemy\\cmd_tbl\\em067_01_cmdtbl",
+   "type": "0x3aabba02",
+   "path_hash": "0x7c18f9f6"
+  },
+  {
+   "file_id": "0x10748",
+   "path": "effect\\pel\\em\\em067_01u",
+   "type": "0x5a525c16",
+   "path_hash": "0x13c2bab0"
+  },
+  {
+   "file_id": "0x10749",
+   "path": "effect\\psl\\enemy\\em067\\em067_01\\mot\\em067_01_0",
+   "type": "0x254309c9",
+   "path_hash": "0x2824de35"
+  },
+  {
+   "file_id": "0x1074a",
+   "path": "effect\\psl\\enemy\\em067\\em067_01\\mot\\em067_01_2",
+   "type": "0x254309c9",
+   "path_hash": "0xc62abf19"
+  },
+  {
+   "file_id": "0x1074b",
+   "path": "effect\\psl\\enemy\\em067\\em067_01\\mot\\em067_01_3",
+   "type": "0x254309c9",
+   "path_hash": "0xb12d8f8f"
+  },
+  {
+   "file_id": "0x1074c",
+   "path": "effect\\psl\\enemy\\em067\\em067_01\\mot\\em067_01_4",
+   "type": "0x254309c9",
+   "path_hash": "0x2f491a2c"
+  },
+  {
+   "file_id": "0x1074d",
+   "path": "enemy\\body_data\\em067_01_bodydata",
+   "type": "0x1ac7b52d",
+   "path_hash": "0xad0fdcb1"
+  },
+  {
+   "file_id": "0x1074e",
+   "path": "enemy\\dt_tune\\em067_01_dttune",
+   "type": "0x48e8ac29",
+   "path_hash": "0xf9996ccf"
+  },
+  {
+   "file_id": "0x1074f",
+   "path": "sound\\call\\em\\em067_01",
+   "type": "0x10ebe843",
+   "path_hash": "0x2f34efb9"
+  },
+  {
+   "file_id": "0x10750",
+   "path": "sound\\se\\em\\em067_01\\snd_em067_01",
+   "type": "0x1bcc4966",
+   "path_hash": "0x216a6d79"
+  }
+ ],
+ "notes": [
+  "material XfB__E0__m00_body: template solid, type 0, em092_01_BM",
+  "material XfB__E0__m00_fatbig: template solid, type 1, em092_03_BM",
+  "material XfB_0__m02_eye: template unlit, type 2, em092_01_BM",
+  "material XfB_0__m03_virs: template add, type 3, em092_06_BM",
+  "parts states: 33 (GU layout), groups dropped (not in em092): [2, 3, 4, 7, 21, 22, 23, 26, 27, 28, 29, 102, 103, 105, 107, 109], hidden at spawn: [50]",
+  "effect area colour: Dunes soil median (211, 165, 117, 255) (areas 1..11: [[214, 165, 132, 255], [236, 151, 85, 255], [217, 154, 104, 255], [207, 155, 113, 255], [185, 143, 110, 255], [204, 150, 102, 255], [226, 186, 139, 255], [211, 168, 117, 255], [211, 168, 117, 255], [207, 171, 134, 255], [232, 181, 140, 255]])",
+  "effects: 63 entries (tools/efl4u2gu.py effect_set)",
+  "  MODEL effect\\base\\cm\\cm000\\cm000_000: 1 materials",
+  "  MODEL effect\\base\\em\\em092\\ef_em092: 3 materials",
+  "  MODEL effect\\base\\qe\\qe000\\qe000_001: 1 materials",
+  "  MODEL effect\\base\\qe\\qe001\\qe001_000: 2 materials",
+  "  PSL anim 4 slot 2: MEF id 1100 has no PEL record (not in the MEF)",
+  "  PSL anim 19 slot 0: MEF id 1100 has no PEL record (not in the MEF)",
+  "  PSL anim 12 slot 2: MEF id 1100 has no PEL record (not in the MEF)",
+  "  PSL anim 16 slot 1: MEF id 1100 has no PEL record (not in the MEF)",
+  "  PSL anim 18 slot 2: MEF id 1100 has no PEL record (not in the MEF)",
+  "  PSL anim 20 slot 1: MEF id 1100 has no PEL record (not in the MEF)",
+  "  PSL anim 20 slot 3: MEF id 1100 has no PEL record (not in the MEF)",
+  "  PSL anim 55 slot 2: MEF id 1100 has no PEL record (not in the MEF)",
+  "  PSL anim 56 slot 2: MEF id 1100 has no PEL record (not in the MEF)",
+  "  PSL anim 57 slot 2: MEF id 1100 has no PEL record (not in the MEF)",
+  "  PSL anim 58 slot 2: MEF id 1100 has no PEL record (not in the MEF)",
+  "  PSL anim 59 slot 1: MEF id 1100 has no PEL record (not in the MEF)",
+  "  PSL anim 60 slot 1: MEF id 1100 has no PEL record (not in the MEF)",
+  "  PSL anim 71 slot 1: MEF id 1100 has no PEL record (not in the MEF)",
+  "  PSL anim 74 slot 2: MEF id 1100 has no PEL record (not in the MEF)",
+  "  PSL anim 85 slot 4: MEF id 1100 has no PEL record (not in the MEF)",
+  "  PSL anim 100 slot 1: MEF id 1100 has no PEL record (not in the MEF)",
+  "  PSL anim 106 slot 1: MEF id 1100 has no PEL record (not in the MEF)",
+  "  PSL anim 107 slot 3: MEF id 1100 has no PEL record (not in the MEF)",
+  "  PSL anim 108 slot 1: MEF id 1100 has no PEL record (not in the MEF)",
+  "  PSL anim 109 slot 1: MEF id 1100 has no PEL record (not in the MEF)",
+  "  PEL effect\\pel\\em\\em067_01u: 75 records (list 1) + 24 GU records (list 2); PSL x4 from LMT event group 2",
+  "em092 sound: 53 waves (53 used by the bank), bank 11 groups / 145 entries, request 313 entries (20 common-bank entries from GU em067_00, 0 converted, + 17 more of its common-bank requests), sound call 41135 B",
+  "bodydata: GU em067_00 minus records [12, 13] (bones [131, 142])",
+  "dttune: GU em067_00 + 42 bytes of 4U em022 -> em092 differences (GU retuned 13 other bytes)",
+  "kept effect\\pel\\em\\em067_00u although replaced: named by ['shell\\\\em\\\\em067_00_shell01\\\\em067_00_01', 'shell\\\\em\\\\em067_00_shell02\\\\em067_00_02', 'shell\\\\em\\\\em067_00_shell13\\\\em067_00_13']",
+  "kept sound\\se\\em\\em067_00\\snd_em067_00 although replaced: named by ['shell\\\\em\\\\em067_00_shell02\\\\em067_00_02']",
+  "shared from em067_00: 517 files kept, 20 dropped (replaced or its model)"
+ ]
+}

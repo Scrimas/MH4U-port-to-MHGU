@@ -1,4 +1,5 @@
-"""snd4u2gu.py : MH4U (3DS) monster sound effects -> MHGU (Switch) formats, for Gogmazios (em089).
+"""snd4u2gu.py : MH4U (3DS) monster sound effects -> MHGU (Switch) formats: Gogmazios (em089) here, any monster through
+monster_entries(spec) (monsters/tigerstripe_zamtrios/tools/build_em067_01_arc.py).
 
   snd4u2gu.py convert [--keep-volume] [OUTDIR]   convert em089's 4U sound call / bank / request / waves; write them
                                                  as OUTDIR/<arc path>.<type hash> (default dump/converted/em089/snd)
@@ -218,8 +219,9 @@ def req_ent_gu(w, keep_volume=False):
     return struct.pack('<22I', *g) + GU_TAIL
 
 
-def req_build(r4, common_gu, strs, keep_volume=False):
-    """r4: parsed 4U SREQ; common_gu: {id: 132-byte GU entry} (donor's common-bank entries)."""
+def req_build(r4, common_gu, strs, keep_volume=False, extra=()):
+    """r4: parsed 4U SREQ; common_gu: {id: 132-byte GU entry} (donor's common-bank entries); extra: 132-byte GU
+    entries appended after the converted ones."""
     ents = []; stats = dict(common_donor=0, common_converted=0)
     for w in r4['ents']:
         rid = w[0] & 0xFFFF
@@ -231,6 +233,7 @@ def req_build(r4, common_gu, strs, keep_volume=False):
         if w[21] == 1 and (w[4] & 0xFFFF) == 0x0A:      # GU common-bank entries carry 0x14 here (all pairs)
             e = e[:16] + struct.pack('<I', (w[4] & 0xFFFF0000) | 0x14) + e[20:]
         ents.append(e)
+    ents += list(extra)
     n = len(ents)
     stab = 0x34 + 132 * n
     blob = b''.join(s.encode('ascii') + b'\0' for s in strs)
@@ -258,9 +261,10 @@ def _gu_romfs():
     return RomFS(GU_ROMFS)
 
 
-def donor_common_entries(rom=None):
+def donor_common_entries(rom=None, donor_arc=DONOR_ARC):
+    """{request number: 132-byte entry} of a GU monster's common-bank (bank 1) requests, in file order"""
     rom = rom or _gu_romfs()
-    _, dents = arcpack.read(rom.read(DONOR_ARC))
+    _, dents = arcpack.read(rom.read(donor_arc))
     req = [d for p, t, d in dents if t == TG['REQ']]
     assert len(req) == 1
     g = reqgu_parse(req[0])
@@ -271,14 +275,29 @@ def donor_common_entries(rom=None):
     return out
 
 
+def em089_spec():
+    """Gogmazios' sound (tools/build_em089_arc.py) for monster_entries"""
+    return dict(name='em089', src=SRC_4U, p4_wave=P4_WAVE, pg_wave=PG_WAVE, p4_bank=P4_BANK, pg_bank=PG_BANK,
+                p4_call=P4_CALL, pg_call=PG_CALL, donor_arc=DONOR_ARC, donor_name='GU Kushala', donor_extra=False)
+
+
 def em089_entries(keep_volume=False, rom=None, log=None):
     """GU arc entries for em089's sound, in GU arc order: call, waves, bank, request."""
-    _, src = arcpack.read(open(SRC_4U, 'rb').read())
+    return monster_entries(em089_spec(), keep_volume, rom, log)
+
+
+def monster_entries(spec, keep_volume=False, rom=None, log=None):
+    """GU arc entries for a 4U monster's sound, in GU arc order: call, waves, bank, request. spec: name (log), src (its
+    4U arc), p4_wave / p4_bank / p4_call (4U paths), pg_wave / pg_bank / pg_call (GU paths), donor_arc (GU monster
+    arc whose common-bank requests replace 4U's: same numbers in every GU monster), donor_name (log), donor_extra
+    (also append the donor's common-bank requests whose numbers the 4U request lacks: its GU class may post them)."""
+    P4_WAVE, PG_WAVE, P4_BANK, PG_BANK = spec['p4_wave'], spec['pg_wave'], spec['p4_bank'], spec['pg_bank']
+    _, src = arcpack.read(open(spec['src'], 'rb').read())
     S = {(p, t): d for p, t, d in src}
     rename = lambda p: PG_WAVE + p[len(P4_WAVE):] if p.startswith(P4_WAVE) else (_ for _ in ()).throw(
-        AssertionError('wave outside em089: ' + p))
+        AssertionError('wave outside %s: %s' % (spec['name'], p)))
     b4 = bank_parse(S[(P4_BANK, T4['BANK'])])
-    out = [(PG_CALL, TG['CALL'], call_build(S[(P4_CALL, T4['CALL'])]))]
+    out = [(spec['pg_call'], TG['CALL'], call_build(S[(spec['p4_call'], T4['CALL'])]))]
     used = []
     for path, typ, _ in b4['ents']:
         if path not in used: used.append(path)
@@ -289,19 +308,25 @@ def em089_entries(keep_volume=False, rom=None, log=None):
     out.append((PG_BANK, TG['BANK'], bank_build(b4, rename)))
     r4 = req4_parse(S[(P4_BANK, T4['REQ'])])
     assert r4['strs'] == [P4_BANK, P4_COMMON], r4['strs']
-    req, stats = req_build(r4, donor_common_entries(rom), [PG_BANK, PG_COMMON], keep_volume)
+    common = donor_common_entries(rom, spec['donor_arc'])
+    have = {w[0] & 0xFFFF for w in r4['ents']}
+    extra = [e for k, e in common.items() if k not in have] if spec['donor_extra'] else []
+    req, stats = req_build(r4, common, [PG_BANK, PG_COMMON], keep_volume, extra)
     out.append((PG_BANK, TG['REQ'], req))
     if log is not None:
-        log.append('em089 sound: %d waves (%d used by the bank), bank %d groups / %d entries, request %d entries '
-                   '(%d common-bank entries from GU Kushala, %d converted), sound call %d B' % (
-                       len(waves), len(used), len(b4['recs']), len(b4['ents']), len(r4['ents']),
-                       stats['common_donor'], stats['common_converted'], len(out[0][2])))
+        log.append('%s sound: %d waves (%d used by the bank), bank %d groups / %d entries, request %d entries '
+                   '(%d common-bank entries from %s, %d converted%s), sound call %d B' % (
+                       spec['name'], len(waves), len(used), len(b4['recs']), len(b4['ents']), len(r4['ents']),
+                       stats['common_donor'], spec['donor_name'], stats['common_converted'],
+                       ', + %d more of its common-bank requests' % len(extra) if extra else '', len(out[0][2])))
     return out
 
 
-def verify(entries):
+def verify(entries, spec=None):
     """re-parse everything we produced; waves decode identically to the 4U source."""
-    _, src = arcpack.read(open(SRC_4U, 'rb').read())
+    spec = spec or em089_spec()
+    P4_WAVE, PG_WAVE = spec['p4_wave'], spec['pg_wave']
+    _, src = arcpack.read(open(spec['src'], 'rb').read())
     S = {(p, t): d for p, t, d in src}
     for p, t, d in entries:
         if t == TG['WAVE']:

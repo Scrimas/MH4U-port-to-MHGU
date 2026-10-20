@@ -1,0 +1,72 @@
+# Tigerstripe Zamtrios port: plan (approved 2026-10-20)
+
+Source: MH4U em092 (class uEm022, shared with Zamtrios em022). Target: GU Zamtrios class uEm067_00, **variant 1**
+(GU ID 0x143, arc `nativeNX/arc/enemy/em067_01.arc`). Arena: GU Dunes (stage 5) = 4U Dunes day (stage 17), user's
+decision. Phase 1 study: [phase1-variant-map.md](phase1-variant-map.md). Process: notes/porting-guide.md.
+
+## IDs (proposed in Phase 0b, written to allocations.toml in Phase 2)
+| what | value | note |
+|---|---|---|
+| GU ID | 0x143 | em 67, variant 1 (GU ships only em067_00) |
+| registry index | 138 | after Gogmazios 137 |
+| save slot / name entry | 106 / 106 | `dummy2` |
+| Notes entry | 124 | |
+| quests | 11493 / 11494 | 4U m10821 "Grand Finals Confrontation", m10830 "Advanced: Tiger-sharq" (free: no file, no list entry) |
+| quest board slots | Phase 4 | DUMMY placeholders (group 127), chosen as for Gogmazios (notes/stage.md section 8) |
+| materials | 2986..2990 | 4U 1357..1361: T.Zamtrios Shard, Piel, Grandfin, Sawtooth+, Tailbrand |
+| file IDs | own range after Gogmazios' | |
+
+## Phase 2: register the monster and build its arc (no behaviour code)
+1. allocations.toml entry (IDs above).
+2. build.py support for a monster without its own class (`package.toml` names GU's uEm067_00): its registry entry
+   reuses GU's class, its module only holds hooks gated on `variant == 1`. Gogmazios' build output stays
+   byte-identical.
+3. Arc `em067_01.arc` from 4U em092 with the existing converters: models, textures, materials (GU em067_00's as
+   templates), motions and EMC copied as is, effects, sounds, shell data; body / hit / stat data converted as for
+   Gogmazios, differences from GU's own Zamtrios values reported before choosing.
+4. Check whether GU's quest loader accepts 0x143 directly; if not, the same stand-in swap as Gogmazios.
+5. Headless boot test: spawn, variant-1 motions, no crash.
+
+### Phase 2 status (2026-10-20)
+- Done, static checks only (no in-game run yet: the user is playing, nothing installed):
+  - registry: allocations.toml entry; build.py `gu_class` (registry DTI = the donor's, checked against
+    MHGU_Editor dti.pkl: index 56 = uEm067_00), optional ui_icon (donor's), no class registration; Notes bound
+    0x55FF3C = count - count % 2 (odd counts now fine); data-file header name compared on its 16 bytes (port.c);
+    TEST_SWAP_PORT (test swap to any ported monster).
+  - arc (tools/build_em067_01_arc.py, build.sh steps dt / arc / pack): own model / textures / materials, XFS
+    (GU states filtered), 4U motions, camera, EMC, effects (tools/efl4u2gu.py effect_set), sound
+    (tools/snd4u2gu.py monster_entries), bodydata (GU - 2 records), dttune (GU + 42 bytes of 4U deltas); 15 + 2 own
+    file IDs 0x10740..0x10750; the rest shared from em067_00 under its paths / IDs.
+  - Gogmazios outputs byte-identical after the converter refactors (arc, manifest, FILE section).
+  - diagnostics: module em067_01_diag.c (hook 0xf78f98, "tzport:" action / motion log), tools/tzreport.py.
+- Next: boot + spawn test (TEST_SWAP TEST_SWAP_PORT=1, any Zamtrios quest) once the user allows installs; it also
+  answers step 4 (spawn through quest_prep / em_create with 0x143).
+- Open items found while building (for Phase 3 / tests):
+  - LMT events of 19 em092 motions name MEF id 1100, which em092's MEF lacks (4U's resolution not traced).
+  - em092_200 EFL is in no MEF record (4U code posts it): Phase 3.
+  - 4U tExtendMap (body / fat body) has no slot in the GU templates: dropped (look check).
+  - group 50 (eye + m03_virs) shown by 4U under condition 10 (not traced), hidden here as in GU.
+  - 4U material animations (2 x 15 frames on body and fat body) not ported: GU's class asks for none.
+  - fat body material type 1 (GU's rename) is a guess (S).
+  - GU's own-bank requests 212 / 220 / 221 / 230 have no em092 wave group: silent if GU's code posts them.
+  - qe006 / qe013 effects ship under the same 4U paths in Gogmazios' arc (Battlequarters soil) and here (Dunes
+    soil): in a quest with both, the first arc loaded wins.
+
+## Phase 3: behaviour gaps (only where GU's variant-1 code differs from 4U)
+1. Exact walk of em092's EMC (not the heuristic tokenizer): which gap actions are reachable.
+2. Shells: uShell012 subtypes 40..43 (+ the 2100 range rule), uShell016 subtypes 40 / 48.
+3. Gate the CAT2/7 tremor (GU f6e5c8) to variant 0.
+4. The reachable missing actions (7/77, 7/78, 7/200, 7/201, category-3 ledge chain) and effects (effect-manager
+   id 8, uMhEftCtrl000 (13, 68), 0xc0aa20 skip).
+5. Multiplayer: hooks only adjust GU's own code paths; damage stays on the controlling machine; check each shell.
+
+## Phase 4: content
+1. Move the Gogmazios content tools (items, gear, Notes, quests) into shared tools with per-monster inputs;
+   Gogmazios' data file stays byte-identical.
+2. Tigerstripe: 5 materials, carves / rewards, armor (S or Z: from 4U's recipe tables), 17 weapons in 8 classes,
+   jewels if any use its materials, Notes entry, name, icon, 2 G1 quests on Dunes (day).
+3. Music: GU's Zamtrios theme expected to apply through its em-type check (confirm 4U uses the same theme);
+   sounds from em092.
+
+## Phase 5: tests (user sessions)
+Quest spawn, kill (TEST_HP_PCT=5), gear check, then the two-instance multiplayer test.

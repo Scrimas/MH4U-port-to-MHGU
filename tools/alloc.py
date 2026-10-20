@@ -59,9 +59,10 @@ def check(reg=None, gu_main=paths.GU_MAIN):
     pools, ms, errs = reg['pools'], reg['monster'], []
     seen = {}
     for k, m in enumerate(ms):
-        for key in ('name', 'em_id', 'registry_index', 'donor_index', 'save_index', 'name_entry', 'notes_entry',
-                    'ui_icon', 'mapicon_class'):        # module/build.py port_monsters.c / tables.S need them all
-            if key not in m: errs.append('%s: missing %s' % (m.get('name', k), key))
+        for key in ('name', 'em_id', 'registry_index', 'donor_index', 'save_index', 'name_entry', 'notes_entry'):
+            if key not in m: errs.append('%s: missing %s' % (m.get('name', k), key))   # module/build.py needs them
+        if m.get('em_id', 0) >> 8 == 0 and 'mapicon_class' not in m:   # a new em number has no GU size class
+            errs.append('%s: missing mapicon_class' % m.get('name', k))
         for key in ORDERED:
             if key in m and m[key] != pools[key][0] + k:
                 errs.append('%s: %s %d, expected %d (consecutive in [[monster]] order)' %
@@ -102,6 +103,9 @@ def check(reg=None, gu_main=paths.GU_MAIN):
         gu_ids = {struct.unpack_from('<I', img, GU_PAIRS + 8 * i)[0] for i in range(GU_COUNT)}
         for m in ms:
             if m.get('em_id') in gu_ids: errs.append('%s: em_id %#x is a GU monster' % (m['name'], m['em_id']))
+            em = m.get('em_id', 0) & 0xff
+            if m.get('em_id', 0) >> 8 and em not in gu_ids:       # a variant of a GU em: variant 0 must exist
+                errs.append('%s: em_id %#x is a variant of em %d, which GU lacks' % (m['name'], m['em_id'], em))
     return errs
 
 

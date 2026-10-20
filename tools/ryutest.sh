@@ -19,7 +19,10 @@ ryu_pids() {   # only Ryujinx processes running on our root dir (the gui launch'
         case "$c" in *"--root-data-dir $R "*) echo "${p#/proc/}";; esac
     done
 }
-ryu_windows() { hyprctl clients -j | python3 -I -c "import json,sys; print(' '.join(c['workspace']['name'] for c in json.load(sys.stdin) if 'yujinx' in (c['class']+c['title']).lower()))"; }
+ryu_windows() {   # workspaces of the TEST Ryujinx's windows, by pid (the user's own Ryujinx and a folder named Ryujinx
+                  # matched the old class / title test: 2026-10-20 a boot check killed itself over them)
+    hyprctl clients -j | PIDS="$(ryu_pids | tr '\n' ' ')" python3 -I -c "import json,os,sys; p=set(os.environ['PIDS'].split()); print(' '.join(c['workspace']['name'] for c in json.load(sys.stdin) if str(c['pid']) in p))"
+}
 
 stop() {
     for p in $(ryu_pids); do kill "$p"; done; sleep 3

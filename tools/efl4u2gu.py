@@ -1,10 +1,11 @@
-"""efl4u2gu.py : MH4U effect data -> MHGU, for Gogmazios (em089).
+"""efl4u2gu.py : MH4U effect data -> MHGU: Gogmazios (em089) here, any monster through effect_set(spec).
 
   efl4u2gu.py build [OUTDIR]     convert the em089 effect set; write OUTDIR/<path>.<typehash> + OUTDIR/_report.txt
                                  (default OUTDIR = the scratch dir given by $EFX_OUT, else dump/converted/em089_efx)
   efl4u2gu.py check FILE.efl     structural check of a GU (or 4U) EFL
   efl4u2gu.py report             conversion report only (no files)
-Library (tools/build_em089_arc.py): entries() -> [(path, type hash, bytes)] in arc load order, PEL_U, PSL[4].
+Library (tools/build_em089_arc.py): entries() -> [(path, type hash, bytes)] in arc load order, PEL_U, PSL[4];
+other monsters: effect_set(spec, log) (monsters/tigerstripe_zamtrios/tools/build_em067_01_arc.py).
 
 What is converted (all formats were compared on both games' code and on corpora, see notes/port-checklist.md
 "## Effects (effects agent)"):
@@ -148,31 +149,32 @@ def phash(p):
 # ------------------------------------------------------------------ sources
 
 
-_SRC = None
+_SRC = {}
 
 
-def sources():
-    """(path, type) -> bytes over em089.arc and the 4U core arcs (common effects)."""
-    global _SRC
-    if _SRC is None:
-        _SRC = {}
-        arcs = [open(SRC_EM089, 'rb').read()]
+def sources(arc=SRC_EM089, stage_unpacked=STAGE_UNPACKED):
+    """(path, type) -> bytes over a 4U monster arc (default em089.arc), the 4U core arcs (common effects) and the
+    unpacked 4U stage arcs given (lowest priority). Cached per argument set."""
+    key = (arc, tuple(stage_unpacked))
+    if key not in _SRC:
+        S = _SRC[key] = {}
+        arcs = [open(arc, 'rb').read()]
         n, _ = ctr.main_ncch(ROM_4U)
         fs = n.romfs_reader()
         arcs += [fs.read(a) for a in CORE_ARCS]
         for a in arcs:
             for p, t, d in arcpack.read(a)[1]:
-                _SRC.setdefault((p, t), d)
-        for arc in STAGE_UNPACKED:            # 4U stage arcs unpacked as <path>.<type hash> (arcpack unpack)
-            base = os.path.join(ROOT, 'dump', 'm19_unpacked', arc)
+                S.setdefault((p, t), d)
+        for st in stage_unpacked:             # 4U stage arcs unpacked as <path>.<type hash> (arcpack unpack)
+            base = os.path.join(ROOT, 'dump', 'm19_unpacked', st)
             for dp, _, fs in os.walk(base):
                 for f in fs:
                     stem, _, ext = f.rpartition('.')
                     if len(ext) != 8 or any(c not in '0123456789abcdefABCDEF' for c in ext):
                         continue                 # unpack listings / notes, not arc entries
                     rel =os.path.relpath(os.path.join(dp, stem), base).replace('/', '\\')
-                    _SRC.setdefault((rel, int(ext, 16)), open(os.path.join(dp, f), 'rb').read())
-    return _SRC
+                    S.setdefault((rel, int(ext, 16)), open(os.path.join(dp, f), 'rb').read())
+    return _SRC[key]
 
 # ------------------------------------------------------------------ EFL
 
@@ -287,18 +289,32 @@ def unit_4u_to_gu(blk, utype, area=None):
     struct.pack_into('<I', out, 0x18, w)
     if utype != 9 and w & UNIT_COLOUR_MODE == UNIT_AREA_MODE and area:
         assert area != 'code', 'mode-5 unit in a code-coloured EFL (area colour per unit: not mapped)'
-        assert not {0, 1} & set(unit_curve_props(blk)), 'mode-5 unit with colour curves (4U +0x17c path: not mapped)'
         for o in (0x48, 0x4c):
             struct.pack_into('<I', out, o, area_multiply(struct.unpack_from('<I', blk, o)[0], area))
+        # colour curve (prop 0): keys {u32 frame, colour, colour}, the pair layout of words 18 / 19. 4U multiplies the
+        # current curve colour (+0x17c path) each frame; per channel that commutes with the key interpolation, so
+        # every key colour gets it (S; first seen on em092_010, 2026-10-20). Alpha curves (prop 1) need nothing: the
+        # area colours' alpha is 255.
+        a = struct.unpack_from('<I', blk, 0x40)[0] >> 16
+        while a and a + 4 <= len(blk):
+            h = struct.unpack_from('<I', blk, a)[0]
+            if not h & 0xFF or (h >> 8) & 0xFF != 2:
+                break
+            if h >> 24 == 0:
+                for i in range(h & 0xFF):
+                    for o in (a + 8 + 12 * i, a + 12 + 12 * i):
+                        struct.pack_into('<I', out, o, area_multiply(struct.unpack_from('<I', blk, o)[0], area))
+            a += 4 + 12 * (h & 0xFF)
     return bytes(out)
 
 
-def convert_efl(d, log=None):
+def convert_efl(d, log=None, soil=M19A03_AREA_SOIL):
+    """soil = RGBA of the area colour 4U multiplies in (the stage's area_color_soil; default the Battlequarters')"""
     p = efl_parse(d)
     out_blocks, newoff = [], {}
     pos = p['first']
     b = efl_colour_block(d)
-    area = (M19A03_AREA_SOIL if not b or not b[0] & 0x10 else None if not (b[3] >> 16) & 0xFF else 'code')
+    area = (soil if not b or not b[0] & 0x10 else None if not (b[3] >> 16) & 0xFF else 'code')
     for o, size, k in p['blocks']:
         blk = d[o:o + size]
         if k and k[0] == 1:
@@ -501,17 +517,17 @@ def efl_colour_block(d):
     return struct.unpack_from('<4I', d, o + 0x30) if o else None
 
 
-def pel_colour(path, rid):
+def pel_colour(path, rid, S=None, soil=M19A03_AREA_SOIL):
     """RGBA 4U multiplies into the units of record `rid` (EFL `path`), None = 4U keeps the unit colours."""
-    b = efl_colour_block(sources()[(path, T['EFL'])])
+    b = efl_colour_block((S or sources())[(path, T['EFL'])])
     if not b or not b[0] & 0x10:
         return None
     if not (b[3] >> 16) & 0xFF:
-        return M19A03_AREA_SOIL
+        return soil
     return CODE_COLOUR.get(rid)
 
 
-def pel_record(path, r):
+def pel_record(path, r, S=None, soil=M19A03_AREA_SOIL):
     st = bytearray(160)
     struct.pack_into('<4f', st, 0x00, *r['pos'], 0.0)
     struct.pack_into('<4f', st, 0x10, *r['rot'], 0.0)
@@ -520,7 +536,7 @@ def pel_record(path, r):
     st[0x34:] = PEL_TAIL_PREV if pel_follows(r['id']) else PEL_TAIL
     for o, v in PEL_COLOUR_OFF:
         st[o] = v
-    col = pel_colour(path, r['id'])
+    col = pel_colour(path, r['id'], S, soil)
     if col:
         st[PEL_COLOUR_RGBA:PEL_COLOUR_RGBA + 4] = col
         st[PEL_COLOUR_ON], st[PEL_COLOUR_MODE] = 1, PEL_COLOUR_MUL
@@ -530,11 +546,28 @@ def pel_record(path, r):
     return bytes([len(p)]) + p + b'\x01\x00' + bytes(st)
 
 
-def build_pel(recs):
-    """recs: [(efl path, mef record)] -> PEL v15: list 0 empty, lists 1 and 2 = all records."""
-    body = b''.join(pel_record(p, r) for p, r in recs)
+def build_pel(recs, S=None, soil=M19A03_AREA_SOIL, list2=None):
+    """recs: [(efl path, mef record)] -> PEL v15: list 0 empty, list 1 = all records (motion sequences, PSL kind 4),
+    list 2 (code posts) = all records too, or list2 = (count, record bytes) of another PEL (pel_lists)."""
+    body = b''.join(pel_record(p, r, S, soil) for p, r in recs)
+    n2, body2 = list2 if list2 is not None else (len(recs), body)
     return b'PEL\0' + struct.pack('<II', 15, 0) + struct.pack('<I', len(recs)) + body + \
-        struct.pack('<I', len(recs)) + body
+        struct.pack('<I', n2) + body2
+
+
+def pel_lists(d):
+    """a PEL v15's three lists as (count, record bytes); record = u8 path length, path, 2 bytes, 160 bytes"""
+    assert d[:4] == b'PEL\0' and struct.unpack_from('<I', d, 4)[0] == 15
+    out, i = [], 8
+    for _ in range(3):
+        n = struct.unpack_from('<I', d, i)[0]
+        i += 4
+        start = i
+        for _ in range(n):
+            i += 1 + d[i] + 2 + 160
+        out.append((n, d[start:i]))
+    assert i == len(d), 'PEL size'
+    return out
 
 
 def lmt_events(d):
@@ -572,7 +605,7 @@ def build_psl(lmt, known_ids, log=None):
             if r and r in known_ids:
                 mask |= 1 << k; ids[k] = r
             elif r and log is not None:
-                log.append('PSL anim %d slot %d: MEF id %d has no em089 record (4U plays nothing either)' % (i, k, r))
+                log.append('PSL anim %d slot %d: MEF id %d has no PEL record (not in the MEF)' % (i, k, r))
         if not mask or not evs:
             entries.append(None); continue
         # run lengths: 4U totals = frames (114/114 em089 motions), GU PSLs total frames - 1 (every Kushala motion)
@@ -730,20 +763,37 @@ def stage_records():
     return out
 
 
+def em089_spec():
+    """Gogmazios' effect set (tools/build_em089_arc.py) for effect_set"""
+    return dict(arc=SRC_EM089, stage_unpacked=STAGE_UNPACKED, mef=MEF_PATH, em_efl='effect\\efl\\em\\em089\\',
+                groups=GROUP_EFL, extra=extra_records(), lmts=[(LMT_PATH % i, PSL[i]) for i in range(4)], pel=PEL_U,
+                soil=M19A03_AREA_SOIL, list2=None)
+
+
 def em089_set(log):
-    S = sources()
-    mef = mef_records(S[(MEF_PATH, T['MEF'])])
-    efls = {p for (p, t) in S if t == T['EFL'] and p.startswith('effect\\efl\\em\\em089\\')}
+    return effect_set(em089_spec(), log)
+
+
+def effect_set(spec, log):
+    """A 4U monster's effects in GU form: {(path, type): bytes} in arc load order (textures, animations, effect
+    models, EFLs, PEL u, PSLs). spec: arc (its 4U arc), stage_unpacked (unpacked 4U stage arcs, lowest priority),
+    mef (its MEF path), em_efl (its EFL family prefix: every file in it is converted), groups {MEF group: EFL path
+    pattern}, extra [(EFL path, record)] (records for code posts), lmts [(4U LMT path, GU PSL path)] (one PSL per motion
+    list), pel (the GU PEL u path), soil (RGBA of the stage's area colour that 4U multiplies in), list2 (None = PEL
+    list 2 holds our records too, or (count, record bytes) of a GU PEL's list 2: the GU class posts its own ids)."""
+    S = sources(spec['arc'], spec['stage_unpacked'])
+    mef = mef_records(S[(spec['mef'], T['MEF'])])
+    efls = {p for (p, t) in S if t == T['EFL'] and p.startswith(spec['em_efl'])}
     pel_recs = []
     for r in mef:
-        fam = GROUP_EFL.get(r['grp'])
+        fam = spec['groups'].get(r['grp'])
         path = fam % r['file'] if fam else None
         if not path or (path, T['EFL']) not in S:
             log.append('MEF id %d: group %d file %d has no 4U EFL -> no PEL record' % (r['id'], r['grp'], r['file']))
             continue
         efls.add(path)
         pel_recs.append((path, r))
-    for path, r in extra_records():
+    for path, r in spec['extra']:
         assert (path, T['EFL']) in S and r['id'] not in {q['id'] for _, q in pel_recs}, (path, r['id'])
         efls.add(path)
         pel_recs.append((path, r))
@@ -753,7 +803,7 @@ def em089_set(log):
     for p in sorted(efls):
         d4 = S[(p, T['EFL'])]
         l = []
-        conv['EFL'][p] = convert_efl(d4, l)
+        conv['EFL'][p] = convert_efl(d4, l, spec['soil'])
         _, bad = check_efl(conv['EFL'][p])
         assert not bad, (p, bad)
         log.append('EFL %s: %d entries, %d B -> %d B%s' % (p, efl_parse(d4)['n'], len(d4), len(conv['EFL'][p]),
@@ -782,11 +832,13 @@ def em089_set(log):
     for kind in ('TEX', 'EAN', 'MRL', 'MOD', 'EFL'):
         for p in sorted(conv[kind]):
             out[(p, T[kind])] = conv[kind][p]
-    out[(PEL_U, T['PEL'])] = build_pel(pel_recs)
+    out[(spec['pel'], T['PEL'])] = build_pel(pel_recs, S, spec['soil'], spec['list2'])
     known = {r['id'] for _, r in pel_recs}
-    for i in range(4):
-        out[(PSL[i], T['PSL'])] = build_psl(S[(LMT_PATH % i, T['LMT'])], known, log)
-    log.append('PEL %s: %d records x 2 lists; PSL x4 from LMT event group 2' % (PEL_U, len(pel_recs)))
+    for lmt, psl in spec['lmts']:
+        out[(psl, T['PSL'])] = build_psl(S[(lmt, T['LMT'])], known, log)
+    lists = 'x 2 lists' if spec['list2'] is None else '(list 1) + %d GU records (list 2)' % spec['list2'][0]
+    log.append('PEL %s: %d records %s; PSL x%d from LMT event group 2' % (spec['pel'], len(pel_recs), lists,
+                                                                        len(spec['lmts'])))
     return out
 
 
