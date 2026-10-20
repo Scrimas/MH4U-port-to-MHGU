@@ -91,7 +91,11 @@ HOOKS = [
     ('gear_has_skill', 0xE0DA0),   # (skills, id) -> has skill: Enlightened Blade counts as Element / Status Atk Up
     ('em067_01_act', 0xF78F98),    # uEm067_00 slot 125 action dispatcher: Tigerstripe (variant 1) action / motion
                                    # log (monsters/tigerstripe_zamtrios/module/em067_01_diag.c)
-    ('em067_01_post', 0x48C4F0),   # shell request post: no 2/7 tremor for Tigerstripe, as 4U (em067_01_gaps.c)
+    ('em067_01_post', 0x48C4F0),   # shell request post: no 2/7 tremor for Tigerstripe, as 4U (em067_01_gaps.c);
+                                   # restores the variant byte at the three ball posts
+    ('em067_01_ball', 0xF72700),   # Tigerstripe's paralysis balls: GU's variant-0 post path (em067_01_shells.c)
+    ('em067_01_ball43', 0xF735C0),
+    ('em067_01_ball42', 0xF73870),
 ]
 # weapon / sharpness table load exits (gear.c GEAR_HOOK wrappers, out/gear_hooks.inc), "name 0xSITE", written by
 # monsters/gogmazios/tools/gear_weapons_em089.py (gu_class finds and checks each class's site)
