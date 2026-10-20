@@ -1,0 +1,97 @@
+name: Installer
+
+# Builds the MH4U Port installer apps from code only (no game data: the release packages themselves are built and
+# uploaded by tools/release.py on the machine with the dumps), tests them on Linux and Windows against a fake release
+# (installer/tests/cli_test.py), and attaches them to the release of a v* tag.
+#   MH4U-Port-Installer-<version>-x86_64.AppImage   zig, glibc 2.28, AppImage type 2 runtime
+#   MH4U-Port-Installer-<version>-x86_64.exe        mingw-w64 cross build
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    outputs:
+      ver: ${{ steps.ver.outputs.ver }}
+    env:
+      RUNTIME_URL: https://github.com/AppImage/type2-runtime/releases/download/20251108/runtime-x86_64
+      RUNTIME_SHA256: 2fca8b443c92510f1483a883f60061ad09b46b978b2631c807cd873a47ec260d
+      MH4UPORT_REPO: ${{ github.repository }}
+    steps:
+      - name: Toolchain
+        run: |
+          pacman -Syu --noconfirm --needed git rustup mingw-w64-gcc zig cargo-zigbuild squashfs-tools python \
+            fontconfig
+          rustup default stable
+          rustup target add x86_64-pc-windows-gnu
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - uses: actions/checkout@v7
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: installer
+
+      - name: Version
+        id: ver
+        run: echo "ver=$(sed -n 's/^version = "\(.*\)"/\1/p' installer/Cargo.toml | head -1)" >> "$GITHUB_OUTPUT"
+
+      - name: AppImage runtime
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/runtime-x86_64" "$RUNTIME_URL"
+          echo "$RUNTIME_SHA256  $RUNNER_TEMP/runtime-x86_64" | sha256sum -c -
+
+      - name: Build
+        run: APPIMAGE_RUNTIME="$RUNNER_TEMP/runtime-x86_64" bash installer/packaging/build.sh
+
+      - name: Test (Linux binary)
+        run: python3 installer/tests/cli_test.py installer/target/x86_64-unknown-linux-gnu/release/mh4uport-installer
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: installer-${{ steps.ver.outputs.ver }}
+          path: installer/dist/*
+          if-no-files-found: error
+
+  windows:
+    needs: build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v7
+        with:
+          name: installer-${{ needs.build.outputs.ver }}
+          path: dist
+      - name: Test (the shipped .exe)
+        run: python installer/tests/cli_test.py "dist/MH4U-Port-Installer-${{ needs.build.outputs.ver }}-x86_64.exe"
+
+  attach:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: installer-${{ needs.build.outputs.ver }}
+          path: dist
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # tools/release.py publish creates the release (with the packages) and its tag
+          for i in 1 2 3 4 5 6; do
+            gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 && break
+            sleep 20
+          done
+          gh release upload "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --clobber

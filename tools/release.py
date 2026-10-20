@@ -153,7 +153,8 @@ def package(out):
         entries.append(dict(name=p['name'], title=p['title'], version=p['version'], requires_core=p['requires_core'],
                             file=z, sha256=sha256(os.path.join(out, z)), size=os.path.getsize(os.path.join(out, z))))
     manifest = dict(format=1, title_id=TITLE_ID, mod_name=MOD_NAME,
-                    core=dict(version=c['version'], file=core_zip, sha256=sha256(os.path.join(out, core_zip)),
+                    core=dict(name='core', title=c['title'], version=c['version'], requires_core=c['version'],
+                              file=core_zip, sha256=sha256(os.path.join(out, core_zip)),
                               size=os.path.getsize(os.path.join(out, core_zip))),
                     monsters=entries, warnings=WARNINGS)
     json.dump(manifest, open(os.path.join(out, 'manifest.json'), 'w'), indent=1)

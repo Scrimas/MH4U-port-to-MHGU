@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=MH4U Port Installer
+Comment=Install the MH4U Port monsters into Monster Hunter Generations Ultimate (emulators or Atmosphere)
+Exec=mh4uport-installer
+Icon=mh4uport-installer
+Categories=Utility;Game;
+Terminal=false
+StartupWMClass=mh4uport-installer

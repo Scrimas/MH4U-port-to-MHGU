@@ -10,6 +10,8 @@ ryuroot/
 save-backup-*/
 # build output, caches
 module/out/
+installer/target/
+installer/dist/
 __pycache__/
 *.pyc
 .venv/

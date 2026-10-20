@@ -1,5 +1,20 @@
 # Installer and packages: requirements (goal 3 / goal 4)
 
+## Built (2026-10-21, user decisions: packages on the GitHub repo's releases; standalone Linux AppImage + Windows exe)
+- `tools/release.py` (machine with the dumps; hosted CI cannot build: ~15 GB of 4U / GU data, and the module build
+  reads GU's main): `build` (every monster's build.sh + the module, no test switches), `check` (allocations, versions,
+  requires_core vs module/core.toml, RomFS overlaps, quest HP rows >= 10, module defines.txt empty), `package`
+  (core-<v>.zip, <monster>-<v>.zip, manifest.json; deterministic zips), `publish` (gh release v<core>, asks first).
+- `installer/` (Rust, Slint 1.18.1 as MHGU_Editor; packaging/build.sh = MHGU_Editor's pipeline): finds Ryujinx
+  (+ Flatpak), the yuzu family (yuzu, suyu, sudachi, citron, eden), EmuDeck storage folders and Atmosphère SD cards,
+  or a typed folder; reads the latest release of MH4UPORT_REPO (GitHub API), installs core + ticked monsters, checks
+  size + sha256, keeps mh4uport-install.json (update / remove per monster, uninstall all), asks twice before removing
+  a monster (gear warning), shows the manifest's warnings. CLI mode for tests / scripts (src/main.rs docstring).
+- `.github/workflows/installer.yml`: on v* tags, builds both apps, runs installer/tests/cli_test.py on Linux and on
+  Windows (the shipped .exe), attaches them to the release.
+- Not yet verified: a real GitHub release (no remote yet), the Windows exe's window, Atmosphère on hardware
+  (subsdk1 + exefs_patches IPS untested on a Switch).
+
 Collected before the installer exists; each line is a requirement the user set or a consequence of a design choice.
 
 ## Package layout (decided 2026-10-20)

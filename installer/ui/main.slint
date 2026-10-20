@@ -1,0 +1,73 @@
+import { Button, CheckBox, ComboBox, GroupBox, HorizontalBox, LineEdit, ProgressIndicator, VerticalBox } from "std-widgets.slint";
+
+export struct MonsterRow {
+    name: string,
+    title: string,
+    installed: string,
+    latest: string,
+    selected: bool,
+}
+
+export component MainWindow inherits Window {
+    title: "MH4U Port installer";
+    preferred-width: 640px;
+    preferred-height: 540px;
+    in property <string> release-text: "Looking for the latest release...";
+    in property <[string]> target-labels;
+    in-out property <int> target-index: 0;
+    in-out property <string> custom-path;
+    in-out property <[MonsterRow]> monsters;
+    in property <string> warnings;
+    in property <string> status;
+    in property <float> progress;
+    in property <bool> busy;
+    in property <bool> ready;
+    callback target-selected(int);
+    callback use-path(string);
+    callback toggle(int, bool);
+    callback apply();
+    callback uninstall-all();
+
+    VerticalBox {
+        Text { text: root.release-text; font-weight: 700; wrap: word-wrap; }
+        HorizontalBox {
+            Text { text: "Install into:"; vertical-alignment: center; }
+            ComboBox {
+                model: root.target-labels;
+                current-index <=> root.target-index;
+                enabled: !root.busy;
+                selected => { root.target-selected(self.current-index); }
+            }
+        }
+        HorizontalBox {
+            LineEdit {
+                placeholder-text: "or a folder: the game's mod folder (.../0100770008DD8000) or an SD card root";
+                text <=> root.custom-path;
+                enabled: !root.busy;
+            }
+            Button { text: "Use folder"; enabled: !root.busy; clicked => { root.use-path(root.custom-path); } }
+        }
+        GroupBox {
+            title: "Monsters";
+            VerticalBox {
+                for row[i] in root.monsters: HorizontalBox {
+                    CheckBox {
+                        text: row.title;
+                        checked: row.selected;
+                        enabled: !root.busy;
+                        toggled => { root.toggle(i, self.checked); }
+                    }
+                    Text { text: "installed: " + (row.installed == "" ? "-" : row.installed); vertical-alignment: center; }
+                    Text { text: "latest: " + row.latest; vertical-alignment: center; }
+                }
+            }
+        }
+        Text { text: root.warnings; wrap: word-wrap; color: #c0392b; }
+        HorizontalBox {
+            Button { text: "Install / update"; primary: true; enabled: root.ready && !root.busy; clicked => { root.apply(); } }
+            Button { text: "Uninstall everything"; enabled: root.ready && !root.busy; clicked => { root.uninstall-all(); } }
+        }
+        ProgressIndicator { progress: root.progress; }
+        Text { text: root.status; wrap: word-wrap; }
+    }
+}
