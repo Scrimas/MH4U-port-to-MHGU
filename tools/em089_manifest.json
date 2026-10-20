@@ -1,0 +1,697 @@
+{
+ "monster": "em089_00 (Gogmazios)",
+ "id": "0x59",
+ "registry_index": 137,
+ "donor": "em024_00",
+ "file_id_base": "0x10700",
+ "file_count": 38,
+ "manifest": [
+  {
+   "field": 0,
+   "kind": "model",
+   "file_id": "0x10700",
+   "path": "enemy\\em089\\em089_00\\mod\\em089_00",
+   "type": "0x58a15856",
+   "path_hash": "0xf5fed6bd",
+   "source": "converted"
+  },
+  {
+   "field": 1,
+   "kind": "model (tail)",
+   "file_id": "0x10701",
+   "path": "enemy\\em089\\em089_00\\mod\\em089_00_tail",
+   "type": "0x58a15856",
+   "path_hash": "0xdac95299",
+   "source": "converted"
+  },
+  {
+   "field": 2,
+   "kind": "model (alt)",
+   "file_id": "0x1071c",
+   "path": "enemy\\em089\\em089_00\\mod\\em089_00_gekiryusou",
+   "type": "0x58a15856",
+   "path_hash": "0x08fdd37f",
+   "source": "converted (4U cut object 1: Dragonator spear)"
+  },
+  {
+   "field": 3,
+   "kind": "model data (XFS)",
+   "file_id": "0x10706",
+   "path": "enemy\\em089\\em089_00\\mod\\em089_00",
+   "type": "0x7cd0e77e",
+   "path_hash": "0xf5fed6bd",
+   "source": "converted: parts visibility: 4U rows in the donor's 12-state layout"
+  },
+  {
+   "field": 4,
+   "kind": "motion 0",
+   "file_id": "0x10702",
+   "path": "enemy\\em089\\em089_00\\mot\\em089_00_0",
+   "type": "0x76820d81",
+   "path_hash": "0x2939ce21",
+   "source": "converted"
+  },
+  {
+   "field": 5,
+   "kind": "motion 1",
+   "file_id": "0x10703",
+   "path": "enemy\\em089\\em089_00\\mot\\em089_00_1",
+   "type": "0x76820d81",
+   "path_hash": "0x5e3efeb7",
+   "source": "converted"
+  },
+  {
+   "field": 6,
+   "kind": "motion 2",
+   "file_id": "0x10704",
+   "path": "enemy\\em089\\em089_00\\mot\\em089_00_2",
+   "type": "0x76820d81",
+   "path_hash": "0xc737af0d",
+   "source": "converted"
+  },
+  {
+   "field": 7,
+   "kind": "motion 3",
+   "file_id": "0x10705",
+   "path": "enemy\\em089\\em089_00\\mot\\em089_00_3",
+   "type": "0x76820d81",
+   "path_hash": "0xb0309f9b",
+   "source": "converted"
+  },
+  {
+   "field": 8,
+   "kind": "motion 4",
+   "file_id": -1
+  },
+  {
+   "field": 9,
+   "kind": "",
+   "file_id": -1
+  },
+  {
+   "field": 10,
+   "kind": "",
+   "file_id": -1
+  },
+  {
+   "field": 11,
+   "kind": "camera",
+   "file_id": "0x10707",
+   "path": "enemy\\em089\\em089_00\\mot\\em089_00_cam",
+   "type": "0x39c52040",
+   "path_hash": "0xd15c0487",
+   "source": "converted: camera list from 4U e089_cam (LCM v4 -> v5, tools/lcm4u2gu.py; ids = 4U ids of the camera events)"
+  },
+  {
+   "field": 12,
+   "kind": "sound call",
+   "file_id": "0x1071e",
+   "path": "sound\\call\\em\\em089",
+   "type": "0x10ebe843",
+   "path_hash": "0x5b4ad7b6",
+   "source": "converted (4U sound call, tools/snd4u2gu.py)"
+  },
+  {
+   "field": 13,
+   "kind": "sound bank",
+   "file_id": "0x1071f",
+   "path": "sound\\se\\em\\em089_00\\snd_em089_00",
+   "type": "0x1bcc4966",
+   "path_hash": "0xcc849fd4",
+   "source": "converted (4U request + bank + waves, tools/snd4u2gu.py)"
+  },
+  {
+   "field": 14,
+   "kind": "pts c",
+   "file_id": "0x7a65",
+   "path": "sound\\pts\\em\\em024_00c",
+   "type": "0x4541367c",
+   "path_hash": "0x0812517b",
+   "source": "placeholder (em024_00, original path + file ID)"
+  },
+  {
+   "field": 15,
+   "kind": "pts u",
+   "file_id": "0x7a66",
+   "path": "sound\\pts\\em\\em024_00u",
+   "type": "0x4541367c",
+   "path_hash": "0xfcc6e42a",
+   "source": "placeholder (em024_00, original path + file ID)"
+  },
+  {
+   "field": 16,
+   "kind": "pel c",
+   "file_id": "0x7a5f",
+   "path": "effect\\pel\\em\\em024_00c",
+   "type": "0x5a525c16",
+   "path_hash": "0x223c0666",
+   "source": "placeholder (em024_00, original path + file ID)"
+  },
+  {
+   "field": 17,
+   "kind": "pel u",
+   "file_id": "0x10720",
+   "path": "effect\\pel\\em\\em089_00u",
+   "type": "0x5a525c16",
+   "path_hash": "0x8fe354e0",
+   "source": "converted (4U MEF -> PEL u, tools/efl4u2gu.py)"
+  },
+  {
+   "field": 18,
+   "kind": "psl 0",
+   "file_id": "0x10721",
+   "path": "effect\\psl\\enemy\\em089\\em089_00\\mot\\em089_00_0",
+   "type": "0x254309c9",
+   "path_hash": "0x4d196d53",
+   "source": "converted (4U LMT 0 motion events -> PSL, tools/efl4u2gu.py)"
+  },
+  {
+   "field": 19,
+   "kind": "psl 1",
+   "file_id": "0x10722",
+   "path": "effect\\psl\\enemy\\em089\\em089_00\\mot\\em089_00_1",
+   "type": "0x254309c9",
+   "path_hash": "0x3a1e5dc5",
+   "source": "converted (4U LMT 1 motion events -> PSL, tools/efl4u2gu.py)"
+  },
+  {
+   "field": 20,
+   "kind": "psl 2",
+   "file_id": "0x10723",
+   "path": "effect\\psl\\enemy\\em089\\em089_00\\mot\\em089_00_2",
+   "type": "0x254309c9",
+   "path_hash": "0xa3170c7f",
+   "source": "converted (4U LMT 2 motion events -> PSL, tools/efl4u2gu.py)"
+  },
+  {
+   "field": 21,
+   "kind": "psl 3",
+   "file_id": "0x10724",
+   "path": "effect\\psl\\enemy\\em089\\em089_00\\mot\\em089_00_3",
+   "type": "0x254309c9",
+   "path_hash": "0xd4103ce9",
+   "source": "converted (4U LMT 3 motion events -> PSL, tools/efl4u2gu.py)"
+  },
+  {
+   "field": 22,
+   "kind": "psl 4",
+   "file_id": -1
+  },
+  {
+   "field": 23,
+   "kind": "",
+   "file_id": -1
+  },
+  {
+   "field": 24,
+   "kind": "",
+   "file_id": -1
+  },
+  {
+   "field": 25,
+   "kind": "shell arc",
+   "file_id": "0x7a67",
+   "path": "arc\\shell\\em\\em024_00_shell",
+   "type": "0x73850d05",
+   "path_hash": "0xe1110b19",
+   "source": "placeholder (em024_00, original path + file ID)"
+  },
+  {
+   "field": 26,
+   "kind": "attackdata",
+   "file_id": "0x10708",
+   "path": "enemy\\hit_data\\em089_00_attackdata",
+   "type": "0x70bb64ba",
+   "path_hash": "0x4ac675b5",
+   "source": "converted: attackdata from 4U etd word 28 (61 attacks, 4U attack IDs)"
+  },
+  {
+   "field": 27,
+   "kind": "",
+   "file_id": -1
+  },
+  {
+   "field": 28,
+   "kind": "hitsize",
+   "file_id": "0x10709",
+   "path": "enemy\\hit_data\\em089_00_hitsize",
+   "type": "0x5653c1b0",
+   "path_hash": "0x5d7ea502",
+   "source": "converted: hitsize from 4U etd word 27 (4U bone IDs = model IDs; 13 -> 201)"
+  },
+  {
+   "field": 29,
+   "kind": "",
+   "file_id": -1
+  },
+  {
+   "field": 30,
+   "kind": "bodydata",
+   "file_id": "0x1070a",
+   "path": "enemy\\body_data\\em089_00_bodydata",
+   "type": "0x1ac7b52d",
+   "path_hash": "0x73b0eebf",
+   "source": "converted: bodydata from 4U emd word 8 (own skeleton bone IDs)"
+  },
+  {
+   "field": 31,
+   "kind": "cambodydata",
+   "file_id": "0x1070b",
+   "path": "enemy\\cam_body_data\\em089_00_cambodydata",
+   "type": "0x1ac7b52d",
+   "path_hash": "0x030bcadb",
+   "source": "converted: cambodydata from 4U emd word 9"
+  },
+  {
+   "field": 32,
+   "kind": "dtbase",
+   "file_id": "0x1070c",
+   "path": "enemy\\dt_base\\em089_00_dtbase",
+   "type": "0x59d9c3da",
+   "path_hash": "0x5c826851",
+   "source": "converted: dtbase: donor object + Gogmazios 4U fields/blocks (dt_convert)"
+  },
+  {
+   "field": 33,
+   "kind": "dttune",
+   "file_id": "0x1070d",
+   "path": "enemy\\dt_tune\\em089_00_dttune",
+   "type": "0x48e8ac29",
+   "path_hash": "0x8e749449",
+   "source": "converted: dttune: donor object + Gogmazios 4U fields/blocks (dt_convert)"
+  },
+  {
+   "field": 34,
+   "kind": "dtbparts",
+   "file_id": "0x1070e",
+   "path": "enemy\\dt_base\\em089_00_dtbparts",
+   "type": "0x1bbc291e",
+   "path_hash": "0xdc6fd15a",
+   "source": "placeholder (em024_00, renamed)"
+  },
+  {
+   "field": 35,
+   "kind": "actiontune",
+   "file_id": "0x1070f",
+   "path": "enemy\\action_tune\\em089_00_actiontune",
+   "type": "0x496f8f22",
+   "path_hash": "0xd3293c79",
+   "source": "placeholder (em024_00, renamed)"
+  },
+  {
+   "field": 36,
+   "kind": "",
+   "file_id": -1
+  },
+  {
+   "field": 37,
+   "kind": "cmdtbl",
+   "file_id": "0x1071b",
+   "path": "enemy\\cmd_tbl\\em089_00_cmdtbl_4u",
+   "type": "0x3aabba02",
+   "path_hash": "0x7c984040",
+   "source": "converted (4U command table)"
+  },
+  {
+   "field": 38,
+   "kind": "doumouka",
+   "file_id": -1
+  },
+  {
+   "field": 39,
+   "kind": "doumouka G",
+   "file_id": -1
+  },
+  {
+   "field": 40,
+   "kind": "area_link",
+   "file_id": "0x10711",
+   "path": "enemy\\area_link\\em089_00",
+   "type": "0x4bf84f6f",
+   "path_hash": "0xd629c451",
+   "source": "placeholder (em024_00, renamed)"
+  },
+  {
+   "field": 41,
+   "kind": "area_eat",
+   "file_id": "0x10712",
+   "path": "enemy\\area_eat\\em089_00",
+   "type": "0x56d892d0",
+   "path_hash": "0x9d5f2f38",
+   "source": "placeholder (em024_00, renamed)"
+  },
+  {
+   "field": 42,
+   "kind": "map_info",
+   "file_id": "0x10713",
+   "path": "enemy\\map_info\\em089_00",
+   "type": "0x197e4d7a",
+   "path_hash": "0xf07b0495",
+   "source": "placeholder (em024_00, renamed)"
+  },
+  {
+   "field": 43,
+   "kind": "area_select",
+   "file_id": "0x10714",
+   "path": "enemy\\area_select\\em089_00",
+   "type": "0x15e98d21",
+   "path_hash": "0x6145924d",
+   "source": "placeholder (em024_00, renamed)"
+  },
+  {
+   "field": 44,
+   "kind": "area_patrol",
+   "file_id": "0x10715",
+   "path": "enemy\\area_patrol\\em089_00",
+   "type": "0x0947f3c8",
+   "path_hash": "0xc1735530",
+   "source": "placeholder (em024_00, renamed)"
+  },
+  {
+   "field": 45,
+   "kind": "option motion",
+   "file_id": "0x77ed",
+   "path": "enemy\\em_option\\mot\\em001_00_option",
+   "type": "0x76820d81",
+   "path_hash": "0xeb7af9b0",
+   "source": "placeholder (em024_00, original path + file ID)"
+  },
+  {
+   "field": 46,
+   "kind": "hagi s0",
+   "file_id": "0x10716",
+   "path": "enemy\\hagi\\hagi_s0_em089_00",
+   "type": "0x33a84e14",
+   "path_hash": "0x5d21f952",
+   "source": "converted: hagi s0 from 4U (tools/hagi_em089.py)"
+  },
+  {
+   "field": 47,
+   "kind": "hagi s1",
+   "file_id": "0x10717",
+   "path": "enemy\\hagi\\hagi_s1_em089_00",
+   "type": "0x33a84e14",
+   "path_hash": "0xb2e3926c",
+   "source": "converted: hagi s1 from 4U (tools/hagi_em089.py)"
+  },
+  {
+   "field": 48,
+   "kind": "hagi s2",
+   "file_id": "0x10718",
+   "path": "enemy\\hagi\\hagi_s2_em089_00",
+   "type": "0x33a84e14",
+   "path_hash": "0x59d4296f",
+   "source": "converted: hagi s2 from 4U (tools/hagi_em089.py)"
+  },
+  {
+   "field": 49,
+   "kind": "hagi s3",
+   "file_id": "0x10719",
+   "path": "enemy\\hagi\\hagi_s3_em089_00",
+   "type": "0x33a84e14",
+   "path_hash": "0xb6164251",
+   "source": "converted: hagi s3 from 4U (tools/hagi_em089.py)"
+  },
+  {
+   "field": 50,
+   "kind": "hagi s4",
+   "file_id": "0x1071a",
+   "path": "enemy\\hagi\\hagi_s4_em089_00",
+   "type": "0x33a84e14",
+   "path_hash": "0x54ca5928",
+   "source": "converted: hagi s4 from 4U (tools/hagi_em089.py)"
+  }
+ ],
+ "files": [
+  {
+   "file_id": "0x10700",
+   "path": "enemy\\em089\\em089_00\\mod\\em089_00",
+   "type": "0x58a15856",
+   "path_hash": "0xf5fed6bd"
+  },
+  {
+   "file_id": "0x10701",
+   "path": "enemy\\em089\\em089_00\\mod\\em089_00_tail",
+   "type": "0x58a15856",
+   "path_hash": "0xdac95299"
+  },
+  {
+   "file_id": "0x10702",
+   "path": "enemy\\em089\\em089_00\\mot\\em089_00_0",
+   "type": "0x76820d81",
+   "path_hash": "0x2939ce21"
+  },
+  {
+   "file_id": "0x10703",
+   "path": "enemy\\em089\\em089_00\\mot\\em089_00_1",
+   "type": "0x76820d81",
+   "path_hash": "0x5e3efeb7"
+  },
+  {
+   "file_id": "0x10704",
+   "path": "enemy\\em089\\em089_00\\mot\\em089_00_2",
+   "type": "0x76820d81",
+   "path_hash": "0xc737af0d"
+  },
+  {
+   "file_id": "0x10705",
+   "path": "enemy\\em089\\em089_00\\mot\\em089_00_3",
+   "type": "0x76820d81",
+   "path_hash": "0xb0309f9b"
+  },
+  {
+   "file_id": "0x10706",
+   "path": "enemy\\em089\\em089_00\\mod\\em089_00",
+   "type": "0x7cd0e77e",
+   "path_hash": "0xf5fed6bd"
+  },
+  {
+   "file_id": "0x10707",
+   "path": "enemy\\em089\\em089_00\\mot\\em089_00_cam",
+   "type": "0x39c52040",
+   "path_hash": "0xd15c0487"
+  },
+  {
+   "file_id": "0x10708",
+   "path": "enemy\\hit_data\\em089_00_attackdata",
+   "type": "0x70bb64ba",
+   "path_hash": "0x4ac675b5"
+  },
+  {
+   "file_id": "0x10709",
+   "path": "enemy\\hit_data\\em089_00_hitsize",
+   "type": "0x5653c1b0",
+   "path_hash": "0x5d7ea502"
+  },
+  {
+   "file_id": "0x1070a",
+   "path": "enemy\\body_data\\em089_00_bodydata",
+   "type": "0x1ac7b52d",
+   "path_hash": "0x73b0eebf"
+  },
+  {
+   "file_id": "0x1070b",
+   "path": "enemy\\cam_body_data\\em089_00_cambodydata",
+   "type": "0x1ac7b52d",
+   "path_hash": "0x030bcadb"
+  },
+  {
+   "file_id": "0x1070c",
+   "path": "enemy\\dt_base\\em089_00_dtbase",
+   "type": "0x59d9c3da",
+   "path_hash": "0x5c826851"
+  },
+  {
+   "file_id": "0x1070d",
+   "path": "enemy\\dt_tune\\em089_00_dttune",
+   "type": "0x48e8ac29",
+   "path_hash": "0x8e749449"
+  },
+  {
+   "file_id": "0x1070e",
+   "path": "enemy\\dt_base\\em089_00_dtbparts",
+   "type": "0x1bbc291e",
+   "path_hash": "0xdc6fd15a"
+  },
+  {
+   "file_id": "0x1070f",
+   "path": "enemy\\action_tune\\em089_00_actiontune",
+   "type": "0x496f8f22",
+   "path_hash": "0xd3293c79"
+  },
+  {
+   "file_id": "0x10710",
+   "path": "enemy\\cmd_tbl\\em089_00_cmdtbl",
+   "type": "0x3aabba02",
+   "path_hash": "0x0bf50170"
+  },
+  {
+   "file_id": "0x10711",
+   "path": "enemy\\area_link\\em089_00",
+   "type": "0x4bf84f6f",
+   "path_hash": "0xd629c451"
+  },
+  {
+   "file_id": "0x10712",
+   "path": "enemy\\area_eat\\em089_00",
+   "type": "0x56d892d0",
+   "path_hash": "0x9d5f2f38"
+  },
+  {
+   "file_id": "0x10713",
+   "path": "enemy\\map_info\\em089_00",
+   "type": "0x197e4d7a",
+   "path_hash": "0xf07b0495"
+  },
+  {
+   "file_id": "0x10714",
+   "path": "enemy\\area_select\\em089_00",
+   "type": "0x15e98d21",
+   "path_hash": "0x6145924d"
+  },
+  {
+   "file_id": "0x10715",
+   "path": "enemy\\area_patrol\\em089_00",
+   "type": "0x0947f3c8",
+   "path_hash": "0xc1735530"
+  },
+  {
+   "file_id": "0x10716",
+   "path": "enemy\\hagi\\hagi_s0_em089_00",
+   "type": "0x33a84e14",
+   "path_hash": "0x5d21f952"
+  },
+  {
+   "file_id": "0x10717",
+   "path": "enemy\\hagi\\hagi_s1_em089_00",
+   "type": "0x33a84e14",
+   "path_hash": "0xb2e3926c"
+  },
+  {
+   "file_id": "0x10718",
+   "path": "enemy\\hagi\\hagi_s2_em089_00",
+   "type": "0x33a84e14",
+   "path_hash": "0x59d4296f"
+  },
+  {
+   "file_id": "0x10719",
+   "path": "enemy\\hagi\\hagi_s3_em089_00",
+   "type": "0x33a84e14",
+   "path_hash": "0xb6164251"
+  },
+  {
+   "file_id": "0x1071a",
+   "path": "enemy\\hagi\\hagi_s4_em089_00",
+   "type": "0x33a84e14",
+   "path_hash": "0x54ca5928"
+  },
+  {
+   "file_id": "0x1071b",
+   "path": "enemy\\cmd_tbl\\em089_00_cmdtbl_4u",
+   "type": "0x3aabba02",
+   "path_hash": "0x7c984040"
+  },
+  {
+   "file_id": "0x1071c",
+   "path": "enemy\\em089\\em089_00\\mod\\em089_00_gekiryusou",
+   "type": "0x58a15856",
+   "path_hash": "0x08fdd37f"
+  },
+  {
+   "file_id": "0x1071d",
+   "path": "shell\\em\\em089_00_shell00\\em089_00_00",
+   "type": "0x4aa69872",
+   "path_hash": "0x26b63277"
+  },
+  {
+   "file_id": "0x1071e",
+   "path": "sound\\call\\em\\em089",
+   "type": "0x10ebe843",
+   "path_hash": "0x5b4ad7b6"
+  },
+  {
+   "file_id": "0x1071f",
+   "path": "sound\\se\\em\\em089_00\\snd_em089_00",
+   "type": "0x1bcc4966",
+   "path_hash": "0xcc849fd4"
+  },
+  {
+   "file_id": "0x10720",
+   "path": "effect\\pel\\em\\em089_00u",
+   "type": "0x5a525c16",
+   "path_hash": "0x8fe354e0"
+  },
+  {
+   "file_id": "0x10721",
+   "path": "effect\\psl\\enemy\\em089\\em089_00\\mot\\em089_00_0",
+   "type": "0x254309c9",
+   "path_hash": "0x4d196d53"
+  },
+  {
+   "file_id": "0x10722",
+   "path": "effect\\psl\\enemy\\em089\\em089_00\\mot\\em089_00_1",
+   "type": "0x254309c9",
+   "path_hash": "0x3a1e5dc5"
+  },
+  {
+   "file_id": "0x10723",
+   "path": "effect\\psl\\enemy\\em089\\em089_00\\mot\\em089_00_2",
+   "type": "0x254309c9",
+   "path_hash": "0xa3170c7f"
+  },
+  {
+   "file_id": "0x10724",
+   "path": "effect\\psl\\enemy\\em089\\em089_00\\mot\\em089_00_3",
+   "type": "0x254309c9",
+   "path_hash": "0xd4103ce9"
+  },
+  {
+   "file_id": "0x10725",
+   "path": "sound\\bgm\\battle\\bgm_em089",
+   "type": "0x167dbbff",
+   "path_hash": "0xbe02ba5b"
+  }
+ ],
+ "extra": {
+  "cmdtbl_4u": "0x1071b",
+  "gekiryusou_model": "0x1071c",
+  "shell00": "0x1071d",
+  "bgm_stqr": "0x10725"
+ },
+ "bone_id_remap": {
+  "13": 11,
+  "103": 4,
+  "130": 200,
+  "131": 4,
+  "132": 201,
+  "133": 201,
+  "144": 143,
+  "240": 0,
+  "241": 0,
+  "242": 62,
+  "243": 72
+ },
+ "notes": [
+  "em089_00: 15 materials -> templates ['solid', 'unlit', 'solid_at', 'tar', 'tar', 'tar', 'tar', 'tar', 'tar', 'tar', 'tar', 'tar', 'tar', 'solid', 'add']",
+  "em089_00_tail: 1 materials -> templates ['solid']",
+  "em089_00_gekiryusou: 1 materials -> templates ['solid']",
+  "field 3: CONVERTED parts visibility: 4U rows in the donor's 12-state layout",
+  "field 11: CONVERTED camera list from 4U e089_cam (LCM v4 -> v5, tools/lcm4u2gu.py; ids = 4U ids of the camera events)",
+  "field 26: CONVERTED attackdata from 4U etd word 28 (61 attacks, 4U attack IDs)",
+  "field 28: CONVERTED hitsize from 4U etd word 27 (4U bone IDs = model IDs; 13 -> 201)",
+  "field 30: CONVERTED bodydata from 4U emd word 8 (own skeleton bone IDs)",
+  "field 31: CONVERTED cambodydata from 4U emd word 9",
+  "field 32 em024_00_dtbase: model scale 0.8 (donor) -> 2.5 (4U emd)",
+  "field 32: CONVERTED dtbase: donor object + Gogmazios 4U fields/blocks (dt_convert)",
+  "field 33: CONVERTED dttune: donor object + Gogmazios 4U fields/blocks (dt_convert)",
+  "field 46: CONVERTED hagi s0 from 4U (tools/hagi_em089.py)",
+  "field 47: CONVERTED hagi s1 from 4U (tools/hagi_em089.py)",
+  "field 48: CONVERTED hagi s2 from 4U (tools/hagi_em089.py)",
+  "field 49: CONVERTED hagi s3 from 4U (tools/hagi_em089.py)",
+  "field 50: CONVERTED hagi s4 from 4U (tools/hagi_em089.py)",
+  "shell family shell\\em\\em089_00_shell00\\em089_00_00: 108 files from shell\\em\\em024_00_shell00\\em024_00_00; HDS from 4U 0x1031990, HTS radius 80.0 (4U) instead of 200.0",
+  "em089 sound: 69 waves (69 used by the bank), bank 9 groups / 113 entries, request 290 entries (20 common-bank entries from GU Kushala, 0 converted), sound call 71979 B",
+  "battle BGM STQR sound\\bgm\\battle\\bgm_em089 (500 B)",
+  "effects: 84 entries (tools/efl4u2gu.py); 76 log lines"
+ ]
+}
