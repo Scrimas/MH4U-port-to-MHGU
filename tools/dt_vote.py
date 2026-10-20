@@ -6,12 +6,12 @@ GU object scalar equals. Run with the MHGU_Editor scratch venv.
 """
 import collections, json, os, struct, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import dt_map, gu_schema
+import dt_map, gu_schema, paths
 from romfs import RomFS
 
 
 def vote(kind):
-    rom = RomFS('/home/scrimas/Projects/MHGU_Editor/scratch/base_romfs.bin')
+    rom = RomFS(paths.GU_ROMFS)
     U = dt_map.load_4u()
     blocks = collections.defaultdict(collections.Counter)
     sizes = collections.defaultdict(list)

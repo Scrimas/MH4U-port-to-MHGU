@@ -9,8 +9,8 @@ uEm001_00 (GU) implementations of the same virtual should look alike; base imple
 """
 import bisect, re, struct, sys
 
-sys.path.insert(0, '/home/scrimas/Projects/MH4U_MHGU_port/tools')
-import a4u, gu_enemy as g  # noqa: E402
+sys.path.insert(0, __import__('os').path.dirname(__import__('os').path.abspath(__file__)))
+import a4u, gu_enemy as g, paths  # noqa: E402
 
 GA = g.asm
 LINE = re.compile(r'^ +([0-9a-f]+):\s+\t?(\S+)\s*(.*)$')
@@ -18,7 +18,7 @@ LINE = re.compile(r'^ +([0-9a-f]+):\s+\t?(\S+)\s*(.*)$')
 
 def load_4u():
     ins = {}
-    for l in open('/home/scrimas/Projects/MH4U_MHGU_port/dump/mh4u.asm', errors='replace'):
+    for l in open(paths.DUMP + '/mh4u.asm', errors='replace'):
         m = LINE.match(l)
         if m: ins[int(m.group(1), 16)] = (m.group(2), m.group(3).split(' @')[0].strip())
     return ins

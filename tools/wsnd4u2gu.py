@@ -3,7 +3,8 @@ for the Gogmazios weapons. Formats from tools/snd4u2gu.py (imported, not modifie
 
   wsnd4u2gu.py convert NN IN.arc OUT.arc [--model M]  4U weapon arc (data/pl_<pfx>NNN.arc) -> GU snd arc MMM
   wsnd4u2gu.py gogma DIR4U [OUTDIR]                    the 14 Gogma weapons (DIR4U/pl_<pfx>NNN.arc) ->
-                                                       OUTDIR/wNN/snd/NNN.arc (default module/romfs/nativeNX/arc/weapon)
+                                                       OUTDIR/wNN/snd/NNN.arc (default monsters/gogmazios/romfs/
+                                                       nativeNX/arc/weapon)
   wsnd4u2gu.py check NN OUT.arc [IN.arc]               parse back: waves (bit-identical to IN.arc), bank keys, request
                                                        IDs vs every GU snd arc of the class, request -> bank keys
   wsnd4u2gu.py selftest DIR4U                          rebuild Capcom's 4U -> GU weapon pairs, report byte agreement
@@ -66,7 +67,8 @@ import collections, os, re, struct, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
-sys.path.insert(0, '/home/scrimas/Projects/MHGU_Editor/scratch/py')
+import paths
+sys.path.insert(0, paths.GU_PY)
 import arcpack
 import snd4u2gu as S4
 
@@ -74,7 +76,7 @@ T4, TG = S4.T4, S4.TG
 PFX = {0: 'two', 1: 'one', 2: 'ham', 3: 'lan', 4: 'hbg', 6: 'lbg', 7: 'swo', 8: 'axe', 9: 'gun', 10: 'bow',
        11: 'sou', 12: 'hue', 13: 'rod', 14: 'gaxe'}
 GOGMA = {0: 97, 1: 97, 2: 99, 3: 82, 4: 40, 6: 47, 7: 79, 8: 77, 9: 82, 10: 75, 11: 87, 12: 71, 13: 25, 14: 27}
-OUT_DEFAULT = os.path.join(ROOT, 'module/romfs/nativeNX/arc/weapon')
+OUT_DEFAULT = os.path.join(paths.romfs('gogmazios'), 'nativeNX/arc/weapon')
 RE4 = re.compile(r'^sound\\se\\pl\\wp\\(?:bgn\\)?([a-z]+)\\(\d{3})\\(?:(wave)\\)?(.+)$')
 REG = re.compile(r'^sound\\se\\pl\\wp\\([a-z]+)\\(\d{3})\\(?:(wav)\\)?(.+)$')
 
@@ -341,8 +343,9 @@ def check(nn, path, src=None, rom=None):
 def pairs(dir4u, rom):
     """579 (nn, n4, 4U arc path, GU snd arc path): see the docstring."""
     import glob
-    sys.path.insert(0, '/home/scrimas/Projects/MHGU_Editor/tools')
+    sys.path.insert(0, paths.GU_EDITOR_TOOLS)
     import mod as modlib
+    sys.path.append(os.path.join(paths.monster('gogmazios'), 'tools'))
     import gear_weapons_em089 as G
     from build_assets import arc as gu_arc
     res = gu_arc(rom.read('/nativeNX/loc/arc/resident.arc'))

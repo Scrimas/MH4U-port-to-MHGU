@@ -1,6 +1,6 @@
-"""items_em089.py : Gogmazios materials for module/items.c -> module/items_em089.inc. See notes/content-plan.md "Rewards".
+"""items_em089.py : Gogmazios materials for module/items.c -> gen/items_em089.inc. See notes/content-plan.md "Rewards".
 
-  items_em089.py          write module/items_em089.inc
+  items_em089.py          write monsters/gogmazios/gen/items_em089.inc
   items_em089.py show     print the table only
 
 GU slots: the unused "DUMMY" items 2977.. (name DUMMY, rarity 1, icon 1, in no recipe / reward / carve table), and
@@ -17,7 +17,9 @@ Category (GU file +0x1b, meaning not traced) is not in 4U's record: copied from 
 import os, struct, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(HERE)
+MON = os.path.dirname(HERE)                         # monsters/gogmazios
+ROOT = os.path.dirname(os.path.dirname(MON))
+sys.path.insert(0, os.path.join(ROOT, 'tools'))     # core converters + paths.py
 sys.path.insert(0, HERE)
 import arc
 
@@ -59,7 +61,7 @@ NO_GU_4U = {1721}             # Conqueror's Seal G (m11035 row B, 3 %): a 4U-onl
 # stagger list order (part 1 back, part 7 chest; test 2026-10-20 10:01: the chest break completed "Wound back").
 BREAKS_4U, BREAKS_4U_PTR = 0xf37a8e, 0xf3946c
 BREAK_CONDS = [20, 30, 60, 40]
-OUT = os.path.join(ROOT, 'module/items_em089.inc')
+OUT = os.path.join(MON, 'gen/items_em089.inc')
 
 
 def breaks_4u(exe):

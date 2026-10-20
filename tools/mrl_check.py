@@ -7,8 +7,9 @@ Checks per material: entry size 60, identical entry words except w1 (name hash),
 same descriptor count, names and types; texture indices within the texture table.
 """
 import struct, sys
-sys.path.insert(0, '/home/scrimas/Projects/MHGU_Editor/scratch/py')
 sys.path.insert(0, __import__('os').path.dirname(__import__('os').path.abspath(__file__)))
+import paths
+sys.path.insert(1, paths.GU_PY)      # after this dir, as before
 from romfs import RomFS
 import mrl, mrl_build, mrl_anim
 
@@ -99,5 +100,5 @@ def check(d, rom):
 
 
 if __name__ == '__main__':
-    rom = RomFS('/home/scrimas/Projects/MHGU_Editor/scratch/base_romfs.bin')
+    rom = RomFS(paths.GU_ROMFS)
     sys.exit(0 if check(open(sys.argv[1], 'rb').read(), rom) else 1)

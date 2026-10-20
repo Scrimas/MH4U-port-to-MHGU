@@ -50,9 +50,10 @@ def build(entries, level=9):
 
 
 def selftest(path='/nativeNX/arc/enemy/em001_00.arc'):
-    sys.path.insert(0, '/home/scrimas/Projects/MHGU_Editor/scratch/py')
+    import paths
+    sys.path.insert(0, paths.GU_PY)
     from romfs import RomFS
-    d = RomFS('/home/scrimas/Projects/MHGU_Editor/scratch/base_romfs.bin').read(path)
+    d = RomFS(paths.GU_ROMFS).read(path)
     ver, ents = read(d)
     new = build(ents)
     ver2, ents2 = read(new)

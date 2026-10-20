@@ -1,5 +1,5 @@
 """gear_weapons_em089.py : the 28 Gogmazios weapons as records appended to GU's loaded weapon tables
--> module/gear_weapons_em089.inc (tables + names, read by module/gear.c) and module/gear_hooks.txt (load-exit hooks).
+-> gen/gear_weapons_em089.inc (tables + names, read by module/gear.c) and module/gear_hooks.txt (load-exit hooks).
 Spec: notes/gear-weapons.md (sections 1-8; section numbers below refer to it).
 
   gear_weapons_em089.py          write both files
@@ -21,7 +21,7 @@ Choices (notes section 8 unless noted):
   - Every record is a copy of the stand-in's (GU weapon whose sound set is reused) with fields set; the
     stand-in's final level row for LevelData; a stand-in without a create recipe lends the table's first plain one.
   - mModelID = the 4U record's model number: GU kept 4U weapon model numbers and all 14 Gogma ones are free; the
-    arcs come from tools/weapon4u2gu.py (module/romfs/nativeNX/arc/weapon/wNN/<model>.arc), pwl fixes in gear.c.
+    arcs come from tools/weapon4u2gu.py (romfs/nativeNX/arc/weapon/wNN/<model>.arc), pwl fixes in gear.c.
   - mSrqrNo = mModelID (as for ~95 % of GU weapons): the 4U sounds converted by tools/wsnd4u2gu.py into
     wNN/snd/<model>.arc. mSndMaterial (GU-only bone/iron hit set; 4U's hit sounds are class-wide) is a port choice.
   - mRare 9, mPrice = the 4U price, mPriceChangeLv 0, mSndMaterial 1, mColorIndex 0, mNamed 0, mSpecialSkill 0,
@@ -37,13 +37,15 @@ Choices (notes section 8 unless noted):
 import os, re, struct, sys, pickle
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(HERE)
+MON = os.path.dirname(HERE)                         # monsters/gogmazios
+ROOT = os.path.dirname(os.path.dirname(MON))
+sys.path.insert(0, os.path.join(ROOT, 'tools'))     # core converters + paths.py
 sys.path.insert(0, HERE)
 from gear_em089 import text4u, gu_item_names, c_bytes, c_str, exp_4u, LANGS, GU_ROMFS, EXE, EXE_BASE  # noqa: E402
 from build_assets import RomFS, arc as gu_arc, gmd  # noqa: E402
 import gu  # noqa: E402
 
-OUT_INC = os.path.join(ROOT, 'module/gear_weapons_em089.inc')
+OUT_INC = os.path.join(MON, 'gen/gear_weapons_em089.inc')
 OUT_HOOKS = os.path.join(ROOT, 'module/gear_hooks.txt')
 PCREFS = os.path.join(ROOT, 'dump/gu_pcrefs.pkl')
 

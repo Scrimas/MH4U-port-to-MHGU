@@ -424,10 +424,11 @@ def save_png(img, path):
 
 
 def selftest(arcpath='/nativeNX/arc/enemy/em001_00.arc'):
-    sys.path.insert(0, '/home/scrimas/Projects/MHGU_Editor/scratch/py')
+    import paths
+    sys.path.insert(0, paths.GU_PY)
     from romfs import RomFS
     from arc import arc_entries, arc_read
-    r = RomFS('/home/scrimas/Projects/MHGU_Editor/scratch/base_romfs.bin')
+    r = RomFS(paths.GU_ROMFS)
     d = r.read(arcpath)
     ok = bad = skip = 0
     for e in arc_entries(d):

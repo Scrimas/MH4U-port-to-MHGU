@@ -1,9 +1,9 @@
 """build_em089_arc.py : build nativeNX/arc/enemy/em089_00.arc (Gogmazios) + its file manifest for the module.
 
   build_em089_arc.py --kushala-model    diagnostic: same arc, same paths/file IDs, but fields 0/1 (body, tail)
-                                        hold Kushala's ORIGINAL GU MOD + MRL -> module/romfs-kushala-model/...
-  build_em089_arc.py [--cmdtbl gog]     build, verify, then write:
-      module/romfs/nativeNX/arc/enemy/em089_00.arc   (the Rathian test copy is kept in module/romfs-rathian/)
+                                        hold Kushala's ORIGINAL GU MOD + MRL -> romfs-kushala-model/...
+  build_em089_arc.py [--cmdtbl gog]     build, verify, then write (paths in monsters/gogmazios/):
+      romfs/nativeNX/arc/enemy/em089_00.arc          (the Rathian test copy is kept in romfs-rathian/)
       tools/em089_manifest.json                      (51 manifest fields, file IDs, hashes)
       module/em089_files.inc                         (C tables for the module)
 
@@ -25,21 +25,24 @@ import json, os, re, shutil, struct, sys, zlib
 import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(HERE)
+MON = os.path.dirname(HERE)                         # monsters/gogmazios
+ROOT = os.path.dirname(os.path.dirname(MON))
+sys.path.insert(0, os.path.join(ROOT, 'tools'))     # core converters + paths.py
 sys.path.insert(0, HERE)
-sys.path.insert(0, '/home/scrimas/Projects/MHGU_Editor/scratch/py')
+import paths
+sys.path.insert(0, paths.GU_PY)
 from romfs import RomFS
 import arcpack, mod as modlib, mod4u2gu, tex, mrl, mrl_build, mrl_anim, emdata4u
 import lcm4u2gu                     # 4U camera list (LCM v4) -> GU v5 (behaviour agent, field 11)
 
-GU_ROMFS = '/home/scrimas/Projects/MHGU_Editor/scratch/base_romfs.bin'
-MAIN_IMG = '/home/scrimas/Projects/MHGU_Editor/scratch/mem.bin'
+GU_ROMFS = paths.GU_ROMFS
+MAIN_IMG = paths.GU_MAIN
 SRC_4U = os.path.join(ROOT, 'dump/romfs/data/em089.arc')
-OUT_ARC = os.path.join(ROOT, 'module/romfs/nativeNX/arc/enemy/em089_00.arc')
-OUT_ARC_KUSHALA = os.path.join(ROOT, 'module/romfs-kushala-model/nativeNX/arc/enemy/em089_00.arc')
-RATHIAN_COPY = os.path.join(ROOT, 'module/romfs-rathian/nativeNX/arc/enemy/em089_00.arc')
+OUT_ARC = os.path.join(MON, 'romfs/nativeNX/arc/enemy/em089_00.arc')
+OUT_ARC_KUSHALA = os.path.join(MON, 'romfs-kushala-model/nativeNX/arc/enemy/em089_00.arc')
+RATHIAN_COPY = os.path.join(MON, 'romfs-rathian/nativeNX/arc/enemy/em089_00.arc')
 OUT_JSON = os.path.join(HERE, 'em089_manifest.json')
-OUT_INC = os.path.join(ROOT, 'module/em089_files.inc')
+OUT_INC = os.path.join(MON, 'module/em089_files.inc')
 
 FILES_TABLE = 0x1732A68          # registry index -> manifest (51 x s32 file IDs)
 FILEID_TABLE = 0x15A0CE0         # file ID -> (path hash, type hash), 8 B, entry = ID

@@ -1,6 +1,6 @@
-"""notes_em089.py : Gogmazios in the Hunter's Notes large-monster list -> module/notes_em089.inc (module/notes.c).
+"""notes_em089.py : Gogmazios in the Hunter's Notes large-monster list -> gen/notes_em089.inc (module/notes.c).
 
-  notes_em089.py          write module/notes_em089.inc
+  notes_em089.py          write monsters/gogmazios/gen/notes_em089.inc
   notes_em089.py show     print it only
 
 GU 1.4 main (tools/gu.py), C unless noted:
@@ -23,12 +23,14 @@ Choices: unlocked by clearing quest 11491 (G4 "Quagmire Quarrel"); not capturabl
 import os, struct, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(HERE)
+MON = os.path.dirname(HERE)                         # monsters/gogmazios
+ROOT = os.path.dirname(os.path.dirname(MON))
+sys.path.insert(0, os.path.join(ROOT, 'tools'))     # core converters + paths.py
 sys.path.insert(0, HERE)
 import gu
 from gear_em089 import text4u, c_bytes, c_str, LANGS
 
-OUT = os.path.join(ROOT, 'module/notes_em089.inc')
+OUT = os.path.join(MON, 'gen/notes_em089.inc')
 LIST, UNLOCK, ORDER, N = 0x162d9f0, 0x162d1f8, 0x1631ef4, 123
 EM4U = 89                                # 4U em number = emName / emExp index
 NAME_ENTRY, EM_ID, TYPE_ELDER = 105, 0x59, 13

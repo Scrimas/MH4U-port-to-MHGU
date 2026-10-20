@@ -41,7 +41,8 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-sys.path.insert(0, '/home/scrimas/Projects/MHGU_Editor/scratch/py')
+import paths
+sys.path.insert(0, paths.GU_PY)
 import armor4u2gu as A
 import arcpack, mod as modlib, mod4u2gu, mrl, mrl_anim, mrl_build, tex
 

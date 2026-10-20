@@ -5,7 +5,8 @@
 """
 import collections, pickle, re, sys
 
-sys.path.insert(0, '/home/scrimas/Projects/MHGU_Editor/scratch/py')
+import paths  # noqa: E402
+sys.path.insert(0, paths.GU_PY)
 import asm, vt  # noqa: E402
 
 B = 0x10000000

@@ -4,14 +4,15 @@ Dispatch: vt44 (0x8c3ac0) switches on work byte +0x1ca (category) and sub-dispat
 resolved with disp4u.run(). Motions = constant r1 passed to the setMotion helpers inside the handler.
 """
 import bisect, collections, os, sys
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..'))
+sys.path.insert(0, os.path.join(ROOT, 'tools'))   # core tools
 import a4u, disp4u
 
 LO, HI = 0x8b6600, 0x8cc724
 VT = 0xe6a2b4
 SET_MOTION = {0x94e350: 'setMotion', 0x9190c4: 'setMotionEx', 0x910c6c: 'setMotionTurn?',
               0x94ef9c: 'motion94ef9c', 0x94f440: 'motion94f440', 0x9200a4: 'motion9200a4'}
-MOTIONS = set(map(int, open(os.path.join(os.path.dirname(__file__), '../dump/em089/motions.txt')).read().split()))
+MOTIONS = set(map(int, open(os.path.join(ROOT, 'dump/em089/motions.txt')).read().split()))
 
 
 def is_push(a):

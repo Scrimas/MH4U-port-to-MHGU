@@ -11,9 +11,10 @@ import os, re, shutil, struct, subprocess, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, os.path.join(ROOT, 'tools'))
-import nso
+import nso, paths
 
-MAIN_IMG = '/home/scrimas/Projects/MHGU_Editor/scratch/mem.bin'   # MHGU 1.4 main, flat
+GOG = paths.monster('gogmazios')   # its module sources (module/), generated tables (gen/) and RomFS (romfs/)
+MAIN_IMG = paths.GU_MAIN   # MHGU 1.4 main, flat
 MAIN_BUILD_ID = 'FB08F1D20FD1204FE7070672777F869B'
 MODULE_BASE = 0x2E19000   # subsdk1 lands where sdk was (Ryujinx log: image 3)
 MAIN_BASE = 0x704000      # main (image 1)
@@ -238,10 +239,13 @@ def main():
     open(os.path.join(OUT, 'tables.S'), 'w').write(reg_tables_asm(img))
 
     objs = []
+    src_dirs = (HERE, os.path.join(GOG, 'module'))   # core, then the monster's sources (link order kept)
+    incs = ['-I', OUT, '-I', HERE, '-I', os.path.join(GOG, 'module'), '-I', os.path.join(GOG, 'gen')]
     for src in ('crt0.S', 'main.c', 'util.c', 'em089.c', 'em089_act.c', 'em089_tar.c', 'em089_break.c', 'em089_shell.c', 'em089_shell016.c', 'em089_shell051.c', 'em089_shell005.c', 'em089_aim.c', 'em089_snd.c', 'em089_bgm.c', 'stage.c', 'stage_gimmick.c', 'stage_cart.c', 'stage_doors.c', 'stage_cannon.c', 'em089_efx.c', 'em089_react.c', 'items.c', 'gear.c', 'notes.c', 'em089_pile.c', 'em089_pile_port.c',
                 os.path.join(OUT, 'tables.S')):
+        path = next(p for p in [os.path.join(d, src) for d in src_dirs] if os.path.exists(p))
         o = os.path.join(OUT, os.path.basename(src) + '.o')
-        run('clang', *CFLAGS, *EXTRA_DEFINES, '-I', OUT, '-c', os.path.join(HERE, src), '-o', o)
+        run('clang', *CFLAGS, *EXTRA_DEFINES, *incs, '-c', path, '-o', o)
         objs.append(o)
     elf = os.path.join(OUT, 'subsdk1.elf')
     run('ld.lld', '-shared', '-T', os.path.join(HERE, 'link.ld'), '--hash-style=sysv', '-z', 'norelro',
@@ -284,7 +288,7 @@ def main():
         os.makedirs(ex, exist_ok=True)
         for f in ('subsdk1', MAIN_BUILD_ID + '.ips'):
             shutil.copy(os.path.join(OUT, f), os.path.join(ex, f))
-        romfs = os.path.join(HERE, 'romfs')           # RomFS additions (module/romfs/nativeNX/...)
+        romfs = paths.romfs('gogmazios')              # RomFS additions (monsters/gogmazios/romfs/nativeNX/...)
         if os.path.isdir(romfs):
             dst = os.path.join(MOD_DIR, 'romfs')
             shutil.rmtree(dst, ignore_errors=True)

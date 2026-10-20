@@ -1,6 +1,6 @@
 """ui_em089.py : HUD icon + name of Gogmazios (registry index 137) as RomFS additions. See notes/data.md.
 
-  ui_em089.py            write module/romfs/nativeNX/<lang>/GUI/... for eng fre ger ita spa
+  ui_em089.py            write monsters/gogmazios/romfs/nativeNX/<lang>/GUI/... for eng fre ger ita spa
   ui_em089.py preview    also save the patched atlases as PNG into the scratch dir given by $UI_PREVIEW
 
 Icon: reg_icon[137] (module/build.py ICON_EM089) = UI index 141. The icon setter 0x56ef50 picks atlas
@@ -20,15 +20,18 @@ import os, struct, sys
 import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(HERE)
+MON = os.path.dirname(HERE)                         # monsters/gogmazios
+ROOT = os.path.dirname(os.path.dirname(MON))
+sys.path.insert(0, os.path.join(ROOT, 'tools'))     # core converters + paths.py
 sys.path.insert(0, HERE)
-sys.path.insert(0, '/home/scrimas/Projects/MHGU_Editor/scratch/py')
+import paths
+sys.path.insert(0, paths.GU_PY)
 from romfs import RomFS
 import arcpack, tex
 
-GU_ROMFS = '/home/scrimas/Projects/MHGU_Editor/scratch/base_romfs.bin'
+GU_ROMFS = paths.GU_ROMFS
 SRC_4U = os.path.join(ROOT, 'dump/romfs/eng/data/core_common.arc')
-OUT = os.environ.get('UI_OUT', os.path.join(ROOT, 'module/romfs/nativeNX'))   # UI_OUT: dry run elsewhere
+OUT = os.environ.get('UI_OUT', os.path.join(MON, 'romfs/nativeNX'))   # UI_OUT: dry run elsewhere
 LANGS = ('eng', 'fre', 'ger', 'ita', 'spa')
 ICON_UI_INDEX = 146                      # keep in sync with module/build.py ICON_EM089 (141, 143-145 = the user's
                                          # HD UI v4 cheat: Alatreon / Fatalis icons)
@@ -89,7 +92,7 @@ def main():
     icon = icon_4u()
     atlas, x, y = gu_icon_cell(ICON_UI_INDEX)
     preview = os.environ.get('UI_PREVIEW') if 'preview' in sys.argv else None
-    sys.path.insert(0, '/home/scrimas/Projects/MHGU_Editor/scratch/py')
+    sys.path.insert(0, paths.GU_PY)
     import gmd
     for lang in LANGS:
         rel = '%s/GUI/99_texture/HD_cmn_micon%02d_BM_MQ_NOMIP.tex' % (lang, atlas)

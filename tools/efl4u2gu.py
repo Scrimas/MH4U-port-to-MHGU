@@ -38,14 +38,15 @@ import os, struct, sys, zlib, collections
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
-sys.path.insert(0, '/home/scrimas/Projects/MHGU_Editor/scratch/py')
+import paths
+sys.path.insert(0, paths.GU_PY)
 import arcpack, tex, mod as modlib, mod4u2gu, mrl, mrl_build, ctr
 
 ROM_4U = os.path.join(ROOT, 'dump/base/Monster Hunter 4 Ultimate (EUR) Decrypted.3ds')
 SRC_EM089 = os.path.join(ROOT, 'dump/romfs/data/em089.arc')
 CORE_ARCS = ['/eng/data/core_quest.arc', '/eng/data/core_common.arc']
 STAGE_UNPACKED = ['m19a03', 'm19']   # Battlequarters arena effects (effect\efl\st\m19a03), lowest priority
-GU_ROMFS = '/home/scrimas/Projects/MHGU_Editor/scratch/base_romfs.bin'
+GU_ROMFS = paths.GU_ROMFS
 
 T = dict(EFL=0x6D5AE854, EAN=0x4E397417, TEX=0x241F5DEB, MOD=0x58A15856, MRL=0x2749C8A8, MEF=0x148B6F89,
          LMT=0x76820D81, PEL=0x5A525C16, PSL=0x254309C9)

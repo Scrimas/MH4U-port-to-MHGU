@@ -6,7 +6,8 @@ pcref(b): address computed by the pc-relative instruction at b, with the literal
 where rY was loaded by `ldr rY, [pc, #imm]` within the previous instructions.
 """
 import re, struct, sys
-sys.path.insert(0, '/home/scrimas/Projects/MHGU_Editor/scratch/py')
+import paths
+sys.path.insert(0, paths.GU_PY)
 import asm  # noqa: E402
 
 INS = asm.INS

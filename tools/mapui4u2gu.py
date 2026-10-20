@@ -1,6 +1,7 @@
 """mapui4u2gu.py : in-quest area maps (mapUI, kind 49) of the Battlequarters alias (stage 26 -> m28) from MH4U m19.
 
-  mapui4u2gu.py            write module/romfs/nativeNX/<lang>/arc/stage/mapUI/m28d/a0N_ui_<lang>.arc (eng fre ger ita spa)
+  mapui4u2gu.py            write monsters/gogmazios/romfs/nativeNX/<lang>/arc/stage/mapUI/m28d/a0N_ui_<lang>.arc
+                           (eng fre ger ita spa)
                            and the whole map <lang>/arc/stage/map_com/m28_<lang>.arc (kind 55, see wholemap())
   mapui4u2gu.py preview    also save the composed maps as PNG into the dir given by $UI_PREVIEW
   mapui4u2gu.py gui FILE   dump the instances / position params of a GU map GUI (0x22948394)
@@ -33,14 +34,16 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
-sys.path.insert(0, '/home/scrimas/Projects/MHGU_Editor/scratch/py')
+import paths
+sys.path.insert(0, paths.GU_PY)
 import arcpack, sis, tex
 
-GU_ROMFS = '/home/scrimas/Projects/MHGU_Editor/scratch/base_romfs.bin'
+GU_ROMFS = paths.GU_ROMFS
 MEM4U = os.path.join(ROOT, 'dump/exefs_v11/mem.bin')       # 4U v1.1, flat from 0x100000
 SRC4U = os.path.join(ROOT, 'dump/romfs/eng/data')
-MAPCOM = os.path.join(ROOT, 'module/romfs/nativeNX/loc/arc/stage/map_com/m28.arc')   # stage4u2gu.py alias output
-OUT = os.environ.get('UI_OUT', os.path.join(ROOT, 'module/romfs/nativeNX'))
+GOG_ROMFS = paths.romfs('gogmazios')
+MAPCOM = os.path.join(GOG_ROMFS, 'nativeNX/loc/arc/stage/map_com/m28.arc')   # stage4u2gu.py alias output
+OUT = os.environ.get('UI_OUT', os.path.join(GOG_ROMFS, 'nativeNX'))
 LANGS = ('eng', 'fre', 'ger', 'ita', 'spa')
 AREAS = ((0, 0), (1, 1), (2, 3))        # alias area -> 4U m19 area (stage4u2gu.py alias: 0 -> 0, 1 -> 1, 3 -> 2)
 STAGE4U = 19

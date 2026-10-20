@@ -12,8 +12,9 @@ and the texture indices (by descriptor name: tAlbedoMap, tNormalMap, tSpecularMa
 """
 import struct, sys, zlib
 
-sys.path.insert(0, '/home/scrimas/Projects/MHGU_Editor/scratch/py')
 sys.path.insert(0, __import__('os').path.dirname(__import__('os').path.abspath(__file__)))
+import paths
+sys.path.insert(1, paths.GU_PY)      # after this dir, as before
 import mrl
 from arc import arc_entries, arc_read
 

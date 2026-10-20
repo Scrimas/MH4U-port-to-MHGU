@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """gogreport.py : summarize a Ryujinx log of a Gogmazios test session, so the tester only has to play and close.
 
-usage: python3 tools/gogreport.py [LOG]      (default: newest log in ~/.config/Ryujinx/Logs)
+usage: python3 monsters/gogmazios/tools/gogreport.py [LOG]      (default: newest log in ~/.config/Ryujinx/Logs)
 
 Reports: crash / errors, quest + spawn, action coverage against the handler table of module/em089_act.c
 (s_ported), state / mode / HP timeline, tar timeline (part modes, visibility words), stubs and unmapped conditions.
 """
 import collections, glob, os, re, sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MON = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # monsters/gogmazios
 LOGS = os.path.expanduser('~/.config/Ryujinx/Logs/*.log')
 TAR_PARTS = {0: 'head', 7: 'chest', 2: 'left arm', 3: 'right arm', 6: 'tail'}   # 4U part numbers in the log
 MODES = {0: 'Solid', 1: 'Liquid', 2: 'Gas'}
@@ -16,7 +16,7 @@ NOISE = ('TamperMachine', 'FFmpeg', 'AudioRenderer', 'NvdecProcessor')
 
 
 def handler_table():
-    src = open(os.path.join(ROOT, 'module', 'em089_act.c')).read()
+    src = open(os.path.join(MON, 'module', 'em089_act.c')).read()
     body = src[src.index('s_ported[] = {'):]
     body = body[:body.index('};')]
     return sorted({(int(c), int(n)) for c, n in re.findall(r'\{\s*(\d+),\s*(\d+),\s*\d+,\s*act_\w+\}', body)})

@@ -11,7 +11,8 @@ Ranges: 4U em001 0x6dd000-0x6efee8, GU em001_00 0xcefe00-0xd0cb00, 4U em089 0x8b
 import collections, os, pickle, re, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, '/home/scrimas/Projects/MHGU_Editor/scratch/py')
+import paths  # noqa: E402
+sys.path.insert(0, paths.GU_PY)
 import a4u  # noqa: E402
 import asm  # noqa: E402  (MHGU main.asm index)
 

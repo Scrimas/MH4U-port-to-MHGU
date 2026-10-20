@@ -41,10 +41,11 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-sys.path.insert(0, '/home/scrimas/Projects/MHGU_Editor/scratch/py')
+import paths
+sys.path.insert(0, paths.GU_PY)
 import arcpack, mod as modlib, mod4u2gu, mrl, mrl_build, tex
 
-GU_ROMFS = '/home/scrimas/Projects/MHGU_Editor/scratch/base_romfs.bin'
+GU_ROMFS = paths.GU_ROMFS
 T_TEX, T_MRL, T_MOD, T_CTC, T_XFS = 0x241f5deb, 0x2749c8a8, 0x58a15856, 0x535d969f, 0x66c89ed2
 ARC_RE = re.compile(r'pl_([mf])_(helm|body|arm|wst|leg)(\d+)\.arc$')
 _rom = None

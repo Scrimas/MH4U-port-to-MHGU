@@ -131,7 +131,7 @@ def main():
             os.makedirs(os.path.dirname(fn), exist_ok=True)
             open(fn, 'wb').write(d)
         manifest.append(dict(
-            arc='module/romfs/nativeNX/arc/stage/m28d/a%02d.arc' % k, source_4u='m19%sd' % a4,
+            arc='monsters/gogmazios/romfs/nativeNX/arc/stage/m28d/a%02d.arc' % k, source_4u='m19%sd' % a4,
             remove_types=(['0x79c47b59 (paths sound\\se\\map\\m26d\\m26a%02dd\\...)' % k, '0x15d782fb', '0x1bcc4966']
                           if full else []) + ['0x2543b93e'],
             add_in_order=[dict(path=p, type='0x%08x' % t, file=os.path.relpath(

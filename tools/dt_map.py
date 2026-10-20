@@ -10,7 +10,8 @@ delta bytes into the block that header word w points to.
 """
 import os, struct, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, '/home/scrimas/Projects/MHGU_Editor/scratch/py')
+import paths
+sys.path.insert(0, paths.GU_PY)
 import gu_schema
 from arc import arc_entries, arc_read
 from romfs import RomFS
@@ -30,11 +31,11 @@ def shared_pairs():
     names = [m.group().decode('utf-16le') for m in re.finditer(rb'(?:[\x20-\x7e\x80-\xff][\x00])+', b[start:])]
     em4 = {}
     for k, nm in enumerate(names): em4.setdefault(nm, 'em%03d' % (k + 1))
-    img = open('/home/scrimas/Projects/MHGU_Editor/scratch/mem.bin', 'rb').read()
+    img = open(paths.GU_MAIN, 'rb').read()
     pairs = {struct.unpack_from('<II', img, 0x1597EA4 + 8 * i)[1]: struct.unpack_from('<II', img, 0x1597EA4 + 8 * i)[0]
              for i in range(137)}
     out = []
-    for row in csv.DictReader(open('/home/scrimas/Projects/MHGU_Editor/data/monster-index.csv')):
+    for row in csv.DictReader(open(os.path.join(paths.GU_EDITOR, 'data/monster-index.csv'))):
         nm, idx = row['monster'], int(row['index']) - 1
         if nm not in em4 or idx not in pairs or pairs[idx] & 0x1000: continue
         if nm.startswith(('Raging', 'Furious', 'Savage', 'Apex')): continue   # variants share the base's GU file
@@ -105,7 +106,7 @@ def object_parts(s):
 
 
 def learn(kind, rom=None, U=None):
-    rom = rom or RomFS('/home/scrimas/Projects/MHGU_Editor/scratch/base_romfs.bin')
+    rom = rom or RomFS(paths.GU_ROMFS)
     U = U or load_4u()
     table = {}
     for em4, gu in TRAIN:

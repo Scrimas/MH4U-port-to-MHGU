@@ -9,10 +9,11 @@ Main motion = first listed motion that exists in the LMTs and is not an idle loo
 """
 import os, re
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MON = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # monsters/gogmazios
+ROOT = os.path.dirname(os.path.dirname(MON))
 ACT = os.path.join(ROOT, 'dump', 'em089', 'actions.txt')
 MOT = os.path.join(ROOT, 'dump', 'em089', 'motions.txt')
-OUT = os.path.join(ROOT, 'module', 'em089_actions.inc')
+OUT = os.path.join(MON, 'module', 'em089_actions.inc')
 IDLE = {2, 60}
 
 

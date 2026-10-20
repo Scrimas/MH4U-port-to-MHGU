@@ -8,7 +8,7 @@
   Gogmazios in alias area 2 at (633.5, 0, 1510.8)); needs module/stage.c built with -DGOG_STAGE_ALIAS.
   setEmMain: +0x0C u32 area, +0x10 f32 angle, x, y, z.
 
-Writes (default DIR = module/romfs, mirror of the game RomFS):
+Writes (default DIR = monsters/gogmazios/romfs, mirror of the game RomFS):
   nativeNX/loc/arc/quest/q<ID>.arc                      quest arc (setEmMain, emSetList, rem, supp, questPlus,
                                                           questLink, 5+2 GMDs, questData), loaded at quest start;
                                                           v1.4 finds questLink at entry [count-9], questData [count-1]
@@ -43,9 +43,12 @@ GMD (v0x10302): 'GMD\\0', u32 version, u32 lang 0, u32 unk (copied from the temp
 import argparse, os, struct, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(HERE)
+MON = os.path.dirname(HERE)                         # monsters/gogmazios
+ROOT = os.path.dirname(os.path.dirname(MON))
+sys.path.insert(0, os.path.join(ROOT, 'tools'))     # core converters + paths.py
 sys.path.insert(0, HERE)
-sys.path.insert(0, '/home/scrimas/Projects/MHGU_Editor/scratch/py')
+import paths                        # noqa: E402
+sys.path.insert(0, paths.GU_PY)
 import arcpack                      # noqa: E402
 import items_em089                  # noqa: E402
 from romfs import RomFS             # noqa: E402
@@ -61,7 +64,7 @@ SOURCES = {
 }
 EM_ID = 0x59
 BOSS_ID, BOSS_EM = 0x18, 24    # Kushala: the loader-visible stand-in, swapped to EM_ID at spawn (module/main.c)
-GU_ROMFS = '/home/scrimas/Projects/MHGU_Editor/scratch/base_romfs.bin'
+GU_ROMFS = paths.GU_ROMFS
 Q4U_DIR = os.path.join(ROOT, 'dump/romfs/loc/data')
 HRP_PER_Z = 1880 / 35400       # quest 11491's HRP (chosen at its creation) per zenny of reward, kept for quest 11492
 TPL, TPL_POS = 11413, 11319
@@ -190,7 +193,7 @@ def main():
     ap.add_argument('--source', choices=sorted(SOURCES), default='m11014',
                     help='4U quest to port: m11014 "Advanced: Quagmire Quarrel" -> 11491 (default), m11035 '
                          '"Advanced: Act of Gog" -> 11492')
-    ap.add_argument('--out', default=os.path.join(ROOT, 'module', 'romfs'))
+    ap.add_argument('--out', default=os.path.join(MON, 'romfs'))
     a = ap.parse_args()
     if not (a.arena or a.plain or a.siege or a.legacy):
         a.bq = True                     # the test variant (notes/stage.md section 10) is the default since session 5

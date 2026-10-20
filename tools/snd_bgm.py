@@ -1,7 +1,7 @@
 """snd_bgm.py : MH4U Gogmazios battle BGM (and the Battlequarters streams) -> MHGU Opus streams + battle STQR.
 
   snd_bgm.py all [--keep]        extract, decode, encode, level, write the opus files + the extended bgm_bt.stqr
-                                 into module/romfs/nativeNX/sound/bgm/... (work files: dump/converted/bgm/)
+                                 into monsters/gogmazios/romfs/nativeNX/sound/bgm/... (work files: dump/converted/bgm/)
   snd_bgm.py check FILE.opus     parse a GU (Capcom) opus stream, decode it, print levels
   snd_bgm.py stqr                only rebuild bgm_bt.stqr from the already written opus files
 
@@ -31,12 +31,14 @@ import ctypes, ctypes.util, math, os, struct, subprocess, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
-sys.path.insert(0, '/home/scrimas/Projects/MHGU_Editor/scratch/py')
+import paths
+sys.path.insert(0, paths.GU_PY)
 
 ROM_4U = os.path.join(ROOT, 'dump/base/Monster Hunter 4 Ultimate (EUR) Decrypted.3ds')
-GU_ROMFS = '/home/scrimas/Projects/MHGU_Editor/scratch/base_romfs.bin'
+GU_ROMFS = paths.GU_ROMFS
 WORK = os.path.join(ROOT, 'dump/converted/bgm')
-OUT = os.path.join(ROOT, 'module/romfs/nativeNX/sound/bgm')
+GOG_ROMFS = paths.romfs('gogmazios')
+OUT = os.path.join(GOG_ROMFS, 'nativeNX/sound/bgm')
 GU_BT = '/nativeNX/sound/bgm/battle/bgm_bt.stqr'
 
 EM089_BGM_ID1 = 0x900       # phase 1 (4U id 32)  -- module/em089_bgm.c uses the same values
@@ -395,7 +397,7 @@ def build_m28d_stqr(m28, jingle, med, log):
 
 
 def write(path, data):
-    p = os.path.join(ROOT, 'module/romfs/nativeNX', path.replace('\\', '/'))
+    p = os.path.join(GOG_ROMFS, 'nativeNX', path.replace('\\', '/'))
     os.makedirs(os.path.dirname(p), exist_ok=True)
     open(p, 'wb').write(data)
     return p

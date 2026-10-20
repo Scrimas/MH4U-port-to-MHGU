@@ -1,7 +1,7 @@
-"""gear_em089.py : Gogma armor (+ the Arcana skill) as records appended to GU's loaded tables -> module/gear_em089.inc
+"""gear_em089.py : Gogma armor (+ the Arcana skill) as records appended to GU's loaded tables -> gen/gear_em089.inc
 (module/gear.c). See notes/content-plan.md "Armor and weapons" / "Skills".
 
-  gear_em089.py          write module/gear_em089.inc
+  gear_em089.py          write monsters/gogmazios/gen/gear_em089.inc
   gear_em089.py show     print what would be written
 
 GU tables (file formats, MHGU_Editor docs/07 + this tool's checks; every new record starts from a GU record):
@@ -30,7 +30,7 @@ Choices (notes/content-plan.md):
     Akantor Mask X 134/110 -> 1.196; Gunner: Kaiser Mask X 76/63 = 1.206): 110 -> 132, 64 -> 77.
   - Model: 4U's own numbers, 352 Blademaster / 353 Gunner (4U armor record +0 male / +2 female model = 0x160 /
     0x161). GU keeps 4U model numbers and 352 / 353 are unused gaps in its file list; the arcs come from
-    tools/armor4u2gu.py (module/romfs/nativeNX/arc/player/com/{m,f}/{352,353}/<part>.arc).
+    tools/armor4u2gu.py (romfs/nativeNX/arc/player/com/{m,f}/{352,353}/<part>.arc).
   - Cosmicite Ore (4U rarity 8, top regular G ore, no GU item) -> Meldspar Ore (GU's top regular G ore, rarity 8).
   - Levels: the template's level rows (spheres); Akantor materials -> Gogmazios ones (crystal -> Dragonsphire).
   - Arcana (4U tree 140, +10 = Enlightened Blade = Awaken + Element Atk Up + Status Atk Up): new tree / skill, the
@@ -41,18 +41,21 @@ Choices (notes/content-plan.md):
 import os, struct, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(HERE)
+MON = os.path.dirname(HERE)                         # monsters/gogmazios
+ROOT = os.path.dirname(os.path.dirname(MON))
+sys.path.insert(0, os.path.join(ROOT, 'tools'))     # core converters + paths.py
 sys.path.insert(0, HERE)
-sys.path.insert(0, '/home/scrimas/Projects/MHGU_Editor/tools')
+import paths
+sys.path.insert(0, paths.GU_EDITOR_TOOLS)
 import arc
 import items_em089
 from items_em089 import lmd
 from build_assets import RomFS, arc as gu_arc, gmd
 
-GU_ROMFS = '/home/scrimas/Projects/MHGU_Editor/scratch/base_romfs.bin'
+GU_ROMFS = paths.GU_ROMFS
 EXE = os.path.join(ROOT, 'dump/exefs_v11/mem.bin')
 EXE_BASE = 0x100000
-OUT = os.path.join(ROOT, 'module/gear_em089.inc')
+OUT = os.path.join(MON, 'gen/gear_em089.inc')
 LANGS = items_em089.LANGS
 
 SERIES_FIRST, TREE_ID, SKILL_ID = 1287, 206, 328

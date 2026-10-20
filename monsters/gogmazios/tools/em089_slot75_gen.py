@@ -1,7 +1,7 @@
 """em089_slot75_gen.py : generate module/em089_slot75.inc = literal C translation of the 4U em089 slot-75 motion
 dispatch and per-motion cases (0x8c3cb0 .. 0x8c5058, v1.1), for module/em089_efx.c em089_slot75().
 
-  python3 tools/em089_slot75_gen.py        (writes module/em089_slot75.inc)
+  python3 monsters/gogmazios/tools/em089_slot75_gen.py        (writes monsters/gogmazios/module/em089_slot75.inc)
 
 Every instruction of the range becomes one C statement on register-named variables (r0..r10, s0..s31, the flag
 pair cmpa/cmpb, fa/fb for float compares); branches become gotos (0x8c5058 -> `end`). Mapped calls / fields:
@@ -13,6 +13,7 @@ pair cmpa/cmpb, fa/fb for float compares); branches become gotos (0x8c5058 -> `e
 import os, re, struct, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(HERE))), 'tools'))   # core tools
 sys.path.insert(0, HERE)
 import a4u, dis4u
 

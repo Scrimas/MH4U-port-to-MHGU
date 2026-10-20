@@ -1,5 +1,5 @@
 """guemu.py : run one of MHGU's resource loaders (vtable slot "load(stream)") on a real file under unicorn and
-log where every byte of the file lands in the object.  Run with /home/scrimas/Projects/MHGU_Editor/scratch/venv.
+log where every byte of the file lands in the object.  Run with the MHGU_Editor scratch venv (unicorn).
 
   guemu.py LOADER VTABLE FILE [OBJSIZE]      -> prints "file_off obj_off size" per read, plus heap blocks
 
@@ -10,8 +10,9 @@ bytes and logs them). Any other call into a function listed in ALLOC is served f
 import struct, sys
 from unicorn import Uc, UC_ARCH_ARM, UC_MODE_ARM, UC_HOOK_CODE, UC_HOOK_MEM_UNMAPPED, UcError
 from unicorn.arm_const import *
+import paths
 
-MEM = open('/home/scrimas/Projects/MHGU_Editor/scratch/mem.bin', 'rb').read()
+MEM = open(paths.GU_MAIN, 'rb').read()
 IMG_END = 0x2147000
 STREAM_INIT, STREAM_READ = 0x8260D4, 0x82710C
 OBJ, HEAP, STACK, CTX = 0x30000000, 0x34000000, 0x3F000000, 0x3E000000

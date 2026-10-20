@@ -7,9 +7,9 @@
 # The user's ~/.config/Ryujinx (config, mods, saves) is never touched; ryuroot/bis/user is a copy. Exception: the gui
 # run writes its Ryujinx log to ~/.config/Ryujinx/Logs (the newest file there during the run).
 set -u
-ROOT=/home/scrimas/Projects/MH4U_MHGU_port
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
 R=$ROOT/ryuroot
-GAME="/home/scrimas/Switch Games/Monster Hunter Generations Ultimate  [0100770008dd8000][v0].nsp"
+GAME=${GAME:-"$HOME/Switch Games/Monster Hunter Generations Ultimate  [0100770008dd8000][v0].nsp"}
 
 ryu_pids() {   # only Ryujinx processes running on our root dir (the gui launch's /proc/PID/exe is unreadable: cmdline)
     for p in /proc/[0-9]*; do

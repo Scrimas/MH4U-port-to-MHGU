@@ -24,7 +24,8 @@ chosen by GU's enemy vtable slot 149 = em089_drop_set); items via tools/items_em
 import os, struct, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(HERE)
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
+sys.path.insert(0, os.path.join(ROOT, 'tools'))     # core tools
 sys.path.insert(0, HERE)
 import items_em089
 

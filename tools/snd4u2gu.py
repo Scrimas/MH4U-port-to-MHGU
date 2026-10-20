@@ -46,10 +46,11 @@ import os, re, struct, sys, zlib
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
-sys.path.insert(0, '/home/scrimas/Projects/MHGU_Editor/scratch/py')
+import paths
+sys.path.insert(0, paths.GU_PY)
 import arcpack
 
-GU_ROMFS = '/home/scrimas/Projects/MHGU_Editor/scratch/base_romfs.bin'
+GU_ROMFS = paths.GU_ROMFS
 SRC_4U = os.path.join(ROOT, 'dump/romfs/data/em089.arc')
 DONOR_ARC = '/nativeNX/arc/enemy/em024_00.arc'          # GU Kushala (common-bank request entries)
 DEFAULT_OUT = os.path.join(ROOT, 'dump/converted/em089/snd')

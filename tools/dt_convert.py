@@ -9,7 +9,8 @@ are applied; everything else stays the donor's. Rules: (object field, 4U file, h
 """
 import os, struct, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, '/home/scrimas/Projects/MHGU_Editor/scratch/py')
+import paths
+sys.path.insert(0, paths.GU_PY)
 import guemu, gu_schema, emdata4u
 from romfs import RomFS
 from arc import arc_entries, arc_read
@@ -109,7 +110,7 @@ def gu_file(rom, gu, kind):
 
 
 def validate():
-    rom = RomFS('/home/scrimas/Projects/MHGU_Editor/scratch/base_romfs.bin')
+    rom = RomFS(paths.GU_ROMFS)
     for kind in ('dtbase', 'dttune'):
         donor = gu_file(rom, 'em024_00', kind)
         for em4, gu in (('em032', 'em027_00'), ('em001', 'em001_00'), ('em031', 'em024_00')):
@@ -125,7 +126,7 @@ if __name__ == '__main__':
     if sys.argv[1] == 'validate':
         validate()
     elif sys.argv[1] == 'build':
-        rom = RomFS('/home/scrimas/Projects/MHGU_Editor/scratch/base_romfs.bin')
+        rom = RomFS(paths.GU_ROMFS)
         d4 = emdata4u.load_4u(sys.argv[2]); os.makedirs(sys.argv[4], exist_ok=True)
         for kind in ('dtbase', 'dttune'):
             log = []

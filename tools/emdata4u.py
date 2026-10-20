@@ -208,9 +208,10 @@ CONVERTERS = {
 
 
 def selftest():
-    sys.path.insert(0, '/home/scrimas/Projects/MHGU_Editor/scratch/py')
+    import paths
+    sys.path.insert(0, paths.GU_PY)
     from romfs import RomFS
-    rom = RomFS('/home/scrimas/Projects/MHGU_Editor/scratch/base_romfs.bin')
+    rom = RomFS(paths.GU_ROMFS)
     for em4, gu in (('em001', 'em001_00'), ('em031', 'em024_00'), ('em011', 'em011_00'), ('em032', 'em027_00')):
         d4 = load_4u(em4)
         arc = rom.read('/nativeNX/arc/enemy/%s.arc' % gu)
