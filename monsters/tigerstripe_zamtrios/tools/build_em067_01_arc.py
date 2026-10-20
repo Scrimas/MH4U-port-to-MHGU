@@ -149,6 +149,82 @@ def model(S, rom, notes):
     return out, m4
 
 
+# Paralysis balls (notes/shells.md): GU's uShellEm067_sp_13 / sp_01 run Tigerstripe's balls and their impact residue
+# (module em067_01_shells.c posts them for variant 1). Their families ship inside the monster arc under GU's paths,
+# so ours carry Tigerstripe's data: HDS entries from 4U's records (the conversion of gogmazios/tools/build_em089_arc.py
+# shell_hds, checked here on GU's own Zamtrios entries, which are 4U Zamtrios' records converted), the defs' effect
+# list = em067_01u, and in em067_01u's code-post list GU's ball effects point at em092's.
+HDS_T, HTS_T, SHELL_DEF_T = 0x4EB68CEE, 0x5653C1B0, 0x4AA69872
+S012_REC_4U = 0x1028904 + 84    # 4U uShell012 attack records (40 B): Zamtrios 7..10, Tigerstripe 29..32
+S003_REC_4U = 0x101efbc + 628   # 4U uShell003 (impact residue): Zamtrios 63 / 71 / 72, Tigerstripe 169 / 171 / 172
+BALLS = ('shell\\em\\em067_00_shell13\\em067_00_13', ((0, 7, 29), (1, 8, 30), (2, 9, 31), (3, 10, 32)), 8)
+RESIDUE = ('shell\\em\\em067_00_shell01\\em067_00_01', ((5, 63, 169), (6, 71, 171), (7, 72, 172)), 0xfe)
+RESIDUE_RADIUS = {5: 200.0, 6: 200.0, 7: 300.0}      # 4U volumes of 169 / 171 / 172 (GU Zamtrios: 125 / 125 / 200)
+BALL_FX = {'effect\\em\\em067\\em067_00_012': 'effect\\efl\\em\\em092\\em092_012',     # flight
+           'effect\\em\\em067\\em067_00_014': 'effect\\efl\\em\\em092\\em092_013'}     # impact
+
+
+def hds_entry(exe, a, b1c):
+    """a 4U 40-B attack record -> a GU 56-B HDS entry (build_em089_arc.shell_hds rules; byte 0x19 set by the caller)"""
+    r4 = exe[a - 0x100000:a - 0x100000 + 40]
+    r = bytearray(56)
+    r[0:0x24] = r4[0:0x24]
+    r[0x12] = r4[0x12] & 3
+    r[0x1c] = b1c
+    struct.pack_into('<f', r, 0x28, 1.0)
+    r[0x2c] = r4[0x12] >> 2
+    return r
+
+
+def shell_data(ents, notes):
+    """the kept GU entries with Tigerstripe's ball / residue hit data and effect list"""
+    exe = open(os.path.join(ROOT, 'dump/exefs_v11/code.bin'), 'rb').read()     # MH4U v1.1 code, at 0x100000
+    out = []
+    for p, t, d in ents:
+        for path, rows, b1c in (BALLS, RESIDUE):
+            if (p, t) != (path + '_hitdata', HDS_T): continue
+            d = bytearray(d)
+            for k, zm, ts in rows:
+                o = 16 + 56 * k
+                gu = hds_entry(exe, S012_REC_4U + 40 * zm if b1c == 8 else S003_REC_4U + 40 * zm, b1c)
+                gu[0x19] = d[o + 0x19]
+                assert bytes(gu) == bytes(d[o:o + 56]), (path, k, 'GU entry is not 4U record %d converted' % zm)
+                new = hds_entry(exe, S012_REC_4U + 40 * ts if b1c == 8 else S003_REC_4U + 40 * ts, b1c)
+                new[0x19] = d[o + 0x19]
+                d[o:o + 56] = new
+            notes.append('shell %s: HDS entries %s = 4U records %s' % (path.split('\\')[-1], [r[0] for r in rows],
+                                                                     [r[2] for r in rows]))
+            d = bytes(d)
+        if (p, t) == (RESIDUE[0] + '_hitsize', HTS_T):     # residue volumes: the group of each entry, 4U radius
+            d = bytearray(d)
+            hds = [e for e in ents if e[:2] == (RESIDUE[0] + '_hitdata', HDS_T)][0][2]
+            for k, rad in RESIDUE_RADIUS.items():
+                g = hds[16 + 56 * k + 0x19]
+                off = struct.unpack_from('<I', d, 16 + 8 * g + 4)[0]
+                struct.pack_into('<f', d, off + 0x0c, rad)
+            d = bytes(d)
+        if t == SHELL_DEF_T and p.startswith('shell\\em\\em067_00_shell'):
+            assert d.count(b'effect\\pel\\em\\em067_00u') == 1, p
+            d = d.replace(b'effect\\pel\\em\\em067_00u', PEL_U.encode())
+        out.append((p, t, d))
+    return out
+
+
+def ball_fx_list2(list2):
+    """GU PEL list 2 (count, record bytes) with the ball flight / impact records on em092's EFLs (state kept)"""
+    n, body = list2
+    out, i = b'', 0
+    for _ in range(n):
+        L = body[i]
+        path = body[i + 1:i + 1 + L].decode('ascii')
+        rest = body[i + 1 + L:i + 1 + L + 2 + 160]
+        new = BALL_FX.get(path, path).encode('ascii')
+        out += bytes([len(new)]) + new + rest
+        i += 1 + L + 2 + 160
+    assert i == len(body)
+    return n, out
+
+
 def parts_xfs(gu_xfs, groups, notes):
     """GU em067_00's parts states (rMonsterPartsManager XFS) for em092's mesh groups. 4U em092's visibility rows are
     a subset of em022's, identical for every group they share, so the GU states mean the same for those groups."""
@@ -195,9 +271,12 @@ def effects(gu_pel_u, notes):
     groups.update({g: 'effect\\efl\\qe\\qe%03d\\qe%03d_%%03d' % (g, g) for g in (0, 6, 8, 13)})
     spec = dict(arc=SRC_4U, stage_unpacked=[], mef='effect\\mef\\em\\em092_0', em_efl='effect\\efl\\em\\em092\\',
                 groups=groups, extra=[], lmts=[(P4 + 'mot\\em092_%d' % b, PSL % b) for b in BANKS], pel=PEL_U,
-                soil=dunes_soil(notes), list2=efl4u2gu.pel_lists(gu_pel_u)[2])
+                soil=dunes_soil(notes), list2=ball_fx_list2(efl4u2gu.pel_lists(gu_pel_u)[2]))
     log = []
     out = efl4u2gu.effect_set(spec, log)
+    for p in set(BALL_FX.values()):
+        assert (p, efl4u2gu.T['EFL']) in out, 'ball effect not shipped: ' + p
+    notes.append('PEL list 2: GU ball effects -> %s' % sorted(set(BALL_FX.values())))
     notes.append('effects: %d entries (tools/efl4u2gu.py effect_set)' % len(out))
     notes += ['  ' + l for l in log if not l.startswith('EFL ')]
     return [(p, t, d) for (p, t), d in out.items()]
@@ -261,9 +340,10 @@ def main():
     _, src = arcpack.read(open(SRC_4U, 'rb').read())
     S = {(p, t): d for p, t, d in src}
     _, gents = arcpack.read(rom.read(GU_ARC))
+    notes = []
+    gents = shell_data(gents, notes)
     ghash = {(phash(p), t): (p, t) for p, t, _ in gents}
     gman = manifest_of(img, ALLOC['donor_index'])
-    notes = []
 
     # ---- our own files
     own, ents = {}, []

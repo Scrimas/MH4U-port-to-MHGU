@@ -245,16 +245,21 @@ the stack for variant 1 too (f735bc -> sp+80, f7386c).
     check how slot 90 uses it).
 
 ### 5b. Data (monsters/tigerstripe_zamtrios/tools/build_em067_01_arc.py)
-- Three families: shell\em\em067_01_shell13 / 01 / 02 = copies of GU's, with the path rename and the def's PEL path
-  `em067_01u` (same lengths). Keep `sound\pts\em\em067_00u` (shared). One new file ID per def (after 0x10755).
+- **As built (shell_data / ball_fx_list2):** the shell arc (field 25, `arc\shell\em\em067_00_shell`, ARCS) and the
+  three families are entries of GU's monster arc em067_00.arc, so em067_01.arc keeps them under GU's paths and file
+  IDs (no rename, no new file ID) with Tigerstripe's data. The three defs' PEL path -> `em067_01u` (same length); GU's
+  em067_00u then leaves our arc. Same first-loaded cost as 5.0. The HDS conversion asserts GU's own entries equal 4U
+  Zamtrios records 7..10 / 63, 71, 72 converted before writing Tigerstripe's. shell02 not touched yet.
+- (Plan, superseded:) Three families: shell\em\em067_01_shell13 / 01 / 02 = copies of GU's, with the path rename and
+  the def's PEL path `em067_01u` (same lengths). Keep `sound\pts\em\em067_00u` (shared). One new file ID per def.
 - shell13 HDS entries 0..3 <- 4U uShell012 records 29 / 30 / 31 / 32 (0x1028904 + 84 + 40 i), with the GU conversion
   and byte 0x1c = 8. HTS unchanged.
 - shell01 HDS 5 / 6 / 7 <- 4U uShell003 169 / 171 / 172 (0x101efbc + 628 + 40 sub), byte 0x1c 0xfe. HTS groups 5..7 ->
   4U r200 / 200 / 300 (faithful), GU had 125 / 125 / 200. Entries 0..4 stay GU's.
 - shell02: HDS 0 byte 0x0c = 0x11 (4U record 38); sh000 length 2000; sh001 life 50.
-- PEL em067_01u list 2: replace records 0 / 10 -> em092_012 (k 0 / k 1) and 1 / 11 -> em092_013 (all elements; 4U
-  impact kinds 0 / 2 use all, kind 1 uses mask 1 / 2). The ef params then stay byte-identical to GU's. Records 30 / 31
-  -> TBD (keep GU's or drop until 0xc07ecc kind 7 is resolved).
+- PEL em067_01u list 2 (built): by path, `effect\em\em067\em067_00_012` (records 0 / 2, flight) ->
+  `effect\efl\em\em092\em092_012` and `em067_00_014` (records 1 / 3, impact) -> `em092_013`, state bytes kept, so the
+  ef params stay byte-identical to GU's. (The plan's indices 0 / 10, 1 / 11, 30 / 31 counted another list.)
 
 ### 5c. Open risks / questions
 1. 0xc07ecc kind 7 (uShell016 40 / 48 effect, event 15): which EFL is it? Is the visible TS breath a motion effect?

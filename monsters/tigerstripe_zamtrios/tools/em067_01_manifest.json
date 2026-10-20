@@ -459,12 +459,15 @@
   }
  ],
  "notes": [
+  "shell em067_00_01: HDS entries [5, 6, 7] = 4U records [169, 171, 172]",
+  "shell em067_00_13: HDS entries [0, 1, 2, 3] = 4U records [29, 30, 31, 32]",
   "material XfB__E0__m00_body: template solid_sphere, type 0, em092_01_BM, sphere em092_05_BM",
   "material XfB__E0__m00_fatbig: template solid_sphere, type 1, em092_03_BM, sphere em092_07_BM",
   "material XfB_0__m02_eye: template unlit, type 2, em092_01_BM",
   "material XfB_0__m03_virs: template add, type 3, em092_06_BM",
   "parts states: 33 (GU layout), groups dropped (not in em092): [2, 3, 4, 7, 21, 22, 23, 26, 27, 28, 29, 102, 103, 105, 107, 109], hidden at spawn: [50]",
   "effect area colour: Dunes soil median (211, 165, 117, 255) (areas 1..11: [[214, 165, 132, 255], [236, 151, 85, 255], [217, 154, 104, 255], [207, 155, 113, 255], [185, 143, 110, 255], [204, 150, 102, 255], [226, 186, 139, 255], [211, 168, 117, 255], [211, 168, 117, 255], [207, 171, 134, 255], [232, 181, 140, 255]])",
+  "PEL list 2: GU ball effects -> ['effect\\\\efl\\\\em\\\\em092\\\\em092_012', 'effect\\\\efl\\\\em\\\\em092\\\\em092_013']",
   "effects: 63 entries (tools/efl4u2gu.py effect_set)",
   "  MODEL effect\\base\\cm\\cm000\\cm000_000: 1 materials",
   "  MODEL effect\\base\\em\\em092\\ef_em092: 3 materials",
@@ -495,8 +498,7 @@
   "em092 sound: 53 waves (53 used by the bank), bank 11 groups / 145 entries, request 313 entries (20 common-bank entries from GU em067_00, 0 converted, + 17 more of its common-bank requests), sound call 41135 B",
   "bodydata: GU em067_00 minus records [12, 13] (bones [131, 142])",
   "dttune: GU em067_00 + 42 bytes of 4U em022 -> em092 differences (GU retuned 13 other bytes)",
-  "kept effect\\pel\\em\\em067_00u although replaced: named by ['shell\\\\em\\\\em067_00_shell01\\\\em067_00_01', 'shell\\\\em\\\\em067_00_shell02\\\\em067_00_02', 'shell\\\\em\\\\em067_00_shell13\\\\em067_00_13']",
   "kept sound\\se\\em\\em067_00\\snd_em067_00 although replaced: named by ['shell\\\\em\\\\em067_00_shell02\\\\em067_00_02']",
-  "shared from em067_00: 512 files kept, 25 dropped (replaced or its model)"
+  "shared from em067_00: 511 files kept, 26 dropped (replaced or its model)"
  ]
 }
