@@ -89,7 +89,7 @@ static int tbl_append(void *res, const struct tbl_cls *c, const uint8_t *recs, u
 #define TBL_NEEDS_KIREAJI 2u    /* LevelData rows use the monster's sharpness entries: skipped if those were refused */
 static int s_kire[PORT_N];      /* 0 not loaded, 1 appended, -1 refused */
 
-static void gear_tables_loaded(void *res)
+void gear_tables_loaded(void *res)        /* also items.c: the item table's TBLA blocks (appended items) */
 {
     for (int m = 0; m < PORT_N; m++) {
         const uint8_t *s;

@@ -102,3 +102,18 @@ Consumers: 0x4a858 (load, caller 0x7079c), 0x4acc4, 0x4afe4, 0x4b0e0, 0x4b1d8, 0
 3. Hooks: 0x152960 (file IDs >= our base -> own (hash, type) table, same tail call); 0x3a75c8 and 0x3a3930
    (skip / return 0 for id 0x59).
 4. RomFS addition: nativeNX/arc/enemy/em089_00.arc whose internal paths hash to the manifest entries.
+
+## Packages and companions (2026-10-21, for Dalamadur)
+- A package (monsters/<package>/) may hold several allocations.toml entries (key `package`): one registry index,
+  em ID, data file (gen/<entry>.bin, sections in gen/<entry>/) and manifest each; one module dir, one romfs, one
+  release zip, one package.toml (`[classes]` entry = C prefix; entries sharing a class register it once).
+  tools/paths.py resolves an entry name to its package, so tools keep passing entry names.
+- A companion (`companion_of = owner`) is a second enemy of its owner's fight (4U: Dalamadur's tail half em083 /
+  em111 next to em024 / em110). GU precedent (C): Ahtal-Neset em087 (index 133, no name, flags 0x400c8001 as
+  Lao-Shan's) beside Ahtal-Ka em088. A companion keeps its owner's name entry, takes no Notes entry (save bits
+  123..127 are only 5), no quests, items or gear, and has a save slot it may share with other companions: the
+  quest-end tally 0x3a75c8 indexes a 137-entry array without a bound, so every killable registry index needs a slot
+  (GU's em087 tallies into its own index). Its stand-in is swapped and its arc preloaded while its owner's quest
+  runs (main.c standin_swap / em_arc_request, port.h PORT_OWNER).
+- Variants of a ported em are allowed (Shah Dalamadur = variant 1 of the Dalamadur em number, as 4U runs em024 /
+  em110 with one class).

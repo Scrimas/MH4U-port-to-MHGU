@@ -23,6 +23,7 @@ enum { R0, R1, R2, R3, R4, R5, R12, LR };
 #define ITEM_DATA 20        /* ITEM section record: u16 id, u8 rarity, icon, colour, category, dummy icon, 0,
                                u32 dummy sell, sell, buy */
 void gmd_text_loaded(uint8_t *m, const char *name, uint32_t lang);   /* gear.c: every TXTA append */
+void gear_tables_loaded(void *res);                                 /* gear.c: every TBLA append */
 static const char *const LANGS[] = { "eng", "fre", "ger", "ita", "spa" };   /* data file text order */
 
 static int str_eq(const char *a, const char *b)
@@ -31,13 +32,15 @@ static int str_eq(const char *a, const char *b)
     return *a == *b;
 }
 
-/* 0x19237c: rItemData load done (the first data use at boot: every data file is read here) */
+/* 0x19237c: rItemData load done (the first data use at boot: every data file is read here). Items appended past
+ * GU's 2991 (TBLA blocks, notes/items-append.md) go in first: the append replaces the record array. */
 int item_data_loaded_c(uint32_t *regs)
 {
+    if (!FIELD(uint8_t *, regs[R4], 0x6c)) return 0;
+    port_load_all();
+    gear_tables_loaded((void *)regs[R4]);
     uint8_t *recs = FIELD(uint8_t *, regs[R4], 0x6c);
     uint32_t n = FIELD(uint32_t, regs[R4], 0x64);
-    if (!recs) return 0;
-    port_load_all();
     for (int m = 0; m < PORT_N; m++) {
         const uint8_t *s = port_section(m, "ITEM", 0, 0);
         uint32_t cnt = s ? PORT_U32(s, 0) : 0, done = 0;
@@ -97,6 +100,54 @@ static void monster_name(int m, const char **str, uint32_t n, uint32_t lang)
     }
     str[e] = PORT_STR(s, 4 + 4 * lang);
     logf("mh4uport: monster name entry %u = %s", e, str[e]);
+}
+
+/* ---- items obtained (notes/items-append.md) ----
+ * sItem +0x9c: 94 x u32, bit = item ID, IDs 0..3007; set 0x1943d4 / clear 0x194408 (IDs 1..2990), test 0x19443c (no
+ * bound). With items appended past 2990 (PORT_ITEM_COUNT, build.py hooks them only then), IDs up to 3007 keep GU's
+ * map and IDs from 3008 use the reserved zero block of the save object sUserInfo ([0x1897f78] +0x3684..+0x43f8:
+ * zeroed by its initialiser 0x51cb08, copied by save / load, read by nothing else; MHGU_Editor save map). The three
+ * are replaced (build.py REPLACE_HOOKS): r0 = sItem, r1 = item ID (u16, as GU's uxth / ubfx). */
+#define OBTAINED_MAP 0x9c
+#define OBTAINED_BITS 3008u
+#define OBTAINED_EXT 0x3700u                /* sUserInfo offset of our bits (IDs 3008..), 512 bytes */
+#define OBTAINED_EXT_BITS (512u * 8u)
+
+static uint32_t *obtained_word(uint32_t sitem, uint32_t id, uint32_t *bit)
+{
+    *bit = 1u << (id & 31);
+    if (id < OBTAINED_BITS) return &FIELD(uint32_t, sitem, OBTAINED_MAP + 4 * (id >> 5));
+    uint8_t *s = *(uint8_t **)MAIN(0x1897f78);
+    id -= OBTAINED_BITS;
+    if (!s || id >= OBTAINED_EXT_BITS) return 0;
+    *bit = 1u << (id & 31);
+    return &FIELD(uint32_t, s, OBTAINED_EXT + 4 * (id >> 5));
+}
+
+static int obtained_valid(uint32_t id)       /* GU: (u16)(id - 1) <= count - 2, i.e. 1..count - 1 */
+{
+    return (uint16_t)(id - 1) <= PORT_ITEM_COUNT - 2u;
+}
+
+int obtained_set_c(uint32_t *regs)
+{
+    uint32_t id = regs[R1] & 0xffff, bit, *w = obtained_valid(id) ? obtained_word(regs[R0], id, &bit) : 0;
+    if (w) *w |= bit;
+    return 1;
+}
+
+int obtained_clear_c(uint32_t *regs)
+{
+    uint32_t id = regs[R1] & 0xffff, bit, *w = obtained_valid(id) ? obtained_word(regs[R0], id, &bit) : 0;
+    if (w) *w &= ~bit;
+    return 1;
+}
+
+int obtained_test_c(uint32_t *regs)
+{
+    uint32_t id = regs[R1] & 0xffff, bit, *w = id < PORT_ITEM_COUNT ? obtained_word(regs[R0], id, &bit) : 0;
+    regs[R0] = w ? *w & bit : 0;             /* the masked word, as GU's test */
+    return 1;
 }
 
 /* 0xb83c48: rGUIMessage load done */

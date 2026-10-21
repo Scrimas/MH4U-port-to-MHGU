@@ -1,7 +1,8 @@
 /* Ported monsters in the Hunter's Notes large-monster list (data file section NOTE; the two texts per entry are a
  * TXTA append of HN_MonsterListMsg, gear.c). The three GU tables (list 0x162d9f0 16 B, unlock conditions 0x162d1f8
  * 8 B {u32 value, u8 kind}, display order 0x1631ef4 u32) are copied from GU's own at module_init with one more entry
- * per ported monster (allocations.toml notes_entry = 123 + registry position): the list through data word 0x183ec4c
+ * per ported monster (allocations.toml notes_entry, consecutive from 123; companions have none): the list through
+ * data word 0x183ec4c
  * (main.c), the other two through literal patches, the 123-entry loop bounds patched (build.py LIT_PATCHES /
  * WORD_PATCHES; two loops are unrolled by two and read one record past the end: a padding record follows).
  * Save bits 123..127 of S+0x35b0 are free. Until its data file is read, a monster's entry is a padding record
@@ -16,7 +17,7 @@
 #define GU_UNLOCK  0x162d1f8u
 #define GU_ORDER   0x1631ef4u
 #define GU_COUNT   123
-#define NOTES_COUNT (GU_COUNT + PORT_N)
+#define NOTES_COUNT (GU_COUNT + (int)PORT_NOTES_COUNT)
 
 uint8_t notes_list[(NOTES_COUNT + 1) * 16] __attribute__((aligned(4)));   /* + the padding record */
 uint8_t notes_unlock[NOTES_COUNT * 8] __attribute__((aligned(4)));
@@ -36,7 +37,8 @@ void notes_init(void)
     for (int i = 0; i < GU_COUNT * 8; i++) notes_unlock[i] = unl[i];
     for (int i = 0; i < GU_COUNT; i++) notes_order[i] = ((const uint32_t *)MAIN(GU_ORDER))[i];
     for (int m = 0; m < PORT_N; m++) {
-        uint32_t e = GU_COUNT + (uint32_t)m;
+        uint32_t e = port_monsters[m].notes_entry;
+        if (!e) continue;
         padding(notes_list + 16 * e);
         FIELD(uint32_t, notes_unlock, 8 * e) = port_monsters[m].quests[0];
         notes_unlock[8 * e + 4] = 2;           /* kind 2 = that quest cleared */
@@ -48,9 +50,9 @@ void notes_init(void)
 /* NOTE: u8 list record[16], u8 unlock record[8], u32 the entry it is listed after (port.c, once per monster) */
 void notes_data_loaded(int m)
 {
-    uint32_t size, e = GU_COUNT + (uint32_t)m, k, at = NOTES_COUNT;
+    uint32_t size, e = port_monsters[m].notes_entry, k, at = NOTES_COUNT;
     const uint8_t *s = port_section(m, "NOTE", 0, &size);
-    if (!s || size < 28 || port_monsters[m].notes_entry != e) return;
+    if (!s || size < 28 || e < GU_COUNT || e >= NOTES_COUNT) return;
     for (int i = 0; i < 16; i++) notes_list[16 * e + i] = s[i];
     for (int i = 0; i < 8; i++) notes_unlock[8 * e + i] = s[16 + i];
     for (k = 0; k < NOTES_COUNT && notes_order[k] != e; k++) ;

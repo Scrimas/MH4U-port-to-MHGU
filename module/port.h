@@ -14,10 +14,14 @@
 struct port_monster {
     const char *name;                     /* data file + log name */
     uint16_t em_id, index, donor_index, standin_id;   /* standin 0 = none */
-    uint16_t save_index, save_id, name_entry, notes_entry;
+    uint16_t save_index, save_id, name_entry, notes_entry;   /* notes_entry 0 = none (a companion) */
     uint32_t quests[2], quest_slots[2];   /* 0 = none */
-    void (*register_class)(void);         /* 0 = a GU class runs it (package.toml gu_class) */
+    void (*register_class)(void);         /* 0 = a GU class runs it (package.toml gu_class), or an earlier entry
+                                             registered the same class */
+    int owner;                            /* a companion (allocations.toml companion_of): its owner's port index;
+                                             -1 = a monster. Companions spawn in their owner's quests */
 };
+#define PORT_OWNER(m) (port_monsters[m].owner >= 0 ? port_monsters[m].owner : (m))
 extern const struct port_monster port_monsters[];   /* out/port_monsters.c */
 extern uint32_t port_manifests[][51];               /* registry file manifests (reg_files[index] points here) */
 
