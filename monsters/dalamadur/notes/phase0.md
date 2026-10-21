@@ -56,7 +56,18 @@ gear_scan.py, armor_skills.py, shells2.py, acts2.py).
 ## Arena
 - 4U stage 8 Speartip Crag ("S. Crag"): m08a00d (camp), m08a01d (arena: breakables k00..k02, collision a-g00 / a-w00
   and a-g00-shell / a-w00-shell). The fight stays in one area; Dalamadur destroys parts of the arena over time (user).
-  GU has no counterpart (stages 1..27): stage alias. Study: notes/speartip-crag.md.
+  GU has no counterpart (stages 1..27): stage alias. Study: notes/speartip-crag.md (helper, 2026-10-21). Key results:
+  - The monster breaks the arena (C): stage command 0x6c3400(stage, area 1, mId, 0) from uEm083 0x8a0a80 (k00,
+    action 7.60, motion 623 frame 1238), uEm083 0x8a19d8 (k01, 7.61, motion 624 frame 810) and uEm024 0x7708c4
+    (k02, 7.62, motion 564 frame 1082). The head's 1.60..1.62 sync the tail and queue 7.60..7.62; the AI picks the
+    next piece by HP band (k00 < 90 %, k01 < 62 %, k02 < 44 %) and the highest broken piece (0x7731a4).
+  - The two halves share one HP pool: 0x9201a0 for ids 24 / 83 / 110 / 111 (C). GU has no such sync: port it
+    (controller-only damage, multiplayer).
+  - Breakables k00..k02 = KowareObj mType 9..11, one action Id 0 each, collision swap part 2*mId-1 off / 2*mId on
+    (the rule GU shares). The -shell collisions load with the area, nothing swaps them.
+  - Host stage candidate GU m18 (S: its kod is exactly three type-0 area-1 entries); which stage m18 is and how GU
+    drives its breakables: open (G).
+  - bgm_st_08 = Dalamadur's battle theme (seq 11 bgm_em024, seq 12 bgm_em024_2); phase switch not traced.
 - BGM (C): sound/bgm/stage/bgm_st_08.stq -> wav/bgm_em024.mca, bgm_em024_2.mca; area streams str_map/m08
   m08_a00d / m08_a01d.
 
