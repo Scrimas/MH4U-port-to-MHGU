@@ -40,8 +40,8 @@ sys.path.insert(0, os.path.join(ROOT, 'tools'))     # core converters + paths.py
 import paths
 sys.path.insert(0, paths.GU_PY)
 from romfs import RomFS
-import alloc, arcpack, ctr, efl4u2gu, emc, emdata4u, lcm4u2gu, mod as modlib, mod4u2gu, mrl, mrl_anim, mrl_build, \
-    portdata, snd4u2gu, tex
+import alloc, arcpack, ctr, efl4u2gu, emc, emdata4u, lcm4u2gu, lmt, mod as modlib, mod4u2gu, mrl, mrl_anim, \
+    mrl_build, portdata, snd4u2gu, tex
 
 NAME = 'tigerstripe_zamtrios'
 ALLOC = alloc.monster(NAME)
@@ -402,6 +402,26 @@ def cmdtbl(d4, gu, notes):
     return emc.build(ts)
 
 
+# GU leaves an area with Zamtrios' dive (6/1 0x415 submerge, 6/3 0x416 travel, 6/2 0x417 emerge: shared code, no
+# variant test, as in 4U), but em092's bank 4 lacks indices 21..23 (phase1-variant-map.md 4), so 6/1 had no motion and
+# every area move failed (test 2026-10-21 08:52: 1/51 -> 6/1 -> 6/3 -> 7/13 loop). The user recalls 4U Tigerstripe
+# diving into the ground to leave: em022's three motions go into em092's empty slots (same skeleton by bone ID). They
+# carry em022's event data; our PSL / sound call come from em092's lists, so the dive plays without effects / sounds.
+EM022_ARC = os.path.join(ROOT, 'dump/romfs/data/em022.arc')
+DIVE = {4: [(21, 21), (22, 22), (23, 23)]}       # bank: [(em022 index, em092 index)]
+
+
+def motion_bank(S, b, notes):
+    d = S[(P4 + 'mot\\em092_%d' % b, T['LMT'])]
+    if b not in DIVE:
+        return d
+    _, z = arcpack.read(open(EM022_ARC, 'rb').read())
+    src = [x for p, t, x in z if (p, t) == ('enemy\\em022\\mot\\em022_%d' % b, T['LMT'])][0]
+    out = lmt.splice(d, src, DIVE[b])
+    notes.append('motions bank %d: em092 + em022 dive %s (0x415..0x417)' % (b, [i for i, _ in DIVE[b]]))
+    return out
+
+
 # Area changes: the five per-monster area files (manifest fields 40 area_link, 41 area_eat, 42 map_info, 43
 # area_select, 44 area_patrol) are keyed by map (XFS records mMapNo; map_info = 86-byte blocks per map). GU Zamtrios'
 # cover map 14 only (its other stages are single-area arenas), so on the Dunes (map 5) Tigerstripe had no next area
@@ -482,7 +502,7 @@ def main():
     ents.append((P + 'mod\\em067_01', T['XFS'], parts_xfs(gu_xfs, groups, notes)))
     own[3] = (P + 'mod\\em067_01', T['XFS'])
     for b in BANKS:
-        ents.append((P + 'mot\\em067_01_%d' % b, T['LMT'], S[(P4 + 'mot\\em092_%d' % b, T['LMT'])]))
+        ents.append((P + 'mot\\em067_01_%d' % b, T['LMT'], motion_bank(S, b, notes)))
         own[4 + b] = (P + 'mot\\em067_01_%d' % b, T['LMT'])
     ents.append((P + 'mot\\em067_01_cam', T['LCM'], lcm4u2gu.convert(S[(P4 + 'mot\\e092_cam', T['LCM'])])))
     own[11] = (P + 'mot\\em067_01_cam', T['LCM'])
