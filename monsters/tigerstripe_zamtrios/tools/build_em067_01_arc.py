@@ -15,7 +15,7 @@ em067_00 in the same quest. GU's class uEm067_00 runs it (variant byte 1, notes/
       mod\\em067_01 XFS             GU em067_00's 33 parts states, kept for em092's mesh groups
       mot\\em067_01_0/2/3/4         4U motion lists (LMT 67, unchanged): GU's variant-1 code asks for em092's motions
       mot\\em067_01_cam             4U camera list (tools/lcm4u2gu.py)
-      cmd_tbl\\em067_01_cmdtbl      4U command table, GU group count (tools/emc.py to_gu)
+      cmd_tbl\\em067_01_cmdtbl      4U command table + GU's extra selector / area-move scripts (cmdtbl())
       effects                       tools/efl4u2gu.py effect_set: em092's EFLs (+ the qe families its MEF names) under
                                     their 4U paths, PEL u list 1 from its MEF (the 4U ids its motions' PSLs name), list
                                     2 = GU em067_00u's (GU's class posts GU ids), PSL per motion list from its LMTs;
@@ -379,6 +379,29 @@ def bodydata(gu, notes):
     return bytes(head) + b''.join(keep) + tail
 
 
+def cmdtbl(d4, gu, notes):
+    """4U em092's command table + the entries GU em067_00's table has beyond it (group 0 selector 29, group 1 scripts
+    180..199). GU's class code picks group-1 scripts by number outside the table's own selectors: the area moves of
+    resident enemy\\area_act_tbl (Zamtrios' entry: 180..187, picked through 0xb4e58 -> 0x69c1c8, read at 0x82a04
+    without a range check). 4U had native actions there, so em092's table stops at 179 and an area move read past it
+    (null script pointer: crash in the EMC decoder 0x50ce0, test 2026-10-21 08:20). Every script the appended ones
+    call (14 nn) is the same in both tables (asserted), so they run as in GU."""
+    ts = emc.parse(emc.to_gu(d4))[1]
+    g = emc.parse(gu)[1]
+    assert len(ts) == len(g)
+    added, todo = [], []
+    for k in range(len(g)):
+        assert len(ts[k]) <= len(g[k]), k
+        added += [(k, i) for i in range(len(ts[k]), len(g[k]))]
+        ts[k] = ts[k] + g[k][len(ts[k]):]
+    for k, i in added:
+        for c in emc.refs(g[k][i])[1]:
+            assert c >= len(emc.parse(emc.to_gu(d4))[1][1]) or g[1][c] == ts[1][c], (k, i, 'calls a script em092 changes', c)
+    notes.append('cmdtbl: 4U em092 + GU em067_00 entries %s (all their calls are scripts identical in both)' %
+                 ['g%d s%d' % a for a in added])
+    return emc.build(ts)
+
+
 def attackdata(gu, notes):
     """4U em092's attackdata (tools/emdata4u.py) with GU em067_00's byte 28 (GU-only, the converter writes 6). 4U em092
     and em022 share one table (asserted), so this is GU's table except where GU retuned 4U fields for its Zamtrios:
@@ -440,7 +463,10 @@ def main():
         own[4 + b] = (P + 'mot\\em067_01_%d' % b, T['LMT'])
     ents.append((P + 'mot\\em067_01_cam', T['LCM'], lcm4u2gu.convert(S[(P4 + 'mot\\e092_cam', T['LCM'])])))
     own[11] = (P + 'mot\\em067_01_cam', T['LCM'])
-    ents.append(('enemy\\cmd_tbl\\em067_01_cmdtbl', T['EMC'], emc.to_gu(S[(P4 + 'data\\em092_cmd', T['EMC'])])))
+    gu_cmd = [d for p, t, d in gents if p.startswith('enemy\\cmd_tbl\\em067_00') and t == T['EMC']]
+    assert len(gu_cmd) == 1
+    ents.append(('enemy\\cmd_tbl\\em067_01_cmdtbl', T['EMC'], cmdtbl(S[(P4 + 'data\\em092_cmd', T['EMC'])], gu_cmd[0],
+                                                                     notes)))
     own[37] = ('enemy\\cmd_tbl\\em067_01_cmdtbl', T['EMC'])
     G = {(p, t): d for p, t, d in gents}
     gfile = lambda k: G[ghash[fileid_entry(img, gman[k])]]          # GU em067_00's file of manifest field k

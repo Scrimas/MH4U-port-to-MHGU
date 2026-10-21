@@ -17,7 +17,7 @@
 #include "util.h"
 #include "alloc.h"
 
-enum { R0 };
+enum { R0, R1, R2, R3, R4, R5, R12, LR };
 
 #define EM067_VTABLE 0x17e4800u     /* uEm067_00 object vtable (slot 125 = 0xf78f98, slot 247 = 0xf7a308) */
 #define EN_VARIANT   (EN_ID + 5)
@@ -371,7 +371,11 @@ static const struct { uint8_t cat, num; move_fn fn; } s_moves[] = {
     { 0, 0, 0 },
 };
 
-static int run_move(uint32_t *regs)
+/* only the dispatcher's own no-case calls run a move: ca118 from f790d8 (bl, category default) returns to f790dc,
+ * ca10c from f75b38 (tail call inside 0xf75678, called by f790f0) to f790f4. Any other caller of these generic
+ * end-of-action thunks (an interrupt, an AI reset) really ends the move: running it instead left the AI resuming from
+ * a null script pointer (test 2026-10-21 08:20, crash in the EMC decoder 0x50ce0 after 7/54). */
+static int run_move(uint32_t *regs, uint32_t ret)
 {
     void *self = (void *)regs[R0];
     if (!self || FIELD(uint32_t, self, 0) != MAIN(EM067_VTABLE) || FIELD(uint8_t, self, EN_VARIANT) != 1)
@@ -379,6 +383,11 @@ static int run_move(uint32_t *regs)
     uint8_t cat = FIELD(uint8_t, self, EN_ACT_CAT), num = FIELD(uint8_t, self, EN_ACT_CAT + 1);
     for (uint32_t i = 0; s_moves[i].fn; i++)
         if (s_moves[i].cat == cat && s_moves[i].num == num) {
+            if (regs[LR] - MAIN_BASE != ret) {
+                static uint32_t s_end;
+                if (++s_end <= 20) logf("tzport: em067_01 ported move %u/%u ended by %x", cat, num, regs[LR] - MAIN_BASE);
+                return 0;
+            }
             static uint32_t s_n;
             if (REC(self)[REC_STEP0] == 0 && ++s_n <= 40) logf("tzport: em067_01 ported move %u/%u starts", cat, num);
             s_moves[i].fn(self);
@@ -387,5 +396,5 @@ static int run_move(uint32_t *regs)
     return 0;
 }
 
-int em067_01_end_c(uint32_t *regs) { return run_move(regs); }     /* 0xca118: categories without a case */
-int em067_01_end7_c(uint32_t *regs) { return run_move(regs); }    /* 0xca10c: category-7 numbers without a case */
+int em067_01_end_c(uint32_t *regs) { return run_move(regs, 0xf790dcu); }     /* 0xca118: categories without a case */
+int em067_01_end7_c(uint32_t *regs) { return run_move(regs, 0xf790f4u); }    /* 0xca10c: category-7 numbers */

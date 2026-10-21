@@ -29,6 +29,21 @@ def parse(d):
     return ver, groups
 
 
+def build(groups, ver=0x20120804):
+    """[[script bytes] per group] -> EMC in the games' own layout (GU em067_00 / 4U em092 rebuild byte-identical):
+    header, group rows {count, offset, 0, 0}, then per group its script table {length, offset, 0, 0} followed by its
+    scripts, each padded to 16; an empty group points at the next table."""
+    out = bytearray(struct.pack('<4sIII', b'EMC\0', ver, len(groups), 0)) + bytes(16 * len(groups))
+    for g, scripts in enumerate(groups):
+        tab = len(out)
+        struct.pack_into('<II', out, 0x10 + 16 * g, len(scripts), tab)
+        out += bytes(16 * len(scripts))
+        for i, s in enumerate(scripts):
+            struct.pack_into('<II', out, tab + 16 * i, len(s), len(out))
+            out += s + bytes(-len(s) % 16)
+    return bytes(out)
+
+
 def to_gu(b):
     """4U EMC has 23 groups, GU 21; 4U's last two are empty. Keep every offset: rows 21-22 become padding."""
     magic, ver, ng, _ = struct.unpack_from('<4sIII', b, 0)
