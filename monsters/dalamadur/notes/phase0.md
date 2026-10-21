@@ -25,6 +25,11 @@ gear_scan.py, armor_skills.py, shells2.py, acts2.py).
   0x76d5a0), 0x76de9c (vt40 0x76da88), 0x770e7c / 0x7713b0 / 0x771960 (handlers 0x770954 / 0x770ec0 / 0x7713ec,
   each then calls 0x7753f4 with r1 = 0); uEm083 `cmp #83` at 0x89ff5c, 0x8a0068, 0x8a0420, 0x8a2008, 0x8a27e8,
   0x8a28a8, 0x8a29f8, 0x8a2abc, 0x8a2e9c.
+- Assets (C): em024.arc = 120 files: model `mod\em024` (56 bones, 51 meshes, 8 materials, 7 textures, vertex
+  format 0x01B36016 stride 36 / 4 weights, which tools/mod4u2gu.py handles; body AABB z -29082..16663), a boneless
+  2-mesh `mod\em024_tail` (78 vertices: a severed-tail piece? G), effect model ef_em024, 3 LMTs em024_0 / 2 / 3
+  (5 MB), camera list e024_cam, 23 EFL + 2 MEF, 73 waves + SNDB / SREQ / call list, em024_cmd + em083_cmd. em083.arc
+  (92 files) carries the same model, motions, camera and sounds, its own em083_cmd, no effects.
 - Shah data (C): em110_cmd == em024_cmd byte for byte; etd 59 bytes differ (same size); emd +448 B; em111 emd ==
   em083 emd, etd 6 bytes differ; 2 extra waves (se_fire_atk, se_fire_pre_atk); 9 extra effects em110_200..210;
   2 extra textures (_06, _09).
@@ -32,11 +37,10 @@ gear_scan.py, armor_skills.py, shells2.py, acts2.py).
 ## Walking on the body (user: on some parts, mainly head and back, at certain points, only when allowed)
 - 4U: emd header word 10 (+0x28) is set only for em024, em083, em110, em111 and em046 (Dah'ren Mohran). C. It points
   to a pointer list (em024: 0x1578 empty, 0x1584, 0x1728; em083: 0xadc, 0xae8) of polygon lists
-  {u32 bone, u32 vertex count (4 or 6), u32 -> vertices (12 B each)} closed by 0xffffffff. Word 12 = 2, word 13 ->
-  a further block (enable rules? G). = bone-attached ground polygons. S
-- 0x937150 (C): W+0x420 = [species row 0x91df20] +0x28 (this polygon block). Readers to trace (enemy common code,
-  W+0x420 loads): 0x9402a4, 0x9406e0, 0x942d78 (4 reads each, polygon-loop shape), 0x939c40, 0x920104, 0x946698,
-  0x948b9c, 0x94a66c. Other +0x420 hits in the exe are unrelated objects.
+  {u32 bone, u32 vertex count (4..9), u32 -> vertices (12 B each)} closed by 0xffffffff. = bone-attached ground
+  polygons, chosen per frame by W+0x28e (C, class-study.md).
+- Corrected 2026-10-21 (class-study.md): W+0x420 (0x937150) is emd word 12 (flags), not this block; the species row
+  is emd + 8 and only 0x930990 reads word 10.
 
 ## Action tables (C, scratch acttab.py: recursive disp4u on 1cb)
 - uEm024: 95 actions on 19 handlers: 1.0-2 0x76df28; 1.3-11 0x76e050; 1.50-55, 1.60-91 (38) 0x76e754; 7.0/2/3/4
@@ -50,7 +54,8 @@ gear_scan.py, armor_skills.py, shells2.py, acts2.py).
   7.60-85 are not in the tail's AI, so the main drives them (S).
 - GU precedent (C, data): Nakarkos em084_00.arc carries `collision\em084_00_g00` / `_w00` (SBC, type 0x51fc779f =
   stage collision); Ahtal-Neset em087_00.arc carries g00..g12 / w00..w15. GU em087 (registry index 133, no name) +
-  em088 Ahtal-Ka (index 134) is a two-enemy fight like Dalamadur + tail. To trace: how uEm084_00 / uEm087_00 load
+  em088 Ahtal-Ka (index 134) is a two-enemy fight like Dalamadur + tail: GU quests 11432 / 1011030 (stage 27) list
+  bosses [0x58, 0x57] with objective "hunt 0x58 x 1" (C, base RomFS), the same shape as the 4U quests. To trace: how uEm084_00 / uEm087_00 load
   and move their SBC with the joints, and how GU spawns / names em087.
 
 ## Arena
@@ -65,8 +70,8 @@ gear_scan.py, armor_skills.py, shells2.py, acts2.py).
     (controller-only damage, multiplayer).
   - Breakables k00..k02 = KowareObj mType 9..11, one action Id 0 each, collision swap part 2*mId-1 off / 2*mId on
     (the rule GU shares). The -shell collisions load with the area, nothing swaps them.
-  - Host stage candidate GU m18 (S: its kod is exactly three type-0 area-1 entries); which stage m18 is and how GU
-    drives its breakables: open (G).
+  - Host stage candidate GU m18 = the Sanctuary (Amatsu's arena, C) (S: its kod is exactly three type-0 area-1
+    entries); how GU drives its breakables: open (G).
   - bgm_st_08 = Dalamadur's battle theme (seq 11 bgm_em024, seq 12 bgm_em024_2); phase switch not traced.
 - BGM (C): sound/bgm/stage/bgm_st_08.stq -> wav/bgm_em024.mca, bgm_em024_2.mca; area streams str_map/m08
   m08_a00d / m08_a01d.

@@ -147,8 +147,12 @@ Stage id = [[0xfb6b7c]+0xc8c] & 0xff (scan: stage8.py, base register verified un
   - Stream 1 = bgm_em024_2: 94.9 s, loop 652680..3106944.
   - Sequences 0..10 have no stream (control rows). **Seq 11 -> bgm_em024 (-0.3 dB), seq 12 -> bgm_em024_2 (-0.5 dB).**
   - No bgm_map_08 jingle: request 10 is empty here, while every other 4U bgm_st_NN uses request 10 = bgm_map_NN.
-  - So Dalamadur's theme is a stage theme (wav in sound\bgm\stage\wav), not in bgm_bat. The switch from phase 1
-    to phase 2 is not traced (open). C
+  - So Dalamadur's theme is a stage theme (wav in sound\bgm\stage\wav), not in bgm_bat. C
+  - Phase switch (C, 2026-10-21, scratch bgmsel.py emulates the selector): the 4U battle-music selector 0x30e16c
+    gives em 24 / 110 the stage theme: id 12 (bgm_em024_2) once 0x6c3b94(stage, area 1, kobj id 1) is true, i.e. k00's
+    state byte +0xb1 >= 4 (broken, 0x1d238c), else id 11 (bgm_em024). The tails (83 / 111) get no theme (flag 255).
+    Phase 2 therefore starts with the first arena break (k00, tail action 7.60, HP < 90 %). User: the music changes
+    mid-fight with the phase.
 - str_m08 (sound\bgm\str_map\m08): 3 streams.
   - m08_a00d (28.7 s), m08_a01d (29.4 s) and com rain (26.2 s).
   - Sequences: id 0 -> a00d (-11 dB), 1 -> a01d (-10 dB), 20 -> rain (-6 dB). C
@@ -164,7 +168,9 @@ Stage id = [[0xfb6b7c]+0xc8c] & 0xff (scan: stage8.py, base register verified un
   - m18d.arc ships m18a01d-k01..k03 schedulers + models.
   The other kod tables: m09 / m10 / m15 / m17 / m21 / m27 have a placeholder {0,0,0,0,50}, m16 one entry,
   m19 4 entries (2 of type 1), m20 2 (type 1), m25 three (vital 100 / 300 / 400).
-  - What GU's own code does with m18's kobjs, and which stage m18 is, isn't checked (G).
+  - m18 = the Sanctuary, Amatsu's arena (C, 2026-10-21: base-RomFS questData +0x14 == 18 only in Amatsu (em 0x3a)
+    quests and the Redhelm / Silverwind / Soulseer hunts; scratch gustage.py). What GU's own code does with its
+    kobjs isn't checked (G).
   - The Battlequarters route (new stage 28 = alias of 26 with m28 paths) works the same way with a 2-area donor
     (new id 29 / m29 paths, or reuse 28 if the two ports never coexist: G).
 - **Breakables:** convert 4U k00 / k01 / k02 to GU slots k01 / k02 / k03 (GU file id 0xbbdf + stage*52 + area*4 +
@@ -204,7 +210,7 @@ Stage id = [[0xfb6b7c]+0xc8c] & 0xff (scan: stage8.py, base register verified un
 1. EMC ops 0x0a / 0x11 that gate the break selector (head g0 s0 prefix).
 2. The tail's path into 7/60 / 7/61 (head-tail sync struct at +0x8c88 / the flag written at 0x76e914).
 3. KowareEft list 0x23 -> effect files. snd request id -> wave mapping.
-4. bgm_em024 -> bgm_em024_2 switch condition.
-5. Identity and engine behaviour of GU m18 (host candidate), GU KowareObj handling of mType 9..11.
+4. (settled 2026-10-21: k00 broken -> bgm_em024_2, see section 5 BGM.)
+5. (m18 = the Sanctuary, settled 2026-10-21.) GU KowareObj handling of mType 9..11.
 6. Unidentified stage-8 sites: 0x306410, 0x98cac0, 0xb30a5c, 0x6634f8, 0xb6c6e8 and the 0x933b30 routine that
    W+0x539 suppresses.

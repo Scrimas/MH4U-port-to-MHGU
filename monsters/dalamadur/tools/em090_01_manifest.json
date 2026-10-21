@@ -1,0 +1,505 @@
+{
+ "monster": "em090_01 (Shah Dalamadur)",
+ "entry": "shah_dalamadur",
+ "donor": "em024_00",
+ "file_id_base": "0x10800",
+ "file_count": 17,
+ "manifest": [
+  {
+   "field": 0,
+   "kind": "model",
+   "file_id": "0x10800",
+   "path": "enemy\\em090\\em090_01\\mod\\em090_01",
+   "type": "0x58a15856",
+   "source": "own"
+  },
+  {
+   "field": 1,
+   "kind": "model (tail)",
+   "file_id": "0x10801",
+   "path": "enemy\\em090\\em090_01\\mod\\em090_01_tail",
+   "type": "0x58a15856",
+   "source": "own"
+  },
+  {
+   "field": 2,
+   "kind": "",
+   "file_id": -1
+  },
+  {
+   "field": 3,
+   "kind": "model data (XFS)",
+   "file_id": "0x10802",
+   "path": "enemy\\em090\\em090_01\\mod\\em090_01",
+   "type": "0x7cd0e77e",
+   "source": "own"
+  },
+  {
+   "field": 4,
+   "kind": "motion 0",
+   "file_id": "0x10783",
+   "path": "enemy\\em090\\em090_00\\mot\\em090_00_0",
+   "type": "0x76820d81",
+   "source": "shared (em090_00, its file ID)"
+  },
+  {
+   "field": 5,
+   "kind": "",
+   "file_id": -1
+  },
+  {
+   "field": 6,
+   "kind": "motion 2",
+   "file_id": "0x10803",
+   "path": "enemy\\em090\\em090_01\\mot\\em090_01_2",
+   "type": "0x76820d81",
+   "source": "own"
+  },
+  {
+   "field": 7,
+   "kind": "motion 3",
+   "file_id": "0x10785",
+   "path": "enemy\\em090\\em090_00\\mot\\em090_00_3",
+   "type": "0x76820d81",
+   "source": "shared (em090_00, its file ID)"
+  },
+  {
+   "field": 8,
+   "kind": "",
+   "file_id": -1
+  },
+  {
+   "field": 9,
+   "kind": "",
+   "file_id": -1
+  },
+  {
+   "field": 10,
+   "kind": "",
+   "file_id": -1
+  },
+  {
+   "field": 11,
+   "kind": "camera",
+   "file_id": "0x10804",
+   "path": "enemy\\em090\\em090_01\\mot\\em090_01_cam",
+   "type": "0x39c52040",
+   "source": "own"
+  },
+  {
+   "field": 12,
+   "kind": "sound call",
+   "file_id": "0x10805",
+   "path": "sound\\call\\em\\em090_01",
+   "type": "0x10ebe843",
+   "source": "own"
+  },
+  {
+   "field": 13,
+   "kind": "sound bank",
+   "file_id": "0x10806",
+   "path": "sound\\se\\em\\em090_01\\snd_em090_01",
+   "type": "0x1bcc4966",
+   "source": "own"
+  },
+  {
+   "field": 14,
+   "kind": "pts c",
+   "file_id": "0x7a65",
+   "path": "sound\\pts\\em\\em024_00c",
+   "type": "0x4541367c",
+   "source": "donor em024_00 (original path + file ID)"
+  },
+  {
+   "field": 15,
+   "kind": "pts u",
+   "file_id": "0x7a66",
+   "path": "sound\\pts\\em\\em024_00u",
+   "type": "0x4541367c",
+   "source": "donor em024_00 (original path + file ID)"
+  },
+  {
+   "field": 16,
+   "kind": "pel c",
+   "file_id": "0x7a5f",
+   "path": "effect\\pel\\em\\em024_00c",
+   "type": "0x5a525c16",
+   "source": "donor em024_00 (original path + file ID)"
+  },
+  {
+   "field": 17,
+   "kind": "pel u",
+   "file_id": "0x10807",
+   "path": "effect\\pel\\em\\em090_01u",
+   "type": "0x5a525c16",
+   "source": "own"
+  },
+  {
+   "field": 18,
+   "kind": "psl 0",
+   "file_id": "0x10808",
+   "path": "effect\\psl\\enemy\\em090\\em090_01\\mot\\em090_01_0",
+   "type": "0x254309c9",
+   "source": "own"
+  },
+  {
+   "field": 19,
+   "kind": "",
+   "file_id": -1
+  },
+  {
+   "field": 20,
+   "kind": "psl 2",
+   "file_id": "0x10809",
+   "path": "effect\\psl\\enemy\\em090\\em090_01\\mot\\em090_01_2",
+   "type": "0x254309c9",
+   "source": "own"
+  },
+  {
+   "field": 21,
+   "kind": "psl 3",
+   "file_id": "0x1080a",
+   "path": "effect\\psl\\enemy\\em090\\em090_01\\mot\\em090_01_3",
+   "type": "0x254309c9",
+   "source": "own"
+  },
+  {
+   "field": 22,
+   "kind": "",
+   "file_id": -1
+  },
+  {
+   "field": 23,
+   "kind": "",
+   "file_id": -1
+  },
+  {
+   "field": 24,
+   "kind": "",
+   "file_id": -1
+  },
+  {
+   "field": 25,
+   "kind": "shell arc",
+   "file_id": "0x7a67",
+   "path": "arc\\shell\\em\\em024_00_shell",
+   "type": "0x73850d05",
+   "source": "donor em024_00 (original path + file ID)"
+  },
+  {
+   "field": 26,
+   "kind": "attackdata",
+   "file_id": "0x1080b",
+   "path": "enemy\\hit_data\\em090_01_attackdata",
+   "type": "0x70bb64ba",
+   "source": "own"
+  },
+  {
+   "field": 27,
+   "kind": "",
+   "file_id": -1
+  },
+  {
+   "field": 28,
+   "kind": "hitsize",
+   "file_id": "0x1080c",
+   "path": "enemy\\hit_data\\em090_01_hitsize",
+   "type": "0x5653c1b0",
+   "source": "own"
+  },
+  {
+   "field": 29,
+   "kind": "",
+   "file_id": -1
+  },
+  {
+   "field": 30,
+   "kind": "bodydata",
+   "file_id": "0x1080d",
+   "path": "enemy\\body_data\\em090_01_bodydata",
+   "type": "0x1ac7b52d",
+   "source": "own"
+  },
+  {
+   "field": 31,
+   "kind": "cambodydata",
+   "file_id": "0x1080e",
+   "path": "enemy\\cam_body_data\\em090_01_cambodydata",
+   "type": "0x1ac7b52d",
+   "source": "own"
+  },
+  {
+   "field": 32,
+   "kind": "dtbase",
+   "file_id": "0x1080f",
+   "path": "enemy\\dt_base\\em090_01_dtbase",
+   "type": "0x59d9c3da",
+   "source": "own"
+  },
+  {
+   "field": 33,
+   "kind": "dttune",
+   "file_id": "0x10810",
+   "path": "enemy\\dt_tune\\em090_01_dttune",
+   "type": "0x48e8ac29",
+   "source": "own"
+  },
+  {
+   "field": 34,
+   "kind": "dtbparts",
+   "file_id": "0x10794",
+   "path": "enemy\\dt_base\\em090_00_dtbparts",
+   "type": "0x1bbc291e",
+   "source": "shared (em090_00, its file ID)"
+  },
+  {
+   "field": 35,
+   "kind": "actiontune",
+   "file_id": "0x10795",
+   "path": "enemy\\action_tune\\em090_00_actiontune",
+   "type": "0x496f8f22",
+   "source": "shared (em090_00, its file ID)"
+  },
+  {
+   "field": 36,
+   "kind": "",
+   "file_id": -1
+  },
+  {
+   "field": 37,
+   "kind": "cmdtbl",
+   "file_id": "0x10787",
+   "path": "enemy\\cmd_tbl\\em090_00_cmdtbl",
+   "type": "0x3aabba02",
+   "source": "shared (em090_00, its file ID)"
+  },
+  {
+   "field": 38,
+   "kind": "",
+   "file_id": -1
+  },
+  {
+   "field": 39,
+   "kind": "",
+   "file_id": -1
+  },
+  {
+   "field": 40,
+   "kind": "area_link",
+   "file_id": "0x10796",
+   "path": "enemy\\area_link\\em090_00",
+   "type": "0x4bf84f6f",
+   "source": "shared (em090_00, its file ID)"
+  },
+  {
+   "field": 41,
+   "kind": "area_eat",
+   "file_id": "0x10797",
+   "path": "enemy\\area_eat\\em090_00",
+   "type": "0x56d892d0",
+   "source": "shared (em090_00, its file ID)"
+  },
+  {
+   "field": 42,
+   "kind": "map_info",
+   "file_id": "0x10798",
+   "path": "enemy\\map_info\\em090_00",
+   "type": "0x197e4d7a",
+   "source": "shared (em090_00, its file ID)"
+  },
+  {
+   "field": 43,
+   "kind": "area_select",
+   "file_id": "0x10799",
+   "path": "enemy\\area_select\\em090_00",
+   "type": "0x15e98d21",
+   "source": "shared (em090_00, its file ID)"
+  },
+  {
+   "field": 44,
+   "kind": "area_patrol",
+   "file_id": "0x1079a",
+   "path": "enemy\\area_patrol\\em090_00",
+   "type": "0x0947f3c8",
+   "source": "shared (em090_00, its file ID)"
+  },
+  {
+   "field": 45,
+   "kind": "option motion",
+   "file_id": "0x77ed",
+   "path": "enemy\\em_option\\mot\\em001_00_option",
+   "type": "0x76820d81",
+   "source": "donor em024_00 (original path + file ID)"
+  },
+  {
+   "field": 46,
+   "kind": "hagi s0",
+   "file_id": "0x1079b",
+   "path": "enemy\\hagi\\hagi_s0_em090_00",
+   "type": "0x33a84e14",
+   "source": "shared (em090_00, its file ID)"
+  },
+  {
+   "field": 47,
+   "kind": "hagi s1",
+   "file_id": "0x1079c",
+   "path": "enemy\\hagi\\hagi_s1_em090_00",
+   "type": "0x33a84e14",
+   "source": "shared (em090_00, its file ID)"
+  },
+  {
+   "field": 48,
+   "kind": "hagi s2",
+   "file_id": "0x1079d",
+   "path": "enemy\\hagi\\hagi_s2_em090_00",
+   "type": "0x33a84e14",
+   "source": "shared (em090_00, its file ID)"
+  },
+  {
+   "field": 49,
+   "kind": "hagi s3",
+   "file_id": "0x1079e",
+   "path": "enemy\\hagi\\hagi_s3_em090_00",
+   "type": "0x33a84e14",
+   "source": "shared (em090_00, its file ID)"
+  },
+  {
+   "field": 50,
+   "kind": "hagi s4",
+   "file_id": "0x1079f",
+   "path": "enemy\\hagi\\hagi_s4_em090_00",
+   "type": "0x33a84e14",
+   "source": "shared (em090_00, its file ID)"
+  }
+ ],
+ "extra": {},
+ "files": [
+  {
+   "file_id": "0x10800",
+   "path": "enemy\\em090\\em090_01\\mod\\em090_01",
+   "type": "0x58a15856",
+   "path_hash": "0xcb959f8e"
+  },
+  {
+   "file_id": "0x10801",
+   "path": "enemy\\em090\\em090_01\\mod\\em090_01_tail",
+   "type": "0x58a15856",
+   "path_hash": "0xdf13b8c4"
+  },
+  {
+   "file_id": "0x10802",
+   "path": "enemy\\em090\\em090_01\\mod\\em090_01",
+   "type": "0x7cd0e77e",
+   "path_hash": "0xcb959f8e"
+  },
+  {
+   "file_id": "0x10803",
+   "path": "enemy\\em090\\em090_01\\mot\\em090_01_2",
+   "type": "0x76820d81",
+   "path_hash": "0x3c5c0d62"
+  },
+  {
+   "file_id": "0x10804",
+   "path": "enemy\\em090\\em090_01\\mot\\em090_01_cam",
+   "type": "0x39c52040",
+   "path_hash": "0x0be14a40"
+  },
+  {
+   "file_id": "0x10805",
+   "path": "sound\\call\\em\\em090_01",
+   "type": "0x10ebe843",
+   "path_hash": "0x30b340d1"
+  },
+  {
+   "file_id": "0x10806",
+   "path": "sound\\se\\em\\em090_01\\snd_em090_01",
+   "type": "0x1bcc4966",
+   "path_hash": "0xe8001a32"
+  },
+  {
+   "file_id": "0x10807",
+   "path": "effect\\pel\\em\\em090_01u",
+   "type": "0x5a525c16",
+   "path_hash": "0x50b4d475"
+  },
+  {
+   "file_id": "0x10808",
+   "path": "effect\\psl\\enemy\\em090\\em090_01\\mot\\em090_01_0",
+   "type": "0x254309c9",
+   "path_hash": "0xb672cf3c"
+  },
+  {
+   "file_id": "0x10809",
+   "path": "effect\\psl\\enemy\\em090\\em090_01\\mot\\em090_01_2",
+   "type": "0x254309c9",
+   "path_hash": "0x587cae10"
+  },
+  {
+   "file_id": "0x1080a",
+   "path": "effect\\psl\\enemy\\em090\\em090_01\\mot\\em090_01_3",
+   "type": "0x254309c9",
+   "path_hash": "0x2f7b9e86"
+  },
+  {
+   "file_id": "0x1080b",
+   "path": "enemy\\hit_data\\em090_01_attackdata",
+   "type": "0x70bb64ba",
+   "path_hash": "0x0979bf24"
+  },
+  {
+   "file_id": "0x1080c",
+   "path": "enemy\\hit_data\\em090_01_hitsize",
+   "type": "0x5653c1b0",
+   "path_hash": "0x0a3a5255"
+  },
+  {
+   "file_id": "0x1080d",
+   "path": "enemy\\body_data\\em090_01_bodydata",
+   "type": "0x1ac7b52d",
+   "path_hash": "0x86e86e1f"
+  },
+  {
+   "file_id": "0x1080e",
+   "path": "enemy\\cam_body_data\\em090_01_cambodydata",
+   "type": "0x1ac7b52d",
+   "path_hash": "0x8440d6c3"
+  },
+  {
+   "file_id": "0x1080f",
+   "path": "enemy\\dt_base\\em090_01_dtbase",
+   "type": "0x59d9c3da",
+   "path_hash": "0x70c01a25"
+  },
+  {
+   "file_id": "0x10810",
+   "path": "enemy\\dt_tune\\em090_01_dttune",
+   "type": "0x48e8ac29",
+   "path_hash": "0xa236e63d"
+  }
+ ],
+ "notes": [
+  "em090_01 material XfB__m00_alpha: template solid_at, 2 animations",
+  "em090_01 material XfB__m01_eye: template unlit, 2 animations, raster ['RSMesh', 'RSMeshCN']",
+  "em090_01 material XfB__m00_body1: template solid_sphere, sphere em110_03_BM, 2 animations",
+  "em090_01 material XfB__m00_body4_nm: template solid_sphere, sphere em110_06_BM, 2 animations",
+  "em090_01 material XfB__m00_body2: template solid_sphere, sphere em110_03_BM, 2 animations",
+  "em090_01 material XfB__m00_body5_nm: template solid_sphere, sphere em110_06_BM, 2 animations",
+  "em090_01 material XfB__m00_ang: template add, 1 animations",
+  "em090_01 material XfB__m02_inn: template unlit, 3 animations",
+  "em090_01 material XfB__m00_add: template add, 1 animations",
+  "em090_01_tail material XfB__m00_body2: template solid_sphere, sphere em110_03_BM",
+  "motion list 0 = em090_00's (shared)",
+  "motion list 3 = em090_00's (shared)",
+  "command table = em090_00's (shared)",
+  "em090_01 effects: 62 entries (tools/efl4u2gu.py effect_set), 30 code-post records from MEF _1",
+  "  MODEL effect\\base\\cm\\cm000\\cm000_000: 1 materials",
+  "  MODEL effect\\base\\em\\em110\\ef_em110: 3 materials",
+  "  MODEL effect\\base\\qe\\qe000\\qe000_001: 1 materials",
+  "  MODEL effect\\base\\qe\\qe001\\qe001_000: 2 materials",
+  "  PEL effect\\pel\\em\\em090_01u: 81 records x 2 lists; PSL x3 from LMT event group 2",
+  "em110 sound: 75 waves (75 used by the bank), bank 7 groups / 86 entries, request 161 entries (0 common-bank entries from GU Kushala, 0 converted), sound call 62116 B",
+  "em090_01 XFS: 12 states, visible at spawn [0, 4, 6, 8, 11, 100, 101, 102, 103, 104]",
+  "em090_01 data: 70 attacks, 27 hitsize groups, bodydata 61 / cambodydata 34 records (4U em110)",
+  "arc: 184 own / shared files + 792 donor chain files"
+ ]
+}
