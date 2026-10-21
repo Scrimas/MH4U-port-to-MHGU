@@ -19,10 +19,15 @@ HANDLED = {
     1: {0, 1, 2, 4, 5, 10, 16, 18, 19, 20, 21, 22, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 45, 46, 49,
         50, 51, 52, 53, 54, 55, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 100, 101, 102, 103},
     6: {0, 1, 2, 3, 4, 5, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 23, 24, 32, 34, 36, 37, 38, 39, 40, 41, 42, 43},
+    2: set(range(38)),
     7: {6, 7, 8, 9, 10, 11, 12, 13, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 52, 53, 54, 55, 56, 58, 61, 62, 63,
         64, 65, 66, 67, 68, 69, 71, 72, 73, 74, 75, 76, 202, 203},
+    8: {0},
+    12: {0},
     13: {8, 9, 10, 11, 12},
 }
+# Tigerstripe's own handlers for GU's gaps (module em067_01_moves.c, notes/missing-actions.md)
+PORTED = {(3, 0), (3, 1), (3, 2), (3, 3), (3, 4), (7, 70), (7, 77), (7, 78), (7, 200), (7, 201)}
 # motions GU's variant-1 code requests (notes/phase1-variant-map.md section 4): only em092's motion lists have them
 VARIANT1_MOTIONS = [0x462, 0x463, 0x464, 0x465, 0x466, 0x467, 0x468, 0x469, 0x46a, 0x46b, 0x46c, 0x46d, 0x46e,
                     0x370, 0x372]
@@ -69,9 +74,12 @@ def main():
         if b: mots[int(b.group(1), 16)] += 1
     print('  actions: %d starts, %d distinct' % (sum(acts.values()), len(acts)))
     print('  ', ' '.join('%d/%d x%d' % (c, n, k) for (c, n), k in sorted(acts.items())))
-    gaps = [(c, n) for c, n in acts if not gu_handles(c, n)]
+    gaps = [(c, n) for c, n in acts if not gu_handles(c, n) and (c, n) not in PORTED]
     print('  reaching no uEm067_00 handler (base / default case): %s' % (
         ' '.join('%d/%d x%d' % (c, n, acts[c, n]) for c, n in sorted(gaps)) or 'none'))
+    ported = collections.Counter(re.search(r'move (\d+/\d+)', m).group(1) for _, m in tz if 'ported move' in m)
+    print('  ported moves run (em067_01_moves.c): %s' % (
+        ' '.join('%s x%d' % kv for kv in sorted(ported.items())) or 'none'))
     seen = [m for m in VARIANT1_MOTIONS if m in mots]
     print('  variant-1 motions played: %d of %d (%s); never: %s' % (
         len(seen), len(VARIANT1_MOTIONS), ' '.join('%x' % m for m in seen) or '-',
