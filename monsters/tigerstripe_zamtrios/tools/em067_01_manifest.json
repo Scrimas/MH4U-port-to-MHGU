@@ -3,7 +3,7 @@
  "id": "0x143",
  "registry_index": 138,
  "file_id_base": "0x10740",
- "file_count": 23,
+ "file_count": 28,
  "manifest": [
   {
    "field": 0,
@@ -251,38 +251,38 @@
   },
   {
    "field": 40,
-   "file_id": "0x7e3f",
-   "path": "enemy\\area_link\\em067_00",
+   "file_id": "0x10757",
+   "path": "enemy\\area_link\\em067_01",
    "type": "0x4bf84f6f",
-   "source": "shared (GU em067_00, its file ID)"
+   "source": "GU em007_00 (area data)"
   },
   {
    "field": 41,
-   "file_id": "0x7e40",
-   "path": "enemy\\area_eat\\em067_00",
+   "file_id": "0x10758",
+   "path": "enemy\\area_eat\\em067_01",
    "type": "0x56d892d0",
-   "source": "shared (GU em067_00, its file ID)"
+   "source": "GU em007_00 (area data)"
   },
   {
    "field": 42,
-   "file_id": "0x7e41",
-   "path": "enemy\\map_info\\em067_00",
+   "file_id": "0x10759",
+   "path": "enemy\\map_info\\em067_01",
    "type": "0x197e4d7a",
-   "source": "shared (GU em067_00, its file ID)"
+   "source": "GU em007_00 (area data)"
   },
   {
    "field": 43,
-   "file_id": "0x7e42",
-   "path": "enemy\\area_select\\em067_00",
+   "file_id": "0x1075a",
+   "path": "enemy\\area_select\\em067_01",
    "type": "0x15e98d21",
-   "source": "shared (GU em067_00, its file ID)"
+   "source": "GU em007_00 (area data)"
   },
   {
    "field": 44,
-   "file_id": "0x7e43",
-   "path": "enemy\\area_patrol\\em067_00",
+   "file_id": "0x1075b",
+   "path": "enemy\\area_patrol\\em067_01",
    "type": "0x0947f3c8",
-   "source": "shared (GU em067_00, its file ID)"
+   "source": "GU em007_00 (area data)"
   },
   {
    "field": 45,
@@ -462,6 +462,36 @@
    "path": "enemy\\hit_data\\em067_01_attackdata",
    "type": "0x70bb64ba",
    "path_hash": "0x1c92d704"
+  },
+  {
+   "file_id": "0x10757",
+   "path": "enemy\\area_link\\em067_01",
+   "type": "0x4bf84f6f",
+   "path_hash": "0xfec13d95"
+  },
+  {
+   "file_id": "0x10758",
+   "path": "enemy\\area_eat\\em067_01",
+   "type": "0x56d892d0",
+   "path_hash": "0xb5b7d6fc"
+  },
+  {
+   "file_id": "0x10759",
+   "path": "enemy\\map_info\\em067_01",
+   "type": "0x197e4d7a",
+   "path_hash": "0xd893fd51"
+  },
+  {
+   "file_id": "0x1075a",
+   "path": "enemy\\area_select\\em067_01",
+   "type": "0x15e98d21",
+   "path_hash": "0x49ad6b89"
+  },
+  {
+   "file_id": "0x1075b",
+   "path": "enemy\\area_patrol\\em067_01",
+   "type": "0x0947f3c8",
+   "path_hash": "0xe99bacf4"
   }
  ],
  "notes": [
@@ -507,7 +537,8 @@
   "attackdata: 4U em092 (= em022) with GU byte 28; differs from GU in the flags of records [23, 24, 31, 32, 33]",
   "bodydata: GU em067_00 minus records [12, 13] (bones [131, 142])",
   "dttune: GU em067_00 + 42 bytes of 4U em022 -> em092 differences (GU retuned 13 other bytes)",
+  "area data (fields 40-44): GU em007_00 (map 5 / 22 routes; GU em067_00 covers map 14 only)",
   "kept sound\\se\\em\\em067_00\\snd_em067_00 although replaced: named by ['shell\\\\em\\\\em067_00_shell02\\\\em067_00_02']",
-  "shared from em067_00: 510 files kept, 27 dropped (replaced or its model)"
+  "shared from em067_00: 505 files kept, 32 dropped (replaced or its model)"
  ]
 }

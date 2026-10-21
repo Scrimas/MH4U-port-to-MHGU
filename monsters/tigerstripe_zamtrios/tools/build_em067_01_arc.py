@@ -59,7 +59,7 @@ P0 = 'enemy\\em067\\em067_00\\'  # GU variant 0
 P = 'enemy\\em067\\em067_01\\'   # ours
 BANKS = (0, 2, 3, 4)             # motion lists of em092 and em067_00 (neither has list 1): manifest field 4 + bank
 # manifest fields with our own file: IDs are given in this order (append only: IDs never move once shipped)
-OWN_ORDER = [0, 3, 4, 6, 7, 8, 11, 37, 17, 18, 20, 21, 22, 30, 33, 12, 13, 46, 47, 48, 49, 50, 26]
+OWN_ORDER = [0, 3, 4, 6, 7, 8, 11, 37, 17, 18, 20, 21, 22, 30, 33, 12, 13, 46, 47, 48, 49, 50, 26, 40, 41, 42, 43, 44]
 DT_DIR = os.path.join(ROOT, 'dump/converted/em092')           # build.sh step dt
 PEL_U = 'effect\\pel\\em\\em067_01u'
 PSL = 'effect\\psl\\enemy\\em067\\em067_01\\mot\\em067_01_%d'
@@ -402,6 +402,29 @@ def cmdtbl(d4, gu, notes):
     return emc.build(ts)
 
 
+# Area changes: the five per-monster area files (manifest fields 40 area_link, 41 area_eat, 42 map_info, 43
+# area_select, 44 area_patrol) are keyed by map (XFS records mMapNo; map_info = 86-byte blocks per map). GU Zamtrios'
+# cover map 14 only (its other stages are single-area arenas), so on the Dunes (map 5) Tigerstripe had no next area
+# and never left. 4U keeps no area data in the monster arcs (em022 / em092 have none), so ours are GU Diablos'
+# (em007_00: a large ground monster of the Dunes, map 5 areas 1-5, 7, 10 incl. the spawn area 4; no patrol data,
+# as every GU Dunes route of it).
+AREA_DONOR = ('/nativeNX/arc/enemy/em007_00.arc', 'em007_00')
+AREA_FIELDS = {40: 'area_link', 41: 'area_eat', 42: 'map_info', 43: 'area_select', 44: 'area_patrol'}
+
+
+def area_files(rom, gtype, notes):
+    """{field: (our path, type, GU em007_00's data)}"""
+    _, g = arcpack.read(rom.read(AREA_DONOR[0]))
+    out = {}
+    for k, kind in AREA_FIELDS.items():
+        src = [(p, t, d) for p, t, d in g if p == 'enemy\\%s\\%s' % (kind, AREA_DONOR[1])]
+        assert len(src) == 1 and src[0][1] == gtype[k], (k, kind)
+        out[k] = ('enemy\\%s\\em067_01' % kind, src[0][1], src[0][2])
+    notes.append('area data (fields 40-44): GU %s (map 5 / 22 routes; GU em067_00 covers map 14 only)' %
+                 AREA_DONOR[1])
+    return out
+
+
 def attackdata(gu, notes):
     """4U em092's attackdata (tools/emdata4u.py) with GU em067_00's byte 28 (GU-only, the converter writes 6). 4U em092
     and em022 share one table (asserted), so this is GU's table except where GU retuned 4U fields for its Zamtrios:
@@ -489,6 +512,10 @@ def main():
         path, typ = 'enemy\\hagi\\hagi_s%d_em067_01' % (k - 46), ghash[fileid_entry(img, gman[k])][1]
         ents.append((path, typ, data))
         own[k] = (path, typ)
+    for k, (path, typ, data) in area_files(rom, {k: ghash[fileid_entry(img, gman[k])][1] for k in AREA_FIELDS},
+                                           notes).items():
+        ents.append((path, typ, data))
+        own[k] = (path, typ)
 
     # ---- the shared GU em067_00 files: everything but what ours replace and em067_00's model (MOD, MRL, textures)
     replaced = {ghash[fileid_entry(img, gman[k])] for k in own if gman[k] != -1}
@@ -512,7 +539,7 @@ def main():
         assert fid <= FILE_ID_LAST, 'file IDs past the allocations.toml range: widen file_ids'
         new_files.append((fid,) + own[k])
         manifest[k] = fid
-        src_of[k] = 'converted (4U em092)'
+        src_of[k] = 'GU %s (area data)' % AREA_DONOR[1] if k in AREA_FIELDS else 'converted (4U em092)'
     for k in range(51):
         if k not in own and manifest[k] != -1: src_of[k] = 'shared (GU em067_00, its file ID)'
 
