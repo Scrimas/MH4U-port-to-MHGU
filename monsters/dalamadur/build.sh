@@ -32,10 +32,18 @@ step() {      # name: command line of one step
     bgm)          python3 "$T/bgm_dalamadur.py" ;;                          # theme opus + dump/converted/dalamadur STQR
     walk)         python3 tools/walk4u2gu.py convert ;;                     # walk collision SBC (dump/converted/dalamadur/walk)
     arc)          python3 "$T/build_dalamadur_arc.py" ;;                    # the four monster arcs + manifests
+    quest)        python3 "$T/build_dalamadur_quest.py" ;;                  # quest 11494 (4U m10709)
+    pack)         pack ;;                                 # sections (portdata.py sec_dir) -> gen/<entry>.bin
     *)            echo "unknown step $1"; return 2 ;;
     esac
 }
-ALL=(dt bgm walk arc)
+pack() {      # one data file per entry (tools/portdata.py)
+    local e
+    for e in dalamadur shah_dalamadur dalamadur_tail shah_dalamadur_tail; do
+        python3 tools/portdata.py pack $e || return 1
+    done
+}
+ALL=(dt bgm walk arc quest pack)
 STEPS=("$@"); [ $# -eq 0 ] && STEPS=("${ALL[@]}")
 k=0; fails=0; t0=$(date +%s)
 for s in "${STEPS[@]}"; do
