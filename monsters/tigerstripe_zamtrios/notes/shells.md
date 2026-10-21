@@ -275,4 +275,7 @@ the stack for variant 1 too (f735bc -> sp+80, f7386c).
 6. 7/202 / 7/203 reachability comes from the heuristic EMC tokenizer: confirm with the action log (tzreport.py)
    before stage 2.
 7. In game: the log should show our request lines; the balls must appear with the em092_012 effect and paralyse; the
-   residue should paralyse inside r200 / 300 for 10 frames.
+   residue should paralyse inside r200 / 300 for 10 frames. **Confirmed 2026-10-21** (user: "All fixed"): the three
+   hooks fired (f72700 x9, f73870 x6, f735c0 x5), GU posted id 292 kinds 0 / 1 / 3 / 4 and the residue id 290 kinds
+   8..11 (from f7c098), no crash. Ball effects: shells look up PEL list-2 records by id (state +0x30): 0 / 10 =
+   flight (em092_012), 1 / 11 = impacts (em092_013); the breath shell's 30 / 31 are untouched.
