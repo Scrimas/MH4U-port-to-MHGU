@@ -3,7 +3,7 @@
 Source: 4U v1.1 EUR exe `dump/exefs_v11/mem.bin` (address A = file offset A - 0x100000), 4U RomFS text
 (`dump/romfs/<lang>/data/core_common.arc`, lmd), quests `dump/romfs/loc/data/quest01.arc`. GU side: MHGU_Editor
 `scratch/base_romfs.bin` (resident.arc, resident_eng.arc, blacksmith.arc, result.arc). Read-only research; scratch
-scripts: `/tmp/claude-1000/-home-scrimas-Projects-MH4U-MHGU-port/aa473438-013b-4411-b8ca-5d2f95908e85/scratchpad/content/t*.py`.
+scripts: `dump/scratch/tigerstripe-session/content/t*.py` (local archive of the session scratchpad).
 Tags: C confirmed in code/data, S strong, G guess. "GU id" = GU item / tree / weapon found by identical English name.
 TS materials -> GU slots (allocations.toml order, S): 1357 -> 2986, 1358 -> 2987, 1359 -> 2988, 1360 -> 2989, 1361 -> 2990.
 

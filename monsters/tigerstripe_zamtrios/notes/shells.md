@@ -1,7 +1,7 @@
 # Tigerstripe Zamtrios: paralysis shells (design, 2026-10-21, helper, static only)
 
 Tags: C = confirmed in code / data, S = strong, G = guess. 4U = MH4U v1.1 (dump/mh4u.asm), GU = MHGU 1.4 main.
-Scratch scripts: /tmp/claude-1000/-home-scrimas-Projects-MH4U-MHGU-port/aa473438-013b-4411-b8ca-5d2f95908e85/scratchpad/shells/.
+Scratch scripts: dump/scratch/tigerstripe-session/shells/ (local archive of the session scratchpad).
 
 Short version: Tigerstripe's paralysis balls are 4U uShell012 subtypes 40-43 (+ an invisible uShell003 residue sphere,
 subtypes 169-172, at the impact). Their code is the same as Zamtrios' 8-11: only data changes (effect group, attack

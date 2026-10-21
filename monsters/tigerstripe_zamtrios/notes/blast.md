@@ -1,7 +1,7 @@
 # Tigerstripe Zamtrios: 7/70 deflate blast = 4U uShell016 subtypes 38 / 49 (static, 2026-10-21)
 
 Tags: C = confirmed in code / data, S = strong, G = guess. 4U = MH4U v1.1 (dump/mh4u.asm, code.bin at 0x100000).
-Scratch scripts: /tmp/claude-1000/-home-scrimas-Projects-MH4U-MHGU-port/aa473438-013b-4411-b8ca-5d2f95908e85/scratchpad/blast/.
+Scratch scripts: dump/scratch/tigerstripe-session/blast/ (local archive of the session scratchpad).
 Shell field names follow monsters/gogmazios/module/em089_shell016.c: P = +0x100 (far point), Q = +0x120 (start).
 
 Short version: 38 and 49 run the **same code**. They differ only in data: Dunes 38 = volume r208 + effect scale

@@ -6,9 +6,8 @@ name: Installer
 #   MH4U-Port-Installer-<version>-x86_64.AppImage   zig, glibc 2.28, AppImage type 2 runtime
 #   MH4U-Port-Installer-<version>-x86_64.exe        mingw-w64 cross build
 
+# Releases ship no apps since 2026-10-21 (user): manual runs only, nothing attaches to v* tags.
 on:
-  push:
-    tags: ["v*"]
   workflow_dispatch:
 
 permissions:

@@ -3,19 +3,19 @@ never be built in hosted CI: the converters read ~15 GB of 4U / GU data and the 
 
   release.py build           every monster's build.sh (all steps), then the module, both without test switches
   release.py check           release checks on the current outputs (exit 1 on any failure)
-  release.py package [DIR]   check, then zips + manifest.json into DIR (default dump/release/v<core version>)
+  release.py package [DIR]   check, then the zips + NOTES.md into DIR (default dump/release/v<core version>)
   release.py all [DIR]       build + package
   release.py publish DIR --repo OWNER/NAME [--yes] [--draft]
-                             create the GitHub release v<core version> with DIR's files (gh CLI); asks first unless
-                             --yes. CI (.github/workflows/installer.yml) then attaches the installer apps to it.
+                             create the GitHub release v<core version> with DIR's zips and NOTES.md as its text (gh
+                             CLI); asks first unless --yes. No installer apps (user, 2026-10-21): users extract the zips.
 
-Packages (notes/installer.md): core-<v>.zip = exefs/{subsdk1, <build id>.ips} + romfs/nativeNX/mh4uport/<every monster>.bin
-(always installed together: gear IDs depend on all of them); <monster>-<v>.zip = that monster's romfs/ (its assets).
-Zip paths are relative to the mod folder ('<mods>/contents/<title>/MH4U Port/' for Ryujinx, '<load>/<TITLE>/MH4U Port/'
-for the yuzu family); the installer maps them for Atmosphère. manifest.json: format 1, title, mod name, core and
-monsters {name, title, version, requires_core, file, sha256, size} and the warnings the installer shows.
+Packages: core-<v>.zip = MH4U Port/exefs/{subsdk1, <build id>.ips} + MH4U Port/romfs/nativeNX/mh4uport/<every
+monster>.bin (always installed together: gear IDs depend on all of them); <monster>-<v>.zip = MH4U Port/romfs/... (that
+monster's assets, optional). Every zip extracts into the game's mod directory ('<mods>/contents/<title>/' for Ryujinx,
+'<load>/<TITLE>/' for the yuzu family) and they merge into the one 'MH4U Port' folder. NOTES.md (the release text):
+files, sha256, install steps, warnings.
 """
-import hashlib, json, os, re, struct, subprocess, sys, tomllib, zipfile
+import hashlib, os, re, struct, subprocess, sys, tomllib, zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -141,42 +141,53 @@ def package(out):
                ('exefs/' + build_id(), os.path.join(MODULE_OUT, build_id()))]
     members += [('romfs/nativeNX/mh4uport/%s.bin' % p['name'], os.path.join(paths.gen(p['name']), p['name'] + '.bin'))
                 for p in pk]
-    entries = []
     core_zip = 'core-%s.zip' % c['version']
-    write_zip(os.path.join(out, core_zip), members)
+    write_zip(os.path.join(out, core_zip), [(MOD_NAME + '/' + a, s) for a, s in members])
     for p in pk:
         rf = paths.romfs(p['name'])
-        mem = [('romfs/' + os.path.relpath(os.path.join(d, f), rf).replace(os.sep, '/'), os.path.join(d, f))
+        mem = [(MOD_NAME + '/romfs/' + os.path.relpath(os.path.join(d, f), rf).replace(os.sep, '/'), os.path.join(d, f))
                for d, _, fs in os.walk(rf) for f in fs]
-        z = '%s-%s.zip' % (p['name'], p['version'])
-        write_zip(os.path.join(out, z), mem)
-        entries.append(dict(name=p['name'], title=p['title'], version=p['version'], requires_core=p['requires_core'],
-                            file=z, sha256=sha256(os.path.join(out, z)), size=os.path.getsize(os.path.join(out, z))))
-    manifest = dict(format=1, title_id=TITLE_ID, mod_name=MOD_NAME,
-                    core=dict(name='core', title=c['title'], version=c['version'], requires_core=c['version'],
-                              file=core_zip, sha256=sha256(os.path.join(out, core_zip)),
-                              size=os.path.getsize(os.path.join(out, core_zip))),
-                    monsters=entries, warnings=WARNINGS)
-    json.dump(manifest, open(os.path.join(out, 'manifest.json'), 'w'), indent=1)
+        write_zip(os.path.join(out, '%s-%s.zip' % (p['name'], p['version'])), mem)
+    with open(os.path.join(out, 'NOTES.md'), 'w') as f:
+        f.write(notes(c, pk, out))
     for f in sorted(os.listdir(out)):
         print('%10d %s' % (os.path.getsize(os.path.join(out, f)), os.path.join(out, f)))
     return out
 
 
+def notes(c, pk, out):
+    """release notes: what each zip is, how to install (extract into the game's mod directory), the warnings"""
+    lines = ['MH4U Port %s for MHGU 1.4 (title %s).' % (c['version'], TITLE_ID), '',
+             '| file | what | sha256 |', '|---|---|---|',
+             '| core-%s.zip | **required**: the module (exefs) and every monster\'s data file | `%s` |'
+             % (c['version'], sha256(os.path.join(out, 'core-%s.zip' % c['version'])))]
+    for p in pk:
+        z = '%s-%s.zip' % (p['name'], p['version'])
+        lines.append('| %s | %s %s (needs core %s or newer) | `%s` |' % (z, p['title'], p['version'], p['requires_core'],
+                                                                        sha256(os.path.join(out, z))))
+    lines += ['', '## Install',
+              '1. Open the game\'s mod directory: Ryujinx: right-click MHGU > Open Mods Directory '
+              '(`mods/contents/%s/`); yuzu / suyu / sudachi / Eden: right-click > Open Mod Data Location '
+              '(`load/%s/`).' % (TITLE_ID.lower(), TITLE_ID),
+              '2. Extract **core** there, then every monster you want. Each zip holds the folder `%s/`; they merge into '
+              'that one folder.' % MOD_NAME,
+              '3. Updating: delete the `%s` folder, then extract the new zips.' % MOD_NAME, '',
+              '## Warnings'] + ['- ' + w for w in WARNINGS]
+    return '\n'.join(lines) + '\n'
+
+
 def publish(out, repo, yes, draft):
     c = core()
     tag = 'v%s' % c['version']
-    files = [os.path.join(out, f) for f in sorted(os.listdir(out))]
-    assert any(f.endswith('manifest.json') for f in files), 'no manifest.json in %s' % out
+    files = [os.path.join(out, f) for f in sorted(os.listdir(out)) if f.endswith('.zip')]
+    body = os.path.join(out, 'NOTES.md')
+    assert os.path.exists(body) and any(os.path.basename(f).startswith('core-') for f in files), 'package %s first' % out
     print('%srelease %s on %s with %d files:' % ('draft ' if draft else '', tag, repo, len(files)))
     for f in files: print('  ', os.path.basename(f))
     if not yes and input('publish? [y/N] ').strip().lower() != 'y':
         sys.exit('not published')
-    # a draft has no tag yet (GitHub creates it on publishing), so the tag workflow runs then; attach the installer
-    # apps to a draft by hand (gh workflow run installer.yml, then gh release upload)
     subprocess.run(['gh', 'release', 'create', tag, '--repo', repo, '--title', 'MH4U Port %s' % tag,
-                    '--notes', 'MH4U Port %s: install with the MH4U Port installer (attached by CI).' % tag]
-                   + (['--draft'] if draft else []) + files, check=True)
+                    '--notes-file', body] + (['--draft'] if draft else []) + files, check=True)
 
 
 def main():
