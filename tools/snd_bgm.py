@@ -319,6 +319,12 @@ def build_em089_stqr(new_streams, log):
     resolve. Header = GU bgm_bt's, streams = ours only (index 0, 1), sequences = GU Kushala's template with our
     id / dB / stream index. Only the GU loader reads a sequence's stream index (+0x5c, at load 0xb6ced8); playback
     uses the pre-resolved stream pointer at +0x88, so the entries work when returned for the GU battle STQR."""
+    return build_battle_stqr(new_streams, log, EM089_STQR, 'em089')
+
+
+def build_battle_stqr(new_streams, log, out_path, label):
+    """a monster's own battle STQR (build_em089_stqr): streams [(path, size, samples, loop start, loop end, sequence
+    id, dB)] -> out_path; returns the bytes."""
     from romfs import RomFS
     base = RomFS(GU_ROMFS).read(GU_BT)
     s = stqr_parse(base)
@@ -334,12 +340,13 @@ def build_em089_stqr(new_streams, log):
         struct.pack_into('<f', q, 36, db)
         struct.pack_into('<I', q, 92, len(s['streams']) - 1)
         s['seqs'].append(bytes(q))
-        log.append('  em089 stqr: stream %d %s, sequence id 0x%x, %.2f dB' % (len(s['streams']) - 1, path, rid, db))
+        log.append('  %s stqr: stream %d %s, sequence id 0x%x, %.2f dB' % (label, len(s['streams']) - 1, path, rid,
+                                                                             db))
     out = stqr_build(s)
     chk = stqr_parse(out)
     assert len(chk['streams']) == len(new_streams) == len(chk['seqs'])
-    open(EM089_STQR, 'wb').write(out)
-    log.append('  -> %s' % EM089_STQR)
+    open(out_path, 'wb').write(out)
+    log.append('  -> %s' % out_path)
     return out
 
 

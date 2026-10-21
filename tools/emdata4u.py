@@ -58,6 +58,10 @@ def bodydata(emd, word):
 
 def attackdata(etd):
     a, b = hw(etd, 28), hw(etd, 29)
+    if not b:     # word 29 absent (Dalamadur em024 / em083: 70 / 24 records): the table runs to the next block named
+        # by the header (40 words, blocks from 0xa0; words 35+ hold floats / counts, not offsets)
+        b = min(v for v in (hw(etd, i) for i in range(29, 40)) if a < v < len(etd))
+        assert (b - a) % 40 == 0, 'attack table %#x..%#x is not whole 40-byte records' % (a, b)
     recs = []
     for k in range((b - a) // 40):
         r4 = etd[a + 40 * k:a + 40 * k + 40]

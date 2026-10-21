@@ -307,7 +307,9 @@ def monster_entries(spec, keep_volume=False, rom=None, log=None):
         out.append((rename(path), TG['WAVE'], gu_wave(madp_parse(S[(path, T4['WAVE'])]))))
     out.append((PG_BANK, TG['BANK'], bank_build(b4, rename)))
     r4 = req4_parse(S[(P4_BANK, T4['REQ'])])
-    assert r4['strs'] == [P4_BANK, P4_COMMON], r4['strs']
+    # 4U requests name their own bank and the common one; Dalamadur's (em024 / em110) only its own (no entry uses bank 1)
+    assert r4['strs'] in ([P4_BANK, P4_COMMON], [P4_BANK]), r4['strs']
+    assert len(r4['strs']) == 2 or all(w[21] == 0 for w in r4['ents']), 'common-bank entries without the common bank'
     common = donor_common_entries(rom, spec['donor_arc'])
     have = {w[0] & 0xFFFF for w in r4['ents']}
     extra = [e for k, e in common.items() if k not in have] if spec['donor_extra'] else []
