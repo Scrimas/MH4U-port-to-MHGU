@@ -466,6 +466,7 @@
  ],
  "notes": [
   "shell em067_00_01: HDS entries [5, 6, 7] = 4U records [169, 171, 172]",
+  "shell em067_00_02: HDS entries [1, 2] = 4U uShell016 records [33, 39], HTS groups [1, 2] (r [208.0, 260.0])",
   "shell em067_00_13: HDS entries [0, 1, 2, 3] = 4U records [29, 30, 31, 32]",
   "material XfB__E0__m00_body: template solid_sphere, type 0, em092_01_BM, sphere em092_05_BM",
   "material XfB__E0__m00_fatbig: template solid_sphere, type 1, em092_03_BM, sphere em092_07_BM",
@@ -500,7 +501,7 @@
   "  PSL anim 107 slot 3: MEF id 1100 has no PEL record (not in the MEF)",
   "  PSL anim 108 slot 1: MEF id 1100 has no PEL record (not in the MEF)",
   "  PSL anim 109 slot 1: MEF id 1100 has no PEL record (not in the MEF)",
-  "  PEL effect\\pel\\em\\em067_01u: 75 records (list 1) + 24 GU records (list 2); PSL x4 from LMT event group 2",
+  "  PEL effect\\pel\\em\\em067_01u: 75 records (list 1) + 24 GU records (list 2) + 3 code records [4238, 4249, 4300]; PSL x4 from LMT event group 2",
   "em092 sound: 53 waves (53 used by the bank), bank 11 groups / 145 entries, request 313 entries (20 common-bank entries from GU em067_00, 0 converted, + 17 more of its common-bank requests), sound call 41135 B",
   "attackdata: 4U em092 (= em022) with GU byte 28; differs from GU in the flags of records [23, 24, 31, 32, 33]",
   "bodydata: GU em067_00 minus records [12, 13] (bones [131, 142])",

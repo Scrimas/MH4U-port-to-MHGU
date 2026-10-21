@@ -162,6 +162,41 @@ RESIDUE = ('shell\\em\\em067_00_shell01\\em067_00_01', ((5, 63, 169), (6, 71, 17
 RESIDUE_RADIUS = {5: 200.0, 6: 200.0, 7: 300.0}      # 4U volumes of 169 / 171 / 172 (GU Zamtrios: 125 / 125 / 200)
 BALL_FX = {'effect\\em\\em067\\em067_00_012': 'effect\\efl\\em\\em092\\em092_012',     # flight
            'effect\\em\\em067\\em067_00_014': 'effect\\efl\\em\\em092\\em092_013'}     # impact
+# 7/70's sand / air blast (notes/blast.md): 4U uShell016 38 (Dunes) / 49, our class module em067_01_shell016.c on GU's
+# breath family sp_02 (shell table row 291 = file 0x8a76), whose HDS / HTS get two more entries / groups: 4U records
+# 33 / 39 (uShell016 records 0x102b370 + 96, byte 0x1c 6 as GU's own entry 0 = record 12, checked) and capsule
+# volumes 19 / 21 (0x102b230 / 0x102b2d0: bone 1001, r208 / r260). The module arms HDS entries 1 / 2.
+BREATH = 'shell\\em\\em067_00_shell02\\em067_00_02'
+BREATH_FILE_ID = 0x8a76
+S016_REC_4U = 0x102b370 + 96
+BLAST = ((38, 33, 0x102b230, 208.0), (49, 39, 0x102b2d0, 260.0))     # subtype, record, volume, radius
+BLAST_HDS0 = 1                                                         # entry of 38 (49 = + 1): em067_01_shell016.c
+# code-posted effects (PEL list 2, efl4u2gu extra2): em092_001 element 1 at the mouth along the blast (4U uEffect015
+# kinds 8 / 9, scale (0.8, 0.8, 1.0) / 1.0), em092_200 at the shell's end (uEffect002 49, all elements)
+BLAST_FX = [('effect\\efl\\em\\em092\\em092_001', dict(id=4238, joint=-1, k=1, pos=(0.0, 0.0, 0.0), rot=(0.0, 0.0, 0.0),
+                                                      scl=(0.8, 0.8, 1.0))),
+            ('effect\\efl\\em\\em092\\em092_001', dict(id=4249, joint=-1, k=1, pos=(0.0, 0.0, 0.0), rot=(0.0, 0.0, 0.0),
+                                                      scl=(1.0, 1.0, 1.0))),
+            ('effect\\efl\\em\\em092\\em092_200', dict(id=4300, joint=-1, k=-1, pos=(0.0, 0.0, 0.0), rot=(0.0, 0.0, 0.0),
+                                                      scl=(1.0, 1.0, 1.0)))]
+
+
+def hts_add(d, groups):
+    """HTS with `groups` (lists of 48-B records) appended (before a closing empty group, as emdata4u writes for monster
+    hitsize; GU's shell HTS have none) -> (data, first new index)"""
+    n = struct.unpack_from('<I', d, 8)[0]
+    tab = [struct.unpack_from('<II', d, 16 + 8 * g) for g in range(n)]
+    recs = [d[off:off + 48 * cnt] for cnt, off in tab]
+    assert 16 + 8 * n + sum(len(r) for r in recs) == len(d), 'HTS layout'
+    first = n - 1 if tab[-1] == (0, len(d)) else n
+    recs[first:first] = [b''.join(g) for g in groups]
+    head = bytearray(d[:16])
+    struct.pack_into('<I', head, 8, len(recs))
+    table, data, base = b'', b'', 16 + 8 * len(recs)
+    for r in recs:
+        table += struct.pack('<II', len(r) // 48, base + len(data))
+        data += r
+    return bytes(head) + table + data, first
 
 
 def hds_entry(exe, a, b1c):
@@ -179,7 +214,7 @@ def hds_entry(exe, a, b1c):
 def shell_data(ents, notes):
     """the kept GU entries with Tigerstripe's ball / residue hit data and effect list"""
     exe = open(os.path.join(ROOT, 'dump/exefs_v11/code.bin'), 'rb').read()     # MH4U v1.1 code, at 0x100000
-    out = []
+    out, blast_hds = [], [None]
     for p, t, d in ents:
         for path, rows, b1c in (BALLS, RESIDUE):
             if (p, t) != (path + '_hitdata', HDS_T): continue
@@ -203,11 +238,37 @@ def shell_data(ents, notes):
                 off = struct.unpack_from('<I', d, 16 + 8 * g + 4)[0]
                 struct.pack_into('<f', d, off + 0x0c, rad)
             d = bytes(d)
+        if (p, t) == (BREATH + '_hitsize', HTS_T):           # 7/70 blast volumes, then the blast HDS entries
+            vols = []
+            for sub, rec, vol, rad in BLAST:
+                r = bytearray(exe[vol - 0x100000:vol - 0x100000 + 40]) + bytearray(8)
+                assert struct.unpack_from('<Hf', r, 0)[0] == 1001 and struct.unpack_from('<f', r, 0x0c)[0] == rad, sub
+                struct.pack_into('<H', r, 0x0a, 0x0848)            # GU's value in every HTS record (build_em089_arc)
+                vols.append([bytes(r)])
+            d, g0 = hts_add(d, vols)
+            hds = [e for e in ents if e[:2] == (BREATH + '_hitdata', HDS_T)][0][2]
+            n = struct.unpack_from('<I', hds, 8)[0]
+            assert n == BLAST_HDS0 and len(hds) == 16 + 56 * n
+            gu = hds_entry(exe, S016_REC_4U + 40 * 12, 6)
+            gu[0x19] = hds[16 + 0x19]
+            gu[2:4] = hds[18:20]                                   # GU's +2 (9999) on its breath entry
+            assert bytes(gu) == hds[16:72], 'GU breath entry is not 4U record 12 converted'
+            new = bytearray(hds)
+            struct.pack_into('<I', new, 8, n + len(BLAST))
+            for i, (sub, rec, vol, rad) in enumerate(BLAST):
+                e = hds_entry(exe, S016_REC_4U + 40 * rec, 6)
+                e[0x19] = g0 + i
+                new += e
+            blast_hds[0] = bytes(new)
+            notes.append('shell em067_00_02: HDS entries %s = 4U uShell016 records %s, HTS groups %s (r %s)' % (
+                list(range(n, n + len(BLAST))), [b[1] for b in BLAST], list(range(g0, g0 + len(BLAST))),
+                [b[3] for b in BLAST]))
         if t == SHELL_DEF_T and p.startswith('shell\\em\\em067_00_shell'):
             assert d.count(b'effect\\pel\\em\\em067_00u') == 1, p
             d = d.replace(b'effect\\pel\\em\\em067_00u', PEL_U.encode())
         out.append((p, t, d))
-    return out
+    assert blast_hds[0], 'breath family not found'
+    return [(p, t, blast_hds[0] if (p, t) == (BREATH + '_hitdata', HDS_T) else d) for p, t, d in out]
 
 
 def ball_fx_list2(list2):
@@ -271,7 +332,7 @@ def effects(gu_pel_u, notes):
     groups.update({g: 'effect\\efl\\qe\\qe%03d\\qe%03d_%%03d' % (g, g) for g in (0, 6, 8, 13)})
     spec = dict(arc=SRC_4U, stage_unpacked=[], mef='effect\\mef\\em\\em092_0', em_efl='effect\\efl\\em\\em092\\',
                 groups=groups, extra=[], lmts=[(P4 + 'mot\\em092_%d' % b, PSL % b) for b in BANKS], pel=PEL_U,
-                soil=dunes_soil(notes), list2=ball_fx_list2(efl4u2gu.pel_lists(gu_pel_u)[2]))
+                soil=dunes_soil(notes), list2=ball_fx_list2(efl4u2gu.pel_lists(gu_pel_u)[2]), extra2=BLAST_FX)
     log = []
     out = efl4u2gu.effect_set(spec, log)
     for p in set(BALL_FX.values()):
@@ -362,6 +423,7 @@ def main():
     notes = []
     gents = shell_data(gents, notes)
     ghash = {(phash(p), t): (p, t) for p, t, _ in gents}
+    assert ghash[fileid_entry(img, BREATH_FILE_ID)] == (BREATH, SHELL_DEF_T), 'em067_01_shell016.c loads file 0x8a76'
     gman = manifest_of(img, ALLOC['donor_index'])
 
     # ---- our own files

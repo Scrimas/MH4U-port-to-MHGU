@@ -9,8 +9,7 @@
  *
  * Each handler is a step-by-step translation of the 4U uEm022 handler named in its comment, with the GU callees and
  * fields of notes/missing-actions.md section 2 (step bytes rec+0x1a1..0x1a3). Not ported: 4U W+0x7948 = 1 while
- * airborne (no GU field found) and 7/70's uShell016 38 / 49 shot (no GU shell kind; the motion, the turn and the
- * mode-2 exit are ported).
+ * airborne (no GU field found). 7/70's uShell016 38 / 49 shot: em067_01_shell016.c (notes/blast.md).
  * Multiplayer: GU's pre-step has already run and these handlers run on every machine, as GU's own do; none calls
  * setAction (all end through slot 247), damage stays with GU's attack slots (notes section 6). */
 #include <stdint.h>
@@ -185,7 +184,35 @@ static void act_3_4(void *self)                                    /* 4U 0x74755
     }
 }
 
-/* ---- 7/70, 4U 0x74ff88: turn, (shot at frame 90: not ported), leave mode 2 at frame 134 */
+/* ---- 7/70, 4U 0x74ff88: turn, the sand / air blast at frame 90 (em067_01_shell016.c), leave mode 2 at frame 134 */
+void *em067_01_blast_post(void *self, uint32_t subtype, uint32_t d);
+typedef void (*jointMtx_t)(void *unit, uint32_t joint, float *out);
+#define jointMtx     FN(jointMtx_t, 0xc1660)      /* [0x930894] */
+#define STAGE_PTR    0x188ca48u                   /* [[ ]+0x48] = current stage (gogmazios/module/stage.c) */
+#define STAGE_DUNES  5u                           /* 4U W+0x14b == 17 */
+
+/* 4U 0x750144..0x7501f4: pitch from the mouth (joint 131 + M (0, -60, 0)) to the target + 100 up, relative to the
+ * body pitch, clamped to +20 / -15 deg; 4U subtracts the angles snapshot this+0x8d20 (previous frame's W+0x1a8), here
+ * the current rec+0x50 (notes/blast.md 3a) */
+static void blast(void *self)
+{
+    uint8_t *rec = REC(self);
+    float j[4], m[16], p[3], h;
+    jointPos(self, 131, j);
+    jointMtx(self, 131, m);
+    for (int i = 0; i < 3; i++) p[i] = j[i] - 60.0f * m[4 + i];
+    const float *t = (const float *)(rec + REC_TARGET);
+    float dx = t[0] - p[0], dy = t[1] + 100.0f - p[1], dz = t[2] - p[2];
+    h = dx * dx + dz * dz;
+    __asm__("vsqrt.f32 %0, %1" : "=t"(h) : "t"(h));
+    uint32_t a = (uint32_t)(int32_t)(atan2f_gu(-dy, h) * (65536.0f / 6.28318531f)) & 0xffff;
+    uint32_t d = (a - FIELD(uint32_t, rec, REC_ANGLES)) & 0xffff;
+    if (d < 0x8000) { if (d > 0xe39) d = 0xe39; }
+    else if (d < 0xf555) d = 0xf555;
+    const uint8_t *st = *(const uint8_t **)MAIN(STAGE_PTR);
+    em067_01_blast_post(self, st && st[0x48] == STAGE_DUNES ? 38 : 49, d);
+}
+
 static void act_7_70(void *self)
 {
     uint8_t *rec = REC(self);
@@ -197,7 +224,7 @@ static void act_7_70(void *self)
         break;
     case 1:
         turnToTarget(self, 242, 0);
-        if (at_frame(self, 90.0f)) rec[REC_STEP0] = 2;          /* 4U posts uShell016 38 / 49 here */
+        if (at_frame(self, 90.0f)) { rec[REC_STEP0] = 2; blast(self); }
         break;
     default:
         if (at_frame(self, 134.0f)) rec[REC_MODE] = 0;

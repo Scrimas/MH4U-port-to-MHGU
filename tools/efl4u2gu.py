@@ -780,7 +780,8 @@ def effect_set(spec, log):
     mef (its MEF path), em_efl (its EFL family prefix: every file in it is converted), groups {MEF group: EFL path
     pattern}, extra [(EFL path, record)] (records for code posts), lmts [(4U LMT path, GU PSL path)] (one PSL per motion
     list), pel (the GU PEL u path), soil (RGBA of the stage's area colour that 4U multiplies in), list2 (None = PEL
-    list 2 holds our records too, or (count, record bytes) of a GU PEL's list 2: the GU class posts its own ids)."""
+    list 2 holds our records too, or (count, record bytes) of a GU PEL's list 2: the GU class posts its own ids),
+    optional extra2 [(EFL path, record)] (code posts appended to that GU list 2 only)."""
     S = sources(spec['arc'], spec['stage_unpacked'])
     mef = mef_records(S[(spec['mef'], T['MEF'])])
     efls = {p for (p, t) in S if t == T['EFL'] and p.startswith(spec['em_efl'])}
@@ -797,6 +798,10 @@ def effect_set(spec, log):
         assert (path, T['EFL']) in S and r['id'] not in {q['id'] for _, q in pel_recs}, (path, r['id'])
         efls.add(path)
         pel_recs.append((path, r))
+    extra2 = spec.get('extra2', [])           # code posts appended to a GU list 2 (spec['list2'])
+    for path, r in extra2:
+        assert spec['list2'] is not None and (path, T['EFL']) in S, (path, r['id'])
+        efls.add(path)
     out = collections.OrderedDict()           # (path, type) -> bytes, filled per kind, emitted in load order
     conv = {'TEX': {}, 'EAN': {}, 'MRL': {}, 'MOD': {}, 'EFL': {}}
     need = set()
@@ -832,11 +837,16 @@ def effect_set(spec, log):
     for kind in ('TEX', 'EAN', 'MRL', 'MOD', 'EFL'):
         for p in sorted(conv[kind]):
             out[(p, T[kind])] = conv[kind][p]
-    out[(spec['pel'], T['PEL'])] = build_pel(pel_recs, S, spec['soil'], spec['list2'])
+    list2 = spec['list2']
+    if extra2:
+        n2, body2 = list2
+        list2 = (n2 + len(extra2), body2 + b''.join(pel_record(p, r, S, spec['soil']) for p, r in extra2))
+    out[(spec['pel'], T['PEL'])] = build_pel(pel_recs, S, spec['soil'], list2)
     known = {r['id'] for _, r in pel_recs}
     for lmt, psl in spec['lmts']:
         out[(psl, T['PSL'])] = build_psl(S[(lmt, T['LMT'])], known, log)
     lists = 'x 2 lists' if spec['list2'] is None else '(list 1) + %d GU records (list 2)' % spec['list2'][0]
+    if extra2: lists += ' + %d code records %s' % (len(extra2), [r['id'] for _, r in extra2])
     log.append('PEL %s: %d records %s; PSL x%d from LMT event group 2' % (spec['pel'], len(pel_recs), lists,
                                                                         len(spec['lmts'])))
     return out

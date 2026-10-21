@@ -1,4 +1,5 @@
-/* em067_01_diag.c: Tigerstripe Zamtrios diagnostics (logs only, prefix "tzport:").
+/* em067_01_diag.c: Tigerstripe Zamtrios diagnostics (logs, prefix "tzport:"), and the per-frame tick of the 7/70
+ * blast's end effect (em067_01_shell016_tick).
  *
  * Hook 0xf78f98 = uEm067_00 vtable slot 125, the action dispatcher (= 4U slot 44, every frame): for the first
  * Zamtrios variant 1 (ID 0x143) it meets, log each new action (category / number, enemy +0x73e0 / +0x73e1) and each
@@ -13,6 +14,8 @@
 enum { R0 };
 
 #define EN_VARIANT (EN_ID + 5)      /* u8, set by setup 0x6fb14 from ID bits 8-11 */
+
+void em067_01_shell016_tick(void *owner);
 #define MAX_LINES  600u
 
 int em067_01_act_c(uint32_t *regs)
@@ -20,7 +23,9 @@ int em067_01_act_c(uint32_t *regs)
     static void *s_self;
     static uint32_t s_act, s_mot, s_lines;
     void *self = (void *)regs[R0];
-    if (FIELD(uint16_t, self, EN_ID) != TIGERSTRIPE_ZAMTRIOS_EM_ID || s_lines >= MAX_LINES) return 0;
+    if (FIELD(uint16_t, self, EN_ID) != TIGERSTRIPE_ZAMTRIOS_EM_ID) return 0;
+    em067_01_shell016_tick(self);                 /* the 7/70 blast's end effect (em067_01_shell016.c) */
+    if (s_lines >= MAX_LINES) return 0;
     if (!s_self) {
         s_self = self;
         s_act = s_mot = ~0u;
