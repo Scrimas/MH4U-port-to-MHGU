@@ -3,7 +3,7 @@
  "id": "0x143",
  "registry_index": 138,
  "file_id_base": "0x10740",
- "file_count": 22,
+ "file_count": 23,
  "manifest": [
   {
    "field": 0,
@@ -165,10 +165,10 @@
   },
   {
    "field": 26,
-   "file_id": "0x7e35",
-   "path": "enemy\\hit_data\\em067_00_attackdata",
+   "file_id": "0x10756",
+   "path": "enemy\\hit_data\\em067_01_attackdata",
    "type": "0x70bb64ba",
-   "source": "shared (GU em067_00, its file ID)"
+   "source": "converted (4U em092)"
   },
   {
    "field": 27,
@@ -456,6 +456,12 @@
    "path": "enemy\\hagi\\hagi_s4_em067_01",
    "type": "0x33a84e14",
    "path_hash": "0x7c22a0ec"
+  },
+  {
+   "file_id": "0x10756",
+   "path": "enemy\\hit_data\\em067_01_attackdata",
+   "type": "0x70bb64ba",
+   "path_hash": "0x1c92d704"
   }
  ],
  "notes": [
@@ -496,9 +502,10 @@
   "  PSL anim 109 slot 1: MEF id 1100 has no PEL record (not in the MEF)",
   "  PEL effect\\pel\\em\\em067_01u: 75 records (list 1) + 24 GU records (list 2); PSL x4 from LMT event group 2",
   "em092 sound: 53 waves (53 used by the bank), bank 11 groups / 145 entries, request 313 entries (20 common-bank entries from GU em067_00, 0 converted, + 17 more of its common-bank requests), sound call 41135 B",
+  "attackdata: 4U em092 (= em022) with GU byte 28; differs from GU in the flags of records [23, 24, 31, 32, 33]",
   "bodydata: GU em067_00 minus records [12, 13] (bones [131, 142])",
   "dttune: GU em067_00 + 42 bytes of 4U em022 -> em092 differences (GU retuned 13 other bytes)",
   "kept sound\\se\\em\\em067_00\\snd_em067_00 although replaced: named by ['shell\\\\em\\\\em067_00_shell02\\\\em067_00_02']",
-  "shared from em067_00: 511 files kept, 26 dropped (replaced or its model)"
+  "shared from em067_00: 510 files kept, 27 dropped (replaced or its model)"
  ]
 }

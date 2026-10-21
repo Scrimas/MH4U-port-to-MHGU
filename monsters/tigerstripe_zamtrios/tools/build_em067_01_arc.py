@@ -59,7 +59,7 @@ P0 = 'enemy\\em067\\em067_00\\'  # GU variant 0
 P = 'enemy\\em067\\em067_01\\'   # ours
 BANKS = (0, 2, 3, 4)             # motion lists of em092 and em067_00 (neither has list 1): manifest field 4 + bank
 # manifest fields with our own file: IDs are given in this order (append only: IDs never move once shipped)
-OWN_ORDER = [0, 3, 4, 6, 7, 8, 11, 37, 17, 18, 20, 21, 22, 30, 33, 12, 13, 46, 47, 48, 49, 50]
+OWN_ORDER = [0, 3, 4, 6, 7, 8, 11, 37, 17, 18, 20, 21, 22, 30, 33, 12, 13, 46, 47, 48, 49, 50, 26]
 DT_DIR = os.path.join(ROOT, 'dump/converted/em092')           # build.sh step dt
 PEL_U = 'effect\\pel\\em\\em067_01u'
 PSL = 'effect\\psl\\enemy\\em067\\em067_01\\mot\\em067_01_%d'
@@ -318,6 +318,25 @@ def bodydata(gu, notes):
     return bytes(head) + b''.join(keep) + tail
 
 
+def attackdata(gu, notes):
+    """4U em092's attackdata (tools/emdata4u.py) with GU em067_00's byte 28 (GU-only, the converter writes 6). 4U em092
+    and em022 share one table (asserted), so this is GU's table except where GU retuned 4U fields for its Zamtrios:
+    flags bytes 12-13 of records 23, 24, 31, 32, 33 (4U 01 08, GU 81 02: bit 7 of byte 12 is the bit Zamtrios' ice
+    balls carry in the shell hit data and Tigerstripe's paralysis balls lack)."""
+    ts = emdata4u.attackdata(emdata4u.load_4u('em092')['etd'])
+    assert ts == emdata4u.attackdata(emdata4u.load_4u('em022')['etd'])
+    n = struct.unpack_from('<I', gu, 8)[0]
+    assert ts[:16] == gu[:16] and len(ts) == len(gu) == 16 + 32 * n
+    out = bytearray(ts)
+    for k in range(n):
+        out[16 + 32 * k + 28] = gu[16 + 32 * k + 28]
+    diff = sorted({(i - 16) // 32 for i in range(16, len(gu)) if out[i] != gu[i]})
+    assert all(out[16 + 32 * k:16 + 32 * k + 32][:12] + out[16 + 32 * k + 14:16 + 32 * k + 32] ==
+               gu[16 + 32 * k:16 + 32 * k + 12] + gu[16 + 32 * k + 14:16 + 32 * k + 32] for k in diff), 'more than flags'
+    notes.append('attackdata: 4U em092 (= em022) with GU byte 28; differs from GU in the flags of records %s' % diff)
+    return bytes(out)
+
+
 def dttune(gu, notes):
     """GU em067_00's dttune + the bytes where tools/dt_convert.py (donor em067_00) gives em092 != em022: Tigerstripe's
     4U differences on GU's own Zamtrios tuning (GU's retuned bytes and these never overlap: asserted)."""
@@ -371,7 +390,8 @@ def main():
     files, fields = sound(rom, notes)
     ents += files
     own.update(fields)
-    for k, path, conv in ((30, 'enemy\\body_data\\em067_01_bodydata', bodydata),
+    for k, path, conv in ((26, 'enemy\\hit_data\\em067_01_attackdata', attackdata),
+                          (30, 'enemy\\body_data\\em067_01_bodydata', bodydata),
                           (33, 'enemy\\dt_tune\\em067_01_dttune', dttune)):
         typ = ghash[fileid_entry(img, gman[k])][1]
         ents.append((path, typ, conv(gfile(k), notes)))
