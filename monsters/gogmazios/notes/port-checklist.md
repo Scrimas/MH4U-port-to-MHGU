@@ -4,6 +4,8 @@ Status: [x] faithful, [~] simplified (what), [ ] not started (still fallback / o
 Handler = real 4U handler from the dispatchers (cat 0 0x8b6f2c, 1 0x8bac40, 2 0x8bd4b0, 4 0x8c2640, 7 0x8c0f94,
 3/11/13 inline in slot 44 0x8c3ac0), r1 variant in brackets. Everywhere skipped: frame events 0x8b8e28.
 Code: module/em089_act.c (one function per 4U handler). Tools (scratchpad, not in repo): p4u.py / h4u.py listings.
+"scratchpad" below = the last Gogmazios session's scratchpad, archived locally in dump/scratch/gogmazios-session/
+(2026-10-21; older sessions' scratch files are gone).
 
 ## Fidelity plan (main agent, 2026-10-18) — the goal and who owns what
 Goal (user): a FUNCTIONAL build faithful to 4U Gogmazios in looks, arena, behaviour, music and sound effects, ported

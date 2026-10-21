@@ -13,6 +13,7 @@ Mark every fact you write down as C (confirmed in code or data), S (strong) or G
 | `notes/` | core notes (this guide, registry, enemy-class, port, api-map, assets, data, gear-weapons, installer) |
 | `monsters/<name>/` | one monster: `module/` (its C code, compiled into the core module), `tools/`, `notes/`, `package.toml` (version, C prefix), `build.sh` (every generator, in order) |
 | `monsters/<name>/gen/`, `romfs/` | gitignored game data: its data file `<name>.bin` (+ the `.sec` sections) and its converted RomFS (= its assets) |
+| `dump/scratch/<monster>-session/` | gitignored local archive of a session scratchpad (the one-off RE / check scripts and outputs notes call "scratchpad"); copy yours there before a reboot wipes /tmp |
 
 Gogmazios files named below as `tools/*_em089.py`, `tools/build_gog_quest.py`, `tools/gogreport.py`,
 `module/em089*.c`, `module/stage*.c` or `notes/{port-checklist,stage,content-plan,em089-behaviour}.md` now live in
@@ -345,6 +346,32 @@ Stop it with `ryutest.sh stop` (matches the cmdline: the gui process's /proc exe
   pre-setting the flag bit (0x9d458 skips a set flag). A 4U-specific behaviour is ported by giving that one object
   a copied vtable with its own move (slot 10), as module/em089_pile.c does.
 
+## 5b. Lessons from Tigerstripe Zamtrios (a 4U subspecies run by GU's own class, 2026-10-21)
+Notes: monsters/tigerstripe_zamtrios/notes/ (plan, phase1-variant-map, missing-actions, shells, blast, area-move).
+- **Install target:** user tests run `~/.config/Ryujinx`; `module/build.py install` defaults to the ryuroot test dir.
+  Use `GOG_MOD_ROOT=~/.config/Ryujinx/mods python3 module/build.py install` and `cmp` the installed files. One
+  test round was lost to the wrong folder.
+- **Missing actions:** GU's dispatcher ends unknown actions through the base thunks 0xca118 / 0xca10c (slot 247).
+  Hooking them works only with a return-address filter (the dispatcher's own no-case path): other callers use the
+  same thunks to END actions, and running a move there left the AI with a null script pointer (crash).
+- **Command table (EMC):** GU's AI interpreter reads 4U tables, but GU changed the language around them. Area moves
+  are engine opcodes (0x94 setup, 0x95 start, 0x9e advance) that 4U tables never contain (4U's 0x03 / 0x06 / 0x36 /
+  0x4d are no-ops in GU); map cases (`2a`) use GU stage ids (4U 17 Dunes -> 5, 4 -> 14); GU class code picks
+  group-1 scripts by number (area_act_tbl entries, e.g. 180..187) without a range check. A 4U table must take GU's
+  adapted versions of shared scripts and carry every script number GU code can pick (tools/emc.py build, the
+  cmdtbl() of build_em067_01_arc.py). For a monster with no GU counterpart (Dalamadur), the area moves still need
+  GU's opcodes in its own table or the monster never changes area (or loops dive / surface).
+- **Area data:** the five per-monster area files (manifest 40..44) are keyed by stage (XFS mMapNo, map_info = 86-B
+  blocks per map). A donor's files cover only its own stages; read them with tools/xfs.py and ship data for the
+  quest's stage.
+- **Motions requested by shared GU code** must exist in the monster's banks (motion ffff in the action log = absent;
+  the action ends at once). tools/lmt.py copies LMT v67 animations between banks with every pointer relocated.
+- **Validate every conversion on GU's own data first:** shell HDS entries (4U records -> GU entries, asserted equal
+  on the donor's), attack data (4U vs GU differ only in GU-only bytes or deliberate retunes), EMC rebuilds (GU's file
+  byte-identical). Asserts in the build turned guesses into checks.
+- **Effects posted from code** need PEL list-2 records (efl4u2gu effect_set `extra2` when list 2 comes from GU); shell
+  effect params look records up by id (state +0x30), not by position.
+
 ## 6. Dalamadur: things to settle first (all open, verify each)
 - Its 4U em number, class DTI / vtable, action table size, and whether it uses shells / effects shared with other
   4U monsters (a shell class ported for Gogmazios may be reusable if the 4U class is the same uShellNNN).
@@ -353,9 +380,10 @@ Stop it with `ryutest.sh stop` (matches the cmdline: the gui process's /proc exe
 - Size: a very large monster means many bones, hitzones and break parts, possibly special camera code (4U LCM ids
   and the camera-event path 0x93457c -> GU 0xaa418, see em089_act.c) and special collision. Check its emd / etd
   layouts against emdata4u.py before building data.
-- Registry and content for a second monster: one allocations.toml entry (index 138, Notes entry 124, save slot 106 /
-  id 0x1065, name entry 106, the next DUMMY items 2986.. and decorations 2893.., its own file ID range, BGM IDs,
-  UI icon cell) and its package.toml; the core needs no edit for those (Phase 3). Still open per monster: its quest
+- Registry and content for another monster: one allocations.toml entry (the next free registry index, Notes entry,
+  save slot, name entry, DUMMY items, decorations, file ID range, BGM IDs, UI icon cell: Tigerstripe Zamtrios took
+  index 138 / Notes 124 / name 106, so read allocations.toml and `python3 tools/alloc.py show` for the free pools)
+  and its package.toml; the core needs no edit for those (Phase 3). Still open per monster: its quest
   IDs and DUMMY quest_group slots (only 11491 / 11492 and slots 1011009 / 1011003 are checked free: check more and
   extend the pools), and its gear tools: the Gogmazios ones compute IDs as the v1.0 counts, a second monster's must
   start at GU's count + alloc.offset(name, table) (allocations.toml [monster.append], frozen once released).

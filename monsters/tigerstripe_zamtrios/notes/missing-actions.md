@@ -2,7 +2,7 @@
 
 4U = MH4U v1.1 (`dump/mh4u.asm`), class uEm022, W = `[this+0xe28]`, work = `[this+0x8d88]`. GU = MHGU 1.4 main, class
 uEm067_00, rec = `[this+0x1428]`, work = `[this+0xcac0]`. Tags: **C** confirmed in code, **S** strong, **G** guess.
-Scratch scripts (not in the repo): scratchpad `miss/` (`ann.py` = 4U listing with literals and apimap2 names, `d2.py`
+Scratch scripts (not in the repo): dump/scratch/tigerstripe-session/`miss/` (`ann.py` = 4U listing with literals and apimap2 names, `d2.py`
 = dispatcher emulation with r1..r3, `g7.py` / `gtab.py` = GU jump tables).
 
 ## 1. The gap list

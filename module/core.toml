@@ -3,4 +3,5 @@
 # (tools/release.py). Bump on every published change of the module or of any data file.
 name = "core"
 title = "MH4U Port core"
-version = "1.1.0"          # 1.1.0: registry entries run by a GU class (Tigerstripe Zamtrios)
+version = "1.2.0"          # 1.2.0: Tigerstripe's ported moves, sand blast, ball posts, area-move hooks; 1.1.0: registry
+                           # entries run by a GU class (Tigerstripe Zamtrios)

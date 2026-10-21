@@ -4,7 +4,7 @@
 GU = MHGU 1.4 main, class uEm067_00 (0xf68df4..0xf7b4d8), variant byte `this+0xb5f5`, rec = `[this+0x1428]`.
 Confidence: **C** confirmed in code/data, **S** strong, **G** guess. "not verified" = check incomplete.
 Action numbers: 4U CAT7 jump table has `sub #6` (num = index + 6); GU CAT7 the same (0xf756a0, 198 entries).
-Scratch scripts used: scratchpad `scan92.py`, `u22.py`/`catmap4.py` (4U), `g67.py`/`gsites.py`/`gptr.py` (GU),
+Scratch scripts used (local archive dump/scratch/tigerstripe-session/): `scan92.py`, `u22.py`/`catmap4.py` (4U), `g67.py`/`gsites.py`/`gptr.py` (GU),
 `assets.py` (arcs). Not part of the repo.
 
 ## 0. Counts
