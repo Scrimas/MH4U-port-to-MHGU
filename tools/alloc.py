@@ -7,6 +7,11 @@
   import alloc
   m = alloc.monster('gogmazios')         # dict of its allocations (allocations.toml [[monster]])
   alloc.offset('gogmazios', 'kireaji')   # records the monsters before it append to that table (0 for the first)
+
+Entries: one [[monster]] = one registry index. Optional keys: `package` (the monsters/ folder, default the name:
+several entries can share one package), `companion_of` (a second enemy spawned with its owner's monster, e.g. a tail
+half: registry index, em ID, donor and files of its own; its owner's name entry; a save tally slot that companions may
+share with each other, never with a monster; no Notes entry, quests, items or gear).
 """
 import os, struct, sys, tomllib
 
@@ -37,6 +42,19 @@ def monster(name, reg=None):
     raise KeyError('no monster %r in allocations.toml' % name)
 
 
+def package(m):
+    """the package (monsters/ folder) of an entry"""
+    return m.get('package', m['name'])
+
+
+def packages(reg=None):
+    """package names in registry order of their first entry"""
+    out = []
+    for m in monsters(reg):
+        if package(m) not in out: out.append(package(m))
+    return out
+
+
 def offset(name, table, sub=None, reg=None):
     """records the monsters listed before `name` append to `table` (weapons: sub = 'w00'..)"""
     n = 0
@@ -45,6 +63,14 @@ def offset(name, table, sub=None, reg=None):
         a = m.get('append', {}).get(table, 0)
         n += a.get(sub, 0) if isinstance(a, dict) else a
     raise KeyError(name)
+
+
+GU_ITEMS = 2991                          # GU's item records (IDs 0..2990), notes/items-append.md
+
+
+def item_count(reg=None):
+    """item records once every monster's appended items are in (allocations.toml [monster.append] items)"""
+    return GU_ITEMS + sum(m.get('append', {}).get('items', 0) for m in monsters(reg))
 
 
 def values(m, key):
@@ -58,15 +84,30 @@ def check(reg=None, gu_main=paths.GU_MAIN):
     reg = reg or load()
     pools, ms, errs = reg['pools'], reg['monster'], []
     seen = {}
+    by_name = {m.get('name'): m for m in ms}
+    companions = {m.get('name') for m in ms if 'companion_of' in m}
+    order = {'registry_index': 0, 'notes_entry': 0}     # next position of each ORDERED key
     for k, m in enumerate(ms):
-        for key in ('name', 'em_id', 'registry_index', 'donor_index', 'save_index', 'name_entry', 'notes_entry'):
+        comp = m.get('companion_of')
+        need = ('name', 'em_id', 'registry_index', 'donor_index', 'save_index', 'name_entry')
+        for key in need + (() if comp else ('notes_entry',)):
             if key not in m: errs.append('%s: missing %s' % (m.get('name', k), key))   # module/build.py needs them
         if m.get('em_id', 0) >> 8 == 0 and 'mapicon_class' not in m:   # a new em number has no GU size class
             errs.append('%s: missing mapicon_class' % m.get('name', k))
+        if comp:
+            o = by_name.get(comp)
+            if not o or 'companion_of' in o:
+                errs.append('%s: companion_of %r is not a monster entry' % (m['name'], comp))
+            elif package(o) != package(m) or m.get('name_entry') != o.get('name_entry'):
+                errs.append('%s: a companion shares its owner\'s package and name entry' % m['name'])
+            for key in ('notes_entry', 'quests', 'quest_slots', 'items', 'decorations', 'append', 'ui_icon',
+                        'armor_models', 'weapon_models', 'bgm_ids', 'stage_alias'):
+                if key in m: errs.append('%s: a companion has no %s (its owner holds them)' % (m['name'], key))
         for key in ORDERED:
-            if key in m and m[key] != pools[key][0] + k:
+            if key in m and m[key] != pools[key][0] + order[key]:
                 errs.append('%s: %s %d, expected %d (consecutive in [[monster]] order)' %
-                            (m['name'], key, m[key], pools[key][0] + k))
+                            (m['name'], key, m[key], pools[key][0] + order[key]))
+            order[key] += key in m
         for key in RANGES + LISTS + SCALARS + ORDERED:
             taken = {}
             for v in values(m, key):
@@ -75,7 +116,9 @@ def check(reg=None, gu_main=paths.GU_MAIN):
                     errs.append('%s: %s %d not in the pool %s' % (m['name'], key, v, pools[key]))
                 elif lo is not None and not lo <= v <= hi:
                     errs.append('%s: %s %#x outside the pool [%#x, %#x]' % (m['name'], key, v, lo, hi))
-                if (key, v) in seen: taken.setdefault(seen[key, v], []).append(v)
+                if comp and key == 'name_entry': continue           # its owner's (checked above)
+                if (key, v) in seen and not (key == 'save_index' and comp and seen[key, v] in companions):
+                    taken.setdefault(seen[key, v], []).append(v)   # companions may share one tally slot
                 seen[key, v] = m['name']
             for other, vs in taken.items():
                 errs.append('%s: %s %#x..%#x (%d values) already taken by %s' % (m['name'], key, vs[0], vs[-1],
@@ -98,14 +141,22 @@ def check(reg=None, gu_main=paths.GU_MAIN):
                 seen[key, v] = m['name']
         if len(m.get('quest_slots', [])) != len(m.get('quests', [])):
             errs.append('%s: one quest_slot per quest' % m['name'])
+        n_app = m.get('append', {}).get('items', 0)     # appended items: IDs right after GU's and the earlier ones
+        if n_app:
+            first = GU_ITEMS + offset(m['name'], 'items', reg=reg)
+            if m.get('items') != [first, first + n_app - 1]:
+                errs.append('%s: items %s, expected [%d, %d] (append items = %d)' % (m['name'], m.get('items'),
+                                                                                    first, first + n_app - 1, n_app))
     if gu_main and os.path.exists(gu_main):        # the em IDs must be free in GU's own registry
         img = open(gu_main, 'rb').read()
         gu_ids = {struct.unpack_from('<I', img, GU_PAIRS + 8 * i)[0] for i in range(GU_COUNT)}
+        ported = {m.get('em_id') for m in ms}
         for m in ms:
             if m.get('em_id') in gu_ids: errs.append('%s: em_id %#x is a GU monster' % (m['name'], m['em_id']))
             em = m.get('em_id', 0) & 0xff
-            if m.get('em_id', 0) >> 8 and em not in gu_ids:       # a variant of a GU em: variant 0 must exist
-                errs.append('%s: em_id %#x is a variant of em %d, which GU lacks' % (m['name'], m['em_id'], em))
+            if m.get('em_id', 0) >> 8 and em not in gu_ids | ported:   # a variant: variant 0 must exist (GU or ours)
+                errs.append('%s: em_id %#x is a variant of em %d, which neither GU nor a port has' %
+                            (m['name'], m['em_id'], em))
     return errs
 
 
@@ -114,6 +165,8 @@ def header(reg=None):
     reg = reg or load()
     out = ['/* alloc.h: generated by tools/alloc.py from allocations.toml -- do not edit */', '#pragma once',
            '#define PORT_MONSTER_COUNT %du' % len(reg['monster']),
+           '#define PORT_NOTES_COUNT %du' % sum('notes_entry' in m for m in reg['monster']),
+           '#define PORT_ITEM_COUNT %du' % item_count(reg),
            '#define PORT_FILE_ID_MIN 0x%xu' % reg['pools']['file_ids'][0]]
     for k, m in enumerate(reg['monster']):
         p = m['name'].upper()

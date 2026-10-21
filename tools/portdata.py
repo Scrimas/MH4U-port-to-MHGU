@@ -102,9 +102,14 @@ def txta(texts):
     return s
 
 
+def sec_dir(name):
+    """where an entry's section files live: monsters/<name>/gen, or gen/<entry> in a package of several entries"""
+    return paths.gen(name) if paths.package(name) == name else os.path.join(paths.gen(name), name)
+
+
 def write_section(name, sec, part=None):
-    """monsters/<name>/gen/<TAG>[-part].sec (several files may carry the same tag: the module reads them all)"""
-    d = paths.gen(name)
+    """<sec_dir>/<TAG>[-part].sec (several files may carry the same tag: the module reads them all)"""
+    d = sec_dir(name)
     os.makedirs(d, exist_ok=True)
     p = os.path.join(d, sec.tag.strip() + ('-' + part if part else '') + '.sec')
     open(p, 'wb').write(sec.tag.encode() + sec.bytes())
@@ -121,7 +126,7 @@ def version(name):
 def pack(name):
     import alloc
     m = alloc.monster(name)
-    d = paths.gen(name)
+    d = sec_dir(name)
     secs = []
     for f in sorted(os.listdir(d)):
         if f.endswith('.sec'):
@@ -134,7 +139,7 @@ def pack(name):
     for tag, b in secs:
         dir_ += tag + struct.pack('<II', off + len(body), len(b))
         body += b
-    out = os.path.join(d, name + '.bin')
+    out = os.path.join(paths.gen(name), name + '.bin')
     open(out, 'wb').write(head + dir_ + body)
     print('wrote %s: version %s, %d sections (%s), %d bytes' % (out, vs, len(secs),
                                                                 ' '.join(t.decode() for t, _ in secs),

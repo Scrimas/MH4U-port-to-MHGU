@@ -3,7 +3,7 @@
   build.py            build into module/out/
   build.py install    also install into the Ryujinx mod folder: exefs/, every monster's data file
                       (romfs/nativeNX/mh4uport/<name>.bin, always) and the monsters' assets (romfs/...); PORT_ASSETS =
-                      comma-separated monster names whose assets to install (default: all, "none" = none)
+                      comma-separated packages whose assets to install (default: all, "none" = none)
 
 Hooks: (name, main offset of the hooked instruction). The two instructions at the site
 are moved into the trampoline, so they must not be pc-relative or branches (checked).
@@ -19,10 +19,13 @@ MONSTERS = alloc.monsters()        # registry order (allocations.toml): registry
 
 
 def package(m):
-    """monsters/<name>/package.toml: version, code = C prefix (<code>_register_class, g_<code>_dti), gu_class = name
-    of the GU class that runs the monster instead (its donor's: a GU variant, e.g. uEm067_00 for em067_01)"""
+    """monsters/<package>/package.toml: version, code = C prefix (<code>_register_class, g_<code>_dti), gu_class =
+    name of the GU class that runs the monster instead (its donor's: a GU variant, e.g. uEm067_00 for em067_01); a
+    package of several entries names each entry's class in [classes] (entry name = code; entries may share one)"""
     with open(os.path.join(paths.monster(m['name']), 'package.toml'), 'rb') as f:
-        return tomllib.load(f)
+        p = tomllib.load(f)
+    if m['name'] in p.get('classes', {}): p['code'] = p['classes'][m['name']]
+    return p
 
 
 def gu_class_dti(m, raw):
@@ -167,6 +170,58 @@ WORD_PATCHES = [
     (0x55FF84, 0xE35E007B, cmp_imm(0xE35E007B, NOTES_COUNT)),  # n-th entry of a type
     (0x5B0CB8, 0xE355007B, cmp_imm(0xE355007B, NOTES_COUNT)),  # list screen: visible entries in display order
 ]
+
+# Items appended past GU's 2991 (allocations.toml [monster.append] items; notes/items-append.md): the code that bounds
+# item IDs by the count is raised by the appended count, the per-item buffers grow with it, and the items-obtained
+# set / clear / test are replaced (items.c: IDs from 3008 use a reserved save block). Nothing changes without them.
+ITEMS_APPENDED = alloc.item_count() - alloc.GU_ITEMS
+ITEM_BOUND_SITES = [            # movw rX, #0xbad / #0xbae / #0xbaf: `id - 1 <= 2989` checks and one loop over all IDs
+    0x6F3DF8, 0x6F90F4, 0x6FA504, 0x6FA7EC, 0x6FBA28, 0x6FCEBC, 0x6FCF98, 0x6FCFB0, 0x6FD020, 0x6FD0E0, 0x6FD19C,
+    0x7054E8, 0x709438, 0x7094EC, 0x7094F4, 0x72F2B0, 0x72F890, 0x72FA24, 0x72FBF4, 0x744394, 0x78D9E4,
+    0x199C08,                   # item box sort / merge 0x199ae4: loop over its u32[2991] stack array
+    0x383F14, 0x383F38, 0x383F78, 0x383F88, 0x383F9C, 0x383FD8]    # 0x3839bc: per-item byte buffer (size, count)
+ITEM_ARRAY_SIZE = 0x199B78      # movw r1, #0x2ebc: memset of that stack array (4 x 2991)
+ITEM_SORT_FRAME = (0x199AE8, 0x199D4C)    # sub / add sp, sp, #708 (+ #11264): the array is sp+8 .. the frame top
+if ITEMS_APPENDED:
+    HOOKS += [('obtained_set', 0x1943D4), ('obtained_clear', 0x194408), ('obtained_test', 0x19443C)]
+    REPLACE_HOOKS |= {'obtained_set', 'obtained_clear', 'obtained_test'}
+
+
+def movw_imm(word, imm):
+    """the same `movw rD, #imm16` with another immediate"""
+    assert (word & 0x0FF00000) == 0x03000000 and imm < 0x10000, hex(word)
+    return (word & 0xFFF0F000) | (imm & 0xF000) << 4 | (imm & 0xFFF)
+
+
+def arm_imm(v):
+    """ARM modified immediate (rot << 8 | imm8) for v, None when v has no encoding"""
+    for rot in range(16):
+        x = ((v << 2 * rot) | (v >> (32 - 2 * rot))) & 0xFFFFFFFF if rot else v
+        if x < 256: return rot << 8 | x
+    return None
+
+
+def item_patches(img):
+    """(site, old, new) words for ITEMS_APPENDED items past 2991 (none without)"""
+    if not ITEMS_APPENDED: return []
+    n, out = ITEMS_APPENDED, []
+    word = lambda a: struct.unpack_from('<I', img, a)[0]
+    imm16 = lambda w: (w >> 4) & 0xF000 | w & 0xFFF
+    for site in ITEM_BOUND_SITES:
+        w = word(site)
+        assert imm16(w) in (0xBAD, 0xBAE, 0xBAF), 'item bound %x: %x' % (site, w)
+        out.append((site, w, movw_imm(w, imm16(w) + n)))
+    w = word(ITEM_ARRAY_SIZE)
+    assert imm16(w) == 0x2EBC, hex(w)
+    out.append((ITEM_ARRAY_SIZE, w, movw_imm(w, 0x2EBC + 4 * n)))
+    grow = next(d for d in range(4 * n, 4 * n + 1024, 8) if arm_imm(708 + d) is not None)   # keeps 8-byte alignment
+    for site, op in zip(ITEM_SORT_FRAME, (0xE24DDF00, 0xE28DDF00)):       # sub / add sp, sp, #708 (0xb1 ror 30)
+        w = word(site)
+        assert w == op | 0xB1, 'item sort frame %x: %x' % (site, w)
+        out.append((site, w, (w & ~0xFFF) | arm_imm(708 + grow)))
+    return out
+
+
 GOT_FILES = 0x1839618                          # data word -> reg_files, written by module_init
 CLONE_RATHIAN = 'CLONE_RATHIAN' in os.environ.get('GOG_DEFINES', '')   # test: Rathian's class / files for every monster
 # (NATIVE_DONOR, test: keep the donor's manifest = game file IDs, is handled by port.c)
@@ -219,14 +274,19 @@ def monsters_c():
     out = ['/* port_monsters.c: generated by module/build.py from allocations.toml + package.toml -- do not edit */',
            '#include "port.h"']
     own = [m for m in MONSTERS if 'gu_class' not in package(m)]      # gu_class monsters register no class
-    out += ['void %s_register_class(void);' % package(m)['code'] for m in own]
+    codes = []                                                       # entries sharing a class register it once
+    for m in own:
+        if package(m)['code'] not in codes: codes.append(package(m)['code'])
+    out += ['void %s_register_class(void);' % c for c in codes]
+    own = [next(m for m in own if package(m)['code'] == c) for c in codes]
     out.append('const struct port_monster port_monsters[] = {')
+    port = {m['name']: k for k, m in enumerate(MONSTERS)}
     for m in MONSTERS:
         q, s = (m.get('quests', []) + [0, 0])[:2], (m.get('quest_slots', []) + [0, 0])[:2]
-        out.append('    {"%s", 0x%x, %d, %d, 0x%x, %d, 0x%x, %d, %d, {%d, %d}, {%d, %d}, %s},' % (
+        out.append('    {"%s", 0x%x, %d, %d, 0x%x, %d, 0x%x, %d, %d, {%d, %d}, {%d, %d}, %s, %d},' % (
             m['name'], m['em_id'], m['registry_index'], m['donor_index'], m.get('standin_id', 0), m['save_index'],
-            0x1064 + m['save_index'] - 105, m['name_entry'], m['notes_entry'], q[0], q[1], s[0], s[1],
-            '%s_register_class' % package(m)['code'] if m in own else '0'))
+            0x1064 + m['save_index'] - 105, m['name_entry'], m.get('notes_entry', 0), q[0], q[1], s[0], s[1],
+            '%s_register_class' % package(m)['code'] if m in own else '0', port.get(m.get('companion_of'), -1)))
     return '\n'.join(out + ['};']) + '\n'
 
 OUT = os.path.join(HERE, 'out')
@@ -317,7 +377,7 @@ def main():
         ''.join('GEAR_HOOK(%s)\n' % l.split()[0] for l in open(_GEAR_HOOKS) if l.strip()))
 
     objs = []
-    mods = [os.path.join(paths.monster(m['name']), 'module') for m in MONSTERS]
+    mods = [os.path.join(paths.monster(p), 'module') for p in alloc.packages()]   # once per package
     incs = ['-I', OUT, '-I', HERE] + [a for d in mods for a in ('-I', d)]
     srcs = [os.path.join(HERE, f) for f in ('crt0.S', 'main.c', 'util.c', 'port.c', 'quest.c', 'items.c', 'gear.c',
                                             'notes.c')]
@@ -352,7 +412,7 @@ def main():
         if delta > 0x10: sys.exit('literal %x: expected %s (+small), got target %x' % (lit, sym, use + 8 + old))
         new = (MODULE_BASE + syms[sym] - MAIN_BASE + delta - (use + 8)) & 0xFFFFFFFF
         recs += struct.pack('>IH', lit + 0x100, 4) + struct.pack('<I', new)
-    for site, old, new in WORD_PATCHES:
+    for site, old, new in WORD_PATCHES + item_patches(img):
         if struct.unpack_from('<I', img, site)[0] != old: sys.exit('word patch %x: unexpected original' % site)
         recs += struct.pack('>IH', site + 0x100, 4) + struct.pack('<I', new)
     open(os.path.join(OUT, MAIN_BUILD_ID + '.ips'), 'wb').write(b'IPS32' + recs + b'EEOF')
@@ -380,10 +440,11 @@ def install():
     os.makedirs(os.path.join(dst, 'nativeNX', 'mh4uport'))
     for m in MONSTERS:
         src = os.path.join(paths.gen(m['name']), m['name'] + '.bin')
-        if not os.path.exists(src): sys.exit('no data file %s: run monsters/%s/build.sh' % (src, m['name']))
+        if not os.path.exists(src): sys.exit('no data file %s: run monsters/%s/build.sh' % (src, alloc.package(m)))
         shutil.copy(src, os.path.join(dst, 'nativeNX', 'mh4uport'))
-    sel = os.environ.get('PORT_ASSETS', 'all')
-    names = [m['name'] for m in MONSTERS] if sel == 'all' else [] if sel == 'none' else sel.split(',')
+    sel = os.environ.get('PORT_ASSETS', 'all')           # package names (an entry name selects its package)
+    names = alloc.packages() if sel == 'all' else [] if sel == 'none' else \
+        list(dict.fromkeys(paths.package(n) for n in sel.split(',')))
     owner = {}
     for name in names:                                 # monsters never ship the same RomFS path
         src = paths.romfs(name)

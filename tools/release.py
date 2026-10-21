@@ -47,7 +47,13 @@ def core():
 
 
 def packages():
-    return [dict(toml(os.path.join(paths.monster(m['name']), 'package.toml')), alloc=m) for m in alloc.monsters()]
+    """one dict per package: its package.toml + entries = its allocations.toml entries (one data file each) + alloc =
+    the first entry"""
+    out = []
+    for p in alloc.packages():
+        ents = [m for m in alloc.monsters() if alloc.package(m) == p]
+        out.append(dict(toml(os.path.join(paths.monster(p), 'package.toml')), entries=ents, alloc=ents[0]))
+    return out
 
 
 def clean_env():
@@ -84,14 +90,15 @@ def check():
         name = p['name']
         if vtuple(p['requires_core']) > vtuple(c['version']):
             bad.append('%s requires core %s, core is %s' % (name, p['requires_core'], c['version']))
-        data = os.path.join(paths.gen(name), name + '.bin')
-        if not os.path.exists(data):
-            bad.append('%s: no data file %s' % (name, data)); continue
-        hdr, _ = portdata.read(data)
-        if hdr['version'] != portdata.version(name)[1]:
-            bad.append('%s: data file version %x != package.toml %s' % (name, hdr['version'], p['version']))
-        if os.path.getmtime(data) < os.path.getmtime(os.path.join(paths.monster(name), 'package.toml')):
-            bad.append('%s: data file older than package.toml (repack)' % name)
+        for e in (m['name'] for m in p['entries']):
+            data = os.path.join(paths.gen(e), e + '.bin')
+            if not os.path.exists(data):
+                bad.append('%s: no data file %s' % (e, data)); continue
+            hdr, _ = portdata.read(data)
+            if hdr['version'] != portdata.version(e)[1]:
+                bad.append('%s: data file version %x != package.toml %s' % (e, hdr['version'], p['version']))
+            if os.path.getmtime(data) < os.path.getmtime(os.path.join(paths.monster(e), 'package.toml')):
+                bad.append('%s: data file older than package.toml (repack)' % e)
         rf = paths.romfs(name)
         files = [os.path.relpath(os.path.join(d, f), rf) for d, _, fs in os.walk(rf) for f in fs]
         if not files:
@@ -104,7 +111,7 @@ def check():
             if m:                    # boss record +0x69 = HP row: test builds use rows 0..9 (5 % HP)
                 qd = open(os.path.join(rf, rel), 'rb').read()
                 qid = int(m.group(1))
-                if qid not in p['alloc'].get('quests', []):
+                if qid not in [q for m in p['entries'] for q in m.get('quests', [])]:
                     bad.append('%s: quest %d is not in its allocations' % (name, qid))
                 if qd[0x69] < 10:
                     bad.append('%s: quest %d has HP row %d (a test build?)' % (name, qid, qd[0x69]))
@@ -139,8 +146,8 @@ def package(out):
     pk = packages()
     members = [('exefs/subsdk1', os.path.join(MODULE_OUT, 'subsdk1')),
                ('exefs/' + build_id(), os.path.join(MODULE_OUT, build_id()))]
-    members += [('romfs/nativeNX/mh4uport/%s.bin' % p['name'], os.path.join(paths.gen(p['name']), p['name'] + '.bin'))
-                for p in pk]
+    members += [('romfs/nativeNX/mh4uport/%s.bin' % m['name'], os.path.join(paths.gen(m['name']), m['name'] + '.bin'))
+                for p in pk for m in p['entries']]
     core_zip = 'core-%s.zip' % c['version']
     write_zip(os.path.join(out, core_zip), [(MOD_NAME + '/' + a, s) for a, s in members])
     for p in pk:
