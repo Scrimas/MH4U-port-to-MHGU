@@ -17,3 +17,7 @@ Unequip a monster's gear before removing that monster. Online, everyone should h
 You need your own MH4U and MHGU dumps; no game data is in this repo. Each monster builds with `monsters/<name>/build.sh`, and `python3 tools/release.py all` makes the release zips.
 
 `notes/porting-guide.md` explains how a port works and is the place to start for a new monster.
+
+## License
+
+GNU General Public License v3.0 or later (GPL-3.0-or-later): you can redistribute and modify this project under version 3 of the License or, at your option, any later version. See [LICENSE](LICENSE). Game data and assets stay their owners' and are not covered.
