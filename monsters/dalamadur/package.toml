@@ -1,0 +1,13 @@
+# Dalamadur package: Dalamadur, Shah Dalamadur and their tail halves (allocations.toml entries dalamadur,
+# shah_dalamadur, dalamadur_tail, shah_dalamadur_tail), what the installer shows and installs, and the version
+# written into the entries' data files.
+name = "dalamadur"
+title = "Dalamadur"
+version = "0.1.0"          # bump on every published change of this package's files (data, assets or code)
+requires_core = "1.3.0"    # oldest core module (exefs) that runs this version: multi-entry packages, companions
+
+[classes]                  # C prefix of each entry's class (module/build.py): <code>_register_class(), g_<code>_dti
+dalamadur = "em090"        # uEm090_00: the head half, both variants (4U uEm024 runs em024 and em110)
+shah_dalamadur = "em090"
+dalamadur_tail = "em091"   # uEm091_00: the tail half, both variants (4U uEm083 runs em083 and em111)
+shah_dalamadur_tail = "em091"

@@ -136,3 +136,62 @@ w10 = 2
 w11 = 2
 w13 = 3
 w14 = 2
+
+# Package monsters/dalamadur: Dalamadur (4U em024), Shah Dalamadur (em110) and their tail halves (em083 / em111), two
+# enemies per fight as 4U spawns them (GU precedent: Ahtal-Ka + Ahtal-Neset). Classes: package.toml [classes].
+[[monster]]
+name = "dalamadur"
+package = "dalamadur"
+title = "Dalamadur"
+em_id = 0x5a
+registry_index = 139
+donor_index = 23                        # Kushala em024_00: placeholder data and per-index records (as Gogmazios)
+standin_id = 0x18                       # Kushala: the quests' loader-visible boss, swapped at spawn
+mapicon_class = 18                      # Kushala's size class until the map icons (goal F; 4U classes 22 / 23)
+file_ids = [0x10780, 0x107ff]
+save_index = 107
+name_entry = 107
+notes_entry = 125
+quests = [11494]                        # test quest (goal D); becomes 4U m10709 Speartip Menace (goal F)
+quest_slots = [1011049]
+bgm_ids = [0x902, 0x903]                # phase 1, phase 2 (4U bgm_em024 / bgm_em024_2; Shah plays the same)
+
+[[monster]]
+name = "shah_dalamadur"
+package = "dalamadur"
+title = "Shah Dalamadur"
+em_id = 0x15a                           # variant 1 of Dalamadur's em: one class runs both (4U em024 / em110)
+registry_index = 140
+donor_index = 23
+standin_id = 0x18
+file_ids = [0x10800, 0x1087f]
+save_index = 108
+name_entry = 108
+notes_entry = 126
+
+[[monster]]
+name = "dalamadur_tail"
+package = "dalamadur"
+title = "Dalamadur (tail half)"
+companion_of = "dalamadur"
+em_id = 0x5b
+registry_index = 141
+donor_index = 23
+standin_id = 0x0f                       # Gendrome: a stand-in of its own (one swap per boss), smallest GU boss arc
+mapicon_class = 18
+file_ids = [0x10880, 0x1089f]
+save_index = 109                        # tally slot shared by both tails
+name_entry = 107
+
+[[monster]]
+name = "shah_dalamadur_tail"
+package = "dalamadur"
+title = "Shah Dalamadur (tail half)"
+companion_of = "shah_dalamadur"
+em_id = 0x15b
+registry_index = 142
+donor_index = 23
+standin_id = 0x0f
+file_ids = [0x108a0, 0x108bf]
+save_index = 109
+name_entry = 108
