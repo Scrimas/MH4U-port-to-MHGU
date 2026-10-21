@@ -385,20 +385,35 @@ def cmdtbl(d4, gu, notes):
     resident enemy\\area_act_tbl (Zamtrios' entry: 180..187, picked through 0xb4e58 -> 0x69c1c8, read at 0x82a04
     without a range check). 4U had native actions there, so em092's table stops at 179 and an area move read past it
     (null script pointer: crash in the EMC decoder 0x50ce0, test 2026-10-21 08:20). Every script the appended ones
-    call (14 nn) is the same in both tables (asserted), so they run as in GU."""
+    call (14 nn) is the same in both tables (asserted), so they run as in GU.
+    Also, every script em092 shares with 4U em022 takes GU's version where GU adapted it (notes/area-move.md): GU
+    replaced 4U's script-driven area move by engine opcodes (0x94 set up, 0x95 start, 0x9e advance: selectors s0 / s10;
+    patrol 0x96 / 0x97 / 0x4e in s1 / s3 / s9), emptied 4U's routing script s145 and renumbered the map cases (4U 4 ->
+    14, 17 Dunes -> 5, 18 -> none). With 4U's versions the area move never started (4U opcodes are no-ops in GU and
+    the 4U Dunes case 17 never matches GU's 5): he dived and resurfaced in place (test 2026-10-21 09:04). em092's own
+    scripts (selectors s2, s16..s28) stay 4U's; GU's only change to em022's s2 is its new selector-29 condition."""
     ts = emc.parse(emc.to_gu(d4))[1]
     g = emc.parse(gu)[1]
-    assert len(ts) == len(g)
-    added, todo = [], []
+    _, z = arcpack.read(open(EM022_ARC, 'rb').read())
+    zm = emc.parse(emc.to_gu([x for p, t, x in z if p == 'enemy\\em022\\data\\em022_cmd'][0]))[1]
+    assert len(ts) == len(g) == len(zm)
+    added, adapted, own = [], [], []
     for k in range(len(g)):
-        assert len(ts[k]) <= len(g[k]), k
+        assert len(ts[k]) == len(zm[k]) <= len(g[k]), k
+        for i in range(len(ts[k])):
+            if ts[k][i] != zm[k][i]:
+                own.append((k, i))
+            elif g[k][i] != zm[k][i]:
+                ts[k][i] = g[k][i]
+                adapted.append((k, i))
         added += [(k, i) for i in range(len(ts[k]), len(g[k]))]
         ts[k] = ts[k] + g[k][len(ts[k]):]
-    for k, i in added:
+    for k, i in added + adapted:
         for c in emc.refs(g[k][i])[1]:
-            assert c >= len(emc.parse(emc.to_gu(d4))[1][1]) or g[1][c] == ts[1][c], (k, i, 'calls a script em092 changes', c)
-    notes.append('cmdtbl: 4U em092 + GU em067_00 entries %s (all their calls are scripts identical in both)' %
-                 ['g%d s%d' % a for a in added])
+            assert ts[1][c] == g[1][c], (k, i, 'calls a script that differs from GU', c)
+    notes.append('cmdtbl: 4U em092; GU em067_00 versions of %s (shared with em022, adapted by GU); appended %s; em092 '
+                 'own %s' % (['g%d s%d' % a for a in adapted], ['g%d s%d' % a for a in added],
+                             ['g%d s%d' % a for a in own]))
     return emc.build(ts)
 
 

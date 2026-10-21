@@ -98,6 +98,8 @@ HOOKS = [
     ('em067_01_ball42', 0xF73870),
     ('em067_01_end', 0xCA118),     # base "no case" thunks -> slot 247: Tigerstripe's actions GU lacks run instead
     ('em067_01_end7', 0xCA10C),    # (em067_01_moves.c)
+    ('em067_01_amove', 0x8F004),   # area move setup / transfer: Tigerstripe log lines (em067_01_diag.c)
+    ('em067_01_atransfer', 0xB5D6C),
 ]
 # weapon / sharpness table load exits (gear.c GEAR_HOOK wrappers, out/gear_hooks.inc), "name 0xSITE", written by
 # monsters/gogmazios/tools/gear_weapons_em089.py (gu_class finds and checks each class's site)
