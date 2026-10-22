@@ -25,6 +25,7 @@ RANGES = ('file_ids', 'items', 'decorations')           # [first, last] per mons
 LISTS = ('quests', 'quest_slots', 'bgm_ids')            # explicit values per monster
 SCALARS = ('save_index', 'name_entry', 'ui_icon')       # one value per monster, unique
 ORDERED = ('registry_index', 'notes_entry')             # consecutive in [[monster]] order
+QUESTS_PER_ENTRY = 4                                    # module/port.h PORT_QUESTS
 
 
 def load(path=TOML):
@@ -114,8 +115,9 @@ def check(reg=None, gu_main=paths.GU_MAIN):
                 lo, hi = (pools[key][0], pools[key][-1]) if key not in ('quests', 'quest_slots') else (None, None)
                 if key in ('quests', 'quest_slots') and v not in pools[key]:
                     errs.append('%s: %s %d not in the pool %s' % (m['name'], key, v, pools[key]))
-                elif lo is not None and not lo <= v <= hi:
-                    errs.append('%s: %s %#x outside the pool [%#x, %#x]' % (m['name'], key, v, lo, hi))
+                elif lo is not None and not lo <= v <= hi and not (key == 'items' and m.get('append', {}).get('items')):
+                    errs.append('%s: %s %#x outside the pool [%#x, %#x]' % (m['name'], key, v, lo, hi))   # appended
+                    # items are past GU's table instead (checked below)
                 if comp and key == 'name_entry': continue           # its owner's (checked above)
                 if (key, v) in seen and not (key == 'save_index' and comp and seen[key, v] in companions):
                     taken.setdefault(seen[key, v], []).append(v)   # companions may share one tally slot
@@ -128,8 +130,14 @@ def check(reg=None, gu_main=paths.GU_MAIN):
             errs.append('%s: em number %d is a GU monster (variant 0)' % (m['name'], em))
         for key, v in (('em_id', m.get('em_id')), ('stage folder', (m.get('stage_alias') or [0, None])[1])):
             if v is None: continue
+            # one stage alias may serve several entries of the same package (Dalamadur / Shah: Speartip Crag)
+            if key == 'stage folder' and (key, v) in seen and m.get('package') == seen.get(('stage folder pkg', v)) \
+                    and m['stage_alias'] == seen.get(('stage alias', v)):
+                continue
             if (key, v) in seen: errs.append('%s: %s %#x already taken by %s' % (m['name'], key, v, seen[key, v]))
             seen[key, v] = m['name']
+            if key == 'stage folder':
+                seen[('stage folder pkg', v)], seen[('stage alias', v)] = m.get('package'), m['stage_alias']
         sa = m.get('stage_alias')
         if sa and not pools['stage_folder'][0] <= sa[1] <= pools['stage_folder'][1]:
             errs.append('%s: stage folder %d outside the pool' % (m['name'], sa[1]))
@@ -141,6 +149,8 @@ def check(reg=None, gu_main=paths.GU_MAIN):
                 seen[key, v] = m['name']
         if len(m.get('quest_slots', [])) != len(m.get('quests', [])):
             errs.append('%s: one quest_slot per quest' % m['name'])
+        if len(m.get('quests', [])) > QUESTS_PER_ENTRY:
+            errs.append('%s: more than %d quests' % (m['name'], QUESTS_PER_ENTRY))
         n_app = m.get('append', {}).get('items', 0)     # appended items: IDs right after GU's and the earlier ones
         if n_app:
             first = GU_ITEMS + offset(m['name'], 'items', reg=reg)

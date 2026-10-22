@@ -16,8 +16,13 @@ save_index = [105, 111]                 # unused registry slots dummy1..7 (IDs 0
 name_entry = [105, 111]                 # monsterName GMD entries 'dummy1'..'dummy7'
 ui_icon = [146, 195]                    # HD_cmn_micon01 cells after GU's 0..140 and the HD UI v4 cheat's 141, 143-145
 notes_entry = [123, 127]                # Hunter's Notes save map S+0x35b0: bits 123..127 unused
-quests = [11491, 11492, 11493, 11494]   # checked free (no file, no list entry); check more before extending
-quest_slots = [1011009, 1011003, 1011048, 1011049]   # quest_group group-127 entries renamed in memory. 1011048 /
+quests = [11491, 11492, 11493, 11494, 10790, 10791, 10792, 11495, 11496]   # checked free (no file, no list
+                                        # entry; v1.0 RomFS); 107NN = Hub HR 7, 114NN = Hub G4 (the ID's digits decide
+                                        # which hub loads it, the questData bytes the rank: plan.md Dalamadur 6.)
+quest_slots = [1011009, 1011003, 1011048, 1011049, 1010007, 1010177, 1110009, 1110114, 1110115]
+                                        # quest_group group-127 entries renamed in memory. 1010007 / 1010177 / 1110009 /
+                                        # 1110114 / 1110115 (indexes 1307 / 1329 / 1314 / 1393 / 1394, 2026-10-21):
+                                        # absent from the catalog, like 1011048 /
                                         # 1011049 (indexes 1449 / 1450, 2026-10-20): absent from the event download
                                         # catalog 0x1595e98 (205 x {u32 quest, u32 serial}), so no save can hold them
                                         # (their RomFS files exist, unused by our own IDs). 1011009 / 1011003 ARE in
@@ -152,9 +157,69 @@ file_ids = [0x10780, 0x107ff]
 save_index = 107
 name_entry = 107
 notes_entry = 125
-quests = [11494]                        # test quest (goal D); becomes 4U m10709 Speartip Menace (goal F)
-quest_slots = [1011049]
+quests = [10790, 10791, 10792, 11494]   # 4U m10709 Advanced: Speartip Menace, m10721 Advanced: Here to Eternity,
+                                        # event m60131 Pillar of Strength (HR 7), event m60209 The Speartip's King (G;
+                                        # 11494 was the G test build of m10709). quests[0] unlocks the Notes entry
+quest_slots = [1010007, 1010177, 1110009, 1011049]
 bgm_ids = [0x902, 0x903]                # phase 1, phase 2 (4U bgm_em024 / bgm_em024_2; Shah plays the same)
+stage_alias = [18, 29]                  # the Sanctuary (2 areas, 3 kobjs) loads folder m29 = Speartip Crag
+items = [2991, 3020]                    # appended (notes/items-append.md): both variants' 30 materials,
+                                        # monsters/dalamadur/tools/items_em090.py
+armor_models = [193, 194, 298, 299, 348, 349, 452, 453]   # 4U Rebellion / Riot HR, EX, X, Z (unused in GU)
+
+[monster.weapon_models]                 # per weapon class, two models per line (GU model numbers = 4U's, unused in
+w00 = 57                                # GU): wNN = the HR / G-rank one, gNN = the Dalamadur X one (tools/alloc.py
+g00 = 104                               # takes the class from the key's digits, so gNN is checked as class NN too)
+w01 = 55
+g01 = 105
+w02 = 59
+g02 = 107
+w03 = 36
+g03 = 91
+w04 = 24
+g04 = 47
+w06 = 45
+g06 = 56
+w07 = 42
+g07 = 87
+w08 = 43
+g08 = 85
+w09 = 49                                # sounds: set 049 for both (GU's own snd/090.arc is another set, left alone)
+g09 = 90
+w10 = 25
+g10 = 84
+w11 = 41
+g11 = 96
+w12 = 35
+g12 = 78
+w13 = 6
+g13 = 40
+w14 = 18
+g14 = 35
+
+[monster.append]
+items = 30
+notes_text = 1                          # description only (4U has no Dalamadur tip: tools/notes_em090.py)
+armor_series = 8                        # 4 pairs (tools/gear_em090.py)
+armor_create = 4
+armor_process = 28                      # the templates' level rows: 2 x Akantor's + 2 x Akantor X's
+kireaji = 28                            # the weapons' 4U sharpness entries (tools/gear_weapons_em090.py)
+
+[monster.append.weapons]                # BaseData / MsgData / LevelData rows per class: one line each (create, HR
+w00 = 5                                 # upgrade, G, two Dalamadur X; the IG one more, tools/gear_weapons_em090.py)
+w01 = 5
+w02 = 5
+w03 = 5
+w04 = 5
+w06 = 5
+w07 = 5
+w08 = 5
+w09 = 5
+w10 = 5
+w11 = 5
+w12 = 5
+w13 = 6
+w14 = 5
 
 [[monster]]
 name = "shah_dalamadur"
@@ -168,6 +233,12 @@ file_ids = [0x10800, 0x1087f]
 save_index = 108
 name_entry = 108
 notes_entry = 126
+quests = [11495, 11496]                 # 4U m11030 Advanced: Eternal Emperor, event m60213 The Crimson Shah (both G)
+quest_slots = [1110114, 1110115]
+stage_alias = [18, 29]                  # Speartip Crag, as Dalamadur's (same package: tools/alloc.py allows the share)
+
+[monster.append]
+notes_text = 1                          # description only (4U emExp[110]; tools/notes_em090.py)
 
 [[monster]]
 name = "dalamadur_tail"

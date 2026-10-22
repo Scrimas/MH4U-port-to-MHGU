@@ -199,7 +199,7 @@ uint32_t port_quest_id(void)
 int port_quest_owner(uint32_t quest_id, int *which)
 {
     for (int m = 0; quest_id && m < PORT_N; m++)
-        for (int k = 0; k < 2; k++)
+        for (int k = 0; k < PORT_QUESTS; k++)
             if (port_monsters[m].quests[k] == quest_id) {
                 if (which) *which = k;
                 return m;

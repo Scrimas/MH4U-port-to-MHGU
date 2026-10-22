@@ -100,28 +100,37 @@ def armor_recipe_4u(exe, part, k):
 
 def armor(spec, R=None, exe=None):
     """[TBLA table dicts] and [TXTA entries] of the monster's armor series pair, create recipes and level rows"""
-    name, tpl_ids = spec['name'], spec['template']
+    return armors(spec['name'], spec['materials'], [spec], R, exe)
+
+
+def armors(name, materials, specs, R=None, exe=None):
+    """the same for several series pairs: specs = [the per-pair keys of armor's spec (template, model, parts,
+    defense, tree, recipes, scrap, level_swap, template_word, colour)], IDs in list order (pair s = first + 2 s);
+    one TBLA block per table (allocations.toml armor_series = 2 x pairs, armor_create = pairs)"""
     a = alloc.monster(name)['append']
     R = R or RomFS(GU_ROMFS)
     exe = exe or open(EXE, 'rb').read()
     res = gu_arc(R.read('/nativeNX/loc/arc/resident.arc'))
     bs = gu_arc(R.read('/nativeNX/arc/facility/blacksmith.arc'))
-    names = gu_item_names(R, spec['materials'])
+    names = gu_item_names(R, materials)
     st4 = text4u('eng')['skillType']
     series = res['table\\armorSeriesData']
     first = cnt(series) + alloc.offset(name, 'armor_series')
-    assert a.get('armor_series') == 2 and a.get('armor_create') == 1, 'allocations.toml armor_series / armor_create'
+    assert a.get('armor_series') == 2 * len(specs) and a.get('armor_create') == len(specs), \
+        'allocations.toml armor_series / armor_create'
     tables, texts = [], []
 
-    # ---- armor series: Blademaster, Gunner
+    # ---- armor series: Blademaster, Gunner per pair
     recs = []
-    for g in range(2):
+    for s, g in [(s, g) for s in range(len(specs)) for g in range(2)]:
+        spec, f = specs[s], first + 2 * s
+        tpl_ids = spec['template']
         r = bytearray(series[8 + 127 * tpl_ids[g]: 8 + 127 * (tpl_ids[g] + 1)])
         p = [armor_4u(exe, pt, k0 + g) for (_, pt), k0 in zip(PARTS, spec['parts'])]
         assert all(x['rare'] == p[0]['rare'] and x['price'] == p[0]['price'] and x['res'] == p[0]['res'] and
                    x['defense'] == p[0]['defense'] and x['colour'] == p[0]['colour'] for x in p), p
-        struct.pack_into('<I', r, 0, first + g)
-        struct.pack_into('<H', r, 4, first + g)                      # sort after every GU series
+        struct.pack_into('<I', r, 0, f + g)
+        struct.pack_into('<H', r, 4, f + g)                          # sort after every GU series
         struct.pack_into('<H', r, 11, spec['model'][g])
         r[13:17] = bytes([1, 1, 1 - g, g])
         struct.pack_into('<I', r, 17, p[0]['price'])
@@ -139,43 +148,51 @@ def armor(spec, R=None, exe=None):
         r[108:113] = bytes(x['slots'] for x in p)
         recs.append(bytes(r))
     tables.append(dict(path='table\\armorSeriesData', cls=CLS_ARMOR_SERIES, rec_bytes=127, base=first,
-                       records=b''.join(recs)))                         # Blademaster, Gunner
+                       records=b''.join(recs)))                         # Blademaster, Gunner per pair
 
     # ---- names: 10 strings per series (Blademaster then Gunner: 5 names, 5 descriptions), 5 languages
     text = []
     for lang in LANGS:
         t = text4u(lang)
         strs = []
-        for g in range(2):
-            strs += [t[part + 'Name'][k0 + g] for (part, _), k0 in zip(PARTS, spec['parts'])]
-            strs += [t[part + 'Exp'][exp_4u(exe, EXP_4U[part], k0 + g)] for (part, _), k0 in zip(PARTS, spec['parts'])]
+        for spec in specs:
+            for g in range(2):
+                strs += [t[part + 'Name'][k0 + g] for (part, _), k0 in zip(PARTS, spec['parts'])]
+                strs += [t[part + 'Exp'][exp_4u(exe, EXP_4U[part], k0 + g)]
+                         for (part, _), k0 in zip(PARTS, spec['parts'])]
         text.append([gu_str(s) for s in strs])
     texts.append(('armorSeriesData', first * 10, text))
 
-    # ---- create recipes, one per part
+    # ---- create recipes, one per part and pair
     off = alloc.offset(name, 'armor_create')
     for part in range(5):
         t = bs['table\\armorCreateA%02d' % part]
         n = cnt(t)
-        tpl = [t[8 + 42 * i: 50 + 42 * i] for i in range(n) if struct.unpack_from('<H', t, 8 + 42 * i)[0] == tpl_ids[0]]
-        r = bytearray(tpl[0])
-        struct.pack_into('<4H', r, 0, first, first + 1, 0, 0)
-        for k in range(4):
-            nm, c = spec['recipes'][part][k]
-            struct.pack_into('<HB', r, 10 + 4 * k, names[nm], c)       # the flag byte (+13 on the first) stays
-        if spec.get('scrap') is not None:
-            struct.pack_into('<H', r, 30, spec['scrap'])
+        recs = []
+        for s, spec in enumerate(specs):
+            tpl_ids, f = spec['template'], first + 2 * s
+            tpl = [t[8 + 42 * i: 50 + 42 * i] for i in range(n)
+                   if struct.unpack_from('<H', t, 8 + 42 * i)[0] == tpl_ids[0]]
+            r = bytearray(tpl[0])
+            struct.pack_into('<4H', r, 0, f, f + 1, 0, 0)
+            for k in range(4):
+                nm, c = spec['recipes'][part][k]
+                struct.pack_into('<HB', r, 10 + 4 * k, names[nm], c)       # the flag byte (+13 on the first) stays
+            if spec.get('scrap') is not None:
+                struct.pack_into('<H', r, 30, spec['scrap'])
+            recs.append(bytes(r))
         tables.append(dict(path='table\\armorCreateA%02d' % part, cls=CLS_ARMOR_CREATE, rec_bytes=42, base=n + off,
-                           records=bytes(r)))
+                           records=b''.join(recs)))
 
     # ---- level rows
     t = bs['table\\armorProcessA00']
     n = cnt(t)
     it_names = {v: k for k, v in names.items()}
-    swap = spec.get('level_swap', {})
     lv = []
-    ours = {tpl_ids[0]: first, tpl_ids[1]: first + 1, 0: 0}
-    for i in range(n):                   # one row per level holds the whole set (Blademaster + Gunner IDs)
+    for s, i in [(s, i) for s in range(len(specs)) for i in range(n)]:
+            spec, f = specs[s], first + 2 * s   # one row per level holds the whole set (Blademaster + Gunner IDs)
+            tpl_ids, swap = spec['template'], spec.get('level_swap', {})
+            ours = {tpl_ids[0]: f, tpl_ids[1]: f + 1, 0: 0}
             r = bytearray(t[8 + 38 * i: 46 + 38 * i])
             ids = struct.unpack_from('<4H', r, 0)
             if tpl_ids[0] not in ids: continue

@@ -16,6 +16,7 @@ Sections (written by the monster tools, consumed by module/*.c):
   ITEM  u32 n, n x {u16 id, u8 rarity, icon, colour, category, dummy_icon, 0, u32 dummy_sell, sell, buy},
         u32 text[5][n][2] (name, description per language)                                            (items.c)
   BUI   u32 groups, u32 entries, u8 cond[groups], u8 count[groups] (4-aligned), {u8 chance, count, u16 item}[entries]
+  BUIr  the same for GU rank file r = '1' Low, '2' High, '4' G (quest\bui\bui_s<r>): preferred over BUI     (items.c)
   TBLA  u32 n, n x {u32 path suffix, u32 flags, u32 alloc, free, ctor, parse, u16 mem size, u16 file record size,
         u32 base, u32 count, u32 records}: records appended to a GU table when it holds exactly `base`   (gear.c)
   TXTA  u32 n, n x {u32 GMD name, u32 base, u32 count, u32 strings}: u32 strings[5][count] appended (gear.c)
@@ -23,6 +24,10 @@ Sections (written by the monster tools, consumed by module/*.c):
   NAME  u32 monsterName entry, u32 name[5]                                                           (items.c)
   SKIL  u32 n, n x {u32 skill, u32 grants[3]}: having `skill` also answers yes for the granted GU skills (gear.c)
   PWLF  u32 n, n x {u32 path suffix, u16 model, u8 from, u8 to}: weapon motion-set fixes             (gear.c)
+  GPTS  u32 n, n x {u8 GU rank, u8 list, u16 0, u32 offset}, lists {u8 weight, u8 qty, u16 item} closed by weight
+        0xff: a monster's runtime gather-point item lists (monsters/dalamadur/module/dala_gather.c)
+  WALK  u32 n, n x {u16 joint, u16 triangles, u32 offset}, triangles x 9 f32 bone-local vertices: 4U walk strips
+        for the module's copy of 4U's ground query (monsters/dalamadur/module/dala_walk.c, tools/walk_em090.py)
 TBLA flags: 1 = the sharpness table, 2 = needs that monster's sharpness rows (skipped when they were refused).
 """
 import json, os, struct, sys, tomllib
@@ -178,7 +183,7 @@ def decode(tag, b):
         text = [[[cstr(b, u(t + 4 * (2 * (len(recs) * l + i) + j))[0]) for j in range(2)] for i in range(n)]
                 for l in range(len(LANGS))]
         return dict(items=recs, text=text)
-    if tag == 'BUI ':
+    if tag[:3] == 'BUI':
         g, e = u(0, 2)
         cond, cnt = list(b[8:8 + g]), list(b[8 + g:8 + 2 * g])
         o = 8 + (2 * g + 3) // 4 * 4

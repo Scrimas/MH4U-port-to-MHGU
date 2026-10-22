@@ -70,13 +70,15 @@ def ses_build_gu(recs):
     return out
 
 
-def convert_area(k, a4, full, log):
-    src = os.path.join(U4, 'm19' + a4)
-    gdir = 'sound\\se\\map\\m26d\\m26a%02dd\\' % k
-    gbank = gdir + 'snd_m26a%02dd' % k
-    gcall = 'sound\\call\\map\\m26d\\m26a%02dd' % k
+def convert_area(k, a4, full, log, u4=U4, s4='m19', sg='m26'):
+    """4U area a4 of stage s4 (arcs unpacked in u4/<s4><a4>/) -> GU area k of the stage folder sg (the GU paths the
+    stage loader asks for); full = also the bank, request and waves. Returns [(path, type, bytes)]."""
+    src = os.path.join(u4, s4 + a4)
+    gdir = 'sound\\se\\map\\%sd\\%sa%02dd\\' % (sg, sg, k)
+    gbank = gdir + 'snd_%sa%02dd' % (sg, k)
+    gcall = 'sound\\call\\map\\%sd\\%sa%02dd' % (sg, sg, k)
     files = []
-    ses = open(os.path.join(src, 'sound/call/map/m19/m19_%sd.%08x' % (a4, T_SES4)), 'rb').read()
+    ses = open(os.path.join(src, 'sound/call/map/%s/%s_%sd.%08x' % (s4, s4, a4, T_SES4)), 'rb').read()
     recs = ses_parse(ses, False)
     keep = []
     for r in recs:
@@ -89,9 +91,9 @@ def convert_area(k, a4, full, log):
     for i, r in enumerate(keep):        # renumber (index / lo16 = record number in both games)
         r['index'] = i; r['w'][0] = (r['w'][0] & 0xFFFF0000) | i
     if full:
-        b4p = os.path.join(src, 'sound/se/map/m19/m19%sd/snd_m19%sd' % (a4, a4))
+        b4p = os.path.join(src, 'sound/se/map/%s/%s%sd/snd_%s%sd' % (s4, s4, a4, s4, a4))
         b4 = snd4u2gu.bank_parse(open(b4p + '.%08x' % snd4u2gu.T4['BANK'], 'rb').read())
-        p4 = 'sound\\se\\map\\m19\\m19%sd\\wave\\' % a4
+        p4 = 'sound\\se\\map\\%s\\%s%sd\\wave\\' % (s4, s4, a4)
         rename = lambda p: gdir + 'wav\\' + p[len(p4):] if p.startswith(p4) else (_ for _ in ()).throw(
             AssertionError(p))
         used = []
@@ -102,7 +104,7 @@ def convert_area(k, a4, full, log):
             files.append((rename(p), snd4u2gu.TG['WAVE'], snd4u2gu.gu_wave(snd4u2gu.madp_parse(d))))
         files.append((gbank, snd4u2gu.TG['BANK'], snd4u2gu.bank_build(b4, rename)))
         r4 = snd4u2gu.req4_parse(open(b4p + '.%08x' % snd4u2gu.T4['REQ'], 'rb').read())
-        assert r4['strs'] == ['sound\\se\\map\\m19\\m19%sd\\snd_m19%sd' % (a4, a4)], r4['strs']
+        assert r4['strs'] == ['sound\\se\\map\\%s\\%s%sd\\snd_%s%sd' % (s4, s4, a4, s4, a4)], r4['strs']
         req, _ = snd4u2gu.req_build(r4, {}, [gbank], keep_volume=True)
         files.append((gbank, snd4u2gu.TG['REQ'], req))
         ids = {w[0] & 0xFFFF for w in r4['ents']}

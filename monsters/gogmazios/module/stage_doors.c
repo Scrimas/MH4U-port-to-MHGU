@@ -13,16 +13,16 @@
  * 0x4ffdc4) itself. This file adds what 4U's stage class did:
  *   stage_frame @0x503c7c (gimmick manager per frame, r0 = mgr): the 4U trigger -> command 0 via 0x514f9c, HUD
  *       message, the frame-2 effect (em089_efx_stage_kowareeft: the Effect controller class is absent in GU);
- *   stage_kobj_bcast @0x500d18 (inside 0x500cb4, r0 = kobj): GU sends command 0 to EVERY kobj at quest start
- *       (non-siege quests: Fortress barricades open); for every area-2 kobj of the alias (doors mId 3 and the
- *       converted 4U breakables k01 / k02, mId 1 / 2) it becomes command 1 (a no-op case of 0x514f9c). 4U's m19
- *       stage start (0x6c222c) plays nothing on them (0x1d0c64 pre-breaks k01..k03 only for quest 1002), so without
- *       this the doors would open at once and the breakables would show their action-0 frames from the start.
+ *   GU sends command 0 to EVERY kobj at quest start (non-siege quests: Fortress barricades open); the core holds it
+ *       for every area-2 kobj of the alias (doors mId 3 and the converted 4U breakables k01 / k02, mId 1 / 2: module/
+ *       stage_alias.c stage_kobj_bcast, package.toml [stage] hold_kobj_areas). 4U's m19 stage start (0x6c222c) plays
+ *       nothing on them (0x1d0c64 pre-breaks k01..k03 only for quest 1002), so without it the doors would open at
+ *       once and the breakables would show their action-0 frames from the start.
  * Deviations: HUD text = GU QuestDialog 93 "The Demolisher is ready for use." (GU has no "All clear..." line; the
  * kind-1 ids match 4U up to 12 only); boss = first large monster of sEnemy with HP > 0 (4U also checks a record
  * flag W+0x1b4 bit 0 whose GU field was not traced); single player (4U's net message for the kobj not sent: GU's
  * 0x515328 sends its own when online).
- * Define STAGE_DOORS_OFF: no trigger, no broadcast block (GU then opens the doors at quest start). */
+ * Define STAGE_DOORS_OFF: no trigger (the quest-start hold is package.toml's). */
 #include <stdint.h>
 #include "util.h"
 #include "game.h"
@@ -164,21 +164,4 @@ int stage_frame_c(uint32_t *regs)
 #endif
     stage_cannon_tick(mgr);
     return 0;
-}
-
-/* inside 0x500cb4 at 0x500d18 (r0 = kobj, about to get command 0 at quest start) */
-int stage_kobj_bcast_c(uint32_t *regs)
-{
-#ifdef STAGE_DOORS_OFF
-    (void)regs;
-    return 0;
-#else
-    static uint32_t s_n;
-    uint8_t *k = (uint8_t *)(uintptr_t)regs[R0];
-    if (!k || !stage_alias_active() || k[KOBJ_AREA] != DOORS_AREA) return 0;
-    regs[R1] = 1;                     /* command 1: no case in 0x514f9c (returns) */
-    if (++s_n <= 8) logf("gogport: stage doors: quest-start command 0 blocked for area-2 KowareObj %x (mId %u)",
-                         (uint32_t)k, k[KOBJ_ID]);
-    return 0;
-#endif
 }

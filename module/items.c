@@ -146,7 +146,7 @@ int obtained_clear_c(uint32_t *regs)
 int obtained_test_c(uint32_t *regs)
 {
     uint32_t id = regs[R1] & 0xffff, bit, *w = id < PORT_ITEM_COUNT ? obtained_word(regs[R0], id, &bit) : 0;
-    regs[R0] = w ? *w & bit : 0;             /* the masked word, as GU's test */
+    regs[R0] = w && (*w & bit) ? 1 : 0;      /* 0 / 1 as GU's test (`movwne r0, #1`): callers `cmp r0, #1` */
     return 1;
 }
 
@@ -155,14 +155,17 @@ int item_text_loaded_c(uint32_t *regs)
 {
     uint8_t *msg = (uint8_t *)regs[R4];
     const char *name = FIELD(const char *, msg, 0x8c), *path = (const char *)(msg + 0x8), *suffix = 0;
-    const char **str = FIELD(const char **, msg, 0x98);
-    uint32_t n = FIELD(uint32_t, msg, 0x88), lang = 0;
-    if (!name || !str) return 0;
+    uint32_t lang = 0;
+    if (!name || !FIELD(const char **, msg, 0x98)) return 0;
     for (const char *p = path; p < path + 64 && *p; p++)
         if (*p == '_') suffix = p + 1;
     for (uint32_t k = 0; suffix && k < sizeof(LANGS) / sizeof(LANGS[0]); k++)
         if (str_eq(suffix, LANGS[k])) lang = k;          /* chS / chT / others: English */
     gmd_text_loaded(msg, name, lang);                    /* gear, skill, weapon, Notes texts (gear.c) */
+    /* read the string table only now: a TXTA append (appended items' itemData) replaces it with a grown copy, and
+     * names written into the old one were lost (test 2026-10-21: every DUMMY material named DUMMY) */
+    const char **str = FIELD(const char **, msg, 0x98);
+    uint32_t n = FIELD(uint32_t, msg, 0x88);
     for (int m = 0; m < PORT_N; m++) {
         if (str_eq(name, "itemData")) item_names(m, str, n, lang, path);
         else if (str_eq(name, "monsterName")) monster_name(m, str, n, lang);
@@ -176,25 +179,33 @@ int item_text_loaded_c(uint32_t *regs)
  * break list quest+0x566 {u16 em id, u8 cond, u8 count, u16}). Record: +4 u16 em id, +6 u8 cond[18], +0x18 u8
  * count[18], +0x2a entries {u8 chance, u8 count, u16 item}, each group closed by chance 255 (group lookup 0x354484).
  * cond = table 0x162a736 {10, 20, .., 60}[break group] (list adder 0x3a6f54; tail sever = 10). No GU record has a
- * ported monster's ID: the hook answers with the monster's own record (BUI section), whatever the rank, also for
- * its save-slot ID (main.c stats_add counts it under it) and for its quests' stand-in ID while they run. */
+ * ported monster's ID: the hook answers with the monster's own record, also for its save-slot ID (main.c stats_add
+ * counts it under it) and for its quests' stand-in ID while they run. The rank: GU's file is bui_s<rank>, file ID
+ * 0xf05f + s8 [[quest + 0xa4] + 44] (C, 0x3a3884..0x3a38cc; GU's data: s1 Low, s2 High, s4 G, e.g. Kushala's Daora
+ * Horn / Horn+ / Hardhorn). The record is the monster's BUI<rank> section ('BUI2' = High ...), else its BUI section
+ * (every rank: Gogmazios, Tigerstripe). */
 #define BUI_REC 468
 static uint8_t s_bui[PORT_N][BUI_REC];
+static int8_t s_bui_rank[PORT_N];   /* rank + 1 the record was built for (0 = not built) */
 
-static int bui_build(int m)
+static int bui_build(int m, int rank)
 {
     uint8_t *b = s_bui[m];
     uint32_t size;
-    const uint8_t *s = port_section(m, "BUI ", 0, &size);
+    const char tag[4] = {'B', 'U', 'I', (char)(rank >= 0 && rank <= 9 ? '0' + rank : ' ')};
+    const uint8_t *s = port_section(m, tag, 0, &size);
+    if (!s) s = port_section(m, "BUI ", 0, &size);
     if (!s) return 0;
     uint32_t groups = PORT_U32(s, 0), ents = PORT_U32(s, 4), o = 8 + ((2 * groups + 3) & ~3u);
     if (groups > 18 || 0x2a + 4 * ents > BUI_REC || o + 4 * ents > size) return 0;
+    for (uint32_t k = 0; k < BUI_REC; k++) b[k] = 0;   /* another rank's record may have had more groups */
     for (uint32_t g = 0; g < groups; g++) {
         b[0x06 + g] = s[8 + g];
         b[0x18 + g] = s[8 + groups + g];
     }
     for (uint32_t e = 0; e < 4 * ents; e++) b[0x2a + e] = s[o + e];
     FIELD(uint16_t, b, 4) = port_monsters[m].em_id;
+    s_bui_rank[m] = (int8_t)(rank + 1);
     return 1;
 }
 
@@ -203,12 +214,14 @@ int bui_record_c(uint32_t *regs)
 {
     uint32_t id = regs[R1] & 0xffff;
     int q = port_running_quest(0);
+    const uint8_t *info = (const uint8_t *)FIELD(uint32_t, (void *)regs[R0], 0xa4);
+    int rank = info ? (int8_t)info[44] : -1;      /* GU returns no record without it */
     for (int m = 0; m < PORT_N; m++) {
         const struct port_monster *p = &port_monsters[m];
         if (id != p->em_id && id != p->save_id && !(q == m && p->standin_id && id == p->standin_id)) continue;
-        if (!FIELD(uint16_t, s_bui[m], 4) && !bui_build(m)) return 0;
+        if ((!FIELD(uint16_t, s_bui[m], 4) || s_bui_rank[m] != rank + 1) && !bui_build(m, rank)) return 0;
         regs[R0] = (uint32_t)s_bui[m];
-        logf("mh4uport: break rewards for id %x: %s record", id, p->name);
+        logf("mh4uport: break rewards for id %x: %s record (rank %d)", id, p->name, rank);
         return 1;
     }
     return 0;

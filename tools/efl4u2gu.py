@@ -517,26 +517,29 @@ def efl_colour_block(d):
     return struct.unpack_from('<4I', d, o + 0x30) if o else None
 
 
-def pel_colour(path, rid, S=None, soil=M19A03_AREA_SOIL):
-    """RGBA 4U multiplies into the units of record `rid` (EFL `path`), None = 4U keeps the unit colours."""
+def pel_colour(path, rid, S=None, soil=M19A03_AREA_SOIL, code=None):
+    """RGBA 4U multiplies into the units of record `rid` (EFL `path`), None = 4U keeps the unit colours. code = the
+    record's own 0xc48378 colour (other monsters' code posts), else CODE_COLOUR (em089)."""
     b = efl_colour_block((S or sources())[(path, T['EFL'])])
     if not b or not b[0] & 0x10:
         return None
     if not (b[3] >> 16) & 0xFF:
         return soil
-    return CODE_COLOUR.get(rid)
+    return code or CODE_COLOUR.get(rid)
 
 
 def pel_record(path, r, S=None, soil=M19A03_AREA_SOIL):
+    """r: a MEF record dict; optional keys for code posts of other monsters (ids are per PEL, so they do not go
+    through em089's id rules): follow (bool, else pel_follows(id)), colour (RGBA bytes, else CODE_COLOUR)."""
     st = bytearray(160)
     struct.pack_into('<4f', st, 0x00, *r['pos'], 0.0)
     struct.pack_into('<4f', st, 0x10, *r['rot'], 0.0)
     struct.pack_into('<4f', st, 0x20, *r['scl'], 0.0)
     struct.pack_into('<HH', st, 0x30, r['id'], r['joint'] & 0xFFFF)
-    st[0x34:] = PEL_TAIL_PREV if pel_follows(r['id']) else PEL_TAIL
+    st[0x34:] = PEL_TAIL_PREV if r.get('follow', pel_follows(r['id'])) else PEL_TAIL
     for o, v in PEL_COLOUR_OFF:
         st[o] = v
-    col = pel_colour(path, r['id'], S, soil)
+    col = pel_colour(path, r['id'], S, soil, r.get('colour'))
     if col:
         st[PEL_COLOUR_RGBA:PEL_COLOUR_RGBA + 4] = col
         st[PEL_COLOUR_ON], st[PEL_COLOUR_MODE] = 1, PEL_COLOUR_MUL

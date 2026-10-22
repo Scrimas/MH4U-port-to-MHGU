@@ -131,7 +131,7 @@ pairs where possible (tools/dt_vote.py, dt_map.py, snd4u2gu.py selftest), then a
 | motions LMT 67 | copy as is | same layout. Root track = bone 0xff usage 4; end-frame vectors at anim +0x10 |
 | EMC | copy, drop 4U's 2 trailing empty groups | |
 | camera list LCM v4 -> v5 | tools/lcm4u2gu.py | 16-byte record prefix |
-| emd / etd -> bodydata, hitsize, attackdata, XFS, dtbase, dttune | tools/emdata4u.py, dt_convert.py (unicorn venv) | voted mappings only; dtbparts stayed the donor's (break records installed at runtime) |
+| emd / etd -> bodydata, hitsize, attackdata, XFS, dtbase, dttune | tools/emdata4u.py, dt_convert.py (unicorn venv) | voted mappings only; dtbparts stayed the donor's (break records installed at runtime); pass `--sensor` so the monster gets its own 4U eye records (etd word 9 -> dttune +0x78), else it sees through the donor's eye bone |
 | effects EFL / EAN / MEF -> GU EFL + PEL / PSL | tools/efl4u2gu.py | PEL records in extra_records(); PSL from LMT event group 2 |
 | sounds MADP / SNDB / SREQ -> GU types | tools/snd4u2gu.py | rules from Capcom's own monster pairs (selftest) |
 | BGM | tools/snd_bgm.py | MCA -> Opus + own STQR in the monster arc, hook bgm_stqr |
@@ -149,8 +149,10 @@ pairs where possible (tools/dt_vote.py, dt_map.py, snd4u2gu.py selftest), then a
   never the 4U number.
 - The shared hooks already serve every monster from its descriptor: em_create / quest_prep (stand-in swap while its
   quest runs), em_arc_request (arc preload), em_record (donor record), file_id, name_index, stats_add / stats_hunted /
-  save_hunts, quest board / unlock / clear, break rewards, items, gear, Notes. Monster-specific hook sites (BGM,
-  stage alias) stay in the monster's code; a second user of the same site turns its handler into a core dispatcher.
+  save_hunts, quest board / unlock / clear, break rewards, items, gear, Notes, stage aliases (module/stage_alias.c:
+  arc path redirect, quest-start KowareObj hold, area / whole-map records, all from allocations.toml stage_alias +
+  package.toml [stage]). Monster-specific hook sites (BGM) stay in the monster's code; a second user of the same site
+  turns its handler into a core dispatcher.
 - Class: `monsters/gogmazios/module/em089.c` is the template. ctor = uFestaEnemy ctor + our vtable + EN_WORK = record + 96; own fields
   after SIZE_uFestaEnemy. Overridden slots (game.h names): 125 ACTION (= 4U slot 44 dispatch), 119 STATE_FRAME
   (4U slot 40), 129 ACTION_START (4U 47), 127 ACTION_REMAP, 130 MOTION_FRAME, 132 PARTS_FRAME (4U 50), 133 AI_COND
@@ -204,7 +206,9 @@ pairs where possible (tools/dt_vote.py, dt_map.py, snd4u2gu.py selftest), then a
 - Arena: if GU lacks it, follow notes/stage.md (alias build, collision, SIS, gimmicks, lighting: the 4U unlit
   flag is MRL w6 bit 31, GU lighting comes from the template feature). Stage-specific engine tables matter
   (e.g. 4U arena point tables are per stage: 0x689f7c uses the em's emd +0x40 table except on stage 13).
-- Map UI: tools/mapui4u2gu.py (area maps + whole map, transforms in its docstring).
+  Second example, smaller and more generic: monsters/dalamadur/tools/build_speartip.py (4U m08 on GU stage 18,
+  host audit and the GU stage files that carry another stage's look: notes/speartip-crag.md section 7).
+- Map UI: tools/mapui4u2gu.py (area maps + whole map, transforms in its docstring); Dalamadur's build_speartip_ui.py.
 
 ### Phase 5b: content (save, items, gear, Notes, quests)
 Order that worked: save slot -> materials -> carves / rewards -> second quest + subquests -> armor data on a GU
@@ -268,6 +272,12 @@ testable alone (the user checks the smithy or one quest).
   convert(edges=True), same rule for armor and weapons (none on vertex-colour glow meshes). 4U glow meshes with
   vertex colour (0x7BA7401B) become GU 0xCBF6C01A (vcolour=True). Weapon drawMode 0xECD3 -> 0xECF3 when the GU
   material is exactly BSAddAlpha + DSZTest + RSMesh, else 0xEFFF (weapon4u2gu drawmodes()).
+  New weapon ports: convert with `--alpha-test-4u` (templates keep the 4U material's alpha test and reference,
+  MRL w7 bits 24 / 8-15). Without it an opaque 4U blade can get an alpha-tested template, and the BM alpha (the 4U
+  specular mask) cuts holes in it (Dalamadur's hammer and gunlance). Also `--anim-4u`: a non-exact template's
+  copied animation belongs to another weapon (Dalamadur's HBG strip scrolled the wrong way and showed other parts of
+  the texture sheet); the flag converts the 4U animation instead when every track maps. Gogmazios and Tigerstripe
+  were built without both flags.
   The helm XFS (hair shown per hairstyle) has no derivable rule: copy a GU helm's and check hair in game.
 - **Weapon sounds.** tools/wsnd4u2gu.py `gogma <4U pl_*.arc dir>` -> arc/weapon/wNN/snd/<model>.arc, then mSrqrNo =
   mModelID in the weapon record. GU banks / requests are class templates: only the waves, key -> wave and the
