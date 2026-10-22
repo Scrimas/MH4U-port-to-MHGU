@@ -206,11 +206,71 @@ Stage id = [[0xfb6b7c]+0xc8c] & 0xff (scan: stage8.py, base register verified un
 - **Walking on Dalamadur's body:** not in the stage data. Every m08 SBC part is accounted for above, so it's
   monster-side collision (open, monster study).
 
+## 7. Goal E build (2026-10-21): Speartip Crag on GU stage 18
+Tools: monsters/dalamadur/tools/build_speartip.py (arcs), build_speartip_ui.py (maps); build.sh steps `speartip`,
+`ui`. Module: core module/stage_alias.c (Gogmazios' alias hooks moved there, table-driven: allocations.toml
+`stage_alias = [18, 29]`, package.toml [stage] kinds 49 / 54 / 55 / 56 / 58, hold_kobj_areas [1], maprec, wholemap_k).
+Quest 11494 keeps stage 18; both halves at 4U's spawn (area 1, (0, 0, 0), rotation 0); start in camp.
+
+### GU host audit (stage 18, the Sanctuary) C
+- Area count 2, gimmick flags u16[18] = 0x108: bit 0x08 = one st004 ballista per SIS point kind 3 (the Sanctuary's
+  arena has 3; 4U m08 has none -> none spawn), 0x100 = st009 shell preload (most stages). Spawner switch 0x502510:
+  stage 18 takes the common case (no spears).
+- Explicit stage tests in main (scan of `ldrb rX, [.., #0x48]` + compare / switch / mask, scratch st18scan.py +
+  jt.py): every switch and bit mask puts 18 with other arena stages (16..21, 25..27) or the common case. Only stage
+  18 / 27 special: 0x185a8 / 0x1880c (functions 0x183e0 / 0x18600, a render / view task: sizes 0xb00 / 0x820 / 0xd0)
+  store a colour at obj+0xdd4 from a runtime table (default black 0xff000000), read by 0xb8a72c / 0xb8e8e0 (alpha
+  forced 0xff): a view clear / background colour (G). Left GU's: visible only where no sky / geometry is drawn.
+- Per-area file lookups 0x1fe48 / 0x23580 = camera XFS (0x6b41a2f9, file IDs 0xd1b6 + area): neither the Sanctuary
+  nor 4U m08 ships one.
+- GU KowareObj (0x5050f0.., 0x512d5c, 0x513498 ..) special-cases mType 4, 5, 6, 12, 17, 18, 20 only: 4U's 9 / 10 /
+  11 are plain breakables. Open point 5 settled.
+- File IDs exist for every slot the alias fills: set schedulers -a00..-a04 per area (0xada7 + (stage * 13 + area) * 5
+  + k), KowareObj k01..k04 (0xbbdf + stage * 52 + area * 4 + k - 1), the camp's SE request 0xcede (the Sanctuary
+  ships none, GU still asks).
+
+### What the alias replaces (build_speartip.py docstring for the full list) C
+- Area arcs: main models, every Sanctuary set scheduler and prop, the Sanctuary props drawn by the -f filter
+  schedulers (5 camp / 11 arena uBaseModels + their MaterialControls: tools/sdl.py remove_objects), area SE.
+  4U sets: camp -a00 falling rocks + SE 2 / 3, -a01 lightning Kaminari01..03, -a02 billboard; arena -a00 (anun,
+  s2-InfiniteLight flash, the a01 bolt mesh with PartsDisp), -a01 = 4U -sky. Every track name / property type of
+  these exists for the same class in GU's scheduler corpus.
+- Stage arc: k01..k03 = 4U k00..k02 (mId 1..3, Effect controllers dropped, no mAt* -> not breakable by hits);
+  area streams = 4U str_m08 (sequences 0 -> camp, 1 / 0x1f / 0x20 / 0x21 -> arena; 4U dB - 1.48 median delta).
+- map_com: collision (5 kinds x 2 areas, camp shells = its main files), SIS verbatim, item pops (none in 4U; the
+  Sanctuary's arena had 4), stage effect lists m18_000 / m18_100 emptied (3 + 1 Sanctuary effects; GU's own empty
+  form, 20 of 140 GU lists are), whole-map offsets = 4U m08's (aMap08 0x656fb4: W 30000, a00 (6800, 5300), a01 (0,
+  -2800)).
+- Maps: area pictures = 4U m08a0N_ID at 2x (records a00 (5.0, 24, -12), a01 (1.5, 4, -20)), the camp's '1' label at
+  its exit, Tex_area01 on it; whole map = 4U m08d_ID's 58 x 64 pane picture centred in the 128 frame (all 5 SIS
+  points land on the art), arena highlight = ui258_area01; GU dims[18] = 40000 -> wholemap_k 4/3.
+
+### Deviations / open (G unless marked)
+- The Sanctuary's breakable map icons (AnimP_k01..03, HD_gmk_m18) are hidden: 4U draws its own (ui288a01
+  koware01..03 = atlas right half: (128, 16, 46, 35), (128, 52, 46, 56), (176, 52, 48, 56) px; pane positions set at
+  run time) that go with the breaks -> goal D6, together with what drives GU's AnimP_k players (no map-UI code reads
+  the kobj table; not traced).
+- Collision flags w2 0x102 (arena lower floor 10, 52 triangles: the floor k01's break exposes) kept: GU uses 0x2 and
+  0x100, never together.
+- GU-only look objects kept in -f: second infinite lights (DEF02 / EM02), GodRays / ColorCorrect / Bloom values.
+- The stage-18 view colour above; pec_m18d, snd_m18d, snd_fs_ase18 stay GU's.
+- Spawn height: the arena floor under the origin is y -1884 (floor 12; y 493 above). 4U keeps the object at the
+  origin; whether GU pulls an enemy down is not traced: the D1 place log (obj y every 300 frames) shows it.
+- Camp labels at 13 4U px outside the exit (as Battlequarters); no arrows.
+
+### Test (goal E): what to look for
+- Log: `port: dalamadur stage path kind 54/56/58/49/55 area N -> m29`, `area map record area N -> k ...`, `whole map
+  record -> k 1333/1000`, `stage: quest-start command 0 held for area-1 KowareObj .. (mId 1/2/3)` x3, D1's
+  `dalaport: place` lines (obj y should stay 0).
+- Visual: camp = 4U camp (tent, falling rocks with sound, lightning in the sky), walk to the exit; arena = 4U crag,
+  dark storm sky with lightning flashes, the spire and both platforms standing; maps show the 4U pictures; falling
+  off the crag returns to camp. Then the same with the Deck (MP).
+
 ## Open points
 1. EMC ops 0x0a / 0x11 that gate the break selector (head g0 s0 prefix).
 2. The tail's path into 7/60 / 7/61 (head-tail sync struct at +0x8c88 / the flag written at 0x76e914).
 3. KowareEft list 0x23 -> effect files. snd request id -> wave mapping.
 4. (settled 2026-10-21: k00 broken -> bgm_em024_2, see section 5 BGM.)
-5. (m18 = the Sanctuary, settled 2026-10-21.) GU KowareObj handling of mType 9..11.
+5. (settled 2026-10-21, section 7: no special case for mType 9..11 in GU.) (m18 = the Sanctuary, settled.)
 6. Unidentified stage-8 sites: 0x306410, 0x98cac0, 0xb30a5c, 0x6634f8, 0xb6c6e8 and the 0x933b30 routine that
    W+0x539 suppresses.

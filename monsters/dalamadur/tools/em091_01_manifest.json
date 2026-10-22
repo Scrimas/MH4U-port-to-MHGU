@@ -3,7 +3,7 @@
  "entry": "shah_dalamadur_tail",
  "donor": "em024_00",
  "file_id_base": "0x108a0",
- "file_count": 7,
+ "file_count": 12,
  "manifest": [
   {
    "field": 0,
@@ -334,42 +334,42 @@
   {
    "field": 46,
    "kind": "hagi s0",
-   "file_id": "0x1079b",
-   "path": "enemy\\hagi\\hagi_s0_em090_00",
+   "file_id": "0x108a7",
+   "path": "enemy\\hagi\\hagi_s0_em091_01",
    "type": "0x33a84e14",
-   "source": "shared (em090_01, its file ID)"
+   "source": "own"
   },
   {
    "field": 47,
    "kind": "hagi s1",
-   "file_id": "0x1079c",
-   "path": "enemy\\hagi\\hagi_s1_em090_00",
+   "file_id": "0x108a8",
+   "path": "enemy\\hagi\\hagi_s1_em091_01",
    "type": "0x33a84e14",
-   "source": "shared (em090_01, its file ID)"
+   "source": "own"
   },
   {
    "field": 48,
    "kind": "hagi s2",
-   "file_id": "0x1079d",
-   "path": "enemy\\hagi\\hagi_s2_em090_00",
+   "file_id": "0x108a9",
+   "path": "enemy\\hagi\\hagi_s2_em091_01",
    "type": "0x33a84e14",
-   "source": "shared (em090_01, its file ID)"
+   "source": "own"
   },
   {
    "field": 49,
    "kind": "hagi s3",
-   "file_id": "0x1079e",
-   "path": "enemy\\hagi\\hagi_s3_em090_00",
+   "file_id": "0x108aa",
+   "path": "enemy\\hagi\\hagi_s3_em091_01",
    "type": "0x33a84e14",
-   "source": "shared (em090_01, its file ID)"
+   "source": "own"
   },
   {
    "field": 50,
    "kind": "hagi s4",
-   "file_id": "0x1079f",
-   "path": "enemy\\hagi\\hagi_s4_em090_00",
+   "file_id": "0x108ab",
+   "path": "enemy\\hagi\\hagi_s4_em091_01",
    "type": "0x33a84e14",
-   "source": "shared (em090_01, its file ID)"
+   "source": "own"
   }
  ],
  "extra": {},
@@ -415,12 +415,43 @@
    "path": "enemy\\dt_tune\\em091_01_dttune",
    "type": "0x48e8ac29",
    "path_hash": "0x63b839fd"
+  },
+  {
+   "file_id": "0x108a7",
+   "path": "enemy\\hagi\\hagi_s0_em091_01",
+   "type": "0x33a84e14",
+   "path_hash": "0xd2f2c89b"
+  },
+  {
+   "file_id": "0x108a8",
+   "path": "enemy\\hagi\\hagi_s1_em091_01",
+   "type": "0x33a84e14",
+   "path_hash": "0x3d30a3a5"
+  },
+  {
+   "file_id": "0x108a9",
+   "path": "enemy\\hagi\\hagi_s2_em091_01",
+   "type": "0x33a84e14",
+   "path_hash": "0xd60718a6"
+  },
+  {
+   "file_id": "0x108aa",
+   "path": "enemy\\hagi\\hagi_s3_em091_01",
+   "type": "0x33a84e14",
+   "path_hash": "0x39c57398"
+  },
+  {
+   "file_id": "0x108ab",
+   "path": "enemy\\hagi\\hagi_s4_em091_01",
+   "type": "0x33a84e14",
+   "path_hash": "0xdb1968e1"
   }
  ],
  "notes": [
+  "carves: tools/hagi_em090.py (fields 46-50, shah_dalamadur_tail)",
   "command table = em091_00's (shared)",
   "em091_01 XFS: 12 states, visible at spawn [1, 16, 18, 20, 107]",
   "em091_01 data: 24 attacks, 11 hitsize groups, bodydata 24 / cambodydata 19 records (4U em111)",
-  "arc: 188 own / shared files + 792 donor chain files"
+  "arc: 301 own / shared files + 792 donor chain files"
  ]
 }

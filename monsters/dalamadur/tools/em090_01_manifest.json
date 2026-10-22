@@ -3,7 +3,7 @@
  "entry": "shah_dalamadur",
  "donor": "em024_00",
  "file_id_base": "0x10800",
- "file_count": 17,
+ "file_count": 22,
  "manifest": [
   {
    "field": 0,
@@ -334,42 +334,42 @@
   {
    "field": 46,
    "kind": "hagi s0",
-   "file_id": "0x1079b",
-   "path": "enemy\\hagi\\hagi_s0_em090_00",
+   "file_id": "0x10811",
+   "path": "enemy\\hagi\\hagi_s0_em090_01",
    "type": "0x33a84e14",
-   "source": "shared (em090_00, its file ID)"
+   "source": "own"
   },
   {
    "field": 47,
    "kind": "hagi s1",
-   "file_id": "0x1079c",
-   "path": "enemy\\hagi\\hagi_s1_em090_00",
+   "file_id": "0x10812",
+   "path": "enemy\\hagi\\hagi_s1_em090_01",
    "type": "0x33a84e14",
-   "source": "shared (em090_00, its file ID)"
+   "source": "own"
   },
   {
    "field": 48,
    "kind": "hagi s2",
-   "file_id": "0x1079d",
-   "path": "enemy\\hagi\\hagi_s2_em090_00",
+   "file_id": "0x10813",
+   "path": "enemy\\hagi\\hagi_s2_em090_01",
    "type": "0x33a84e14",
-   "source": "shared (em090_00, its file ID)"
+   "source": "own"
   },
   {
    "field": 49,
    "kind": "hagi s3",
-   "file_id": "0x1079e",
-   "path": "enemy\\hagi\\hagi_s3_em090_00",
+   "file_id": "0x10814",
+   "path": "enemy\\hagi\\hagi_s3_em090_01",
    "type": "0x33a84e14",
-   "source": "shared (em090_00, its file ID)"
+   "source": "own"
   },
   {
    "field": 50,
    "kind": "hagi s4",
-   "file_id": "0x1079f",
-   "path": "enemy\\hagi\\hagi_s4_em090_00",
+   "file_id": "0x10815",
+   "path": "enemy\\hagi\\hagi_s4_em090_01",
    "type": "0x33a84e14",
-   "source": "shared (em090_00, its file ID)"
+   "source": "own"
   }
  ],
  "extra": {},
@@ -475,31 +475,64 @@
    "path": "enemy\\dt_tune\\em090_01_dttune",
    "type": "0x48e8ac29",
    "path_hash": "0xa236e63d"
+  },
+  {
+   "file_id": "0x10811",
+   "path": "enemy\\hagi\\hagi_s0_em090_01",
+   "type": "0x33a84e14",
+   "path_hash": "0x6a4eaffe"
+  },
+  {
+   "file_id": "0x10812",
+   "path": "enemy\\hagi\\hagi_s1_em090_01",
+   "type": "0x33a84e14",
+   "path_hash": "0x858cc4c0"
+  },
+  {
+   "file_id": "0x10813",
+   "path": "enemy\\hagi\\hagi_s2_em090_01",
+   "type": "0x33a84e14",
+   "path_hash": "0x6ebb7fc3"
+  },
+  {
+   "file_id": "0x10814",
+   "path": "enemy\\hagi\\hagi_s3_em090_01",
+   "type": "0x33a84e14",
+   "path_hash": "0x817914fd"
+  },
+  {
+   "file_id": "0x10815",
+   "path": "enemy\\hagi\\hagi_s4_em090_01",
+   "type": "0x33a84e14",
+   "path_hash": "0x63a50f84"
   }
  ],
  "notes": [
+  "carves: tools/hagi_em090.py (fields 46-50, shah_dalamadur)",
   "em090_01 material XfB__m00_alpha: template solid_at, 2 animations",
   "em090_01 material XfB__m01_eye: template unlit, 2 animations, raster ['RSMesh', 'RSMeshCN']",
-  "em090_01 material XfB__m00_body1: template solid_sphere, sphere em110_03_BM, 2 animations",
-  "em090_01 material XfB__m00_body4_nm: template solid_sphere, sphere em110_06_BM, 2 animations",
-  "em090_01 material XfB__m00_body2: template solid_sphere, sphere em110_03_BM, 2 animations",
-  "em090_01 material XfB__m00_body5_nm: template solid_sphere, sphere em110_06_BM, 2 animations",
+  "em090_01 material XfB__m00_body1: template solid_e1, sphere em110_03_BM, 2 animations",
+  "em090_01 material XfB__m00_body4_nm: template solid_e1, sphere em110_06_BM, 2 animations",
+  "em090_01 material XfB__m00_body2: template solid_e1, sphere em110_03_BM, 2 animations",
+  "em090_01 material XfB__m00_body5_nm: template solid_e1, sphere em110_06_BM, 2 animations",
   "em090_01 material XfB__m00_ang: template add, 1 animations",
   "em090_01 material XfB__m02_inn: template unlit, 3 animations",
   "em090_01 material XfB__m00_add: template add, 1 animations",
-  "em090_01_tail material XfB__m00_body2: template solid_sphere, sphere em110_03_BM",
+  "em090_01_tail material XfB__m00_body2: template solid_e1, sphere em110_03_BM",
   "motion list 0 = em090_00's (shared)",
   "motion list 3 = em090_00's (shared)",
   "command table = em090_00's (shared)",
-  "em090_01 effects: 62 entries (tools/efl4u2gu.py effect_set), 30 code-post records from MEF _1",
+  "em090_01 effects: 66 entries (tools/efl4u2gu.py effect_set), 30 code-post records from MEF _1 + 23 of the class (dala_efx.c)",
   "  MODEL effect\\base\\cm\\cm000\\cm000_000: 1 materials",
+  "  MODEL effect\\base\\cm\\cm000\\cm000_001: 1 materials",
   "  MODEL effect\\base\\em\\em110\\ef_em110: 3 materials",
   "  MODEL effect\\base\\qe\\qe000\\qe000_001: 1 materials",
   "  MODEL effect\\base\\qe\\qe001\\qe001_000: 2 materials",
-  "  PEL effect\\pel\\em\\em090_01u: 81 records x 2 lists; PSL x3 from LMT event group 2",
+  "  PEL effect\\pel\\em\\em090_01u: 104 records x 2 lists; PSL x3 from LMT event group 2",
+  "em090_01 PEL list 1: end mode 1 on the 53 records of MEF slot mode 1 (stop at the event range end, as 4U): 3 4 5 8 9 10 12 13 15 19 21 54 55 101 103 104 105 106 156 157 203 204 252 253 2000 2001 2003 2004 2005 2006 2007 2009 2010 2011 2012 2013 2014 2015 2016 2017 2018 2019 2023 2501 2502 2503 2504 2505 2506 2507 2508 2612 2613",
   "em110 sound: 75 waves (75 used by the bank), bank 7 groups / 86 entries, request 161 entries (0 common-bank entries from GU Kushala, 0 converted), sound call 62116 B",
   "em090_01 XFS: 12 states, visible at spawn [0, 4, 6, 8, 11, 100, 101, 102, 103, 104]",
   "em090_01 data: 70 attacks, 27 hitsize groups, bodydata 61 / cambodydata 34 records (4U em110)",
-  "arc: 184 own / shared files + 792 donor chain files"
+  "arc: 292 own / shared files + 792 donor chain files"
  ]
 }

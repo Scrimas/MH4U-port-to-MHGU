@@ -46,9 +46,10 @@ gotref.py pc-relative refs, sbcinfo.py SBC summaries; em08x_ls.txt listings).
 - 0xc47f68 -> 0xc19940(sCol+0xb8, res, type, area, a5, a6): allocates a 0x70-byte sCollision::Sbc entry (DTI
   0x21275d0): +5 enabled (1), +8 handle, +0x10 type, +0xc area data (0xb12fe8), +0x1c owner, +0x20 refcount,
   +0x2c cSbcMoveMatrix (0xc0c60c), +0x54 resource, +0x58 / +0x5c parts array (sCollision::Sbc::Parts, 64 B each),
-  +0x60 = a5; inserts the bbox into a dynamic BVH (0xc98880, sCol+0xd8 + 64 * tree). With a6 = 0 an entry that
-  already holds the same resource is returned instead of a new one (loop 0xc19970). C (field names from the DTI
-  list, S)
+  +0x60 = a6; inserts the bbox into a dynamic BVH (0xc98880, sCol+0xd8 + 64 * tree). With a5 = 0 an entry that
+  already holds the same resource is returned instead of a new one (loop 0xc19970, gated on [sp+0x38] = a5; corrected
+  2026-10-22, the earlier text had a5 / a6 swapped). The monster calls pass a5 = 1: always a new entry. C (field
+  names from the DTI list, S)
 
 ## 2. How it follows the monster (Q2)
 - API (C): 0xc4754c(sCol, handle, pos*, quat*, flag) builds a 4x4 from quaternion + position, then 0xc473c0 queues a
@@ -132,6 +133,35 @@ gotref.py pc-relative refs, sbcinfo.py SBC summaries; em08x_ls.txt listings).
 - Port consequence: either rebuild the 4U engine in the module (manager slots + player ground query hook), or (S,
   simpler) convert the strips to SBC and use sCollision, which already handles moving ground and multiplayer
   (every machine runs its own collision; only the motion-keyed switches must match).
+
+## 6b. Walk study 2026-10-22 (push volumes, 4U probe, seams)
+- CORRECTED (hurtbox study, same day, C): the push volumes are field 30 "bodydata" (4U emd word 8, enemy+0x75cc,
+  loader 0x709e0, getter 0x710b0), the same list as the hurtboxes (shape cache 0x16abac and hurt pass 0x16c1bc call
+  0x710b0 too; hurtboxes need the hitzone / part fields only bodydata has). Push skips records with +10 & 0x80d2
+  (+10 0x80 = hurt only, 0x100 = push only, 0 = both; same meaning in 4U 0xbbea80) and records whose +12 bits slot 220
+  (rec+0x3b4) reports. Field 31 "cambodydata" (word 9, +0x75d0, getter 0x710d0) is read only by the quest camera's
+  radius-20 sphere (uQuestCamera 0x26934 -> 0x17fa4c -> 0x17f750), falling back to field 30 when empty. The player
+  and camera passes skip an enemy whose rec+0x528 is set (0x17caa4, 0x17fabc); the update clears it every frame
+  (0xa5334) before slot 168 (0xae1f4). 4U Dalamadur never writes the twin W+0x55a (C).
+- The strip measurement below used word 9 (the camera list), not the push list: the push on a rider is S only.
+  Measured (word 9, head 34 capsules, tail 19, radius up to 800; FK of motions 1 / 101): walk-strip vertices sit
+  inside them by up to 340 (chest j4 14 / 73 vertices, junction j140 7 / 14, j1, j3, head j5). C. Ahtal-Neset ships an
+  empty cambodydata (em087_00 / em088_00: 0 records), so the camera sphere ignores it. Port: dala_walk.c walk_push
+  sets rec+0x528 on both halves while
+  the LOCAL hunter's ground contact (hunter+0x2f00: +0x100 found, +0x10+8 handle, +0x10+0x34 SBC; S) is a walk
+  piece, plus 45 frames. G against 4U's own rule (not traced).
+- 4U strip query (C, 0x681e44 -> 0x681c84 -> 0x5a4680): vertical segment from y+50 (x [global+0x5c]) down to y-30
+  off the monster, y-60 on it in state 0xd04fbc, else y-120, y-300 for em024 / em083 only; hit = point inside the
+  triangle's XZ projection, down normals flipped (two-sided), highest hit wins. No slope limit, no walls.
+- GU ground probe 0x4f57f0: type mask 1, owner = the hunter, +-30 (+-300 in one state, 0x29c278). GU's step-up /
+  slope rule for sCollision ground not found. Data hint that it is stricter: GU walkable g files are <= 40 deg at rest
+  (em084 / em087 / em012), stage g files 98 % under 50 deg. C (data)
+- Ours in motions 1 / 101: back 20-45 deg, chest / neck 35-55, flanks 60-90. Seams (step from one piece's open edge
+  onto the next): tail 140|141|142 <= 35; head 1->2 and 3->4 p90 ~90-300; tail 140 -> head 1 median +105 up, p90
+  +393. The junction is an overlap (3D gap median ~45). Modes 1 / 2 have 103 / 86 of 135 triangles facing down, but
+  walking is off when mode != 0 (C). No geometry change until GU's tolerance is known.
+- uQuestCamera tests sCollision with type mask 3 (0x26934 -> 0x183724 -> 0xc17aa0), so it sees our type-1 ground
+  like em087's. C
 
 ## 7. Open
 - What em084 motion 833 is in game (S: a down / lying state) and why its placement is a one-shot.
