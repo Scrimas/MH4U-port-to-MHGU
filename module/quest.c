@@ -22,7 +22,7 @@ static void quest_group_rename(void)
         volatile uint8_t *p = (volatile uint8_t *)(uintptr_t)(e + 12 * i);
         uint32_t id = *(volatile uint32_t *)(p + 4);
         for (int m = 0; m < PORT_N; m++)
-            for (k = 0; k < 2; k++) {
+            for (k = 0; k < PORT_QUESTS; k++) {
                 const struct port_monster *pm = &port_monsters[m];
                 if (id != pm->quest_slots[k] || !pm->quests[k] || !port_installed(m)) continue;
                 *(volatile uint32_t *)(p + 4) = pm->quests[k];

@@ -4,3 +4,10 @@ title = "Gogmazios"
 version = "1.0.0"          # bump on every published change of this monster's files (data, assets or code)
 requires_core = "1.0.0"    # oldest core module (exefs) that runs this version
 code = "em089"             # C prefix of its module code: em089_register_class(), g_em089_dti (module/build.py)
+
+[stage]                    # the Battlequarters alias (allocations.toml stage_alias, module/stage_alias.c)
+kinds = [49, 54, 55, 56, 58]   # arc paths -> m28: mapUI, map_com, language map_com, stage, area (no night version)
+hold_kobj_areas = [2]      # arena: doors / wall and the 4U breakables stay closed / intact at quest start
+maprec = [[1.8, 17, 11], [2.0, 0, -8], [1.1, 0, -1]]   # area maps: 4U m19 a00 / a01 / a03 records {k, x, y}
+                           # (tools/mapui4u2gu.py MAPREC, checked against the 4U table there)
+wholemap_k = 1.5           # whole map: GU dims[26] / 4U m19 W = 60000 / 40000 (tools/mapui4u2gu.py WMAP_K)

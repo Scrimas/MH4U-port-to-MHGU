@@ -9,6 +9,8 @@
 #include "em089_efx.h"       /* effect posts, slot 75 (effects agent) */
 #include "em089_pile.h"      /* the fallen Dragonator spear */
 
+void em089_bgm_register(void);   /* em089_bgm.c */
+
 #define EM089_SIZE (SIZE_uFestaEnemy + 0x98)     /* base + our own fields (F_END in em089_act.c) */
 /* our fields after the base object (0xcac0 = work pointer, set by the ctor): +4..+0x8f used by em089_act.c
  * (action bookkeeping, the em089 aim point / turn rate / latches / tar amounts / AI state of the 4U work struct) */
@@ -146,6 +148,7 @@ void em089_register_class(void)
     s_vt[2 + 168] = (uint32_t)&em089_slot75;   /* 4U slot 75 joint-200 drive (em089_efx.c), while part 1 count == 1 */
     s_vt[2 + 149] = (uint32_t)&em089_drop_set; /* item-drop table set (4U 0x930bdc em 89: work+0xed), em089_act.c */
     em089_efx_init();                          /* uShell016 effect hook (also installed lazily per frame) */
+    em089_bgm_register();                      /* its battle themes (core module/bgm.c, em089_bgm.c) */
 
     const uint32_t *base_dvt = (const uint32_t *)DTIVT_uEm001_00;
     for (int i = 0; i < 2 + 3; i++) g_em089_dti_vt[i] = base_dvt[i - 2];

@@ -4,7 +4,11 @@
   weapon4u2gu.py index DIR4U OUT.pkl        material template index from Capcom's own weapon conversions: every
                                             4U DIR4U/pl_<pfx>NNN.arc whose MOD part GU also has (same class and
                                             number, same bones / bounding box / material names)
-  weapon4u2gu.py convert NN IN.arc OUT.arc IDX.pkl [--model M]
+  weapon4u2gu.py convert NN IN.arc OUT.arc IDX.pkl [--model M] [--alpha-test-4u] [--anim-4u]
+                                            --alpha-test-4u: templates keep the 4U alpha test (pick_template;
+                                            off = the Gogmazios / Tigerstripe builds, byte-identical)
+                                            --anim-4u: a non-exact template gets the 4U material's own animation
+                                            (anim_4u), not its own copy; off = byte-identical as above
   weapon4u2gu.py check OUT.arc              parse every entry back (armor4u2gu.check + MOD/MRL material cover)
 
 Rules, each checked on the 4U -> GU weapon pairs Capcom made (GU keeps 4U weapon model numbers: GS 56/62 same-number
@@ -162,13 +166,46 @@ def index(dir4u, out):
     print(len(idx), 'material pairs ->', out)
 
 
-def pick_template(idx, d, m):
+def pick_template(idx, d, m, alpha=False):
+    """GU template (index entry, how) of a 4U material: an exact pair, else the nearest (_nearest). alpha (convert
+    --alpha-test-4u): a BSSolid 4U material without an exact pair only takes templates whose alpha test (w7 bit 24)
+    equals its own (gu_w7 notes), falling back to any template (logged) when none exists."""
     k, ka, fl = key4(d, m)
     for field, val, how in (('keya', ka, 'exact+anim'), ('key', k, 'exact')):
         ex = [e for e in idx if e[field] == val]
         if ex:
             best = collections.Counter(e['gblock'] for e in ex).most_common(1)[0][0]
             return [e for e in ex if e['gblock'] == best][0], '%s (%d)' % (how, len(ex))
+    if alpha and 'BSSolid' in m['states']:
+        at = bool(m['words'][7] & mrl_build.W7_ALPHATEST)
+        r = _nearest([e for e in idx if bool(gu_w7(e) & mrl_build.W7_ALPHATEST) == at], m, fl)
+        if r: return r[0], r[1] + ', alpha test as 4U'
+        r = _nearest(idx, m, fl)
+        if r: return r[0], r[1] + ', ALPHA TEST DIFFERS FROM 4U'
+    r = _nearest(idx, m, fl)
+    if not r: raise SystemExit('no GU template with signature %s' % (A.sig4(m),))
+    return r
+
+
+# GU w7 alpha test (vote over the index's 2123 Capcom material pairs, 2026-10-21): on BSSolid materials
+# the GU bit 24 equals the 4U one on 1783 / 1786 pairs (4U opaque -> GU opaque 1328 / 1328), the reference
+# (bits 8-15) the 4U one on 429 / 455 alpha-tested pairs (Capcom retuned 26, no rule); blended GU materials all
+# carry the bit. The nearest-template search alone ignores w7: Dalamadur's opaque ham059 / ham107 / gun049 bodies
+# got alpha-tested templates (ref 20 / 64) and lost 53-89 % of their surface to the 4U specular mask in BM alpha.
+_GW7 = {}
+
+
+def gu_w7(e):
+    """MRL w7 of an index entry's GU material."""
+    gp, mp, gi = e['gu']
+    if (gp, mp) not in _GW7:
+        d = [x for p, th, x in entries(rom().read(gp)) if th == T_MRL and p == mp][0]
+        _GW7[(gp, mp)] = [g['words'][7] for g in mrl.read(d)['mats']]
+    return _GW7[(gp, mp)][gi]
+
+
+def _nearest(idx, m, fl):
+    """(index entry, how) of the nearest GU template for a 4U material without an exact pair, None if none."""
     s, an = A.sig4(m), m['words'][12]
     for how, cond in (('nearest, same anim size', lambda e: e['sig'] == s and e['anim'] == an),
                       ('nearest', lambda e: e['sig'] == s and (e['ganim'] > 0) == (an > 0)),
@@ -190,7 +227,7 @@ def pick_template(idx, d, m):
         same = [e for e in same if (e['ganim'] > 0) == (an > 0)] or same    # keep the 4U animation if possible
         cand = [e for e in same if len(e['floats']) == len(fl)] or same
         how = 'relaxed %s, DS+RS states from 4U' % lvl
-    if not cand: raise SystemExit('no GU template with signature %s' % (s,))
+    if not cand: return None
     if len({len(e['floats']) for e in cand}) > 1 or len(cand[0]['floats']) != len(fl):
         cand = [e for e in cand if len(e['floats']) == len(cand[0]['floats'])]
         n = min(len(fl), len(cand[0]['floats']))
@@ -246,7 +283,32 @@ def gu_common(paths):
     return {p: _common[p] for p in paths if p in _common}
 
 
-def convert(nn, src, idx, model=None, log=print):
+# 4U animation on a non-exact template (convert --anim-4u): the template's GU block is Capcom's conversion of ANOTHER
+# weapon's animation. Dalamadur (2026-10-21): hbg024's additive strip got rod005's v scroll -1 -> 0 / 500 f for its
+# own u scroll 0 -> 1 / 100 f and showed other parts of the texture sheet as two long pink planes (user screenshot);
+# ham059 got u 0 -> -1 for 0 -> +1. mrl_anim.gu_entries reproduces Capcom's pairs on these kinds (UV transform: v
+# sign; emission: rod006 = its template's block key for key). 4U tracks it cannot map (fMaterialStdReflect,
+# fUVTransform2: the sword / horn / blade glows) keep the template's block: Capcom's for the same 4U keys there (S).
+def anim_4u(d4, m, gw, gblock):
+    """GU animation block of a 4U material's own animation, on the template's constant buffers; None when it has
+    none, a track has no GU equivalent (mrl_anim.TRACK_MAP) or the template lacks the constant buffer."""
+    e4 = mrl_anim.material_anims(d4)[1].get(m['name'])
+    if not e4 or any(mrl_anim.var_name(0x20, t['cb'], t['var']) not in mrl_anim.TRACK_MAP
+                     for e in e4 for t in e['tracks']):
+        return None
+    cbw = {}
+    for k in range(gw[6] & 0xFFF):
+        a, val, word = struct.unpack_from('<III', gblock, 12 * k)
+        if a & 0xF == 1: cbw[mrl.rec_name(0x22, word)] = word
+    try:
+        ge = mrl_anim.gu_entries(e4, cbw)
+    except KeyError:
+        return None
+    for g, e in zip(ge, e4): g['flags'] |= e['flags'] & mrl_anim.FLAG_AUTOPLAY
+    return mrl_anim.build(ge)
+
+
+def convert(nn, src, idx, model=None, log=print, alpha=False, anim=False):
     pf = PFX[nn]
     n4 = int(re.search(r'pl_%s(\d+)\.arc$' % pf, src).group(1))
     model = n4 if model is None else model
@@ -295,7 +357,7 @@ def convert(nn, src, idx, model=None, log=print):
         for m in r4['mats']:
             if m['name'] not in names:
                 log('  material %08x: not used by the MOD, dropped' % m['name']); continue
-            t, how = pick_template(idx, d4, m)
+            t, how = pick_template(idx, d4, m, alpha)
             key = 'wpn_%s_%s_%d' % (t['gu'][0].split('/')[-2], t['gu'][0].split('/')[-1][:3], t['gu'][2])
             key += '_' + t['gu'][1].split('\\')[-1]
             mrl_build.TEMPLATES[key] = t['gu'][:2] + (t['gu'][2],)
@@ -306,10 +368,15 @@ def convert(nn, src, idx, model=None, log=print):
                         % (m['name'], [(p[0], p[2]) for p in bad], len(r4['textures'])))
             p4 = {p[0]: r4['textures'][p[2] - 1][1] for p in m['params']
                   if p[1] == 3 and 0 < p[2] <= len(r4['textures']) and r4['textures'][p[2] - 1][0]}
-            alb = gpath(p4['tAlbedoMap'])
+            # a 4U material without an albedo (tAlbedoMap 0: additive PS_DevelopLine glow over env_w033, ken044 /
+            # swo042): Capcom's ken044 (1 / 1 pair) takes the part's own BM as albedo, no specular map
+            noalb = 'tAlbedoMap' not in p4
+            if noalb: log('  material %08x: no 4U albedo -> the part\'s own BM, no specular (as Capcom\'s ken044)' % m['name'])
+            alb = gpath(p4['tAlbedoMap'] if not noalb else [p for th, p in real if '\\common\\' not in p][0])
             gs ={p[0]: p[2] for p in gm['mats'][t['gu'][2]]['params'] if p[1] == 3}
             spec_plusA = 'tSpecularMap' in gs and gm['textures'][gs['tSpecularMap'] - 1][1].endswith('+A')
             slots = {'tAlbedoMap': ti(alb), 'tSpecularMap': ti(alb + '+A') if spec_plusA and alb + '+A' in tpath else ti(alb)}
+            if noalb: slots['tSpecularMap'] = 0
             if 'tSphereMap' in gs:
                 if 'tExtendMap' not in p4: raise SystemExit('template %s has a sphere map, 4U material none' % key)
                 slots['tSphereMap'] = ti(gpath(p4['tExtendMap']))
@@ -325,11 +392,18 @@ def convert(nn, src, idx, model=None, log=print):
                 r4s = [x for x in m['states'] if x and x.startswith('RSMesh') and not x.startswith('RSMeshC')]
                 states = tuple(ds[:1] + r4s[:1])
                 extra['bias'] = int(r4s[0][len('RSMeshBias'):]) if r4s and r4s[0].startswith('RSMeshBias') else 0
-            an = ''
+            # alpha-tested in 4U and in the (non-exact) template: the 4U reference (gu_w7 notes); an exact pair keeps
+            # Capcom's own reference for that 4U material
+            if 'alpha test as 4U' in how and m['words'][7] & mrl_build.W7_ALPHATEST:
+                extra['alpha_ref'] = (m['words'][7] >> mrl_build.W7_REF_SHIFT) & 0xFF
+            an, src_an = '', 'GU'
+            if anim and not how.startswith('exact+anim'):
+                a4 = anim_4u(d4, m, gw, gblock)
+                if a4 is not None: ganim, src_an = a4, '4U'
             if ganim:
                 extra['anim'] = ganim
                 kinds = {tr['kind'] & 0xF for e in mrl_anim.parse(ganim) for tr in e['tracks']}
-                an = ' +GU anim %d B (kinds %s)' % (len(ganim), sorted(kinds))
+                an = ' +%s anim %d B (kinds %s)' % (src_an, len(ganim), sorted(kinds))
                 if 3 in kinds: log('  warning: copied animation swaps textures (kind 3): template texture indices')
             elif m['words'][12]:
                 an = ' (4U anim %d B dropped: no animated template)' % m['words'][12]
@@ -396,7 +470,8 @@ if __name__ == '__main__':
     elif cmd == 'convert':
         a = sys.argv[2:]
         mdl = int(a[a.index('--model') + 1]) if '--model' in a else None
-        data = convert(int(a[0]), a[1], pickle.load(open(a[3], 'rb')), model=mdl)
+        data = convert(int(a[0]), a[1], pickle.load(open(a[3], 'rb')), model=mdl, alpha='--alpha-test-4u' in a,
+                       anim='--anim-4u' in a)
         open(a[2], 'wb').write(data)
         print(len(data), 'bytes ->', a[2])
     elif cmd == 'check':

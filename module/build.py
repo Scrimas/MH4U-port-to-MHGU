@@ -16,6 +16,7 @@ sys.path.insert(0, os.path.join(ROOT, 'tools'))
 import alloc, nso, paths
 
 MONSTERS = alloc.monsters()        # registry order (allocations.toml): registry indexes, append order
+QUESTS_PER_ENTRY = alloc.QUESTS_PER_ENTRY   # port.h PORT_QUESTS
 
 
 def package(m):
@@ -62,7 +63,7 @@ HOOKS = [
     ('save_hunts', 0x523104),    # save hunts + captures by ID (bound 136): 0x59 -> its save slot 0x1064
     ('set_action', 0x76154),   # enemy setAction(this, cat, num, mode): diagnostic log of em089 action changes
     ('set_target', 0xC6E14),   # enemy setTarget(this, kind, sub, param, slot): em089 arena points -> emd stage-19 table
-    ('stage_path', 0x15339C),  # stage arc path builder: stage 26 -> m28 files for the Gogmazios quest (stage.c)
+    ('stage_path', 0x15339C),  # stage arc path builder: alias stage -> its folder while the quest runs (stage_alias.c)
     ('stage_maprec', 0x61C394),  # cUIOEnlargeMap setup: per-area map record -> 4U m19 scale / offset (stage.c)
     ('stage_wholerec', 0x61B608),  # cUIOEnlargeMap setup: whole-map record -> scale 60000 / 40000 (4U m19) (stage.c)
     ('quest_group_fix', 0x3B7DE8),  # quest list loader step: placeholder 1011009 -> quest 11491 in memory
@@ -77,12 +78,13 @@ HOOKS = [
     ('add_hp', 0x9A7B8),       # diagnostic: enemy addHP(this, delta)
     ('dmg_recv', 0x9D6F8),     # diagnostic: monster damage receiver (monster, part, damage, kind)
     ('name_index', 0x55BDA4),  # (mgr, id) -> monsterName GMD entry (= 0x50b64(id)); 137 -> EM089_NAME_ENTRY
-    ('bgm_select', 0x4E60D4),  # (ctl, boss entry, u8 *has, u32 *id): battle theme id -> em089's (em089_bgm.c)
-    ('bgm_stqr', 0xB6D72C),    # (stqr, id) -> sequence: ids 0x900/0x901 looked up in em089's STQR (em089_bgm.c)
-    ('bgm_play', 0x4E34A4),    # sSoundControl play stream request: log only in quest 11491 (em089_bgm.c)
+    ('bgm_select', 0x4E60D4),  # (ctl, boss entry, u8 *has, u32 *id): battle theme id -> a registered monster's (bgm.c)
+    ('bgm_stqr', 0xB6D72C),    # (stqr, id) -> sequence: its bgm_ids looked up in its own STQR (bgm.c)
+    ('bgm_play', 0x4E34A4),    # sSoundControl play stream request: log only while its quests run (bgm.c)
     ('stage_spear_count', 0x502694), ('stage_siege_phase', 0x3A5EC4), ('stage_dragonator_fire', 0x503BB0),  # stage_gimmick.c
     ('stage_cart_request', 0x497040), ('stage_cart_avail', 0x495B40), ('stage_cart_tick', 0x495D0C),  # stage_cart.c
-    ('stage_frame', 0x503C7C), ('stage_kobj_bcast', 0x500D18),  # stage_doors.c (+ stage_cannon.c tick)
+    ('stage_frame', 0x503C7C),  # stage_doors.c (+ stage_cannon.c tick)
+    ('stage_kobj_bcast', 0x500D18),  # quest-start KowareObj command 0: held in the alias's areas (stage_alias.c)
     ('stage_cannon_ready', 0x503B88), ('stage_dragonator_post', 0x503A5C), ('stage_cannon_shot', 0x46365C),
     ('stage_shell_dtor', 0x4A18B4), ('stage_kobj_extra', 0x4FDF7C), ('stage_cleanup', 0x4FF074),  # stage_cannon.c
     ('item_data_loaded', 0x19237C),  # rItemData load exit (r4 = this): Gogmazios materials in DUMMY items (items.c)
@@ -103,6 +105,12 @@ HOOKS = [
     ('em067_01_end7', 0xCA10C),    # (em067_01_moves.c)
     ('em067_01_amove', 0x8F004),   # area move setup / transfer: Tigerstripe log lines (em067_01_diag.c)
     ('em067_01_atransfer', 0xB5D6C),
+    ('dala_dmg_end', 0x98E44),     # enemy damage update 0x97ddc, after the rage add, before the reaction dispatcher
+                                   # (r0 = this): Dalamadur tail rage -> head, shared reactions (dala_react.c)
+    ('dala_heat_zone', 0x6A160),   # (mgr, area, pos) heat-aura zone test (Teostra only): 1 inside the Dalamadur
+                                   # head's zone (dala_head25.c)
+    ('dala_map_pos', 0xC09C8),     # (out, obj) object position getter: the map icon loop's call (lr 0x61a110) gets
+                                   # the Dalamadur halves' 4U icon joints (dala_head25.c)
 ]
 # weapon / sharpness table load exits (gear.c GEAR_HOOK wrappers, out/gear_hooks.inc), "name 0xSITE", written by
 # monsters/gogmazios/tools/gear_weapons_em089.py (gu_class finds and checks each class's site)
@@ -282,12 +290,34 @@ def monsters_c():
     out.append('const struct port_monster port_monsters[] = {')
     port = {m['name']: k for k, m in enumerate(MONSTERS)}
     for m in MONSTERS:
-        q, s = (m.get('quests', []) + [0, 0])[:2], (m.get('quest_slots', []) + [0, 0])[:2]
-        out.append('    {"%s", 0x%x, %d, %d, 0x%x, %d, 0x%x, %d, %d, {%d, %d}, {%d, %d}, %s, %d},' % (
+        q, s = [(m.get(k, []) + [0] * QUESTS_PER_ENTRY)[:QUESTS_PER_ENTRY] for k in ('quests', 'quest_slots')]
+        sa, st = m.get('stage_alias', [0, 0]), stage_alias(m)
+        mr = st.get('maprec', []) + [[0, 0, 0]] * (4 - len(st.get('maprec', [])))
+        out.append('    {"%s", 0x%x, %d, %d, 0x%x, %d, 0x%x, %d, %d, {%s}, {%s}, %s, %d, '
+                   '%d, %d, 0x%x, 0x%x, %d, {%s}, {%s}, {%s}, %sf},' % (
             m['name'], m['em_id'], m['registry_index'], m['donor_index'], m.get('standin_id', 0), m['save_index'],
-            0x1064 + m['save_index'] - 105, m['name_entry'], m.get('notes_entry', 0), q[0], q[1], s[0], s[1],
-            '%s_register_class' % package(m)['code'] if m in own else '0', port.get(m.get('companion_of'), -1)))
+            0x1064 + m['save_index'] - 105, m['name_entry'], m.get('notes_entry', 0),
+            ', '.join('%d' % v for v in q), ', '.join('%d' % v for v in s),
+            '%s_register_class' % package(m)['code'] if m in own else '0', port.get(m.get('companion_of'), -1),
+            sa[0], sa[1], sum(1 << a for a in st.get('hold_kobj_areas', [])),
+            sum(1 << (k - 48) for k in st.get('kinds', [])), len(st.get('maprec', [])),
+            ', '.join('%rf' % float(r[0]) for r in mr), ', '.join('%d' % r[1] for r in mr),
+            ', '.join('%d' % r[2] for r in mr), repr(float(st.get('wholemap_k', 0)))))
     return '\n'.join(out + ['};']) + '\n'
+
+
+def stage_alias(m):
+    """package.toml [stage] of an entry with allocations.toml stage_alias (module/stage_alias.c): kinds = arc path kinds
+    redirected to the folder (49 mapUI, 54 map_com, 55 language map_com, 56 stage, 58 area), hold_kobj_areas = areas
+    whose KowareObjs keep GU's quest-start command 0 from playing, maprec = the area map records [k, x, y] per area
+    (with kind 49), wholemap_k = the whole-map record scale (with kind 55)"""
+    if 'stage_alias' not in m: return {}
+    st = package(m).get('stage')
+    if not st or not st.get('kinds'): sys.exit('%s: stage_alias needs package.toml [stage] kinds' % m['name'])
+    assert all(48 <= k < 80 for k in st['kinds']) and all(0 <= a < 8 for a in st.get('hold_kobj_areas', [])), st
+    assert (49 in st['kinds']) == bool(st.get('maprec')) and len(st.get('maprec', [])) <= 4, st
+    assert (55 in st['kinds']) == bool(st.get('wholemap_k')), st
+    return st
 
 OUT = os.path.join(HERE, 'out')
 EXTRA_DEFINES = ['-D' + d for d in os.environ.get('GOG_DEFINES', '').split()]
@@ -380,7 +410,7 @@ def main():
     mods = [os.path.join(paths.monster(p), 'module') for p in alloc.packages()]   # once per package
     incs = ['-I', OUT, '-I', HERE] + [a for d in mods for a in ('-I', d)]
     srcs = [os.path.join(HERE, f) for f in ('crt0.S', 'main.c', 'util.c', 'port.c', 'quest.c', 'items.c', 'gear.c',
-                                            'notes.c')]
+                                            'notes.c', 'stage_alias.c', 'bgm.c')]
     for d in mods:                                     # every registered monster's code, registry order
         srcs += sorted(glob.glob(os.path.join(d, '*.c')))
     srcs += [os.path.join(OUT, 'port_monsters.c'), os.path.join(OUT, 'tables.S')]

@@ -18,7 +18,7 @@ World -> map transform (notes/port-checklist.md "Arena 4", Map UI bullet):
     u = off.x + (x * scale + 20000 * 0.5) / 20000 * 128 (same for v with z) in pixels of the 128x128 map picture
     (layout pane map1 = atlas UV (0,0)-(0.5,1), 1:1). m19 = 0xeebfd4 -> records 0xeebb10.
   => GU (map / 2 + 64) == 4U (u, v) when the GU record holds the 4U scale and offsets and the GU texture is the 4U
-     picture at 2x: no re-fit needed. module/stage.c (stage_maprec) swaps the record while the alias runs.
+     picture at 2x: no re-fit needed. module/stage_alias.c (stage_maprec) swaps the record while the alias runs.
 
 Image: 4U atlas lyt\\quest\\m19\\m19aNN_ID left 128x128 at 2x (nearest). Exit labels: 4U glyphs (digits of the atlas
 top row, rects from ui299aNN; camp = 4U cmn_icon cell of pane uiNNN_camp) next to every exit of OUR converted SIS
@@ -48,7 +48,7 @@ LANGS = ('eng', 'fre', 'ger', 'ita', 'spa')
 AREAS = ((0, 0), (1, 1), (2, 3))        # alias area -> 4U m19 area (stage4u2gu.py alias: 0 -> 0, 1 -> 1, 3 -> 2)
 STAGE4U = 19
 MAPTAB4U = 0xeebe0c                     # 0x5a5f40 literal: 0x18-byte entries per 4U stage, +0xc = record array
-# keep in sync with module/stage.c MAPREC (checked by main())
+# = monsters/gogmazios/package.toml [stage] maprec, which the module applies (both checked by main())
 MAPREC = {0: (1.8, 17, 11), 1: (2.0, 0, -8), 2: (1.1, 0, -1)}
 GLYPH = {1: (128, 0, 8, 16), 2: (136, 0, 12, 16), 3: (148, 0, 12, 16)}   # ui299a00_1 / ui299a01_2 / ui299a00_3 UVs
 CAMP = (192, 127, 16, 16)               # ui299a01_camp UV (0.75, 0.248, 0.0625, 0.03125) on 4U cmn_icon 256x512
@@ -244,11 +244,11 @@ def gui_dump(path):
 # ---------------------------------------------------------------- whole map (map_com <lang>, kind 55)
 # Transform (C, tools/stage4u2gu.py "whole-map area offsets"): GU icon = (x + off) * 256 * k / 60000 HD px from the
 # texture centre (0x61bde8, dims[26] 0x5058d0), 4U u = (x + off + 20000) / 40000 * 128 px of m19d_ID (0xb832ac, W from
-# 0x6596dc). Offsets = 4U's (m28.arc, stage4u2gu.py alias) and k = 60000 / 40000 (module/stage.c stage_wholerec) ->
+# 0x6596dc). Offsets = 4U's (m28.arc, stage4u2gu.py alias) and k = 60000 / 40000 (module/stage_alias.c) ->
 # GU icon = 2 * (u - 64): texture = m19d_ID at 2x, no fit. GUI map26dn: the Fortress area highlights area01 / area02
 # take 4U's ui269_area01 / ui269_area03 panes (alias areas 1 / 2), the fort HP icon players go off-screen.
 WMAP_W4U, WMAP_WGU = 40000, 60000       # 4U 0x6596dc (W passed to 0x6c2ac8), GU dims[26] (0x5058d0)
-WMAP_K = WMAP_WGU / WMAP_W4U            # keep in sync with module/stage.c WHOLEREC_K
+WMAP_K = WMAP_WGU / WMAP_W4U            # = monsters/gogmazios/package.toml [stage] wholemap_k (checked by main())
 WMAP_PANES = {1: 1, 2: 3}               # alias area -> 4U ui269_areaNN (GU GUI instance areaNN = alias area)
 # area labels baked into m19d_ID (4U numbering), as on the area maps: the arena's '3' -> the '2' glyph, the '2' of 4U a02
 # (area dropped by the alias, its piece stays as a passage) erased. Seed boxes of the white digit pixels (4U px).
@@ -393,9 +393,12 @@ def blank_like(t):
 
 def main(preview=None):
     r4 = rec4u()
+    import tomllib
+    st = tomllib.load(open(os.path.join(paths.monster('gogmazios'), 'package.toml'), 'rb'))['stage']
     for alias, a4 in AREAS:
         got = (round(r4[a4][0], 4), r4[a4][1], r4[a4][2])
-        assert got == MAPREC[alias], ('4U record differs from MAPREC / stage.c', alias, got)
+        assert got == MAPREC[alias] == tuple(st['maprec'][alias]), ('4U record / MAPREC / package.toml', alias, got)
+    assert st['wholemap_k'] == WMAP_K, ('package.toml wholemap_k', st['wholemap_k'], WMAP_K)
     from romfs import RomFS
     rf = RomFS(GU_ROMFS)
     for alias, a4 in AREAS:

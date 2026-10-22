@@ -42,6 +42,7 @@ import arcpack
 import tex as texlib
 
 U4 = os.path.join(ROOT, 'dump', 'm19_unpacked')
+U4_MAIN = 'm19'         # u4_find searches this unpacked arc first (the stage-wide 4U arc)
 GUX = os.path.join(ROOT, 'dump', 'gu_stage', 'nativeNX')
 GUU = os.path.join(ROOT, 'dump', 'gu_stage', 'unpacked')
 CACHE = os.path.join(ROOT, 'dump', 'stage_cache')        # converted textures (slow to encode)
@@ -461,12 +462,19 @@ def port_filter(gu, u4d):
 _U4IDX = None
 
 
+def set_source(u4dir, main):
+    """use another 4U stage (its arcs unpacked in u4dir/<arc>/, main = the stage-wide arc) for u4_find /
+    convert_texture (monsters/dalamadur/tools/build_speartip.py: dump/m08_unpacked, 'm08')"""
+    global U4, U4_MAIN, _U4IDX, _TEX4
+    U4, U4_MAIN, _U4IDX, _TEX4 = u4dir, main, None, None
+
+
 def u4_find(path, typ):
-    """bytes of a 4U resource by arc path + type, searched over the unpacked m19 arcs (m19.arc first)."""
+    """bytes of a 4U resource by arc path + type, searched over the unpacked stage arcs (U4_MAIN first)."""
     global _U4IDX
     if _U4IDX is None:
         _U4IDX = {}
-        for arc in ['m19'] + sorted(a for a in os.listdir(U4) if a != 'm19'):
+        for arc in [U4_MAIN] + sorted(a for a in os.listdir(U4) if a != U4_MAIN):
             for dp, _, fs in os.walk(os.path.join(U4, arc)):
                 for f in fs:
                     if '.' not in f or f.startswith('_'): continue
@@ -671,7 +679,7 @@ def convert_sis(area4):
 # k = whole-map record +0x34 / +0x38 (0x61b940; stage 26 = 0x1635b5c: 1.0, f3c / f40 = 0). Checked: Fortress SIS land on
 # the Fortress art. 4U (C): m19 stage class setup 0x6596dc -> 0x6c2ac8(W = 40000, records 0xdee2b4, 4 x 24 B {s32 x,
 # s32 z, ...}); icons 0xb832ac: u = (x + off.x + W / 2) / W * 128 px of m19d_ID (checked: 4U SIS land on m19d_ID).
-# -> offsets = 4U's here; module/stage.c (stage_wholerec) sets k = 60000 / 40000 and tools/mapui4u2gu.py draws the
+# -> offsets = 4U's here; module/stage_alias.c (stage_wholerec) sets k = 60000 / 40000 and tools/mapui4u2gu.py draws the
 # 4U picture at 2x, so GU icon = 2 * (4U u - 64). The other record fields (Fortress' gameplay flags) stay.
 T_WMAP = 0x6ff78212
 WMAP_4U = 0xdee2b4                    # 4U v1.1 whole-map records (24 B), m19 = 4U areas a00..a03
@@ -1017,8 +1025,9 @@ CANNONS_KOWARE = [('stage\\m26d\\m26a02d\\sdl\\m26a02d-k04', 'stage\\m19d\\m19a0
                   ('stage\\m26d\\m26a03d\\sdl\\m26a03d-k01', 'stage\\m19d\\m19a03d\\sdl\\m19a03d-s04', 5, 1)]
 
 
-def convert_kobj(path4, mid, n_se):
-    """4U arena KowareObj scheduler -> GU (Effect controller dropped, kowareModel Draw 1, SE area 3 -> 2)."""
+def convert_kobj(path4, mid, n_se, se_area=(3, 2)):
+    """4U arena KowareObj scheduler -> GU (Effect controller dropped, kowareModel Draw 1, SE area se_area[0] -> [1]:
+    Battlequarters 3 -> 2; n_se = number of SoundControl area tracks)."""
     import sdl
     new = sdl.convert_4u(u4_find(path4, T_SDL), drop_ctrl=lambda c, n: c == EFFECT_CTRL, drop_keyless=True)
     s = sdl.parse(new)
@@ -1034,8 +1043,8 @@ def convert_kobj(path4, mid, n_se):
         if e['kind'] == 3: ctrl = e['x']
         elif e['kind'] in (1, 2, 4): ctrl = None
         elif ctrl == SOUND_CTRL and e['name'] == 'mSdlSeReqArea' and e['times'] is not None:
-            assert sdl.values(s, e) == [3] * len(e['times'])
-            sdl.set_values(s, e, [2] * len(e['times'])); areas += 1
+            assert sdl.values(s, e) == [se_area[0]] * len(e['times'])
+            sdl.set_values(s, e, [se_area[1]] * len(e['times'])); areas += 1
     assert areas == n_se, (path4, areas)
     return sdl.build(s)
 

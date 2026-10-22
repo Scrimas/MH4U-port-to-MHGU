@@ -55,6 +55,18 @@ int em067_01_act_c(uint32_t *regs)
     void *self = (void *)regs[R0];
     if (FIELD(uint16_t, self, EN_ID) != TIGERSTRIPE_ZAMTRIOS_EM_ID) return 0;
     em067_01_shell016_tick(self);                 /* the 7/70 blast's end effect (em067_01_shell016.c) */
+#ifdef TEST_HP_PCT
+    {   /* test builds: start at TEST_HP_PCT % of max HP once (as Gogmazios' em089_act.c) */
+        static void *s_hp_set;
+        uint8_t *rec = FIELD(uint8_t *, self, EN_RECORD);
+        int32_t hp = FIELD(int32_t, rec, REC_HP), mx = FIELD(int32_t, rec, REC_HP + 4);
+        if (s_hp_set != self && mx > 0 && hp == mx) {
+            s_hp_set = self;
+            FIELD(int32_t, rec, REC_HP) = mx * TEST_HP_PCT / 100;
+            logf("tzport: em067_01 test HP %d / %d", mx * TEST_HP_PCT / 100, mx);
+        }
+    }
+#endif
     if (s_lines >= MAX_LINES) return 0;
     if (!s_self) {
         s_self = self;

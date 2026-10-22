@@ -103,6 +103,16 @@ def rem_4u(q, row, gu_item):
             ents.append([gu, count, chance])
         off += 6
     max(ents, key=lambda e: e[2])[2] += lost
+    # a 4U row above 100 % (event m60213 row A: 102): read as rolled out of 100 down the list (G: 4U's roll not
+    # traced), so what lies past 100 is cut, entries past it are unreachable and left out
+    over, kept = sum(e[2] for e in ents) - 100, []
+    if over > 0:
+        print('reward row %#x: 4U chances total %d %%, the last %d %% cut (rolled out of 100, G)' % (row, 100 + over,
+                                                                                                    over))
+        for e in ents:
+            e[2] = min(e[2], 100 - sum(k[2] for k in kept))
+            if e[2]: kept.append(e)
+        ents = kept
     assert sum(e[2] for e in ents) == 100 and len(ents) <= 40, ents
     body = b''.join(struct.pack('<HBB', *e) for e in ents)
     d = struct.pack('<fI', 1.0, 1) + bytes([1, len(ents)]) + bytes(14) + body + struct.pack('<HBB', 0, 0, 0xFF)

@@ -2,7 +2,7 @@
 object inside the emulated game (GU loader -> edit -> GU writer, tools/guemu.py). Run with the scratch venv.
 
   dt_convert.py validate                 rebuild GU Teostra and Rathian from 4U data with Kushala as donor, diff
-  dt_convert.py build EMNNN DONOR OUTDIR
+  dt_convert.py build EMNNN DONOR OUTDIR [--sensor]    (--sensor: also the RECORDS tables, the 4U sensor)
 
 Only mappings that a vote over the 40 monsters present in both games supports (tools/dt_vote.py, dump/dtmap/)
 are applied; everything else stays the donor's. Rules: (object field, 4U file, header word or offset, size rule).
@@ -51,6 +51,12 @@ BLOCKS = {
                0xB8: ('etd', 25, 14, None, 0),   # 32/40 (first 14 bytes of the 4U block)
                0xC8: ('etd', 29, 'gap', 0xFF, 24)},  # 23/40 exact, GU size == 4U gap: the 24-byte part table
 }
+# record tables (opt-in, build --sensor): object pointer field -> (4U file, header word, 4U record size, count field,
+# GU record size); the 4U records end at an s32 0xffff. 0x78 = the sensor ("eye") table GU 0x71144 reads at index
+# ai+0x249 (sensor 0xc3144: near radius = auto notice): GU record = the 4U record with two u16 (eye angle offsets, 0 in
+# every GU file) after the s32 joint; over the 64 records of the shared monsters joint 63 and range 61 are equal, near /
+# angles partly retuned by GU. Not in the vote (record size differs). Opt-in so the files built before stay as they are.
+RECORDS = {'dttune': {0x78: ('etd', 9, 28, 0xF9, 32)}}
 
 
 def ptrs_of(u):
@@ -66,9 +72,26 @@ def emdata4u_ptrs(u):
     return out
 
 
-def convert(kind, donor_bytes, d4, log=None):
+def convert(kind, donor_bytes, d4, log=None, records=False):
     loader, vt, reset = gu_schema.KINDS[kind]
     applied = []
+
+    def modify_records(uc, st):
+        for off, (fk, w, size4, cnt, size) in RECORDS.get(kind, {}).items():
+            u = d4[fk]; p = emdata4u_ptrs(u).get(w)
+            cur = struct.unpack_from('<I', bytes(uc.mem_read(guemu.OBJ + off, 4)))[0]
+            if p is None or not cur:
+                applied.append('records +%#x kept (4U word %d %s, donor %s)' % (
+                    off, w, 'absent' if p is None else 'ok', 'has it' if cur else 'lacks it'))
+                continue
+            recs = []
+            while p + size4 <= len(u) and struct.unpack_from('<i', u, p)[0] != 0xffff:
+                recs.append(u[p:p + 4] + bytes(size - size4) + u[p + 4:p + size4]); p += size4
+            new = st['alloc'](max(1, len(recs)) * size)
+            uc.mem_write(new, b''.join(recs))
+            uc.mem_write(guemu.OBJ + off, struct.pack('<I', new))
+            uc.mem_write(guemu.OBJ + cnt, bytes([len(recs)]))
+            applied.append('records +%#x <- %s word %d (%d x %d bytes, count +%#x)' % (off, fk, w, len(recs), size, cnt))
 
     def modify(uc, st):
         obj = guemu.OBJ
@@ -98,6 +121,8 @@ def convert(kind, donor_bytes, d4, log=None):
             uc.mem_write(obj + off, struct.pack('<I', new))
             applied.append('block +%#x <- %s word %d (%d bytes%s)' % (off, fk, w, n,
                                                                       ', count +%#x = %d' % (cnt, n // esz) if cnt is not None else ''))
+        if records:
+            modify_records(uc, st)
     out, err = guemu.load_modify_write(loader, WRITER[kind], vt, donor_bytes, modify,
                                        alloc=gu_schema.ALLOC, skip={reset})
     if log is not None: log.extend(applied)
@@ -130,6 +155,6 @@ if __name__ == '__main__':
         d4 = emdata4u.load_4u(sys.argv[2]); os.makedirs(sys.argv[4], exist_ok=True)
         for kind in ('dtbase', 'dttune'):
             log = []
-            out = convert(kind, gu_file(rom, sys.argv[3], kind), d4, log)
+            out = convert(kind, gu_file(rom, sys.argv[3], kind), d4, log, records='--sensor' in sys.argv[5:])
             open(os.path.join(sys.argv[4], kind + '.bin'), 'wb').write(out)
             print(kind, len(out), 'bytes'); [print('   ', l) for l in log]

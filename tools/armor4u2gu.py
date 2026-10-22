@@ -214,16 +214,21 @@ def convert(src, idx, ctc=True, xfs_from=354, edges=True, log=print):
         key = 'arm_%s_%d' % (t['gu'][0].split('/')[-2] + t['gu'][0].split('/')[-1], t['gu'][2])
         mrl_build.TEMPLATES[key] = t['gu']
         p4 = {p[0]: r4['textures'][p[2] - 1][1] for p in m['params'] if p[1] == 3 and p[2]}
-        alb = p4['tAlbedoMap']
+        alb = p4.get('tAlbedoMap')
         # template: does its tSpecularMap use the albedo itself or the albedo's BM+A?
         gd = rom().read(t['gu'][0])
         gm = mrl.read([d for p, th, d in entries(gd) if th == T_MRL][0])
         gmat = gm['mats'][t['gu'][2]]
         gs = {p[0]: p[2] for p in gmat['params'] if p[1] == 3}
         spec_plusA = 'tSpecularMap' in gs and gm['textures'][gs['tSpecularMap'] - 1][1].endswith('+A')
-        slots = {'tAlbedoMap': ti(alb),
-                 'tSpecularMap': ti(alb + '+A') if spec_plusA and alb + '+A' in tpath else ti(alb)}
-        if 'tSphereMap' in gs:
+        if alb is None:      # no 4U texture at all (3 materials in 5395 4U armor arcs, C): every slot null, as
+            # Capcom's only converted case, GU m/008/leg skin material (tAlbedoMap / tSpecularMap 0)
+            slots = dict({s: 0 for s in gs}, tAlbedoMap=0)
+            log('  %s: no 4U albedo, null texture slots (as GU m/008/leg)' % names[m['name']])
+        else:
+            slots = {'tAlbedoMap': ti(alb),
+                     'tSpecularMap': ti(alb + '+A') if spec_plusA and alb + '+A' in tpath else ti(alb)}
+        if 'tSphereMap' in gs and alb is not None:
             if 'tExtendMap' not in p4: raise SystemExit('template %s has a sphere map, 4U material none' % key)
             slots['tSphereMap'] = ti(p4['tExtendMap'])
         other = set(gs) - set(slots)
@@ -265,7 +270,8 @@ def check(path):
         elif th == T_MRL:
             r = mrl.read(d)
             miss = [t for th2, t in r['textures'] if th2 and (t, T_TEX) not in paths]
-            bad = [(hex(m['name']), q) for m in r['mats'] for q in m['params'] if q[1] == 3 and not 1 <= q[2] <= len(r['textures'])]
+            bad = [(hex(m['name']), q) for m in r['mats'] for q in m['params']    # 0 = no texture (GU m/008/leg)
+                   if q[1] == 3 and not 0 <= q[2] <= len(r['textures'])]
             info = 'v%#x %d materials, %d textures, missing in arc %s, bad indices %s' % (r['version'], len(r['mats']), len(r['textures']), miss, bad)
             ok &= not miss and not bad
         elif th == T_MOD:

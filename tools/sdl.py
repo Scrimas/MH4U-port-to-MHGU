@@ -159,6 +159,38 @@ def clone_object(s, src, name, model=None, pos=None):
     return new
 
 
+def remove_objects(s, pred):
+    """drop the kind-2 objects with pred(class_hash, name) True, with their tracks and arrays, from a parsed scheduler
+    (either version); an object whose classref track names a dropped object goes too (GU MaterialControl mpTarget ->
+    its model). Track / array parents and classref values are renumbered. Returns the dropped object names."""
+    ents, cref = s['ents'], CREF_KIND[s['ver']]
+    owner = {}
+    for i, e in enumerate(ents):
+        if e['kind'] == 2: owner[i] = i
+        elif e['kind'] in (1, 3, 4): owner[i] = None
+        else: owner[i] = owner.get(e['parent'])
+    drop = {i for i, e in enumerate(ents) if e['kind'] == 2 and pred(e['x'], e['name'])}
+    while True:
+        more = {owner[i] for i, e in enumerate(ents) if e['kind'] == cref and e['values'] is not None and
+                owner[i] is not None and owner[i] not in drop and
+                set(struct.unpack_from('<%dI' % len(e['times']), e['values'])) & drop}
+        if not more: break
+        drop |= more
+    keep = [i not in drop and owner[i] not in drop for i in range(len(ents))]
+    new_idx = {i: j for j, i in enumerate(i for i, k in enumerate(keep) if k)}
+    out = []
+    for i, e in enumerate(ents):
+        if not keep[i]: continue
+        e = dict(e)
+        if e['kind'] not in (1, 2, 3, 4): e['parent'] = new_idx[e['parent']]
+        if e['kind'] == cref and e['values'] is not None:
+            w = struct.unpack_from('<%dI' % len(e['times']), e['values'])
+            e['values'] = struct.pack('<%dI' % len(w), *[new_idx[v] if v else 0 for v in w])
+        out.append(e)
+    s['ents'] = out
+    return [ents[i]['name'] for i in sorted(drop)]
+
+
 def resource_paths(s):
     return sorted({v for e in s['ents'] if e['kind'] == RES_KIND[s['ver']] and e['values'] is not None
                    for v in values(s, e) if v})

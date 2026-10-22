@@ -11,9 +11,12 @@ spec = dict(name=allocations.toml name, materials=items4u.Materials, classes=[cl
 mElement}, kire_4u=[4U sharpness entries, in append order], pwl_fix=[(path suffix, model, GU value, ours)],
 substitutes={4U item name: GU item name}); class spec = dict(nn=GU class, ids4u=(create weapon, then each upgrade of
 the previous one), standin=GU weapon ID whose records are copied, recipes=optional expected [{item name: count}],
-ammo={4U id: ammo string} (bowguns), bow=dict(kyoku, tame, bottles, cshot={4U id: expected charge shots}),
-hh=(4U note set, GU fueMusicData), insect=GU mInsectType, srqr=sound set (default the model number: the 4U arc's
-own sounds converted by tools/wsnd4u2gu.py; a 4U arc holding another weapon's set uses GU's arc of that number)).
+ammo={4U id: ammo string} (bowguns, optional: default the 4U record's, a given string must equal it),
+bow=dict(kyoku, tame, bottles, cshot={4U id: expected charge shots}; each optional: kyoku None / absent = the
+stand-in's (not in the 4U record), bottles default the 4U record's coatings, tame / cshot given = checked against the
+record), hh=(4U note set, GU fueMusicData) (optional: default the 4U set's own index, the two tables being equal),
+insect=GU mInsectType, srqr=sound set (default the model number: the 4U arc's own sounds converted by
+tools/wsnd4u2gu.py; a 4U arc holding another weapon's set uses GU's arc of that number)).
 
 Sources:
   - GU base RomFS tables (loc/arc/resident.arc, arc/facility/blacksmith.arc, <lang>/arc/resident_<lang>.arc).
@@ -23,7 +26,18 @@ Sources:
   - 4U v1.1 exe (dump/exefs_v11/mem.bin @0x100000): weapon records via the equipment pointer table 0xf58868 (melee
     24 B, bow / bowguns 40 B), sharpness table 0xf581e4 (7 cumulative u16), create recipes 0xf3f000.. (24 B), upgrade
     recipes via the pointer table 0xf56974 (24 B per weapon ID: 4 x {u16 item, u16 count}), IG upgrades 0xf569a8
-    (12 B per ID: u16 ID, u16 kinsect level, 2 x {item, count}). Names: core_common <Class>Name_<lang>.
+    (12 B per ID: u16 ID, u16 kinsect level, 2 x {item, count}; ID and level 0 on a G weapon upgraded from an HR
+    one: Metalmangler+ 97, Self-possession 100). Names: core_common <Class>Name_<lang>.
+  - 4U fields read by vote over the 4U / GU weapons of the same English name (C = the 4U value on (nearly) every
+    pair, S = on most, GU retuned the rest): 40-B records +14 defense (C), +15 bow charge levels = mTameDankai (C),
+    bow +18 / +19 element, +20 / +21 status (type, s8 value: as melee +12..+15; S), bow +32 u32 coatings (S, bit 1
+    Power, 2 Poison, 3 Para, 4 Sleep, 5 C.Range, 6 Paint, 7 Exhaust, 8 Blast; bits 9..15 unknown), bowgun +5
+    deviation = GU mBure (C, kept from the stand-in like recoil / reload), +7 ammo record index into the 39-B count
+    records AMMO_4U (one per bowgun; code literals 0x282368 / 0x28236c) and +32 40-bit loadable mask (C: decodes
+    Gogmazios' kiranico ammo exactly); melee +17 SA / CB phial = GU mBinType (S), GL (level - 1) * 3 + type =
+    GU mShootType / mShootLevel + 1 (S), HH note set = an index into NOTES_4U, byte-equal to GU fueMusicData (C;
+    identity on most HH pairs). 4U elements +12 1..5 (fire, water, thunder, dragon, ice) = GU mElement 1..5 (C).
+    Bow arc shot: not in the 40-B record (searched; G: another table).
 Rules (notes section 8; port choices made for Gogmazios, kept for every monster):
   - IDs: a monster's weapons follow GU's and the earlier monsters' (allocations.toml [monster.append.weapons]); each
     line is its own tree: the first weapon from its create recipe, each next one an upgrade of the previous one.
@@ -33,13 +47,14 @@ Rules (notes section 8; port choices made for Gogmazios, kept for every monster)
   - mModelID = mSrqrNo = the 4U record's model number (GU kept 4U's numbers; arcs from tools/weapon4u2gu.py, sounds
     from tools/wsnd4u2gu.py); mSndMaterial 1; mRare = 4U rarity - 1; mPrice = the 4U price; mPriceChangeLv 0,
     mColorIndex 0, mNamed 0, mSpecialSkill 0, mSortID = after GU's and the earlier monsters'.
-  - Status: the 4U value (value / 10 in both games), hidden (negative, needs Awaken) made visible (GU has no Awaken).
+  - Element / status (melee and bows): the 4U value (value / 10 in both games), hidden (negative, needs Awaken)
+    made visible (GU has no Awaken); statuses through spec status, a weapon with both: refused.
   - Sharpness: the monster's 4U entries appended to kireajiData; mKireLevel = 2 x the 4U level.
   - Recipes: the 4U exe's, items by English name in GU itemData_eng (our materials included; spec substitutes for 4U
     items GU lacks); create: mLv 1, mKey[0] 2, no provision, no scraps; process: one level-1 record per weapon,
     all-zero for a create weapon, no provision, no scraps.
-  - Bowguns: ammo from the spec in section 2's slot order (n -> count n enabled, (n) -> count n disabled); kept from
-    the stand-in (logged): special ammo, rapid / crouch fire, recoil, reload, deviation, slot 32.
+  - Bowguns: ammo in section 2's slot order (n -> count n enabled, (n) -> count n disabled), from the 4U record
+    (ammo_4u); kept from the stand-in (logged): special ammo, rapid / crouch fire, recoil, reload, deviation, slot 32.
   - Names: A = B = C = the 4U name; descriptions: 4U's (EXP_4U index tables; create and upgrade share one in 4U).
 """
 import os, re, struct, sys, pickle
@@ -57,6 +72,15 @@ PCREFS = os.path.join(paths.ROOT, 'dump/gu_pcrefs.pkl')
 
 PTAB_4U, KIRE_4U, UPGRADE_4U, IG_UPGRADE_4U = 0xf58868, 0xf581e4, 0xf56974, 0xf569a8
 CREATE_4U = (0xf3f000, 0xf55400)
+AMMO_4U = {6: 0xfb2bf4, 4: 0xfb4739}     # bowgun ammo count records (39 B: 4U ammo index -> clip size), per class
+NOTES_4U = 0xf31da4                      # HH note sets, 50 x 3 colours (= GU table\fueMusicData)
+ELEMENT_4U = {1: 1, 2: 2, 3: 3, 4: 4, 5: 5}   # 4U element -> GU mElement (fire, water, thunder, dragon, ice)
+# 4U ammo index -> GU ammo slot (section 2): 0..19 the same (Normal .. Dragon), 20 none (Slicing, G), 21..30 -> 20..29
+# (Poison .. Recover), 31 / 32 none (G: Demon / Armor), 33 / 34 -> 30 / 31 (Paint / Tranq; order G, both 2 everywhere)
+AMMO_SLOT = dict([(k, k) for k in range(20)] + [(k, k - 1) for k in range(21, 31)] + [(33, 30), (34, 31)])
+# bow coating mask bit -> GU mLoadEnableBottle indexes (4U Power = GU Power Lv1 + Lv2, as the Gogmazios / Tigerstripe
+# specs; [2] / [3] element coatings: GU only; [11]: set on every GU row)
+COATING_4U = {1: (0, 1), 2: (5,), 3: (6,), 4: (7,), 5: (4,), 6: (10,), 7: (8,), 8: (9,)}
 SND_MATERIAL = 1
 # GU NN -> short name, 4U text class, 4U equipment pointer-table index, 4U create-recipe type
 CLASS_INFO = {0: ('GS', 'Lsword', 0, 7), 1: ('SnS', 'Sword', 1, 8), 2: ('Hammer', 'Hammer', 2, 9),
@@ -147,17 +171,53 @@ def u32(exe, a):
 
 
 def weapon_4u(exe, nn, ptab, i):
+    s8 = lambda r, k: struct.unpack_from('b', r, k)[0]
     if nn in (4, 6, 10):
         r = exe[u32(exe, PTAB_4U + 4 * ptab) - EXE_BASE + 40 * i:][:40]
-        return dict(model=struct.unpack_from('<H', r, 0)[0], rare=r[4] + 1, price=struct.unpack_from('<I', r, 8)[0],
-                    raw=struct.unpack_from('<H', r, 12)[0], slots=r[16], aff=struct.unpack_from('b', r, 17)[0],
-                    defense=0, charges=tuple(r[22:26]))
+        w = dict(model=struct.unpack_from('<H', r, 0)[0], rare=r[4] + 1, price=struct.unpack_from('<I', r, 8)[0],
+                 raw=struct.unpack_from('<H', r, 12)[0], slots=r[16], aff=s8(r, 17), defense=r[14],
+                 charges=tuple(r[22:26]), elem=0, elem_value=0, status=0, value=0)
+        if nn == 10:
+            w.update(elem=r[18], elem_value=s8(r, 19), status=r[20], value=s8(r, 21), tame=r[15],
+                     coatings=struct.unpack_from('<I', r, 32)[0])
+        else:
+            w.update(bure=r[5], ammo=exe[AMMO_4U[nn] - EXE_BASE + 39 * r[7]:][:39],
+                     loadable=int.from_bytes(r[32:37], 'little'))
+        return w
     r = exe[u32(exe, PTAB_4U + 4 * ptab) - EXE_BASE + 24 * i:][:24]
-    w = dict(model=struct.unpack_from('<H', r, 0)[0], sharp=r[2], kire=r[3], price=struct.unpack_from('<I', r, 4)[0],
-             raw=struct.unpack_from('<H', r, 8)[0], defense=r[10], aff=struct.unpack_from('b', r, 11)[0],
-             elem=r[12], status=r[14], value=struct.unpack_from('b', r, 15)[0], slots=r[16], extra=r[17], rare=r[19] + 1)
-    assert w['elem'] == 0, w                             # 4U elements: not mapped yet (status weapons only)
-    return w
+    return dict(model=struct.unpack_from('<H', r, 0)[0], sharp=r[2], kire=r[3], price=struct.unpack_from('<I', r, 4)[0],
+                raw=struct.unpack_from('<H', r, 8)[0], defense=r[10], aff=s8(r, 11), elem=r[12], elem_value=s8(r, 13),
+                status=r[14], value=s8(r, 15), slots=r[16], extra=r[17], rare=r[19] + 1)
+
+
+def elem_status(w, status):
+    """(GU mElement, value / 10) of a 4U record: its element, else its status (spec status: 4U -> GU), else none"""
+    if w['elem'] and w['status']:
+        sys.exit('4U weapon with element %d and status %d: not supported' % (w['elem'], w['status']))
+    if w['elem']:
+        return ELEMENT_4U[w['elem']], abs(w['elem_value'])
+    if w['status']:
+        return status[w['status']], abs(w['value'])
+    return 0, 0
+
+
+def ammo_4u(w):
+    """bowgun ammo string (spec format, GU slots 0..31) of a 4U record + [4U ammo indexes loadable without a GU slot]:
+    a loadable ammo = its count; one that is not: (count) on slots 0..14, 0 on 15..31 (as GU zeroes those, S)"""
+    out = ['0'] * 32
+    for k, s in AMMO_SLOT.items():
+        n = w['ammo'][k]
+        out[s] = '%d' % n if (w['loadable'] >> k) & 1 else '(%d)' % n if s < 15 and n else '0'
+    return ' '.join(out), [k for k in range(39) if k not in AMMO_SLOT and (w['loadable'] >> k) & 1]
+
+
+def bottles_4u(mask):
+    """GU mLoadEnableBottle[12] of a 4U bow coating mask (COATING_4U; [11] = 1)"""
+    out = [0] * 11 + [1]
+    for bit, slots in COATING_4U.items():
+        for s in slots:
+            if (mask >> bit) & 1: out[s] = 1
+    return tuple(out)
 
 
 def recipes_4u(exe, t4, ctype, ids4u, nn):
@@ -172,7 +232,7 @@ def recipes_4u(exe, t4, ctype, ids4u, nn):
     for i in ids4u[1:]:
         if nn == 13:
             r = struct.unpack_from('<6H', exe, IG_UPGRADE_4U + 12 * i - EXE_BASE)
-            assert r[0] == i, r
+            assert r[0] in (i, 0), r                     # 0: a G weapon upgraded from an HR one
             out.append(name(zip(r[2::2], r[3::2])))
         else:
             v = struct.unpack_from('<8H', exe, u32(exe, UPGRADE_4U + 4 * (ctype - 7)) + 24 * i - EXE_BASE)
@@ -304,9 +364,18 @@ def build(spec):
             r.update(mIndex=ln + off + len(lout), mNo=ids[k], mLevel=1, mAttack=w['raw'], mDefense=w['defense'],
                      mAffinity=w['aff'] & 0xff, mSlotCount=w['slots'])
             if nn in (4, 6):
-                for s, tok in enumerate(cs['ammo'][i4].split()):
+                ammo, no_slot = ammo_4u(w)
+                if i4 in cs.get('ammo', {}) and cs['ammo'][i4] != ammo:
+                    sys.exit('%s %d: spec ammo %s != the 4U record\'s %s' % (short, i4, cs['ammo'][i4], ammo))
+                for s, tok in enumerate(ammo.split()):
                     r['mLoadShellCount[%d]' % s] = int(tok.strip('()'))
                     r['mLoadEnableShell[%d]' % s] = int(tok != '0' and not tok.startswith('('))
+                if no_slot:
+                    log.append('%s %d %s: loadable 4U ammo without a GU slot (4U index: count) %s: left out' % (
+                        short, ids[k], t4['eng'][txt + 'Name'][i4], ['%d: %d' % (a, w['ammo'][a]) for a in no_slot]))
+                if w['bure'] != r['mBure']:
+                    log.append('%s %d %s: 4U deviation %d, the stand-in\'s mBure %d kept' % (
+                        short, ids[k], t4['eng'][txt + 'Name'][i4], w['bure'], r['mBure']))
                 fire = 'mDownShot' if nn == 4 else 'mQuickShot'
                 log.append('%s %d %s: kept from the stand-in (ID %d Lv%d): mRecoil %d, mReloadSpeed %d, mBure %d, '
                            '%s %s, special ammo (shell, have, count) %s, ammo slot 32 (%d, %d)' % (
@@ -317,15 +386,24 @@ def build(spec):
                                r['mLoadShellCount[32]'], r['mLoadEnableShell[32]']))
             elif nn == 10:
                 bow = cs['bow']
-                b['mElement'] = 0                                # no element / status decoded for 4U bows
-                cshot = tuple(c + 1 for c in w['charges'])      # 4U Rapid n = n - 1, Spread n = n + 4 -> GU + 1 (G)
-                assert cshot == bow['cshot'][i4], (i4, cshot)
-                r.update(mElementValue=0, mKyoku=bow['kyoku'], mTameDankai=bow['tame'])
+                b['mElement'], val = elem_status(w, status)
+                cshot = tuple(c + 1 for c in w['charges'])      # 4U Rapid n = n - 1, Spread n + 4, Pierce n + 9 -> GU + 1 (S)
+                assert i4 not in bow.get('cshot', {}) or cshot == bow['cshot'][i4], (i4, cshot)
+                assert bow.get('tame', w['tame']) == w['tame'], (i4, w['tame'])
+                r.update(mElementValue=val, mTameDankai=w['tame'])
+                if bow.get('kyoku') is None:
+                    log.append('%s %d %s: arc shot not in the 4U record: the stand-in\'s mKyoku %d kept' % (
+                        short, ids[k], t4['eng'][txt + 'Name'][i4], r['mKyoku']))
+                else:
+                    r['mKyoku'] = bow['kyoku']
+                bottles = bow.get('bottles') or bottles_4u(w['coatings'])
+                if w['coatings'] >> 9:
+                    log.append('%s %d %s: 4U coating mask %#x: bits from 9 unknown, ignored' % (
+                        short, ids[k], t4['eng'][txt + 'Name'][i4], w['coatings']))
                 for j in range(4): r['mCShotKind[%d]' % j] = cshot[j]
-                for j in range(12): r['mLoadEnableBottle[%d]' % j] = bow['bottles'][j]
+                for j in range(12): r['mLoadEnableBottle[%d]' % j] = bottles[j]
             else:
-                val = abs(w['value'])                            # 4U hidden (negative) -> visible
-                elem = status[w['status']]
+                elem, val = elem_status(w, status)               # 4U hidden (negative) -> visible
                 r.update(mKireType=kn + kire_4u.index(w['sharp']), mKireLevel=2 * w['kire'])
                 if nn == 11:
                     b.update(mElement1=elem, mElement2=0)
@@ -334,14 +412,17 @@ def build(spec):
                     b['mElement'] = elem
                     r['mElementValue'] = val
                 if nn in (8, 14):
-                    assert w['extra'] == 0, w                    # SA Power phial / CB Impact phial
-                    b['mBinType'], r['mBinElementValue'] = 0, 0
-                elif nn == 9:
-                    assert w['extra'] % 3 == 0, w                # 4U (level - 1) * 3 + type, type 0 Normal
-                    b['mShootType'], r['mShootLevel'] = 0, w['extra'] // 3
-                elif nn == 12:
+                    assert w['extra'] in (0, 1), w               # SA Power / Element phial, CB Impact / Element
+                    b['mBinType'], r['mBinElementValue'] = w['extra'], 0     # (types 2.. carry a value: not read)
+                elif nn == 9:                                    # 4U (level - 1) * 3 + type (Normal, Long, Wide)
+                    b['mShootType'], r['mShootLevel'] = w['extra'] % 3, w['extra'] // 3
+                elif nn == 12 and 'hh' in cs:
                     assert w['extra'] == cs['hh'][0], w
                     r['mFueMusicType'] = cs['hh'][1]
+                elif nn == 12:
+                    fue = res['table\\fueMusicData']
+                    assert exe[NOTES_4U - EXE_BASE:][:len(fue) - 8] == fue[8:] and w['extra'] < (len(fue) - 8) // 3
+                    r['mFueMusicType'] = w['extra']
                 elif nn == 13:
                     assert w['extra'] == 0, w                    # Cutting
                     b['mInsectType'] = cs['insect']

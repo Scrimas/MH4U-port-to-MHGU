@@ -10,16 +10,25 @@
 
 #define PORT_N ((int)PORT_MONSTER_COUNT)
 #define PORT_LANGS 5          /* eng fre ger ita spa: text order in every data section */
+#define PORT_QUESTS 4         /* quests per entry (module/build.py QUESTS_PER_ENTRY) */
 
 struct port_monster {
     const char *name;                     /* data file + log name */
     uint16_t em_id, index, donor_index, standin_id;   /* standin 0 = none */
     uint16_t save_index, save_id, name_entry, notes_entry;   /* notes_entry 0 = none (a companion) */
-    uint32_t quests[2], quest_slots[2];   /* 0 = none */
+    uint32_t quests[PORT_QUESTS], quest_slots[PORT_QUESTS];   /* 0 = none; quests[0] unlocks the Notes entry */
     void (*register_class)(void);         /* 0 = a GU class runs it (package.toml gu_class), or an earlier entry
                                              registered the same class */
     int owner;                            /* a companion (allocations.toml companion_of): its owner's port index;
                                              -1 = a monster. Companions spawn in their owner's quests */
+    uint8_t stage_from, stage_folder;     /* allocations.toml stage_alias: while its quests run, GU stage stage_from
+                                             loads folder m<stage_folder> (module/stage_alias.c); 0 = none */
+    uint8_t stage_hold;                   /* package.toml [stage] hold_kobj_areas: area bit mask */
+    uint32_t stage_kinds;                 /* package.toml [stage] kinds: arc path kinds redirected, bit kind - 48 */
+    uint8_t map_n;                        /* package.toml [stage] maprec: area map records {4U k, x, y} per area */
+    float map_k[4];
+    int16_t map_x[4], map_y[4];
+    float whole_k;                        /* package.toml [stage] wholemap_k: whole-map record scale */
 };
 #define PORT_OWNER(m) (port_monsters[m].owner >= 0 ? port_monsters[m].owner : (m))
 extern const struct port_monster port_monsters[];   /* out/port_monsters.c */
@@ -43,3 +52,15 @@ int port_quest_owner(uint32_t quest_id, int *which);
 int port_running_quest(int *which);       /* owner of the current quest if installed, else -1 */
 
 void notes_data_loaded(int m);            /* notes.c: the monster's Notes entry, after its data loaded */
+
+/* bgm.c: a monster's own battle theme (2 sequences of its own STQR), registered from its class registration */
+struct port_bgm {
+    const char *port, *name;              /* log prefix and monster name ("gogport", "em089") */
+    uint8_t em_types[4];                  /* em type bytes (em ID & 0xff) of its boss entries / units; 0 = unused */
+    uint8_t standins[2];                  /* stand-in em types answered while quest() holds; 0 = unused */
+    int (*quest)(void);                   /* nonzero while one of its quests runs */
+    uint32_t stqr_file;                   /* file ID of its STQR (its arc) */
+    uint32_t ids[2];                      /* phase 1 / phase 2 sequence ids (allocations.toml bgm_ids) */
+    int (*phase2)(void *unit);            /* nonzero = phase 2; unit = its unit found by the boss entry, or 0 */
+};
+void port_bgm_register(const struct port_bgm *b);
