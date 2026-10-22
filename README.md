@@ -1,8 +1,20 @@
 # MH4U Port
 
+⚠️⚠️⚠️ Disclaimer: This project is going to be merged (not anytime soon tho) with another bigger project. 
+In the meantime, I will still be working on porting monsters and make releases. ⚠️⚠️⚠️
+
+Next up is Dalamadur and Shah Dalamadur, in good shape as of October 22. 
+If you are a contributor, I would accept PR, but understand that as it's going to be merged, there are some monsters that are already done and therefore working on them isn't useful.
+If you're interested into porting monsters, here is a (non-exhaustive) list of what monsters are actually useful to be ported:
+- Dah'ren Mohran (from MH4U) and Jhen Mohran (from MH3U)
+- Dire Miralis (from MH3U
+
+
+--- 
+
 Brings Monster Hunter 4 Ultimate monsters into Monster Hunter Generations Ultimate (Switch, v1.4), with their quests, armor, weapons and skills. They are added to the game; nothing is replaced.
 
-**Monsters:** Gogmazios, Tigerstripe Zamtrios. Next up: Dalamadur and Shah Dalamadur.
+**Monsters:** Gogmazios, Tigerstripe Zamtrios.
 
 ## Install
 
