@@ -50,7 +50,8 @@ C = read in code / data, S = strong, G = guess. 4U = MH4U v1.1 code.bin, GU = MH
 - Position: none of the tail's overrides copies the head's position (C for slots 39, 40, 41, 46, 47, 48 start, 57,
   60, 77, 82, 89 and handlers 1.50 / 7.60). No Dalamadur motion moves the root: all 47 root tracks (bone 255,
   usage 4) in em024_0 / 2 / 3 are constant zero (C). The whole body moves through bone 0 inside the animations, so
-  both halves stay at their common spawn point and only their motions must match (S; check in game in Phase 4).
+  both halves stay at their common spawn point. SUPERSEDED in part (2026-10-21, "Where the body is cut"): the tail's
+  motions have no bone-0 track, its bone 0 must take the head's (dala_join.c).
 - Modes W+0x1c9 0 / 1 / 2 (user did not recognise "modes"): three body placements in the arena. Bone 0's
   reference position in the mode idles: motion 1 (-2282, 1644, -1488), motion 21 (-2282, 321, -5097), motion 41
   (-2543, 55, 6442) (C). Long motions move between them (63: 2701 frames from the mode-2 placement, 65: 1553 frames
@@ -102,7 +103,7 @@ C = read in code / data, S = strong, G = guess. 4U = MH4U v1.1 code.bin, GU = MH
 - Rows (emd +0x88, {s32 group, u16 cond, u16 mode, u32 param, u32 threshold}) are evaluated per group by 0x948378
   and written into the same masks by 0x942924. Mode 0 hides while the condition holds, mode 1 while it does not.
   Conditions (switch 0x9483c8): 0 W+0x7a1a != 0; 1 W+0x42c & p (sever flag); 2 / 3 / 9 never; 4 W+0x797e == p;
-  5 (p & ~W+0x797e) == 0; 6 part rank (0x94741c) >= threshold; 7 W+0x7814 & p (Shah's effect state, reset by
+  5 (p & ~W+0x797e) == 0; 6 part rank (0x94741c) >= threshold; 7 W+0x7a14 & p (Shah's effect state, reset by
   0x7753f4); 8 enraged (W+0x530 == 1); 10 W+0x53a or W+0x7e80 bit 5; 11 dead / captured (0x94d7a8).
 - Dalamadur uses 6 (break levels 1..4 on records 0..7), 0 (g23), 8 (rage glow g24, g25, g108), 1 (tail sever:
   g22 shown, g108 hidden), 7 (tail g106; Shah g30..45). GU port: these masks change at runtime (breaks, rage,
@@ -118,8 +119,16 @@ C = read in code / data, S = strong, G = guess. 4U = MH4U v1.1 code.bin, GU = MH
   to bone 0, closes neither half (scratch openends.py).
 - Each half animates only its own bones (runtime joint log: head instance joint 154 constant, tail instance joint 0 /
   200 = its object position). So the head's cut follows head bone 0 (motion 1: (-2282, 1644, -1488) from the
-  object), the tail's cut sits at the tail object's origin (motion 101: bone 200 identity, bone 140 at 0). In 4U
-  both objects are at the arena origin, so the two ends are ~3100 apart: the body between them is not modelled.
+  object), the tail's cut sits at the tail object's origin (motion 101: bone 200 identity, bone 140 at 0).
+  WRONG conclusion removed ("the body between them is not modelled"; user's 4U memory: the body is continuous).
+  Join (helper 2026-10-21, C data / S mechanism): all 47 head motions animate bone 0, none of the 42 tail motions
+  does (they animate 200 = identity and 140..157): the tail is authored in the frame of the head's bone 0. Forward
+  kinematics head 1 + tail 101: tail bone 0 at rest -> tail up to y ~6000 (= the floating tail of the test); tail bone
+  0 = head bone 0 -> the tail continues from the head's cut, down to y ~-2700, tip ~3200. The 4U code that hands bone
+  0 over was not found (tail class, uEnemy init 0x94e6f4, emConstraint 0x91917c, uCoord parent 0x6d3fd0, draw-time
+  skinning 0x95a4ec). Port: dala_join.c, GU slot 168 (both halves): tail j0 local = head j0 local x head world x
+  inverse(tail world) (a plain copy while both objects share one point). The "isolated climbable piece" was the
+  tail's first segment + walk strips (joints 140..142) at the arena origin.
 - 4U arena (k02 spire placed at (404, 1062, -112), speartip-crag.md): the tail's end (origin) is inside the spire's
   base (670 from its centre at y 0, spire radius up to 3120 there); the head's end is ~250 outside the spire's
   surface at its height (1679 vs <= 1424) with a ~900-radius cut face. User (2026-10-21): the ends are hidden in

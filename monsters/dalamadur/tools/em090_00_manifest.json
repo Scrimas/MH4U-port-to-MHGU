@@ -3,7 +3,7 @@
  "entry": "dalamadur",
  "donor": "em024_00",
  "file_id_base": "0x10780",
- "file_count": 38,
+ "file_count": 39,
  "manifest": [
   {
    "field": 0,
@@ -378,7 +378,8 @@
   "walk_b002": "0x107a2",
   "walk_b003": "0x107a3",
   "walk_b004": "0x107a4",
-  "walk_b005": "0x107a5"
+  "walk_b005": "0x107a5",
+  "shell00": "0x107a6"
  },
  "files": [
   {
@@ -608,27 +609,36 @@
    "path": "collision\\em090_00_g005",
    "type": "0x51fc779f",
    "path_hash": "0xfd0b6319"
+  },
+  {
+   "file_id": "0x107a6",
+   "path": "shell\\em\\em090_00_shell00\\em090_00_00",
+   "type": "0x4aa69872",
+   "path_hash": "0x8927bead"
   }
  ],
  "notes": [
   "effect area colour: Speartip Crag arena soil (122, 106, 81, 255)",
+  "carves: tools/hagi_em090.py (fields 46-50, dalamadur)",
   "em090_00 material XfB__m00_alpha: template solid_at",
-  "em090_00 material XfB__m00_body1: template solid_sphere, sphere em024_03_BM",
+  "em090_00 material XfB__m00_body1: template solid_e1, sphere em024_03_BM",
   "em090_00 material XfB__m00_body4_nm: template solid",
   "em090_00 material XfB__m01_eye: template unlit, 2 animations, raster ['RSMesh', 'RSMeshCN']",
   "em090_00 material XfB__m00_body5_nm: template solid",
-  "em090_00 material XfB__m00_body2: template solid_sphere, sphere em024_03_BM",
+  "em090_00 material XfB__m00_body2: template solid_e1, sphere em024_03_BM",
   "em090_00 material XfB__m00_ang: template add, 1 animations",
   "em090_00 material XfB__m02_inn: template unlit, 3 animations",
-  "em090_00_tail material XfB__m00_body2: template solid_sphere, sphere em024_03_BM",
-  "em090_00 effects: 52 entries (tools/efl4u2gu.py effect_set), 18 code-post records from MEF _1",
+  "em090_00_tail material XfB__m00_body2: template solid_e1, sphere em024_03_BM",
+  "em090_00 effects: 56 entries (tools/efl4u2gu.py effect_set), 18 code-post records from MEF _1 + 23 of the class (dala_efx.c)",
   "  MODEL effect\\base\\cm\\cm000\\cm000_000: 1 materials",
+  "  MODEL effect\\base\\cm\\cm000\\cm000_001: 1 materials",
   "  MODEL effect\\base\\em\\em024\\ef_em024: 2 materials",
   "  MODEL effect\\base\\qe\\qe000\\qe000_001: 1 materials",
   "  MODEL effect\\base\\qe\\qe001\\qe001_000: 2 materials",
   "  PSL anim 30 slot 2: MEF id 55 has no PEL record (not in the MEF)",
   "  PSL anim 47 slot 2: MEF id 55 has no PEL record (not in the MEF)",
-  "  PEL effect\\pel\\em\\em090_00u: 70 records x 2 lists; PSL x3 from LMT event group 2",
+  "  PEL effect\\pel\\em\\em090_00u: 93 records x 2 lists; PSL x3 from LMT event group 2",
+  "em090_00 PEL list 1: end mode 1 on the 41 records of MEF slot mode 1 (stop at the event range end, as 4U): 3 4 5 8 9 10 12 13 15 19 21 54 101 103 104 105 106 156 157 203 204 252 253 2000 2003 2004 2005 2006 2007 2009 2010 2011 2012 2013 2014 2015 2016 2017 2018 2019 2023",
   "em024 sound: 73 waves (73 used by the bank), bank 7 groups / 84 entries, request 162 entries (0 common-bank entries from GU Kushala, 0 converted), sound call 62116 B",
   "em090_00 XFS: 12 states, visible at spawn [0, 4, 6, 8, 11, 100, 101, 102, 103, 104]",
   "em090_00 data: 70 attacks, 27 hitsize groups, bodydata 61 / cambodydata 34 records (4U em024)",
@@ -640,11 +650,7 @@
   "field 42: placeholder enemy\\map_info\\em024_00 (donor em024_00, renamed)",
   "field 43: placeholder enemy\\area_select\\em024_00 (donor em024_00, renamed)",
   "field 44: placeholder enemy\\area_patrol\\em024_00 (donor em024_00, renamed)",
-  "field 46: placeholder enemy\\hagi\\hagi_s0_em024_00 (donor em024_00, renamed)",
-  "field 47: placeholder enemy\\hagi\\hagi_s1_em024_00 (donor em024_00, renamed)",
-  "field 48: placeholder enemy\\hagi\\hagi_s2_em024_00 (donor em024_00, renamed)",
-  "field 49: placeholder enemy\\hagi\\hagi_s3_em024_00 (donor em024_00, renamed)",
-  "field 50: placeholder enemy\\hagi\\hagi_s4_em024_00 (donor em024_00, renamed)",
-  "arc: 171 own / shared files + 792 donor chain files"
+  "shell family shell\\em\\em090_00_shell00\\em090_00_00: 108 files from shell\\em\\em024_00_shell00\\em024_00_00; HDS 15 entries, HTS 9 groups (4U volumes 0x102dfe0[0], 0x102dfe0[1], 0x102dfe0[2], 0x1019e50[39], 0x101efbc[95], 0x101efbc[96], 0x101efbc[97], 0x102b370[17], 0x1025b58[22])",
+  "arc: 279 own / shared files + 792 donor chain files"
  ]
 }

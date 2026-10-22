@@ -11,3 +11,11 @@ dalamadur = "em090"        # uEm090_00: the head half, both variants (4U uEm024 
 shah_dalamadur = "em090"
 dalamadur_tail = "em091"   # uEm091_00: the tail half, both variants (4U uEm083 runs em083 and em111)
 shah_dalamadur_tail = "em091"
+
+[stage]                    # Speartip Crag as an alias of the Sanctuary (allocations.toml stage_alias,
+                           # module/stage_alias.c)
+kinds = [49, 54, 55, 56, 58]   # arc paths -> m29: mapUI, map_com, language map_com, stage, area
+hold_kobj_areas = [1]      # arena: the three breakables (spire k02 = mId 3) stand until Dalamadur breaks them
+maprec = [[5.0, 24, -12], [1.5, 4, -20]]   # area maps: 4U m08 a00 / a01 records {k, x, y}
+                           # (4U table 0xeebe0c + 0x18 * 8, checked by tools/build_speartip_ui.py)
+wholemap_k = 1.3333333     # whole map: GU dims[18] / 4U m08 W = 40000 / 30000 (build_speartip_ui.py)
