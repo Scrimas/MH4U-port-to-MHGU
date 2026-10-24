@@ -5,12 +5,14 @@ area-data fix; every area file of the 94 GU monster arcs parses to its exact end
   0x00 'XFS\\0', u16 0x10, u16 minor, u32 object count, u32 0, u32 class count, u32 definition size
   0x18 class table: class count x u32 offset (from 0x18) -> class {u32 DTI hash, u32 field count,
        fields of 0x28 bytes {u32 name offset (from 0x18), u8 type, u8 attribute, u16 size, ...}}
-  0x18 + definition size: the root object; object = {u16 tag (class << 1 | 1, 0 = null), u16, u32 size}, then per
-       field u32 count and count values: types 1 (class) / 2 (class ref) = nested objects, others = size-byte LE ints
+  0x18 + definition size: the root object; object = {u16 tag (class << 1 | 1, 0 = null), u16 serial (depth-first
+       object number), u32 size (4 + body bytes)}, then per field u32 count and count values: types 1 (class) /
+       2 (class ref) = nested objects, others = size-byte LE ints (GU stage cameras m26a00d-cam: checked byte-exact)
 
   defs(d) -> (object count, [(hash, [(name, type, attribute, size)])], data offset)
   parse(d) -> root object: {'_class': hash, field: value} (a field with count != 1 holds a list)
   walk(obj) -> every nested object, depth first (records with a field, e.g. mMapNo: [o for o in walk(r) if 'mMapNo' in o])
+  build(d, root) -> XFS bytes of root (parse() layout) with the header and class table of d
 """
 import struct
 
@@ -67,3 +69,33 @@ def walk(o):
     elif isinstance(o, list):
         for v in o:
             yield from walk(v)
+
+
+def build(d, root):
+    _, cls, data = defs(d)
+    index = {h: i for i, (h, _) in enumerate(cls)}
+    out = bytearray()
+    serial = [0]
+
+    def obj(o):
+        if o is None:
+            out.extend(b'\0' * 8)
+            return
+        ci = index[o['_class']]
+        start = len(out)
+        out.extend(struct.pack('<HHI', ci << 1 | 1, serial[0], 0))
+        serial[0] += 1
+        for name, ty, at, sz in cls[ci][1]:
+            vals = o[name] if isinstance(o[name], list) else [o[name]]
+            out.extend(struct.pack('<I', len(vals)))
+            for v in vals:
+                if ty in (1, 2):
+                    obj(v)
+                else:
+                    out.extend(int(v).to_bytes(sz, 'little'))
+        struct.pack_into('<I', out, start + 4, len(out) - start - 4)
+
+    obj(root)
+    head = bytearray(d[:data])
+    struct.pack_into('<I', head, 8, serial[0])
+    return bytes(head + out)

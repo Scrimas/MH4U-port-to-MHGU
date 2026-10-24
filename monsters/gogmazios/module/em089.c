@@ -11,7 +11,7 @@
 
 void em089_bgm_register(void);   /* em089_bgm.c */
 
-#define EM089_SIZE (SIZE_uFestaEnemy + 0x98)     /* base + our own fields (F_END in em089_act.c) */
+#define EM089_SIZE (SIZE_uFestaEnemy + 0x9c)    /* base + our own fields (F_END in em089_act.c) */
 /* our fields after the base object (0xcac0 = work pointer, set by the ctor): +4..+0x8f used by em089_act.c
  * (action bookkeeping, the em089 aim point / turn rate / latches / tar amounts / AI state of the 4U work struct) */
 

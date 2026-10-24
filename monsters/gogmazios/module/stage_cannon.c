@@ -58,6 +58,11 @@ enum { R0, R1, R2, R3, R4, R5, R12, LR };
 
 int stage_alias_active(void);        /* stage.c */
 uint32_t stage_setup_serial(void);   /* stage.c */
+int stage_demolisher_ready(void *local);           /* stage_demolisher.c */
+int stage_demolisher_fire(void *player, int local);
+void stage_demolisher_create(void *mgr);
+void stage_demolisher_cleanup(void);
+void stage_demolisher_shell_gone(void *sh);
 
 #define STAGE_GIMMICK_MGR 0x18977a0u
 #define MGR_KOBJ          0x21cu
@@ -118,6 +123,10 @@ static const float k_yaw_sin[2] = {-1.0f, 1.0f}, k_yaw_cos[2] = {0.0f, 0.0f};   
 static const float k_off[2][3] = {{0.0f, 40.0f, 190.0f}, {0.0f, 95.0f, 155.0f}};   /* [bonus] */
 #define REC_RADIUS  100.0f
 #define REC_HEIGHT  200.0f            /* GU st006 lever records */
+/* local match margin over REC_RADIUS (hunter joint 0 vs GU's prompt point): wide, so a prompt shown by a cannon
+ * record is always answered as that cannon and never falls through to GU's Dragonator (nothing else of kind 11
+ * stands within 500 of the floor cannons; hunter_cannon also needs y < 500, below the Dragonator ledge) */
+#define LOCAL_MARGIN 150.0f
 
 static struct {
     uint32_t serial;
@@ -171,7 +180,7 @@ static void *local_hunter(void)
     return (pl && *(void **)((uint8_t *)pl + 0x498) && *(void **)((uint8_t *)pl + 0x494)) ? pl : 0;
 }
 
-/* cannon index (0 / 1) whose record the hunter stands at, -1 if none; margin 60 for the local hunter, wider for a
+/* cannon index (0 / 1) whose record the hunter stands at, -1 if none; LOCAL_MARGIN for the local hunter, wider for a
  * replayed remote press (that hunter's position here is the synced copy) */
 static int hunter_cannon(void *pl, float margin)
 {
@@ -196,10 +205,13 @@ static void make_records(void)
         rec_area(r, ARENA_AREA);
         FIELD(uint16_t, r, 0x4e) = 0xffff;
         FIELD(uint16_t, r, 0x50) = 0xffff;
-        FIELD(float, r, 0x48) = REC_RADIUS;
+        /* in-range test 0x319278 (C): +0x44 = horizontal radius, +0x48 = height (|dy| < h / 2). Swapped until
+         * 2026-10-24: the prompt reached 200 while hunter_cannon matched 160, and a press in between fired GU's
+         * Dragonator (test 09:49 05:01, user: "the restraint triggers the Dragonator") */
+        FIELD(float, r, 0x48) = REC_HEIGHT;
         rec_flag(r, 0);
         FIELD(uint8_t, r, 0x56) = 0;
-        FIELD(float, r, 0x44) = REC_HEIGHT;
+        FIELD(float, r, 0x44) = REC_RADIUS;
         FIELD(uint32_t, r, 0x64) = KIND_SWITCH;
         FIELD(uint8_t, r, 0x58) = ARENA_AREA;
         for (int i = 0; i < 3; i++) FIELD(float, r, 4 + 4 * i) = k_rec_pos[k][i];
@@ -315,7 +327,8 @@ int stage_cannon_fire(uint32_t *regs)
     int local = is_local(player) == 1;
     if (local && em089_pile_fire(player, 0)) { s_c.skip_post = 1; return 1; }
     if (!stage_alias_active()) return !local && em089_pile_fire(player, 1);
-    int k = hunter_cannon(player, local ? 60.0f : 300.0f);
+    if (stage_demolisher_fire(player, local)) { if (local) s_c.skip_post = 1; return 1; }
+    int k = hunter_cannon(player, local ? LOCAL_MARGIN : 300.0f);
     if (k < 0) return !local && em089_pile_fire(player, 1);
     if (local) s_c.skip_post = 1;                   /* 0x503a5c follows only for the local hunter */
     uint8_t *o = cannon_kobj((uint32_t)k);
@@ -355,7 +368,9 @@ int stage_cannon_ready_c(uint32_t *regs)
     int pr = em089_pile_ready(local_hunter());   /* the fallen Dragonator spear's record (em089_pile.c, any stage) */
     if (pr >= 0) { regs[R0] = (uint32_t)pr; return 1; }
     if (!stage_alias_active()) return 0;
-    int k = hunter_cannon(local_hunter(), 60.0f);   /* the prompt check is the local hunter's */
+    int dr = stage_demolisher_ready(local_hunter());   /* the Demolisher record at the cart's fire point at S */
+    if (dr >= 0) { regs[R0] = (uint32_t)dr; return 1; }
+    int k = hunter_cannon(local_hunter(), LOCAL_MARGIN);   /* the prompt check is the local hunter's */
     if (k < 0) return 0;
     regs[R0] = (uint32_t)cannon_ready(k);
     if (++s_n <= 6) logf("gogport: stage cannon %u: prompt check -> %u", k + 1u, regs[R0]);
@@ -404,6 +419,7 @@ int stage_shell_dtor_c(uint32_t *regs)
 {
     void *sh = (void *)(uintptr_t)regs[R0];
     int j;
+    stage_demolisher_shell_gone(sh);
     for (j = 0; j < 4 && s_c.shell[j] != sh; j++) ;
     if (j == 4 || !sh) return 0;
     int k = s_c.shell_k[j];
@@ -429,6 +445,7 @@ int stage_kobj_extra_c(uint32_t *regs)
     if (!mgr || !stage_alias_active()) return 0;
     void *s = sched_create(mgr, ARENA_AREA, S04_SLOT, S04_FILE_ID, 1, 0);
     logf("gogport: stage cannon: s04 scheduler (file %x) -> %x", S04_FILE_ID, (uint32_t)s);
+    stage_demolisher_create(mgr);
 #endif
     return 0;
 }
@@ -438,6 +455,7 @@ int stage_cleanup_c(uint32_t *regs)
 {
     (void)regs;
     em089_pile_cleanup();
+    stage_demolisher_cleanup();
     if (s_c.rec[0] || s_c.rec[1]) {
         free_records();
         logf("gogport: stage cannon: interaction records freed (stage cleanup)");

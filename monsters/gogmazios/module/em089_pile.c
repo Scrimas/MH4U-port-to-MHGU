@@ -257,10 +257,12 @@ void pj_record_create(const float pos[3], float radius, float height)
     rec_area(r, area);
     FIELD(uint16_t, r, 0x4e) = 0xffff;
     FIELD(uint16_t, r, 0x50) = 0xffff;
-    FIELD(float, r, 0x48) = radius;
+    /* in-range test 0x319278 (C): +0x44 = horizontal radius, +0x48 = height (|dy| < h / 2); swapped until 2026-10-24
+     * (prompt out to 300 while near_pile matched 100 * scale + 60: a press in between fired GU's Dragonator) */
+    FIELD(float, r, 0x48) = height;
     rec_flag(r, 0);
     FIELD(uint8_t, r, 0x56) = 0;
-    FIELD(float, r, 0x44) = height;
+    FIELD(float, r, 0x44) = radius;
     FIELD(uint32_t, r, 0x64) = KIND_SWITCH;
     FIELD(uint8_t, r, 0x58) = (uint8_t)area;
     for (int i = 0; i < 3; i++) { FIELD(float, r, 4 + 4 * i) = pos[i]; s_pl.rec_pos[i] = pos[i]; }

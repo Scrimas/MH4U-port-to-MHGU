@@ -83,10 +83,15 @@ HOOKS = [
     ('bgm_play', 0x4E34A4),    # sSoundControl play stream request: log only while its quests run (bgm.c)
     ('stage_spear_count', 0x502694), ('stage_siege_phase', 0x3A5EC4), ('stage_dragonator_fire', 0x503BB0),  # stage_gimmick.c
     ('stage_cart_request', 0x497040), ('stage_cart_avail', 0x495B40), ('stage_cart_tick', 0x495D0C),  # stage_cart.c
+    ('stage_cart_place', 0x495D6C),  # stage_cart.c: riders carried with the pose the collision was just placed with
+    ('stage_cart_ground', 0x2E85A4), ('stage_cart_air', 0x2E86FC),  # stage_cart.c: deck backstop for riders, log
     ('stage_frame', 0x503C7C),  # stage_doors.c (+ stage_cannon.c tick)
     ('stage_kobj_bcast', 0x500D18),  # quest-start KowareObj command 0: held in the alias's areas (stage_alias.c)
     ('stage_cannon_ready', 0x503B88), ('stage_dragonator_post', 0x503A5C), ('stage_cannon_shot', 0x46365C),
     ('stage_shell_dtor', 0x4A18B4), ('stage_kobj_extra', 0x4FDF7C), ('stage_cleanup', 0x4FF074),  # stage_cannon.c
+    ('stage_demolisher_pose', 0x466618), ('stage_demolisher_efx', 0x466B9C),  # stage_demolisher.c (uShellPlcom_011)
+    ('em089_tar_dmg', 0x2F1C60), ('em089_tar_struggle', 0x2BBA74), ('em089_tar_mash', 0x2BBB00),
+    ('em089_tar_webpost', 0x2826F4),  # em089_tarhunter.c: Gogmazios' tar on hunters on GU's web status
     ('item_data_loaded', 0x19237C),  # rItemData load exit (r4 = this): Gogmazios materials in DUMMY items (items.c)
     ('item_text_loaded', 0xB83C48),  # rGUIMessage load exit (r4 = this): their names in itemData_<lang> (items.c)
     ('bui_record', 0x3A3874),  # (quest, em id) -> break reward record: em089's own for 0x59 (items.c)

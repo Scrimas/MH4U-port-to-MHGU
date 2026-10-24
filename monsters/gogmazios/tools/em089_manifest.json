@@ -692,6 +692,6 @@
   "shell family shell\\em\\em089_00_shell00\\em089_00_00: 108 files from shell\\em\\em024_00_shell00\\em024_00_00; HDS from 4U 0x1031990, HTS radius 80.0 (4U) instead of 200.0",
   "em089 sound: 69 waves (69 used by the bank), bank 9 groups / 113 entries, request 290 entries (20 common-bank entries from GU Kushala, 0 converted), sound call 71979 B",
   "battle BGM STQR sound\\bgm\\battle\\bgm_em089 (500 B)",
-  "effects: 84 entries (tools/efl4u2gu.py); 76 log lines"
+  "effects: 90 entries (tools/efl4u2gu.py); 79 log lines"
  ]
 }

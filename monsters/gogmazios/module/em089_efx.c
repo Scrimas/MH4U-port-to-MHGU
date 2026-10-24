@@ -458,10 +458,34 @@ void *em089_efx_stage_efl(uint32_t n, const float *pos)
     return em089_efx_post_at(s_efx_owner, 6100 + n, pos);
 }
 
+void *em089_efx_stage_efl_rot(uint32_t n, const float *pos, const float *rot_deg)
+{
+    if (!s_efx_owner || !pos || n >= 14) return 0;
+    return post_full(s_efx_owner, 6100 + n, pos, 0, rot_deg, 0, 0);
+}
+
 void *em089_efx_stage_efl_on(uint32_t n, void *unit)
 {
     if (!s_efx_owner || !unit || n >= 14) return 0;
     return em089_efx_post_on(s_efx_owner, 6100 + n, unit);
+}
+
+void *em089_efx_stage_efl_track(uint32_t n, const float *pos, const float *rot_deg)
+{
+    if (!s_efx_owner || !pos || n >= 14) return 0;
+    return post_full(s_efx_owner, 6100 + n, pos, 0, rot_deg, 0, 3);
+}
+
+void em089_efx_place(void *eff, const float *pos, const float *rot_rad)
+{
+    if (!em089_efx_alive(eff)) return;
+    float q[4] __attribute__((aligned(16))) = {pos[0], pos[1], pos[2], 0.0f};
+    efx_set_pos(eff, q, 0);
+    void *xf = FIELD(void *, eff, EFX_XF);
+    if (xf && rot_rad) {
+        float r[4] __attribute__((aligned(16))) = {rot_rad[0], rot_rad[1], rot_rad[2], 0.0f};
+        efx_set_rot(xf, r);
+    }
 }
 
 /* ------------------------------------------------------------------ hooks */
@@ -478,6 +502,27 @@ static void efx_tick(void *self)
     s016_tick(self);
     aura_tick(self);
     tail_tick(self);
+    em089_tar_hunters_tick(self);
+}
+
+int em089_efx_present(void) { return s_efx_owner != 0; }
+
+void *em089_efx_post_model(void *self, uint32_t id, void *model, uint32_t area)
+{
+    uint32_t buf[REQ_SIZE / 4 + 4];
+    void *req = (void *)(((uint32_t)buf + 15u) & ~15u);
+    if (!self || !model) return 0;
+    efx_req_ctor(req);
+    FIELD(uint32_t, req, 0x8) = 3;                    /* 0x4a1ed8 */
+    FIELD(uint8_t, req, 0xc) = (uint8_t)area;         /* 0x44ce38: the owner's area */
+    FIELD(void *, req, REQ_TARGET) = model;
+    FIELD(uint32_t, req, REQ_FLAGS) |= 2u;
+    void *eff = efx_post_u(self, EFX_MODE_CODE, id, req);
+    efx_req_dtor(req);
+    static uint32_t s_n;
+    if (++s_n <= 40) logf("gogport: em089 efx post id %u on model %x (area %u) -> %x", id, (uint32_t)model, area,
+                          (uint32_t)eff);
+    return eff;
 }
 
 /* ------------------------------------------------------------------ slot 75 */
@@ -619,5 +664,5 @@ void em089_efx_forget(void *self)
     for (int i = 0; i < S75_SLOTS; i++)
         if (s_s75[i].self == self)
             for (uint32_t k = 0; k < sizeof s_s75[i]; k++) ((uint8_t *)&s_s75[i])[k] = 0;
-    if (s_efx_owner == self) s_efx_owner = 0;
+    if (s_efx_owner == self) { s_efx_owner = 0; em089_tar_hunters_forget(); }
 }
