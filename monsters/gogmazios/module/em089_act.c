@@ -60,11 +60,13 @@
 #define F_TAR_D4      (SIZE_uFestaEnemy + 0x8c)  /* float: chest-Liquid event timer [4U work+0xd4] */
 #define F_FLAG_E4     (SIZE_uFestaEnemy + 0x90)  /* u8: em089 flag set by the per-motion table 0x8c5768 [work+0xe4] */
 #define F_TGT         (SIZE_uFestaEnemy + 0x91)  /* u8: 1 + index of the targeted hunter, 0 = none yet (net-synced) */
+#define F_KNOCK_N     (SIZE_uFestaEnemy + 0x92)  /* u8: 10/108 / 109 / 202 / 203 started in the window [work+0xe5] */
 #define F_SHELL_N     (SIZE_uFestaEnemy + 0x94)  /* u8: tar blobs posted in this action (rand index) [work+0xcd] */
 #define F_SHELL_RARE  (SIZE_uFestaEnemy + 0x95)  /* u8: rare drips (kind 6 / 7) posted [work+0xec] */
 #define F_SHELL_ED    (SIZE_uFestaEnemy + 0x96)  /* u8: shiny-drop table set, 1 after a rare drip [work+0xed] */
 #define F_LIGHT       (SIZE_uFestaEnemy + 0x97)  /* u8: light state 0..3 of 0x8c6300 [work+0xc8] */
-#define F_END         (SIZE_uFestaEnemy + 0x98)  /* = EM089_SIZE (em089.c) */
+#define F_KNOCK_T     (SIZE_uFestaEnemy + 0x98)  /* float: F_KNOCK_N reset timer, 900 at each start [work+0xe8] */
+#define F_END         (SIZE_uFestaEnemy + 0x9c)  /* = EM089_SIZE (em089.c) */
 
 /* record fields mapped for the behaviour port (C = same code shape in both games):
  * REC_SPAWN_B3: spawn-record byte 3 (4U W+0x797e, copied by 4U 0x91e360 [0x91e3ec]; GU 0x6fb14 copies the same
@@ -183,6 +185,8 @@ static void *hunter_at(uint32_t i)
         if (*(const uint32_t *)(d + 4) == *(const uint32_t *)(DTI_HUNTER + 4)) return hunter_ok(pl);
     return 0;
 }
+
+void *em089_hunter_at(uint32_t i) { return hunter_at(i); }
 
 static int32_t local_index(void)
 {
@@ -1636,6 +1640,10 @@ static int wall_probe(void *self, uint32_t var)
     float pos[4] = {0}, nrm[4] = {0};
     uint8_t info[0x60] = {0};
     if (!mapSweep(col, self, from, to, 10.0f, FIELD(uint8_t, self, EN_AREA_BYTE), pos, nrm, info, 0x3fff0000u)) return 0;
+    /* 4U's hits lie within the probe (+100): GU's also returned the type-4 wall 4016 ahead at (-965, -4710) on the
+     * south high-platform dash, which stopped it near the arena centre */
+    float dx = pos[0] - from[0], dz = pos[2] - from[2];
+    if (dx * dx + dz * dz > (d + 100.0f) * (d + 100.0f)) return 0;
     float nx = FIELD(float, info, 0x20), nz = FIELD(float, info, 0x28);
     uint32_t n = (uint32_t)(int32_t)(atan2f_gu(nx, nz) * 10430.378f + 0.5f) & 0xffff;
     uint32_t diff = (n + 0x8000u - yaw) & 0xffff;
@@ -2426,8 +2434,16 @@ int em089_cond(void *self, uint32_t id)
     float t[4];
     uint32_t d = 0;
     if (id == 8 || (id >= 11 && id <= 13) || id == 23 || id == 24) {
-        target_pos(self, t);
+        /* 4U measures target slot 0: the hunter, or the arena point a setTarget(5, 8, n) put there (F_NOSYNC 2,
+         * e.g. the restraint's op-9 jumps, em089_react.c) */
+        if (FIELD(uint8_t, self, F_NOSYNC) == 2)
+            for (int i = 0; i < 4; i++) t[i] = ((const float *)(REC(self) + REC_TARGET))[i];
+        else target_pos(self, t);
         d = (angle_to(self, t) - FIELD(uint32_t, REC(self), REC_YAW)) & 0xffff;
+        static uint32_t s_dn;
+        if (id != 8 && FIELD(uint8_t, self, F_NOSYNC) == 2 && ++s_dn <= 40)   /* the restraint's variant jumps */
+            logf("gogport: em089 cond %u (arena-point target %d %d) yaw %x d %x", id, (int32_t)t[0], (int32_t)t[2],
+                 FIELD(uint32_t, REC(self), REC_YAW) & 0xffff, d);
     }
     switch (id) {
     case 0: return FIELD(uint8_t, REC(self), REC_MODE) == 1;
@@ -2482,8 +2498,9 @@ static void lights_action_start(void *self, uint32_t cat, uint32_t num);   /* be
 /* GU slot 129 (base bx lr; called by setAction's on-start bookkeeping 0x755b4 with (cat, num), 0x7580c) = 4U
  * slot 47 [0x8c8778, (this, cat, num)]: counts the flying attacks 7/32, 7/93, 7/142, 7/143, 7/146..7/148 in
  * work+0xcb (AI condition 3) and resets the count on any other action except categories 0 / 3, 2/67 and 4/x
- * (x != 4). Not ported: W+0x28d = 1 (unmapped record byte) and the category-10 branch for 10/108, 10/109, 10/114,
- * 10/202, 10/203 (flying knock-down: net object 0xc088d8, reactions), logged. */
+ * (x != 4). Category 10 [0x8c8850]: 10/108, 10/109, 10/202, 10/203 -> work+0xe5 += 1, work+0xe8 = 900 (0x8c89ec;
+ * em089_react.c picks its table by the count, slot 77 below resets it). Not ported: W+0x28d = 1 (unmapped record
+ * byte) and the 10/114 branch (0x8c8884: hit direction, net object 0xc088d8), logged. */
 void em089_action_start(void *self, uint32_t cat, uint32_t num)
 {
     uint8_t *hits = &FIELD(uint8_t, self, F_HITS);
@@ -2495,8 +2512,11 @@ void em089_action_start(void *self, uint32_t cat, uint32_t num)
     } else {
         *hits = 0;
     }
-    if (cat == 10 && (num == 108 || num == 109 || num == 114 || num == 202 || num == 203))
-        stub("slot 47 cat-10 branch", num, 0);
+    if (cat == 10 && (num == 108 || num == 109 || num == 202 || num == 203)) {
+        FIELD(uint8_t, self, F_KNOCK_N)++;
+        FIELD(float, self, F_KNOCK_T) = 900.0f;
+    }
+    if (cat == 10 && num == 114) stub("slot 47 cat-10 branch", num, 0);
     lights_action_start(self, cat, num);   /* 0x8c8a40..0x8c8be4 */
     FIELD(uint8_t, self, F_SHELL_N) = 0;   /* 0x8c8bec: work+0xcd = 0 (tar blob rand index) */
 }
@@ -3009,8 +3029,8 @@ static void motion_mode(void *self)
 /* 4U slot 77 [0x8c99a0] (per frame, after slot 40; GU slot 170 by position, called from our slot 119 instead):
  * 0x8c5768 above; motion 0x31f: yaw += 18/17 degrees per tick in window 82..252, motion 0x32c: +3 in 10..40 (arena
  * gimmick motions); 0x8c64b8 wing size (em089_wing_update, em089_tar.c) -> word bit 17; 0x8c6300 lights
- * (lights_frame); cooldown work+0xd0 countdown. Not ported: the work+0xe8 timer clearing work+0xe5 (work+0xe5 /
- * +0xe8 are only set by the slot-47 category-10 branch, not ported). */
+ * (lights_frame); cooldown work+0xd0 countdown; the work+0xe8 countdown (paused in motions 0x307 / 0x308 / 0x30b /
+ * 0x316) that clears the knock-down count work+0xe5 (0x8c9ac8). */
 static void em089_slot77(void *self)
 {
     motion_mode(self);
@@ -3043,6 +3063,41 @@ static void em089_slot77(void *self)
     }
     lights_frame(self);   /* 0x8c6300 [0x8c9aac] */
     timerDown(self, &FIELD(float, self, F_COOL), 1.0f);
+    uint32_t k = m - 0x307;
+    if (k != 0 && k != 1 && k != 4 && k != 15 && timerDown(self, &FIELD(float, self, F_KNOCK_T), 1.0f))
+        FIELD(uint8_t, self, F_KNOCK_N) = 0;
+}
+
+uint32_t em089_knock_count(void *self) { return FIELD(uint8_t, self, F_KNOCK_N); }
+
+/* 4U 0x8bdaec (10/108, 10/109, 10/202, 10/203 while work+0xe5 < 2; GU 4U pairs from api-map): step 2 = 0: setTarget
+ * (5, 8, 18, 0) + wanderPoint (the arena point), setStopDist(1, 0, 0) [0x92dc88], timer = 3D distance to point 18
+ * / 8 [0x936894], world velocity x / z = 8 toward it (normalised when the distance >= 2^-23) after resetVel; step 2
+ * = 1: timer down -> step 2 = 2, else pos += velocity [0x955478 = GU 0x7b5f8] and inRange(0, 0) [0x92dd04] -> 2. */
+#define applyVel FN(stopMove_t, 0x7b5f8)   /* rec+0x40.. += this+28 * rec+0x10.. */
+void em089_knock_slide(void *self)
+{
+    if (STEP2(self) == 0) {
+        STEP2(self) = 1;
+        setTarget(self, 5, 8, 18, 0);
+        wanderPoint(self, 0, 0);
+        setStopDist(self, 1, 0, 0.0f);
+        float p[4], *pos = &FIELD(float, REC(self), REC_POS_X);
+        arena_point(18, p);
+        float dx = p[0] - pos[0], dy = p[1] - pos[1], dz = p[2] - pos[2], d2 = dx * dx + dy * dy + dz * dz, d;
+        __asm__("vsqrt.f32 %0, %1" : "=t"(d) : "t"(d2));
+        TIMER(self) = d * 0.125f;
+        if (d >= 1.1920929e-7f) { dx *= 1.0f / d; dz *= 1.0f / d; }
+        resetVel(self);
+        FIELD(float, REC(self), REC_VEL) = dx * 8.0f;
+        FIELD(float, REC(self), REC_VEL + 8) = dz * 8.0f;
+        logf("gogport: em089 knock-down slide to arena point 18 (0, 0, 1200): %d frames", (int32_t)TIMER(self));
+        return;
+    }
+    if (STEP2(self) != 1) return;
+    if (timerDown(self, &TIMER(self), 1.0f)) { STEP2(self)++; return; }
+    applyVel(self);
+    if (inRange(self, 0, 0)) STEP2(self)++;
 }
 
 /* GU slot 119 (base bx lr, per frame from 0xadb3c) = 4U slot 40 [0x8ba258], per-frame state logic:

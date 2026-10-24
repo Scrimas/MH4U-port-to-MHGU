@@ -4,7 +4,8 @@
   stage4u2gu.py check OUT.mod                      decode a converted GU stage model, compare with the sources
   stage4u2gu.py alias [OUTROOT] [--keep-sets] [--keep-filters] [--keep-gimmicks] [--keep-koware] [--keep-sound]
                                                    [--keep-relation] [--keep-doors] [--keep-cart]
-                                                   [--keep-static-doors] [--keep-static-cannons]
+                                                   [--keep-static-doors] [--keep-static-cannons] [--keep-items]
+                                                   [--keep-camera] [--keep-gate]
                                                    build the alias stage arcs (default monsters/gogmazios/romfs); the --keep-*
                                                    flags fall back to the Fortress data of one session-5 change
                                                    (bisecting aid if the in-game test fails at area load)
@@ -724,6 +725,15 @@ def build_map_com(report):
         elif t == T_WMAP and p == 'stage\\m26d\\m26d':
             d, what = wholemap_offsets(d)
             rows.append((p, what))
+        elif t == T_CAM and p == CAMP_CAM and 'camera' not in KEEP:
+            d, what = convert_camp_cam(d)
+            rows.append((p, what))
+        elif t == T_IPS and p == 'stage\\m26d\\m26d' and 'items' not in KEEP:
+            d, what = convert_ips()
+            rows.append((p, what))
+        elif t == T_IPL and p in IPL_4U and 'items' not in KEEP:
+            d, ids = convert_ipl(IPL_4U[p])
+            rows.append((p, '%s (4U items %s -> GU %s)' % (IPL_4U[p], ids, [ITEMS_4U[k] for k in ids])))
         elif (p, t) in GIMMICK_EDITS and 'gimmicks' not in KEEP:
             d, what = GIMMICK_EDITS[(p, t)](d)
             rows.append((p, what))
@@ -735,6 +745,211 @@ def build_map_com(report):
         out.append((p, t, d))
     report['collision'] = rows
     return out
+
+
+# ------------------------------------------------------------------ item pops (map_com IPS / IPL, stage item model)
+# rItemPopSet "IPS" v0x2003, same format in both games (GU reader 0x31a4f4, 4U 0x5b9d40): header 0x34 B {magic, ver,
+# nAreas, data size, 0, 0, size1, size1, 0, size2, offset3 = size1 + size2, 0, size3}, then three sections, each
+# starting with an area table {u32 off, u32 count} (offsets from the section start). Section 1 = gather points (36 B:
+# +0 u8 list, +4 pos, +0x10 radius, +0x14 height, +0x18 / +0x1a u16 (4U yaw at +0x1a), +0x1c count, +0x1d
+# guaranteed count (GU 0x31b290: then a random stop), +0x1e type, +0x1f icon = mesh group of the stage item model
+# (GU 0x3191d8 -> point+0x68 -> 0x31945c; 4U shows group icon - 1, see ITEM_GROUPS), +0x20 flags). Sections 2 / 3 =
+# per-area sub-tables {u32 off, u32 n} -> records (GU 0x319adc / 0x319b28, same layout in 4U; empty in the Fortress).
+# rItemPopList "IPL" v0x2003: {n1, size1, off2, n2, size2} at 0x10, tables at 0x24 / 0x24 + off2 of {u32 off, u32
+# count} -> count x {u8 %, u8 count, u16 item} + 0xff (GU 0x319eb8: list index of a point).
+# The alias used to keep the Fortress files (pickups 760 above our ledges / over the abyss): now 4U m19d's, areas
+# 4U 0 / 1 / 3 -> GU 0 / 1 / 2 (4U m19a02d has no GU area and no points), items by name (ITEMS_4U).
+# Arena piles: 4U places each of its 5 spots twice, a full pile (+0x20 = 0x01 | spot bit 0x04 / 0x08 / 0x10, counts
+# 5 / 4) and a small pile (same bits | 0x20, counts 3 / 2, icon + 1) that 4U activates once the first is empty
+# (0x5b8c20: bits & 0x60, icon + 1, count +48 == 0). GU has no such chain (its +0x56 bits 2 / 4 are runtime flags,
+# 0x319528 / 0x31a944; empty points are deleted and re-created, 0x31b5xx): one GU point per spot with the full
+# pile's mesh and the summed counts 8 / 6, flags 0x01 as the Fortress' (deviation: the small-pile stage is not shown).
+T_IPS, T_IPL = 0x52776ab1, 0x25fd693f
+IPS_4U = 'stage\\m19d\\m19d'
+IPS_AREAS = (0, 1, 3)                   # 4U area of GU area 0, 1, 2
+IPL_4U = {'stage\\m26d\\m26d_low': 'stage\\m19d\\m19d', 'stage\\m26d\\m26d_high': 'stage\\m19d\\m19d_high',
+          'stage\\m26d\\m26d_g': 'stage\\m19d\\m19d_g'}
+# 4U item -> GU item (same English name: Ballista Ammo, Cannon Ammo, Stone, Whetstone, EZ Max Potion, EZ Lifepowder,
+# First-aid Med+, First-aid Med, EZ Barrel Bomb L, Throwing Knife, Bounce Bomb, Barrel Bomb L)
+ITEMS_4U = {780: 1730, 783: 2115, 206: 317, 168: 56, 777: 1724, 1732: 1725, 770: 1717, 769: 1716, 779: 1728,
+            55: 64, 81: 91, 79: 89}
+# The pile meshes: 4U m19-item (groups 17 / 18 = GU m26d-item's two piles, unused by 4U; 21..30 = full / small pile
+# of spot E ballista, E cannon, W ballista, W cannon, N cannon: same bounding box per pair, the small one's vertices
+# mostly the full one's) replaces the Fortress model under its GU path, regrouped. The point visual (uShellSt001
+# init 0x4915fc, by icon point+0x68): icons 21..28 / 29 / 34 / 35 / 38 / 39 = St001 effects only (21..26 = GU's bug
+# points: butterflies, fireflies), 36 = dropped item, 30..33 nothing; icons < 21 and 37 load the item model and draw
+# one group (0x491974): icon 1..12 -> group 5, 6, 7, 8, 1, 2, 11, 12, 3, 4, 9, 10, 13..16 -> none, 17..20 -> 17..20,
+# 37 -> 21 (0 = no visual). Icons 1 / 2 / 5 / 6 / 11 / 12 are also gather kinds of the point scans 0x31badc / 0x31bc34
+# (Palico gathering, G), 37..39 points exist only by a quest flag (0x31a66c), 25 / 26 / 38 are remapped (0x3191d8).
+# The five full piles -> groups / icons 17..20 and group 7 (icon 3); the small piles and 4U's own 17 / 18 -> 22..28,
+# never drawn (no icon sets a group bit above 21).
+ITEM_MODEL = ('stage\\m26d\\m26d-item\\m26d-item', 'stage\\m19d\\m19-item\\m19-item')
+ITEM_GROUPS = {17: 22, 18: 23, 21: 17, 22: 24, 23: 18, 24: 25, 25: 19, 26: 26, 27: 20, 28: 27, 29: 7, 30: 28}
+GROUP_ICON = {7: 3}                     # GU icon drawing that group, where not icon == group
+
+
+def ips_sections(d):
+    magic, ver, n, size, z0, z1, s1, s1b, z2, s2, o3, z3, s3 = struct.unpack_from('<4s12I', d, 0)
+    assert magic == b'IPS\0' and ver == 0x2003 and s1 == s1b and o3 == s1 + s2 and not (z0 | z1 | z2 | z3), d[:0x34]
+    assert size == s1 + s2 + s3 == len(d) - 0x34, (size, s1, s2, s3, len(d))
+    return n, (d[0x34:0x34 + s1], d[0x34 + s1:0x34 + o3], d[0x34 + o3:0x34 + o3 + s3])
+
+
+def ips_build(n, secs):
+    s1, s2, s3 = secs
+    return b'IPS\0' + struct.pack('<12I', 0x2003, n, len(s1) + len(s2) + len(s3), 0, 0, len(s1), len(s1), 0,
+                                  len(s2), len(s1) + len(s2), 0, len(s3)) + s1 + s2 + s3
+
+
+def ips_points(sec, n):
+    return [[sec[o + 36 * i:o + 36 * (i + 1)] for i in range(c)]
+            for o, c in (struct.unpack_from('<2I', sec, 8 * a) for a in range(n))]
+
+
+def ips_pack_points(areas):
+    tab = bytearray(8 * len(areas)); body = b''
+    for a, recs in enumerate(areas):
+        struct.pack_into('<2I', tab, 8 * a, 8 * len(areas) + len(body), len(recs))
+        body += b''.join(recs)
+    return bytes(tab) + body
+
+
+def ips_nested(sec, n4, order):
+    """section 2 / 3 with the area table of `order` (4U areas): each area block (sub-table + records) moves as is,
+    its sub-table offsets shifted"""
+    tab = [struct.unpack_from('<2I', sec, 8 * a) for a in range(n4)]
+    starts = sorted({o for o, c in tab if c} | {len(sec)})
+    out = bytearray(8 * len(order)); body = bytearray()
+    for g, a in enumerate(order):
+        o, c = tab[a]
+        new = 8 * len(order) + len(body)
+        if c:
+            blk = bytearray(sec[o:min(s for s in starts if s > o)])
+            for i in range(c):
+                struct.pack_into('<I', blk, 8 * i, struct.unpack_from('<I', blk, 8 * i)[0] - o + new)
+            body += blk
+        struct.pack_into('<2I', out, 8 * g, new, c)
+    return bytes(out + body)
+
+
+def convert_ips():
+    d4 = u4_find(IPS_4U, T_IPS)
+    n4, (s1, s2, s3) = ips_sections(d4)
+    assert ips_build(n4, (ips_pack_points(ips_points(s1, n4)), ips_nested(s2, n4, range(n4)),
+                          ips_nested(s3, n4, range(n4)))) == d4, 'IPS round trip'
+    pts = ips_points(s1, n4)
+    assert not pts[2], 'points in 4U m19a02d'
+    areas = []
+    for a in IPS_AREAS:
+        recs = [bytearray(r) for r in pts[a] if not (a == 3 and r[0x20] & 0x20)]
+        if a == 3:
+            small = [r for r in pts[a] if r[0x20] & 0x20]
+            assert len(small) == len(recs) == 5, (len(small), len(recs))
+            for r in recs:
+                s, = [s for s in small if s[0x20] == r[0x20] | 0x20 and s[0x1f] == r[0x1f] + 1 and s[0] == r[0]
+                      and s[4:0x1c] == r[4:0x1c]]
+                r[0x1c] += s[0x1c]; r[0x1d] += s[0x1d]
+                g = ITEM_GROUPS[r[0x1f] - 1]
+                r[0x1f] = GROUP_ICON.get(g, g)
+                r[0x20] = 0x01
+        areas.append([bytes(r) for r in recs])
+    d = ips_build(len(IPS_AREAS), (ips_pack_points(areas), ips_nested(s2, n4, IPS_AREAS), ips_nested(s3, n4, IPS_AREAS)))
+    return d, '%s: points per GU area %s (4U areas %s; arena pile pairs merged, icons -> %s), sections 2 / 3 moved' % (
+        IPS_4U, [len(r) for r in areas], list(IPS_AREAS), sorted({r[0x1f] for r in areas[2]}))
+
+
+def convert_ipl(path4):
+    d = bytearray(u4_find(path4, T_IPL))
+    assert d[:4] == b'IPL\0' and struct.unpack_from('<2I', d, 4) == (0x2003, len(d) - 0x24), d[:12]
+    n1, size1, off2, n2, size2 = struct.unpack_from('<5I', d, 0x10)
+    ids = set()
+    for base, n in ((0x24, n1), (0x24 + off2, n2)):
+        for i in range(n):
+            off, cnt = struct.unpack_from('<2I', d, base + 8 * i)
+            for k in range(cnt):
+                o = base + off + 4 * k + 2
+                it = struct.unpack_from('<H', d, o)[0]
+                ids.add(it)
+                struct.pack_into('<H', d, o, ITEMS_4U[it])
+            assert d[base + off + 4 * cnt] == 0xff, (path4, i)
+    return bytes(d), sorted(ids)
+
+
+def regroup_model(dg, gmap):
+    """GU MOD (convert_models output): mesh group ids (group list +0, mesh d0 bits 0..11) renamed by gmap, the group
+    list kept in id order like the sources"""
+    m = modlib.parse(dg)
+    d = bytearray(dg)
+    og, om = m['offsets']['groups'], m['offsets']['meshes']
+    ents = []
+    for i in range(m['groups']):
+        e = bytearray(d[og + 32 * i:og + 32 * (i + 1)])
+        g = struct.unpack_from('<I', e, 0)[0]
+        struct.pack_into('<I', e, 0, gmap.get(g, g))
+        ents.append(bytes(e))
+    d[og:og + 32 * len(ents)] = b''.join(sorted(ents, key=lambda e: struct.unpack_from('<I', e, 0)[0]))
+    for i in range(m['meshes']):
+        d0 = struct.unpack_from('<I', d, om + 48 * i + 4)[0]
+        struct.pack_into('<I', d, om + 48 * i + 4, (d0 & ~0xfff) | gmap.get(d0 & 0xfff, d0 & 0xfff))
+    return bytes(d)
+
+
+# ------------------------------------------------------------------ camp camera (map_com m26a00d-cam)
+# 4U rStageCameraData "SCD" v0x13 (m19a00d-cam): header {nZones, nParams, nRails, 0, offZones, offParams, offRails},
+# zones 0x44 B {u8 id, u8 type, u8 2, u8 2, u8 nConn, u8 0, u8 param, u8 0, 16 B 0, 4 corners (x, z) (= GU 左上 /
+# 右上 / 左下 / 右下 pt, same order), 2 f32 heights, u32 offset of nConn x {u8 zone id, u8 blend frames, u8 flag,
+# u8}}, params 0x38 B {vec3 pos, vec3 target 1, vec3 target 2, vec3 target 3, f32 fov, f32 roll}. Capcom's ported
+# camps (4U m01 / m03 / m04 / m05 / m11 / m15 -> GU m11 / m13 / m14 / m16 / m09 + m10 / m12) map zone id -> areaNo,
+# type -> camType, panType 0, panTarget 2, pos -> panParam.camPos, target -> panParam.target, fov, corners; their
+# three targets are equal (0, 170, 0). m19's only target set in every param is the third, (0, 240, 0) -> used.
+# GU camera 0x159a4 (record +0x31 camType): 0 = fixed camPos looking at the player + target, 1 = rail, 2 = camPos /
+# target as offsets from the player, 3 / 4 = area camera. 0x14a7c keeps the LAST matching record, and m19's catch-all
+# zone 6 (x -2948..4243, z -4805..1781, over the supply-box zone 1) is the last 4U zone -> 4U takes the first match ->
+# records in reverse order. The Fortress file (record 1 = a fixed camera at y 240, 390 below our camp floor around
+# the supply box) is replaced: its default record 0 (camType 3) kept, then 4U's type-0 zones (the supply box). Not
+# converted (deviation): zone 2 (id 4, type 1 = rail camera over x -5600..-2976, rail table at offRails), the type-2
+# follow zones (GU blends type 2 over 40 frames, 0x15428, and no GU camp uses it: the camera trailed the hunter, test
+# of 2026-10-23) and the zone-to-zone blend frames (GU connectArray left empty, as in Capcom's camps): GU's default
+# camera and blending there.
+T_CAM = 0x6b41a2f9
+CAMP_CAM = 'stage\\m26d\\m26a00d\\etc\\m26a00d-cam'
+CAMP_CAM_4U = 'stage\\m19d\\m19a00d\\etc\\m19a00d-cam'
+
+
+def convert_camp_cam(d):
+    import copy, xfs
+    s = u4_find(CAMP_CAM_4U, T_CAM)
+    magic, ver, nz, npar, nrail, z, oz, op, orl = struct.unpack_from('<4s8I', s, 0)
+    assert magic == b'SCD\0' and ver == 0x13, (magic, ver)
+    root = xfs.parse(d)
+    recs = root['mDataArray']['mpArray']
+    assert len(recs) == 2 and [r['cmnData.camType'] for r in recs] == [3, 0], [r['cmnData.camType'] for r in recs]
+    f32 = lambda v: int.from_bytes(struct.pack('<f', v), 'little')
+    v2 = lambda x, y: int.from_bytes(struct.pack('<2f', x, y), 'little')
+    v4 = lambda v: int.from_bytes(struct.pack('<4f', v[0], v[1], v[2], 0.0), 'little')
+    new, done = [recs[0]], []
+    for i in reversed(range(nz)):
+        r = s[oz + 0x44 * i:oz + 0x44 * (i + 1)]
+        zid, typ, prm = r[0], r[1], r[6]
+        if typ != 0:
+            continue
+        pts = struct.unpack_from('<8f', r, 0x18)
+        h = struct.unpack_from('<2f', r, 0x38)
+        p = struct.unpack_from('<14f', s, op + 0x38 * prm)
+        g = copy.deepcopy(recs[1])
+        for k, i2 in zip(('左上 pt', '右上 pt', '左下 pt', '右下 pt'), range(0, 8, 2)):
+            g[k] = v2(pts[i2], pts[i2 + 1])
+        g['高さ'], g['高さ(下)'] = f32(h[0]), f32(h[1])
+        g['cmnData.areaNo'], g['cmnData.camType'], g['cmnData.panType'], g['cmnData.panTarget'] = zid, typ, 0, 2
+        g['cmnData.zoomDist'] = g['cmnData.zoomRate'] = 0
+        g['panParam.fov'], g['panParam.roll'] = f32(p[12]), f32(p[13])
+        g['panParam.camPos'], g['panParam.target'] = v4(p[0:3]), v4(p[9:12])
+        g['railParam.railType'] = g['railParam.target'] = g['railParam.keyNum'] = 0
+        new.append(g)
+        done.append((zid, typ, p[0:3], p[9:12]))
+    root['mDataArray']['mpArray'] = new
+    return xfs.build(d, root), '%s zones (id, type, pos, target) %s, reversed (GU keeps the last match); rail and ' \
+        'follow zones not converted' % (CAMP_CAM_4U, done)
 
 
 # ------------------------------------------------------------------ Fortress gimmick shells (map_com shell params)
@@ -1023,13 +1238,27 @@ T_KOD = 0x2dd067f
 # SE area 3 -> 2). No kod entry (4U's state tables 0x6c55d8 / 0x6c5578 hold no mId 4 / 5).
 CANNONS_KOWARE = [('stage\\m26d\\m26a02d\\sdl\\m26a02d-k04', 'stage\\m19d\\m19a03d\\sdl\\m19a03d-s03', 4, 1),
                   ('stage\\m26d\\m26a03d\\sdl\\m26a03d-k01', 'stage\\m19d\\m19a03d\\sdl\\m19a03d-s04', 5, 1)]
+# Demolisher gate (4U scheduler m19a03d-a00, KowareObj mType 22 / mId 2: cannon a00 at (0, 2200, -8110), pitch
+# -1.134 rad keyed (raise / aim), barrel a01 recoils 300 at frame 156, PartsDisp off 152..400; actions 53 raise
+# 0..150, 54 fire 150..400 (quake 9), 55 400..700; SE controller) -> the path of file 0xc134 (m26a03d-k02, next to
+# s04's 0xc133), created by module/stage_demolisher.c like s04. Same edits as the cannons, plus its
+# ScrollCollisionSbc object (moving collision with 4U's m19a03d-a-w00-a00-shell, not shipped: GU's st007 uses
+# m26d-etc's) dropped: the gate stands behind the south wall, out of the hunters' reach (deviation).
+# mId 2 -> 6: the breakable m26a02d-k02 (converted 4U k02, KowareObj area 2, mId 2 = its Fortress slot) is created
+# first, so area + mId 2 found the breakable (no action 53 / 54: GU's lookup 0x513d3c failed and closed every request,
+# test 20:37 / 20:59). Area-2 mIds: k01 1, k02 2, doors 3, s03 4, s04 5 -> the gate 6 (no kod entry, as s03 / s04).
+GATE_KOWARE = ('stage\\m26d\\m26a03d\\sdl\\m26a03d-k02', 'stage\\m19d\\m19a03d\\sdl\\m19a03d-a00', 2, 1)
+GATE_MID = 6
+SCROLL_SBC = 0x24e6fdaf
 
 
-def convert_kobj(path4, mid, n_se, se_area=(3, 2)):
+def convert_kobj(path4, mid, n_se, se_area=(3, 2), drop_cls=(), new_mid=None):
     """4U arena KowareObj scheduler -> GU (Effect controller dropped, kowareModel Draw 1, SE area se_area[0] -> [1]:
-    Battlequarters 3 -> 2; n_se = number of SoundControl area tracks)."""
+    Battlequarters 3 -> 2; n_se = number of SoundControl area tracks; objects of the classes drop_cls removed;
+    new_mid: the KowareObj mId written instead of 4U's `mid`)."""
     import sdl
-    new = sdl.convert_4u(u4_find(path4, T_SDL), drop_ctrl=lambda c, n: c == EFFECT_CTRL, drop_keyless=True)
+    new = sdl.convert_4u(u4_find(path4, T_SDL), drop_ctrl=lambda c, n: c == EFFECT_CTRL,
+                         drop_obj=lambda c, cat, n: c in drop_cls, drop_keyless=True)
     s = sdl.parse(new)
     mids = []
     for i, n, c, tr in sdl.objects(s):
@@ -1037,6 +1266,8 @@ def convert_kobj(path4, mid, n_se, se_area=(3, 2)):
             sdl.set_values(s, tr['Draw'], [1] * len(tr['Draw']['times']))
         if c == 0x3dfe3bc2:
             mids = sdl.values(s, tr['mId'])
+            if new_mid is not None:
+                sdl.set_values(s, tr['mId'], [new_mid] * len(tr['mId']['times']))
     assert mids == [mid], (path4, mids)
     ctrl = None; areas = 0
     for i, e in enumerate(s['ents']):
@@ -1111,6 +1342,10 @@ def build_stage_arc(report):
     if 'static-cannons' not in KEEP:
         for gpath, upath, mid, nse in CANNONS_KOWARE:
             news.append((gpath, upath, convert_kobj(upath, mid, nse), 'mId %d (floor cannon KowareObj)' % mid))
+    if 'gate' not in KEEP:
+        gpath, upath, mid, nse = GATE_KOWARE
+        news.append((gpath, upath, convert_kobj(upath, mid, nse, drop_cls=(SCROLL_SBC,), new_mid=GATE_MID),
+                     'mId %d -> %d (Demolisher gate KowareObj, ScrollCollisionSbc dropped)' % (mid, GATE_MID)))
     for gpath, upath, new, what in news:
         models = []
         for p in sdl.resource_paths(sdl.parse(new)):
@@ -1119,6 +1354,12 @@ def build_stage_arc(report):
         extra.append((gpath, new, models))
         rows.append((gpath, upath, what, [m[0] for m in models]))
     doors = extra or None
+    item = None
+    if 'items' not in KEEP:                     # the 4U pile meshes under the Fortress item-model path (ITEM_MODEL)
+        pm, pr, pt, prow = convert_prop(ITEM_MODEL[1])
+        item = (regroup_model(pm, ITEM_GROUPS), pr, pt)
+        replaced.add(ITEM_MODEL[0])
+        rows.append((ITEM_MODEL[0], ITEM_MODEL[1], 'groups %s' % ITEM_GROUPS, pt))
     keep = set(); old_tex = set()
     for p, t, d in ents:
         if t == T_MRL: (old_tex if p in replaced else keep).update(mrl_textures(d))
@@ -1126,6 +1367,12 @@ def build_stage_arc(report):
     out = []; done_tex = set()
     for p, t, d in ents:
         if t == T_TEX and p in drop: continue
+        if item and p == ITEM_MODEL[0] and t == T_MRL:
+            mm, mr, mt = item
+            for tp in mt:
+                if tp not in done_tex: out.append((tp, T_TEX, convert_texture(tp))); done_tex.add(tp)
+            out += [(p, T_MRL, mr), (p, T_MOD, mm)]
+            continue
         if p in replaced and t in (T_MOD, T_MRL): continue
         if t == T_SDL and p in inserts:
             new, models = inserts[p]
@@ -1240,7 +1487,7 @@ if __name__ == '__main__':
         args = [a for a in sys.argv[2:] if not a.startswith('--keep-')]
         KEEP.update(a[7:] for a in sys.argv[2:] if a.startswith('--keep-'))
         assert KEEP <= {'sets', 'filters', 'gimmicks', 'koware', 'sound', 'relation', 'doors', 'cart',
-                        'static-doors', 'static-cannons'}, KEEP
+                        'static-doors', 'static-cannons', 'items', 'camera', 'gate'}, KEEP
         alias(args[0] if args else paths.romfs('gogmazios'))
     else:
         raise SystemExit(__doc__)

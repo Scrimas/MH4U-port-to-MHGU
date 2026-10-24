@@ -33,6 +33,7 @@ enum { R0, R1, R2, R3, R4, R5, R12, LR };
 int stage_alias_active(void);        /* stage.c */
 uint32_t stage_setup_serial(void);   /* stage.c */
 void stage_cannon_tick(void *mgr);   /* stage_cannon.c */
+void stage_demolisher_tick(void);    /* stage_demolisher.c */
 
 #define STAGE_GIMMICK_MGR 0x18977a0u
 #define MGR_KOBJ          0x21cu      /* uKowareObj *[24] (0x500d40 registers) */
@@ -65,6 +66,7 @@ static const float k_eft_pos[3] = {0.0f, 0.0f, 0.0f};   /* a01 Effect controller
 static struct {
     uint32_t serial;
     uint8_t fired, msg, eft;
+    uint8_t st_seen;      /* last kobj status logged after the trigger */
     uint32_t logs;
 } s_d;
 
@@ -75,6 +77,17 @@ static void *doors_kobj(void *mgr)
         if (k && k[KOBJ_AREA] == DOORS_AREA && k[KOBJ_ID] == DOORS_ID) return k;
     }
     return 0;
+}
+
+/* 1 once the doors' action 0 has played to its end in this stage load: 4U's cart levers into the south station and
+ * the Demolisher wait for it (0x6b5164: kobj status +0xb1 == 9; GU's doors: 3 -> 6 -> 7 -> 9, log 2026-10-23
+ * 18:44): here = action 0 sent and no longer requested / playing (status 3..7) */
+int stage_doors_opened(void)
+{
+    if (s_d.serial != stage_setup_serial() || !s_d.fired) return 0;
+    uint8_t *mgr = *(uint8_t **)MAIN(STAGE_GIMMICK_MGR);
+    uint8_t *k = mgr ? doors_kobj(mgr) : 0;
+    return k && k[KOBJ_ACT] == 0 && !(k[KOBJ_STATUS] >= 3 && k[KOBJ_STATUS] <= 7);
 }
 
 /* 4U 0x6ae768: HP * 100 / max of the first large monster, 100 if none */
@@ -115,6 +128,15 @@ static int32_t quest_elapsed(int fps)
     return (int32_t)(FIELD(uint32_t, q, 0xcc) * (uint32_t)fps * 60u) - (int32_t)FIELD(uint32_t, q, 0x1c);
 }
 
+/* for stage_demolisher.c's 10-min re-arm (4U 0x6b9de8: countdown at the fire - countdown now >= fps * 600) */
+int stage_game_fps(void) { return game_fps(); }
+
+uint32_t stage_quest_countdown(void)
+{
+    uint8_t *q = *(uint8_t **)MAIN(SQUEST_PTR);
+    return q ? FIELD(uint32_t, q, 0x1c) : 0;
+}
+
 static void doors_tick(void *mgr)
 {
     if (s_d.serial != stage_setup_serial()) {
@@ -137,6 +159,10 @@ static void doors_tick(void *mgr)
              (uint32_t)hp, fps ? (uint32_t)(el / fps) : 0u, (uint32_t)TEST_DOORS_SEC, (uint32_t)k, k[KOBJ_STATUS],
              k[KOBJ_ACT]);
     }
+    if (k[KOBJ_STATUS] != s_d.st_seen && ++s_d.logs <= 20)
+        logf("gogport: stage doors: KowareObj status %u act %u (opened %d)", k[KOBJ_STATUS], k[KOBJ_ACT],
+             stage_doors_opened());
+    s_d.st_seen = k[KOBJ_STATUS];
     if (!s_d.msg) {
         s_d.msg = 1;
         int r = hud_msg(1, HUD_DEMOLISHER, 0);
@@ -163,5 +189,6 @@ int stage_frame_c(uint32_t *regs)
     doors_tick(mgr);
 #endif
     stage_cannon_tick(mgr);
+    stage_demolisher_tick();
     return 0;
 }

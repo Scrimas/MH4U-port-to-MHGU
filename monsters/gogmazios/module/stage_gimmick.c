@@ -107,26 +107,38 @@ static float s_cam4u[16] __attribute__((aligned(16))) = {
     0.0f, 1.0f, 0.0f, 0.0f,
 };
 
-/* 0x503a5c(mgr) body for the alias: 1 = done (GU's Fortress record not used) */
-int stage_dragonator_camera(uint32_t *regs)
+/* 0x503a5c's camera part with a 4U 0xf2d440 record in GU layout (rec, 16 floats): the previous gimmick camera popped,
+ * rec pushed (0x1b08c) with the Dragonator camera's flag and countdown, which GU's 0x50396c releases at <= 0. Up =
+ * GU's own up vector of record 2. Also used by stage_demolisher.c (4U record 6). Returns 0x1b08c's result. */
+int stage_gimmick_camera(void *mgr, float *rec, float frames)
 {
-    static uint32_t s_n;
-    uint8_t *m = (uint8_t *)(uintptr_t)regs[R0];
+    uint8_t *m = mgr;
     void *cam = *(void **)MAIN(CAMERA_MGR);
-    if (!stage_alias_active() || !m || !cam) return 0;
+    if (!m || !cam) return 0;
     const float *gu = (const float *)MAIN(GU_CAM_RECORDS + 64u * GU_CAM_FORTRESS);
     if (gu[12] != 0.0f || gu[13] != 0.0f || gu[14] != 0.0f)
-        for (int i = 12; i < 15; i++) s_cam4u[i] = gu[i];   /* GU's up vector ([0x191e890], copied by 0x505538) */
+        for (int i = 12; i < 15; i++) rec[i] = gu[i];   /* GU's up vector ([0x191e890], copied by 0x505538) */
     if (FIELD(uint16_t, m, GIMMICK_FLAGS) & CAM_ON) {      /* 0x503a6c: previous Dragonator camera still on */
         cam_pop(cam, 0, 1.0f);
         FIELD(uint16_t, m, GIMMICK_FLAGS) &= (uint16_t)~CAM_ON;
         FIELD(float, m, CAM_TIMER) = 0.0f;
     }
-    int r = cam_push(cam, s_cam4u, 1, 1.0f);
+    int r = cam_push(cam, rec, 1, 1.0f);
     if (r == 1) {
         FIELD(uint16_t, m, GIMMICK_FLAGS) |= CAM_ON;
-        FIELD(float, m, CAM_TIMER) = CAM4U_DURATION;
+        FIELD(float, m, CAM_TIMER) = frames;
     }
+    return r;
+}
+
+/* 0x503a5c(mgr) body for the alias: 1 = done (GU's Fortress record not used) */
+int stage_dragonator_camera(uint32_t *regs)
+{
+    static uint32_t s_n;
+    uint8_t *m = (uint8_t *)(uintptr_t)regs[R0];
+    if (!stage_alias_active() || !m || !*(void **)MAIN(CAMERA_MGR)) return 0;
+    const float *gu = (const float *)MAIN(GU_CAM_RECORDS + 64u * GU_CAM_FORTRESS);
+    int r = stage_gimmick_camera(m, s_cam4u, CAM4U_DURATION);
     if (++s_n <= 10)
         logf("gogport: stage dragonator: camera 4U m19a03 eye (%d, %d, %d) target (%d, %d, %d) fov %d up (%d, %d, %d)/1000"
              " for %d frames -> push %d (GU Fortress record: eye (%d, %d, %d) target (%d, %d, %d))",

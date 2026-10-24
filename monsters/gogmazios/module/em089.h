@@ -15,11 +15,14 @@ void em089_fields_init(void *self);   /* em089_act.c: zero our fields (ctor) */
 int em089_cond(void *self, uint32_t id);   /* em089_act.c: GU slot 133 = 4U slot 51 (AI conditions) */
 void em089_state_update(void *self);  /* em089_act.c: GU slot 119 = 4U slot 40 (per-frame state) */
 void em089_action_start(void *self, uint32_t cat, uint32_t num);  /* GU slot 129 = 4U slot 47 */
+uint32_t em089_knock_count(void *self);   /* em089_act.c: 4U work+0xe5 (10/108 / 109 / 202 / 203 in 900 frames) */
+void em089_knock_slide(void *self);       /* em089_act.c: 4U 0x8bdaec, slide to arena point 18 */
 void em089_action_remap(void *self, uint8_t *cat, uint8_t *num);  /* GU slot 127 = 4U slot 46 */
 int em089_motion_frame(void *self);   /* GU slot 130 = 4U slot 48 (per-motion camera shakes) */
 void em089_net_get(void *self, uint8_t *out, uint32_t size);       /* GU slot 171 = 4U slot 78 (net message) */
 void em089_net_set(void *self, const uint8_t *in, uint32_t size);  /* GU slot 172 = 4U slot 79 */
 void *em089_target_hunter(void *self);   /* em089_act.c: the hunter target slot 0 points at (same on every machine) */
+void *em089_hunter_at(uint32_t i);       /* em089_act.c: hunter i (0..3) of the hunter list, 0 if none */
 uint32_t em089_drop_set(void *self);                /* em089_act.c: GU slot 149, shiny-drop table set (4U work+0xed) */
 void em089_set_drop_flag(void *self, uint32_t v);   /* em089_act.c: 4U work+0xed, written before an item drop */
 MtDTI *em089_dti(void);

@@ -25,7 +25,18 @@ enum {
     EM089_EFX_IMPACT = 3100,      /* 0x954e5c kind 1: qe006_000 */
     EM089_EFX_TAIL_BREAK = 3300,  /* slot 64 0x8c67c0: qe013_002 on joint 143 */
     EM089_EFX_S051 = 5100,        /* + uShell051 subtype: ground shell effect (world position) */
+    EM089_EFX_TAR_LOOP = 7000,    /* 4U 0x3284ac state 3: qe008_026 looping on the tarred hunter (joint 0) */
+    EM089_EFX_TAR_END = 7001,     /* 4U 0x3284ac state 3 -> 0: qe008_025 once on the hunter (joint 0) */
 };
+
+/* post on an explicit attach model (req+0xd0 = model, flag 2, req+8 = 3, req+0xc = area: GU's own player effect
+ * post 0x44cdd0 -> 0x4a1e50 with the player shell's model), joint from the record */
+void *em089_efx_post_model(void *self, uint32_t id, void *model, uint32_t area);
+/* 1 while an em089 has run a frame and is not destroyed (the tar-status rules apply, em089_tarhunter.c) */
+int em089_efx_present(void);
+/* em089_tarhunter.c: per frame (from the em089 effect tick), 4U's tar look on tarred hunters */
+void em089_tar_hunters_tick(void *self);
+void em089_tar_hunters_forget(void);
 
 /* hook for em089_shell016.c (em089_shell016_fx): the 4U uShell016 uEffect002 posts (first call = init, second call
  * for the same shell = the end effect at life <= 10); the effect's end follows the 4U shell rule (owner motion change /
@@ -55,10 +66,18 @@ void em089_efx_tail_break(void *self);
 void *em089_efx_stage_kowareeft(uint32_t index, uint32_t group, const float *pos, uint32_t area);
 /* any of the 14 arena EFLs m19a03_NNN (n 0..13, all elements) at a world position */
 void *em089_efx_stage_efl(uint32_t n, const float *pos);
+/* same with a rotation (degrees x, y, z: 4U request rotation, e.g. the Demolisher launch along the barrel) */
+void *em089_efx_stage_efl_rot(uint32_t n, const float *pos, const float *rot_deg);
 /* same, attached to a unit (follows it; the unit must outlive the effect: em089_efx_stop, then wait until
  * !em089_efx_alive before the unit dies, as em089_shell.c does). 4U uShell022 subtype 9 (quest-fired arena projectile,
  * per frame 0xc74b78): m19a03_006 at launch, m19a03_012 trail (looping, handle +0x288), m19a03_007 at impact. */
 void *em089_efx_stage_efl_on(uint32_t n, void *unit);
+/* same at a position, as GU's moving beam (req+8 = 3), to be moved every frame with em089_efx_place: for units
+ * without a model (GU uShellPlcom_011 mode 0, 4U uShell022 kind 9: the attach above found no model, test
+ * 2026-10-24 08:43 "never saw it move, wrong initial location") */
+void *em089_efx_stage_efl_track(uint32_t n, const float *pos, const float *rot_deg);
+/* move a live effect: world position, rotation in radians (x, y, z) or 0 */
+void em089_efx_place(void *eff, const float *pos, const float *rot_rad);
 
 /* 4U uEm089 slot 75 (0x8c3ca0) = GU object slot 168 (vt+0x2a0, per-frame joint-override hook after the motion
  * update, called from the enemy update 0xae1f4; Rajang 0xde5f80 and em0xx 0xd53f64 use it the same way with the

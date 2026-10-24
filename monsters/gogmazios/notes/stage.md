@@ -665,7 +665,12 @@ C = traced. 4U = v1.1, GU = 1.4 main. Resume list + all addresses: checklist "Ar
   frame, life 120 / 60), end 0xc776a0 lowers the barrel).
 - GU: s03 -> m26a02d-k04, s04 -> m26a03d-k01 (created by the module for area 2 with 0x500bb4 at 0x4fdf7c); two
   interaction records (kind 11 = Dragonator switch, mgr [0x1889ec0], alloc 0x31aa6c, register 0x31abac, free
-  0x31aaf4; record +0x4 pos, +0x44 height, +0x48 radius, +0x58 area, +0x60 type, +0x64 kind); ready answered in
+  0x31aaf4; record +0x4 pos, +0x44 horizontal radius, +0x48 height (|dy| < h / 2) (in-range test 0x319278, C; the
+  fields were swapped until 2026-10-24: prompt out to 200 while the cannon match took 160, and a press in that ring
+  fell through to GU's Dragonator: test 09:49 05:01, user "the restraint triggers the Dragonator". 4U's restraint
+  = these cannons: hit types 48 / 49 -> 10/200 / 10/228 (0x939cd8 table 0x939ce8 -> 0x93a5f4), turning em089 to
+  arena points 9 / 8 beside them. Fixed: radius 100 / height 200, local match margin 150; em089_pile.c's record had
+  the same swap, fixed too), +0x58 area, +0x60 type, +0x64 kind); ready answered in
   the 0x503b88 hook (lr 0x2ed448 = kind-11 check), fire in stage_gimmick.c's 0x503bb0 hook (lr 0x2d9514 = switch
   action type 0), Dragonator follow-up 0x503a5c skipped for that press; projectile = GU uShellPlcom_009 (shell type
   29, the st008 cannon's shot; setup param 0x4632ec(20, 16) {vt 0x175f7b0+8, type 29, mode 1, owner, u8 0}, post
@@ -681,7 +686,8 @@ C = traced. 4U = v1.1, GU = 1.4 main. Resume list + all addresses: checklist "Ar
 - Deviations: the bonus shell keeps life 120 (4U 60, GU life field not located); prompt text/icon = GU's
   Dragonator-switch prompt; single player (no net requests); 4U's online-only re-arm shortcut (0x6b1004) not ported.
 - Demolisher / pile bunker: NOT reachable in 4U (no kind-34 / kind-36 record in code, m19 data or any m19 quest;
-  checklist "Arena 4" item 4); Demolisher = gate KowareObj a00 (actions 53/54/55) for the record.
+  checklist "Arena 4" item 4); Demolisher = gate KowareObj a00 (actions 53/54/55) for the record. 2026-10-23: the
+  Demolisher is ported anyway by the user's rule (section 15).
 - Expected logs: `gogport: stage cannon: s04 scheduler (file c133) -> <non-zero>`, `... interaction records (kind
   11) ..`, `... enabled, both used until 180 s ..`, after 3 min `stage cannon 1/2: re-armed` + `action 51 (ready:
   barrel up 25 deg)`, at the cannon `prompt check -> 1`, press: `FIRE (25 deg, 1 shell(s) ..)`, `shell .. start
@@ -689,7 +695,7 @@ C = traced. 4U = v1.1, GU = 1.4 main. Resume list + all addresses: checklist "Ar
   3 min at 25 deg `action 55`, next press a bonus volley (2 shells, pitch d8e4 + ee39). Fallback: module define
   STAGE_CANNONS_OFF; converter `--keep-static-cannons` (old static clones, no kobjs).
 
-### Camp camera: not done (time; section 13 has the SCD layout).
+### Camp camera: done 2026-10-23 (section 15).
 
 ## 2026-10-19: camp dark wedges (2nd attempt, after the w6-bit-31 "lit" change did not remove them)
 - Ruled out (C, offline): (a) blend: the camp torch billboards m19a00d-a00_00..02 (4U BSAddAlpha, glow fan + flame
@@ -740,4 +746,181 @@ wall tops). Pure-black masks of the screenshots: scratchpad mask32/33/34.png (us
   stretched to that vertex (83 non-degenerate in a00, 61 with an edge > 1000, 25 > 5000, max 326923; 56 in a02).
   Fix: 0xFFFF after every mesh (all area models, props, kobj models of m28d). The c04 camera check (FILTER_SETS) and
   DRAWMODE_CAMCHECK stay (4U data), the glow-fan diagnostic is removed.
+
+## 15. 2026-10-23: playtest fixes (ammo pickups, cart riders, camp camera, Demolisher)
+### Item pickups (tools/stage4u2gu.py convert_ips / convert_ipl / regroup_model; `--keep-items` = Fortress's)
+- Fortress gathering points (ammo floating in the sky) replaced by 4U m19d's: IPS 'stage\m19d\m19d' areas 0 / 1 / 3
+  -> alias 0 / 1 / 2, item lists (IPL low / high / G) with the 4U items mapped to GU ids by name (ITEMS_4U: Ballista
+  Ammo 780 -> 1730, Cannon Ammo 783 -> 2115, and the ten G-rank supplies), the Fortress pile model m26d-item
+  replaced by 4U's m19-item (ITEM_GROUPS: full piles 21 / 23 / 25 / 27 / 29 -> groups 17..20 and 7, the rest -> 22..28).
+  Points per area [2, 2, 5] at 4U positions.
+- Icons (fix of the first test's insects / invisible piles): GU's point visual uShellSt001 (init 0x4915fc) draws a
+  model group only for icons < 21 and 37 (1..12 -> groups 5, 6, 7, 8, 1, 2, 11, 12, 3, 4, 9, 10; 13..16 none; 17..20
+  -> 17..20; 37 -> 21); 21..28 are the bug-point effects (butterflies / fireflies), 29 / 34 / 35 / 38 / 39 other
+  St001 effects. Ours: icons 17..20 and 3 (group 7); 1 / 2 / 5 / 6 / 11 / 12 avoided (Palico gather scans 0x31badc /
+  0x31bc34).
+- Deviation: 4U chains a full pile and a small pile (0x5b8c20: the small one appears when the full one is used up).
+  GU has no chain: each 4U pair = one GU point, counts added (8 / 6), flags 0x01, icon = the full pile mesh (4U
+  group = icon - 1). The small-pile stage is not shown.
+- Carried Cannon Ammo (2115) is a pouch item in GU (carry items 2105..2115, 0x1943bc; Ballista Ammo is not one):
+  player+0x32a0 carry state (1 / 2 carrying, 3 / 4 drop, 5 loaded), +0x32a4 held shell. 0x2ffedc runs EVERY FRAME
+  (hunter vt+0x24 0x29b65c -> 0x29b8e8 -> 0x29bad4): outside the carry action group (+0x2506 == 0x1000; a light hit
+  switches to the carry flinch (0x1000, 6), 0x2ae118) state 2 -> 3 and the ball falls; in states 0 / 3 / 4 / 5 a carry
+  item that 0x19cf50 finds in the pouch is removed the next frame (vt+0x360 = 0x3015e0 -> 0x19b7fc(pouch, item,
+  -99)), unless the quest phase byte [0x188ad90]+0x50 is in {4..7, 9} (2 = playing, logged in our quest). A cart load
+  (carry action 43 = 0x2c49b0) sets state 5 and requests 0x497040(cart, 2) (ammo +3, no pouch access); the pouch
+  removal is the same per-frame path. 4U removes it the same way (0xb17d0c, the same frame; cart / cannon load =
+  carry action 12 0xb5df7c removes item 783 at once): no carry hook needed (helper gu5). "Still held" after a hit /
+  a load (tests 18:44 / 20:06) = RESOLVED, not the mod: the tester's Ryujinx cheat "<Inf Use Carry Item Cheat>"
+  (cheats/enabled.txt) patches main+0x3015f8 (`mov r7, r2` -> `mov r7, #0` in hunter vt+0x360 = 0x3015e0), so
+  every pouch change through it is 0: the ball stays in the pouch (slot 32 = slots 0..23 full) and the next pickup
+  says "maximum" (helper gu7, C; item 2115: type 0, max 1, carry flag +0x13). Removal works with the cheat off.
+  (0x19cf50 skips slots 24..31 unless the weapon class is 4 / 5 / 6 / 10; adds skip them too.)
+  `diag carry` logs GU's scan, a raw scan (item, slot, count), group / action and weapon type. Our points give the
+  Fortress' items.
+### Cart riders (module/stage_cart.c)
+- CORRECTED (helper gu6, C): st006+0x15e7 bit 6 is the collision's STILL / teleport flag, not "moving". GU sets
+  it for its own whole move (0x495f80 / 0x49600c .. 0x49665c) = GU's cart carries walkers through nothing but the
+  lever attachment. 0x495d48 passes it to the placement 0xc4754c -> 0xb13638: entry+0x33 = 1, +0x34 = flag | matrix
+  unchanged (0x9c49ac) | sticky +0x50; 0xc1a548 files +0x34 == 0 entries in the moving tree sCol+0x8d8, the rest in
+  sCol+0x10d8. The ground-carry probe 0x4f57f0 (filter +0xc9 = 0: no static terrain) only searches the moving trees
+  (gate 0xc3ee74: entry enabled, owner != the searcher, type & 1, area mask, +0x33 != 0 and +0x34 == 0). The first
+  fix (bit set while a leg moved) put the cart in the still tree: only lever-attached hunters rode (test 18:44).
+  Now: 0 on continuous frames, 1 for two frames after a scheduler-frame jump (first placement, a leg start away
+  from the last pose). Walkable moving collision elsewhere in GU uses flag 0 too (em012 0xd79b54, em087, our
+  Dalamadur dala_walk.c). Ground carry 0x29c368 and the lever carry 0x2f6a34 are exclusive (player+0x3274), so no
+  double carry. Risks: w00 (type 34) becomes a moving wall that pushes; the tester's first "falls through the
+  moving cart" (11:36, bit never written) had an untraced cause; the cart's area mask = 1 << st006+0x1054 at init.
+- Test 20:37 (`diag ride: cart contact`): contact held for whole legs (W -> S frames 3051..3852); one loss during
+  motion (N -> W frame 334, hunter on the deck going airborne, group 4), user: "mid-route (slope / turn), walking
+  and idle, a bit random". The on / off flicker while the cart stands (leg frames 0..49, 700..800) moves nothing.
+  Change: stage_cart_wall @0x495d6c places only w00 with the still flag (no sweeping wall pushing riders); g00 keeps
+  flag 0 (carry).
+- Test 20:59 (still w00), user: "still fall on some part, still left behind mid route on some turn". Log: leg N -> E
+  frame 8686 (4U s00 keys 8670 -> 8694: roll 9 -> 23 deg, yaw -162 -> -148), the hunter 63 above the cart origin =
+  on the low side of the banked deck, lost contact and fell to the arena floor. Helper gu9 (C): the ground query
+  0x18192c (from 0x2e846c) searches both trees with type mask 1 (g00 17 yes, w00 34 never) and keeps the highest hit
+  up to y + 100; grounded and 30+ above it -> airborne (0x2e86fc). The slot-10 wall sweep starts at player+0x1000
+  (pre-carry), so a teleported (still) w00 moves one frame's carry across riders at the trailing fence (w00 group 1
+  = inward fence 165..392 all around the deck, GU m26d-a-w00-s00) -> left behind (S). Why the query misses the deck
+  is not traced. Changes: stage_cart_wall removed (w00 moving again); stage_cart_ground @0x2e85a4 = deck backstop
+  while a leg runs (deck plane local y 165 over x -446..451, z -337..310 from st006+0x40 / quaternion +0x50; replaces
+  GU's result only when GU missed: no hit or 150+ below, hunter within 100 of the deck; log `deck backstop`, and a
+  `deck check` of our maths against GU's own deck hits); stage_cart_air @0x2e86fc logs every airborne switch during
+  a leg (`hunter airborne`, deck over / off, local x / z).
+- Test 2026-10-24 08:43, user: "still dropped me" (N -> W turn); elsewhere "stay on the moving platform but
+  positioned as if on the ground not moving". Log: `deck check` = GU's hit to the unit (pose maths right), the
+  backstop never fired; frames 300..332 of N -> W (turn + rise start, 4U keys 306 / 338) the hunter (contact on)
+  stood still in the world while the cart moved 400, then `hunter airborne` at local x -450 (behind the rear fence
+  -446, ground 1700). Cause (C): slot 10 adds a carry only when 0x4f594c(player+0x2f00) returns 1, i.e. when
+  0xc3eb0c could sweep the hunter to the contact point moved by the entry's old -> new matrix; a blocked sweep = no
+  carry. Change: collision always still (GU's carry never engages; still entries are seen by the ground query) and
+  stage_cart_place @0x495d6c carries the local hunter rigidly (position + facing as 0x29c520) from the last placed
+  pose to the one just placed, in the same update that moves the collision (log `rider carried / not on the deck`).
+  Lever-attached hunters stay GU's. Palicoes are not carried (G: deviation if 4U carries them).
+- Test 09:49 (own carry), user: "issues, but better". Log: 7 legs carried; one loss, N -> E frame 8679..8695: the
+  banked deck's low side (local x 337) dipped below the N platform (y 1700), GU's ground query (highest hit up to
+  y + 100) returned the platform, the hunter stood on it and the cart left. Fix: the hunter carried by the last
+  placement keeps the deck as his ground while over it (stage_cart_ground: GU's result 5+ off the deck -> the deck,
+  log `deck kept for the rider`); the rider is cleared on arrival.
+- Lever gating = 4U 0x6b4fe0: legs into S (44 W -> S, 50 E -> S) only once the doors have opened (4U doors kobj
+  status 9; GU's doors went 3 -> 6 -> 7 -> 9 in the 18:44 log; stage_doors_opened = action 0 sent and status no
+  longer 3..7); no leg while the
+  Demolisher gate is raised for its shot (idle after 53) or moving with another action than 55.
+- Test 2026-10-23, open: walking on the moving cart does not add its motion. Log 18:44 (`diag ride`, N -> W and
+  W -> S legs): the contact record player+0x2f00 stayed empty the whole time (found 0, entry 0xffffff, delta 0),
+  on the deck and on the ground. The hunter standing in the lever action 298 moved with the cart (x 619 -> -33 in
+  1 s = the cart's 12 / frame from frame 49) and kept moving while idle (action 0) afterwards, until action 9;
+  walking (actions 4 / 5 / 22) he stayed in place and fell off. So riders are carried only by the lever action's
+  attachment (player+0x3274 / +0x3278, 0x2f662c); GU's ground carry (0x29c368) never engages because its probe
+  0x4f57f0 (vertical sweep 0xc3ab78 through [0x21270e0] with a filter: type 10, area mask, player mask vt+0xac(pl,
+  1), callback object 0x1897240) does not accept the cart's polygons (GU's own Fortress collision g00-s00 / w00-s00,
+  0xd426 / 0xd427). GU's own cart probably carries no walkers either (G). Next: what the filter needs (polygon
+  attribute / collision object flag) so walkers are carried, as 4U.
+### Camp camera (tools/xfs.py build + stage4u2gu.py convert_camp_cam; `--keep-camera` = Fortress's)
+- xfs.build() serializes the parsed XFS (all 53 GU camera XFS rebuild byte-identical). GU camera list m26a00d-cam
+  (0x6b41a2f9): Fortress record 0 (camType 3) kept as the default; 4U SCD zones of type 0 / 2 appended in REVERSE
+  order (GU 0x14a7c keeps the LAST matching zone, 4U the first): areaNo = zone id, panType 0, panTarget 2, target =
+  4U param target 3 (+0x24; m19 sets only it, Capcom pairs have all three equal), camPos / fov from the param.
+  SCD v0x13 layout: zone 0x44 B {id, type, 2, 2, nConn, 0, param, 0, 16 B, 4 corners (x, z), 2 heights, conn
+  offset}, param 0x38 B {pos, 3 targets, fov, roll}. Supply-box zone 2: camPos (-154, 958, -302), fov 50.
+- Deviations: the 4U rail zone (type 1, west side) and the zone-to-zone blend frames are not converted (GU default
+  camera there / GU blend).
+- Test 2026-10-23: the camera followed far too slowly. GU's camType 2 (eye = player + camPos) blends over 40 frames
+  (0x15428) and no GU camp uses type 2 (m19 is the only camp with type-2 zones). User: drop them -> only the
+  supply-box zone 2 (type 0) + record 0; GU's normal camera elsewhere.
+### Demolisher (module/stage_demolisher.c header has the full trace; tools/stage4u2gu.py GATE_KOWARE)
+- First port (test 2026-10-23): a kind-11 prompt on the cart at S, never usable (the gate kobj sits in status 3
+  before its first action and 3 counted as busy). Replaced by 4U's rule (user's choice: one Dense Marcoal in the
+  supply box): USE Dense Marcoal (GU 1733) in the cart's fire point at S. GU has the whole path (GU helper, C): item
+  use 0x2f80f8 case 1733 -> nearest kind-29 record (0x2f9238) + ready check 0x5048e8 -> action 301 (online 306
+  lock first) = switch type 5 (motion 0x7df) -> 0x5048fc(mgr, player) on every machine, locally 0x50491c (GU's
+  Demolisher camera) and the item consumption. Port: static kind-29 record at (0, 1865, -5315) radius 150 /
+  height 100; hooks stage_demolisher_ready @0x5048e8 (lr 0x2f8ddc hunter / 0x12175bc Prowler / 0x60f0ec prompt:
+  4U 0x6b56e4 = cart parked at S, not fired since the re-arm, gate idle, + the spot), stage_demolisher_fire
+  @0x5048fc (ours; GU's st007 shot never runs in the alias), stage_demolisher_cam @0x50491c (skipped: 4U's
+  record-6 camera instead). The cart's own shot (kind 26) is unavailable at S, as 4U.
+- Re-arm (4U 0x6b9de8..): 10 min of quest countdown after the fire -> gate action 55 -> GU QuestDialog 93 "The
+  Demolisher is ready for use." (4U 20).
+- 2026-10-23 20:30, user's rule: NO item, ONE use per quest (4U's Marcoal is not in the box at the start; the item
+  build was never reached: the game crashed first). The kind-29 record, the three hooks (0x5048e8 / 0x5048fc /
+  0x50491c), the supply-box Marcoal and the re-arm are removed; the trigger is a kind-11 switch record at the S fire
+  point (0, 1865, -5315), radius 150 (+0x44) / height 100 (+0x48), through stage_cannon.c's 0x503b88 / 0x503bb0
+  hooks (stage_demolisher_ready / stage_demolisher_fire), usable while the cart is parked at S and the gate idle.
+- Test 20:37: it fired, but the gate never moved and the shell left 7 ms after the press (impact 1.2 s later): GU's
+  play-action 0x515328 set status 3 and GU's action-end path 0x51479c (3 / 4 -> 2) closed actions 53 and 54 the next
+  frame (cause in GU's kobj update not traced; the cannons' kobjs play fine). Now stage_demolisher_tick plays the
+  gate on its scheduler frame (kobj+0x158: +0x34 frame, +0x38 last, +0x40 paused, step +0x1c, as stage_cart.c):
+  raise 0 -> 150, the shot when raised (4U 0x6b9d28), fire 150 -> 400 from the launch (4U command 37 at 0xc74e38).
+  Not ported: action 54's quake 9 (it came from the kobj action).
+- Test 20:59: still no motion. ROOT CAUSE (helper gu8, C): the breakable m26a02d-k02 (converted 4U k02) is also area
+  2 / mId 2 and is created first, so gate_kobj() (area + mId) returned the breakable: its action list has only Ids
+  0 / 1, GU's start 0x513d3c found no 53 / 54 and its end path closed the requests; and an idle kobj's scheduler is
+  never evaluated (0x513508 clears scheduler +0xc bit 0x400; the move loop needs (flags & 0x407) == 0x402), so the
+  frame writes did nothing either. Fix: GATE_MID 6 (tools/stage4u2gu.py convert_kobj new_mid; area-2 mIds k01 1,
+  k02 2, doors 3, s03 4, s04 5), gate_kobj() by area + mType 22, GU's own play again (0x515328 53 at the press,
+  54 at the launch: quake 9 + SE with them), the shot once 53 was seen playing (6 / 7) and has ended (id kept,
+  status out of 3..7), or after 600 ticks (logged). Side effect of the old build: our 53 / 54 requests went to the
+  breakable (net message 0x21d028 keyed by area / mId, kod state 0x501864 of its entry {2, 2, idx 4}).
+- Test 2026-10-24 08:43: the gate raised (53), the shot launched 2.5 s later (54), impact (0, 0, 1602) 1.2 s later.
+  User: "wrong trajectory, never saw it move, wrong initial location; 4U charges slightly before firing; >10 s from
+  trigger to impact". Helper gu10 (C unless marked):
+  - Time base identical: both games' delta = real seconds * 60 (4U [0x1057194]+0x5c, base +0x2c = 60.0; GU
+    [0x2126764]+0x68, +0x38 = 60.0), unit delta = it * line scale (4U unit+0x14 at 0x64529c, GU unit+0x1c at
+    0xc076e0): 2 per frame at 30 fps, 0.5 at 120. Schedulers (4U 0x1d7b14 = GU 0x966164), shell timers and the
+    integration (4U 0x9a94f4, GU 0x539f4c: pos += v dt + a dt^2 / 2) all use it -> 4U frame counts, per-frame
+    velocities and gravity port 1:1. 4U trigger -> launch = 150 + 20 units = 2.8 s plus the flight; camera 372 =
+    6.2 s. So the reported ">10 s" is not in 4U's code.
+  - No charge effect anywhere (fire 0x6b958c, per-frame 0x6b985c, gate scheduler: no Effect track, uShell022 kind 9
+    states 0 / 1). Charge-like: the gate's raise (action 53: -65 deg held to f20, ratchet to -57 by f37, raise to
+    -15 by f110, kick -11 at f112, settle f122, hold to f150; SE 301@0, 303@20, 301@25, 301@95, 300@107, 302@112)
+    and the shell's 20-unit wait at the muzzle (state 1).
+  - GU uShellPlcom_011 mode 0 skips its 20-unit wait (0x4668a8 runs only with spawn byte [+0x136c]+8 == 1, mode 0
+    is chosen only when it is 0, 0x4664c8): it launched on its first update. Fix: our post is delayed by 20 units.
+  - Neither game draws a shell model (4U 0xc75520 skips it for kind 9): the visible shot is the trail m19a03_012,
+    attached to the shell in 4U (0xc74ea4). Ours was attached through vt+0x130 (no model): it stayed put. Fix:
+    posted at the shell (req+8 = 3, as GU's moving beam) and moved onto it every frame along the velocity
+    (em089_efx_place). Our waits now count the game delta (RAISE_WAIT, the post wait), not ticks.
+  - Open (S): 4U em089 this+20 (the u16 delta tar_add truncates) is ~2 at 30 fps, not 1 as em089_act.c's note says.
+- Cart barrel (4U s02 mRot x, 66 keys of the s00 scheduler): GU's m26d-s01 at st006+0x15a4 is pitched once at init
+  (0x495324, FUP -2 / 10 deg); stage_cart.c writes the 4U pitch every frame with 0x8a7dc4 (folded -75 deg while
+  travelling, N -16, W 15, S 90, E 0). Not ported: 4U s01's travel roll (1055 z keys, 0..4 deg; GU's st006 body =
+  the path model, its roll would tilt the collision).
+- Gate m19a03d-a00 -> m26a03d-k02 (file 0xc134, area 2 slot 6, KowareObj mType 22 mId 2), its ScrollCollisionSbc
+  (class 0x24e6fdaf) dropped (`--keep-gate`: none). Fire: 4U camera record 6 (372 frames), action 53 (raise, frames
+  0..150), then GU's uShellPlcom_011 mode 0 (= Capcom's port of uShell022 kind 9) with 4U's start (0, 2777, -5956),
+  pitch 0xf556 (-15 deg = a00 mRot x at frame 150), velocity (0, -1.5, 108) rotated; 4U effects m19a03_006 / 012 /
+  007 instead of GU's; action 54 at the launch.
+- Deviations: no in-flight hit (4U 2500 type 67 radius 500; GU mode 0 attacks only in the explosion, pl_com_011 has
+  no record for it); 4U's impact check on em089 + stage byte +0x1838 not ported; GU's switch motion 0x7df for 4U's
+  0x20f; 4U's action-54 frame remap during the re-arm wait not ported.
+- Note (GU in-range test 0x319278: +0x44 = horizontal radius, +0x48 = height |dy| < h / 2): stage_cannon.c and
+  em089_pile.c write the two the other way round. Cannons: GU sees 200 / 100 (= st006's lever records, works).
+  Pile: GU sees radius 300 / height 100 * scale while its own fire check uses 100 -> prompt shown farther than it
+  fires (not changed).
+- Expected logs: `Dense Marcoal record (kind 29) ..`, `gate scheduler (file c134) -> <non-zero>`, `Marcoal check (lr
+  60f0ec) -> 1` at the spot, use: `Marcoal check (lr 2f8ddc) -> 1`, `switch type 5 by .. (local) -> fired`, `FIRE by
+  ..: gate action 53`, `gate action 53 status ..`, `shot posted`, `shell .. start (0, 2777, -5955)
+  pitch f556 yaw 0 vel (0, ~26498, ~104709)/1000`, `launch at ..: m19a03_006 .., trail ..`, `impact 2 at ..`,
+  `shell .. gone`; the gate's later actions (54, then 55 if the kobj chains it) as `gate action N status M`.
 

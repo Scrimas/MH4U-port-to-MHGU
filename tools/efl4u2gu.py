@@ -141,6 +141,12 @@ def pel_follows(rid):
 FILTER_GU_W24_31 = (0x04041000, 0, 0x3F800000, 0xBDCCCCCD, 0x3F000000, 0x3F800000, 0x3F000000, 0x3F800000)
 # GU effect material template (BSBlendAlpha effect, no animation block): Kushala's arc cm101_000 mat 0
 mrl_build.TEMPLATES.setdefault('efx_blend', ('/nativeNX/arc/enemy/em024_00.arc', 'effect\\base\\cm101_000', 0))
+# GU opaque lit effect material (for 4U BSSolid effect models, e.g. the tar coat qe000_004 'XfB_0__m00_': emission
+# 0.5, diffuse 0.598, lit): em062_00 effect\base\em062_00_000 mat 0 'XfB_W_0__m00_' = Capcom's conversion of 4U's
+# XfB_W_0 preset on an effect-format mesh (BSSolid, FLighting, FDiffuseVertexColor, FSpecularMap, FEmission;
+# emission 0.5). Effect-format meshes with an opaque lit material exist only in em001 / 023 / 030 / 033 / 042 / 062,
+# ems007 and com (GU arc scan 2026-10-23); with efx_blend the coat drew as a white translucent shell (test).
+mrl_build.TEMPLATES.setdefault('efx_solid', ('/nativeNX/arc/enemy/em062_00.arc', 'effect\\base\\em062_00_000', 0))
 
 
 def phash(p):
@@ -395,9 +401,10 @@ EFX_GU, EFX_GU_STRIDE = 0x207D603B, 24      # GU effect format (S: 12k GU effect
                                             # f16 uv, u8 RGBA (sample normals decode to unit length, e.g. (0,0,-1))
 
 
-def convert_effect_mod(d):
+def convert_effect_mod(d, white_mats=()):
     """boneless 4U effect MOD (0xE6) -> GU MOD (0xD4), every mesh in GU's effect vertex format 0x207D603B
-    (4U vertex colour kept, (0, 0, 0, 255) for the colourless 0x82917009 meshes; uv v -> 1 - v as mod4u2gu)."""
+    (4U vertex colour kept; the colourless 0x82917009 meshes get (0, 0, 0, 255), or white when their material index
+    is in white_mats; uv v -> 1 - v as mod4u2gu)."""
     import numpy as np
     m = modlib.parse(d)
     assert m['version'] == 0xE6 and m['bones'] == 0, 'effect models are boneless'
@@ -419,7 +426,8 @@ def convert_effect_mod(d):
         # constant white colour (0 of 274 in 60 enemy arcs, 22 constant (0, 0, 0, 255)). The GU effect material
         # (FDiffuseVertexColorMD) doubles the vertex colour: the old white fill drew these meshes at 2x = saturated
         # white (test 10: ef_em089 heap disc em089_015 u1, explosion smoke)
-        col = v[:, 24:28] if st == 28 else np.tile(np.array([0, 0, 0, 255], np.uint8), (n, 1))
+        fill = (255, 255, 255, 255) if x['material'] in white_mats else (0, 0, 0, 255)
+        col = v[:, 24:28] if st == 28 else np.tile(np.array(fill, np.uint8), (n, 1))
         q = np.clip(np.round((nrm + 1.0) * 0.5 * 1023), 0, 1023).astype(np.uint32)
         nw = q[:, 0] | (q[:, 1] << 10) | (q[:, 2] << 20) | (3 << 30)
         out = np.zeros((n, EFX_GU_STRIDE), np.uint8)
@@ -471,23 +479,47 @@ def convert_effect_mod(d):
 
 
 def convert_model(path, mod4, mrl4):
-    """effect MOD + MRL -> GU. Materials: GU effect template, 4U blend/depth/raster states, 4U textures."""
-    gmod = convert_effect_mod(mod4)
+    """effect MOD + MRL -> GU. Materials: GU effect template (efx_solid + the 4U CBMaterialStd constants for 4U
+    BSSolid materials, else efx_blend), 4U blend/depth/raster states, 4U textures."""
+    import mrl_anim
     r4 = mrl.read(mrl4)
+    by_hash = {mm['name']: mm for mm in r4['mats']}
+    # colourless 4U meshes of an opaque material: white (efx_solid's FDiffuseVertexColor scales the lit diffuse by
+    # it; 4U has no vertex colour there), else (0, 0, 0, 255) as Capcom's blended effect conversions. 4U opaque
+    # effect materials of em089's set: the tar coat qe000_004, the tar wrap qe000_000 (drawn by qe008_026 = PEL 7000
+    # on a tarred hunter), qe000_001 (tar), one ef_em089 mesh.
+    names = modlib.parse(mod4)['material_names']
+    white = {i for i, n in enumerate(names)
+             if 'BSSolid' in by_hash.get(mrl_build.name_hash(n), {}).get('states', ())}
+    gmod = convert_effect_mod(mod4, white)
     # 4U texture table: (type, path), type 0 = reserved slot (LUT samplers); keep the real textures, renumber
     tex_paths, newidx = [], {}
     for i, (ty, p) in enumerate(r4['textures']):
         if ty == T['TEX']:
             tex_paths.append(p); newidx[i + 1] = len(tex_paths)
-    by_hash = {mm['name']: mm for mm in r4['mats']}
     mats = []
     for name in modlib.parse(gmod)['material_names']:
         mm = by_hash.get(mrl_build.name_hash(name))
         assert mm, '%s: no 4U material for %s' % (path, name)
         alb = [v for n, t, v in mm['params'] if n == 'tAlbedoMap']
         states = [s for s in mm['states'] if s and s[:2] in ('BS', 'DS', 'RS')]
-        mats.append((name, 'efx_blend', {'tAlbedoMap': newidx.get(alb[0], 1) if alb else 1, 'tSpecularMap': 0},
-                     states))
+        slots = {'tAlbedoMap': newidx.get(alb[0], 1) if alb else 1, 'tSpecularMap': 0}
+        if 'BSSolid' in states:
+            # 4U emission / diffuse / albedo colour; specular stays the template's 0 as in Capcom's em062 conversion:
+            # with 4U's (0.98 / 0.5) and no specular map the tar wrap qe000_000 (PEL 7000 = qe008_026) drew white blobs
+            # in its alpha shape (test 2026-10-23 20:06)
+            std = [v for n, t, v in mm['params'] if t == 1 and n == 'CBMaterialStd'][0]
+            consts = {k: v for k, v in mrl_anim.static_constants(mm['block'][std:]).items()
+                      if k != ('$Globals', 'fSpecularColor')}
+            mats.append((name, 'efx_solid', slots, states, consts))
+        else:
+            # the 4U emission into efx_blend's FEmissionConstantEflEmu constant (fixed 1.0 in the template = the 4U
+            # value of every other blended effect material of the set): the tar wrap's blended layer qe000_000
+            # 'XfB_0__m00_2' is 0.35 in 4U and drew as a white film at 1.0 (tests 2026-10-23)
+            std = [v for n, t, v in mm['params'] if t == 1 and n == 'CBMaterialStd']
+            consts = {k: v for k, v in mrl_anim.static_constants(mm['block'][std[0]:]).items()
+                      if k == ('$Globals', 'fEmissionColor')} if std else {}
+            mats.append((name, 'efx_blend', slots, states, consts))
     gmrl = mrl_build.build(gu_rom(), mats, tex_paths)
     return gmod, gmrl, tex_paths
 
@@ -698,6 +730,12 @@ def extra_records():
     # at world positions / on the spear object by the module
     for k in range(5):
         out.append(_rec(6200 + k, 24, -1, k))
+    # 7000 / 7001: tar on a hunter (module/em089_tarhunter.c), 4U per-hunter status unit 0x3284ac state 3: 0xc08698
+    # group 1 file 120 (flat table) = qe008_026 looping on the hunter, back to state 0: 0xc088d8 file 119 = qe008_025
+    # once; posted on the hunter's effect-shell attach model at joint 0 (GU web record 119's joint, 4U's not traced)
+    for rid, path in ((7000, 'effect\\efl\\qe\\qe008\\qe008_026'), (7001, 'effect\\efl\\qe\\qe008\\qe008_025')):
+        out.append((path, dict(id=rid, joint=0, k=-1, pos=(0.0, 0.0, 0.0), rot=(0.0, 0.0, 0.0),
+                               scl=(1.0, 1.0, 1.0))))
     out += stage_records()
     return out
 
@@ -766,11 +804,16 @@ def stage_records():
     return out
 
 
+# 4U tar coat (per-hunter status unit 0x3284ac state 3: effect-model object 0xc0a360 {255, 1, 4} -> table 0xef8c4c
+# [1][4]): created by module/em089_tarhunter.c as a GU uBaseModel parented to the hunter, fetched by path hash + type
+TAR_COAT_MODEL = 'effect\\base\\qe\\qe000\\qe000_004'
+
+
 def em089_spec():
     """Gogmazios' effect set (tools/build_em089_arc.py) for effect_set"""
     return dict(arc=SRC_EM089, stage_unpacked=STAGE_UNPACKED, mef=MEF_PATH, em_efl='effect\\efl\\em\\em089\\',
                 groups=GROUP_EFL, extra=extra_records(), lmts=[(LMT_PATH % i, PSL[i]) for i in range(4)], pel=PEL_U,
-                soil=M19A03_AREA_SOIL, list2=None)
+                soil=M19A03_AREA_SOIL, list2=None, models=[TAR_COAT_MODEL])
 
 
 def em089_set(log):
@@ -817,6 +860,7 @@ def effect_set(spec, log):
         log.append('EFL %s: %d entries, %d B -> %d B%s' % (p, efl_parse(d4)['n'], len(d4), len(conv['EFL'][p]),
                    ('; ' + '; '.join(l)) if l else ''))
         need |= set(efl_paths(d4))
+    need |= set(spec.get('models', []))      # effect models the module creates itself (no EFL names them)
     for p in sorted(need):
         found = [t for (q, t) in S if q == p]
         if not found:

@@ -31,6 +31,7 @@
 #include <stdint.h>
 #include "game.h"
 #include "util.h"
+#include "em089.h"            /* em089_knock_count / em089_knock_slide */
 #include "em089_react.h"
 
 typedef struct { uint32_t op; const void *arg; } rx_op;
@@ -181,7 +182,105 @@ static const rx_op T_ff74e4[] = {{0x0, &D_ff7f64}, {0x3, I(0x258)}, {0x0, &D_ff7
 static const rx_op T_ff750c[] = {{0x0, &D_ff7fc4}, {0x0, &D_ff7fdc}, {0x3, I(0x258)}, {0x0, &D_ff7ff4}, {0x0, &D_ff800c}, {0xff, 0}};
 static const rx_op T_ff753c[] = {{0x0, &D_ff803c}, {0x3, I(0x168)}, {0x0, &D_ff8054}, {0x0, &D_ff806c}, {0xff, 0}};
 static const rx_op T_ff7564[] = {{0x0, &D_ff809c}, {0x3, I(0x168)}, {0x0, &D_ff80b4}, {0x0, &D_ff80cc}, {0xff, 0}};
+
+/* restraint / knock-down tables (10/200, 10/228, 10/108, 10/109, 10/202, 10/203). Op 9 = conditional jump, arg
+ * {u8 kind, u32 arg, table}, same layout and kinds in both interpreters (4U 0x931c90, GU 0x9f5fc, C): kind 4 calls
+ * 4U vt+0xcc = GU vt+0x214 (em089_cond, slot 133) with the byte arg and on true continues with the table from its
+ * first entry. Conditions used: 11 / 13 (target behind, ground / flying), 12 (target on the left half), 23 / 24
+ * (target in front). The .bss movement data 0x10b7cf8 / 0x10b7d10 get the same values as 0x10b7cc8 (static init
+ * 0xd2ab1c, vec3 pairs from 0x10b7cc8 on). */
+typedef struct { uint32_t kind, arg; const rx_op *table; } rx_jump;
+_Static_assert(sizeof(rx_jump) == 12, "rx_jump");
+static const uint32_t MV_10b7cf8[6] = {0x00000000, 0x42200000, 0x00000000, 0x00000000, 0xbf4ccccd, 0x00000000};   /* 0 40 0 0 -0.8 0 */
+static const uint32_t MV_10b7d10[6] = {0x00000000, 0x42200000, 0x00000000, 0x00000000, 0xbf4ccccd, 0x00000000};   /* 0 40 0 0 -0.8 0 */
+static const uint32_t MV_ff80fc[2] = {0xc2340000, 0xc0a00000};   /* {-45, -5} */
+static const uint32_t MV_ff850c[2] = {0xc2340000, 0xc0a00000};   /* {-45, -5} */
+static const uint32_t W_ff7b74 = 0x3f800000;   /* 1.0f */
+static const uint32_t W_ff7b78 = 0x3fc00000;   /* 1.5f */
+static const uint32_t W_ff7b7c = 0x3f800000;   /* 1.0f */
+static const rx_desc D_ff7b80 = {0x314, 0, 0.0f, 0.0f, 0x0, 8, 0, 0, 0};
+static const rx_desc D_ff7b98 = {0x314, 0, 0.0f, 60.0f, 0x0, 8, 0, 0, 0};
+static const rx_desc D_ff7bb0 = {0x314, 0, 20.0f, 20.0f, 0x0, 1, 0, 0, 0};
+static const rx_desc D_ff8104 = {0x315, 0, 0.0f, 0.0f, 0x0, 8, 2, 0, MV_10b7cf8};
+static const rx_desc D_ff811c = {0x000, 0, 0.0f, 0.0f, 0x0, 2, 1, 0, MV_ff80fc};
+static const rx_desc D_ff8134 = {0x316, 0, 0.0f, 0.0f, 0x0, 1, 0, 0, 0};
+static const rx_desc D_ff814c = {0x307, 0, 0.0f, 0.0f, 0x0, 4, 0, 0, 0};
+static const rx_desc D_ff8164 = {0x308, 0, 6.0f, 0.0f, 0x0, 1, 0, 0, 0};
+static const rx_desc D_ff8194 = {0x337, 0, 6.0f, 0.0f, 0x11, 1, 0, 0, 0};
+static const rx_desc D_ff81ac = {0x304, 0, 0.0f, 0.0f, 0x0, 4, 0, 0, 0};
+static const rx_desc D_ff81c4 = {0x305, 0, 6.0f, 0.0f, 0x0, 1, 0, 0, 0};
+static const rx_desc D_ff81f4 = {0x330, 0, 0.0f, 0.0f, 0x0, 1, 0, 0, 0};
+static const rx_desc D_ff820c = {0x337, 0, 0.0f, 112.0f, 0x0, 1, 0, 0, 0};
+static const rx_desc D_ff8224 = {0x331, 0, 0.0f, 0.0f, 0x0, 1, 0, 0, 0};
+static const rx_desc D_ff823c = {0x337, 0, 0.0f, 112.0f, 0x0, 1, 0, 0, 0};
+static const rx_desc D_ff8254 = {0x318, 0, 4.0f, 0.0f, 0x0, 1, 0, 0, 0};
+static const rx_desc D_ff826c = {0x307, 0, 4.0f, 0.0f, 0x0, 1, 0, 0, 0};
+static const rx_desc D_ff8284 = {0x308, 0, 6.0f, 0.0f, 0x0, 1, 0, 0, 0};
+static const rx_desc D_ff8350 = {0x337, 0, 6.0f, 0.0f, 0x11, 1, 0, 0, 0};
+static const rx_desc D_ff8368 = {0x304, 0, 0.0f, 0.0f, 0x0, 4, 0, 0, 0};
+static const rx_desc D_ff8380 = {0x305, 0, 6.0f, 0.0f, 0x0, 1, 0, 0, 0};
+static const rx_desc D_ff83b0 = {0x332, 0, 0.0f, 0.0f, 0x0, 1, 0, 0, 0};
+static const rx_desc D_ff83c8 = {0x337, 0, 0.0f, 92.0f, 0x0, 1, 0, 0, 0};
+static const rx_desc D_ff83e0 = {0x333, 0, 0.0f, 0.0f, 0x0, 1, 0, 0, 0};
+static const rx_desc D_ff83f8 = {0x337, 0, 0.0f, 92.0f, 0x0, 1, 0, 0, 0};
+static const rx_desc D_ff8410 = {0x318, 0, 40.0f, 40.0f, 0x0, 1, 0, 0, 0};
+static const rx_desc D_ff8428 = {0x307, 0, 4.0f, 0.0f, 0x0, 1, 0, 0, 0};
+static const rx_desc D_ff8440 = {0x308, 0, 6.0f, 0.0f, 0x0, 1, 0, 0, 0};
+static const rx_desc D_ff8514 = {0x315, 0, 0.0f, 0.0f, 0x0, 8, 2, 0, MV_10b7d10};
+static const rx_desc D_ff852c = {0x000, 0, 0.0f, 0.0f, 0x0, 2, 1, 0, MV_ff850c};
+static const rx_desc D_ff8544 = {0x316, 0, 0.0f, 0.0f, 0x0, 1, 0, 0, 0};
+static const rx_desc D_ff855c = {0x307, 0, 0.0f, 0.0f, 0x0, 4, 0, 0, 0};
+static const rx_desc D_ff8574 = {0x308, 0, 6.0f, 0.0f, 0x0, 1, 0, 0, 0};
+static const rx_op T_ff71f4[] = {{0x5, I(0x3c)}, {0xe, &W_ff7b74}, {0x0, &D_ff7b80}, {0x5, I(0x78)}, {0xe, &W_ff7b78}, {0x0, &D_ff7b98}, {0xe, &W_ff7b7c}, {0x0, &D_ff7bb0}, {0xff, 0}};
+static const rx_op T_ff758c[] = {{0x4, I(0x80000001)}, {0xb, I(0x1e0)}, {0x5, I(0x34)}, {0x0, &D_ff8104}, {0x1, &D_ff811c}, {0x4, I(0x0)}, {0x0, &D_ff8134}, {0x3, I(0x384)}, {0x0, &D_ff814c}, {0x0, &D_ff8164}, {0xff, 0}};
+static const rx_op T_ff7644[] = {{0x4, I(0x80000001)}, {0xb, I(0x1e0)}, {0x5, I(0x34)}, {0x0, &D_ff8514}, {0x1, &D_ff852c}, {0x4, I(0x0)}, {0x0, &D_ff8544}, {0x3, I(0x384)}, {0x0, &D_ff855c}, {0x0, &D_ff8574}, {0xff, 0}};
+static const rx_op T_ff829c[] = {{0x0, &D_ff8254}, {0x0, &D_ff826c}, {0x0, &D_ff8284}, {0xff, 0}};
+static const rx_op T_ff82fc[] = {{0x0, &D_ff8224}, {0x0, &D_ff823c}, {0x3, I(0x168)}, {0x0, &D_ff81ac}, {0x0, &D_ff81c4}, {0xff, 0}};
+static const rx_jump J_ff8338 = {4, 12, T_ff82fc};
+static const rx_jump J_ff8344 = {4, 23, T_ff829c};
+static const rx_op T_ff82bc[] = {{0x9, &J_ff8344}, {0x9, &J_ff8338}, {0x0, &D_ff81f4}, {0x0, &D_ff820c}, {0x3, I(0x168)}, {0x0, &D_ff81ac}, {0x0, &D_ff81c4}, {0xff, 0}};
+static const rx_jump J_ff832c = {4, 11, T_ff82bc};
+static const rx_op T_ff75e4[] = {{0x9, &J_ff832c}, {0x0, &D_ff8194}, {0x3, I(0x168)}, {0x0, &D_ff81ac}, {0x0, &D_ff81c4}, {0xff, 0}};
+static const rx_op T_ff8458[] = {{0x0, &D_ff8410}, {0x0, &D_ff8428}, {0x0, &D_ff8440}, {0xff, 0}};
+static const rx_op T_ff84b8[] = {{0x0, &D_ff83e0}, {0x0, &D_ff83f8}, {0x3, I(0x168)}, {0x0, &D_ff8368}, {0x0, &D_ff8380}, {0xff, 0}};
+static const rx_jump J_ff84f4 = {4, 12, T_ff84b8};
+static const rx_jump J_ff8500 = {4, 24, T_ff8458};
+static const rx_op T_ff8478[] = {{0x9, &J_ff8500}, {0x9, &J_ff84f4}, {0x0, &D_ff83b0}, {0x0, &D_ff83c8}, {0x3, I(0x168)}, {0x0, &D_ff8368}, {0x0, &D_ff8380}, {0xff, 0}};
+static const rx_jump J_ff84e8 = {4, 13, T_ff8478};
+static const rx_op T_ff7614[] = {{0x9, &J_ff84e8}, {0x0, &D_ff8350}, {0x3, I(0x168)}, {0x0, &D_ff8368}, {0x0, &D_ff8380}, {0xff, 0}};
 #undef I
+
+/* 4U 0x8c2fa4 (10/200 / 10/228), per frame before the table: step 2 = 0 -> 1: setTarget(5, 8, 9 (200) | 8 (228),
+ * 0) + wanderPoint = arena point 9 (1350, 0, 1200) / 8 (-777, 0, 1200) (set_target_c hook); step 2 = 1: turn toward
+ * it in the motion windows below (offset 0x8000 = back to the point, motion 792: front), step = (u16)(0.5 + frac *
+ * K * 65536 / 360) * 0.5, -> step 2 = 2 once facing; motion 792 outside its window: turnToTarget(86, 0) while the
+ * motion blend runs (4U this+644 = GU MOT_BLEND); any other motion -> step 2 = 2 (no turn). */
+static void restrain_turn(void *self, uint32_t num)
+{
+    uint8_t *s2 = &FIELD(uint8_t, REC(self), REC_STEP2);
+    if (*s2 == 0) {
+        *s2 = 1;
+        setTarget(self, 5, 8, num == 200 ? 9 : 8, 0);
+        wanderPoint(self, 0, 0);
+        return;
+    }
+    if (*s2 != 1) return;
+    uint32_t m = curMotion(self), off = 0x8000;
+    float s0, s1, k, frac = 0.0f;
+    switch (m) {
+    case 0x332: case 0x333: s0 = 10.0f; s1 = 30.0f; k = 9.0f; break;    /* 0x8c317c */
+    case 0x337: s0 = 0.0f; s1 = 180.0f; k = 2.0f; break;                /* 0x8c3088 */
+    case 0x330: case 0x331: s0 = 6.0f; s1 = 40.0f; k = 12.0f; break;    /* 0x8c3100 */
+    case 0x318: s0 = 4.0f; s1 = 98.0f; k = 0.95f; off = 0; break;       /* 0x8c31f8 */
+    default: (*s2)++; return;
+    }
+    if (!motionCheck(self, 9, &frac, s0, s1)) {
+        if (m == 0x318 && FIELD(float, self, MOT_BLEND) > 0.0f && turnToTarget(self, 86, 0)) (*s2)++;   /* 0x8c3364 */
+        return;
+    }
+    uint32_t a = (uint16_t)(int32_t)(0.5f + frac * k * 65536.0f * (1.0f / 360.0f));
+    if (turnToTarget(self, (uint16_t)(uint32_t)((float)a * 0.5f), off)) (*s2)++;
+}
 
 static int flying(void *self) { return FIELD(uint8_t, REC(self), REC_MODE) == 1; }   /* 4U W+0x1c9 == 1 */
 
@@ -270,16 +369,16 @@ static int react10(void *self, uint32_t num)
     case 210:    /* 0x8c2e2c */
         t = fly ? T_ff7164 : T_ff7134; break;
     case 108: case 109: case 202: case 203:
-        /* 0x8c2f78 / 0x8c2f4c / 0x8c3440 / 0x8c33f0: [this+0x8d88]+0xe5 >= 2 -> 0xff758c, else em089 0x8bdaec
-         * (step2 timer / setTarget / wanderPoint machine) + 0xff71f4; flag 3 (108, 202) or 1: not ported */
-    case 200: case 228:
-        /* 0x8c2fa4: step2 machine (setTarget(5, 8, 9 | 8) + wanderPoint, then motionCheck / turnToTarget per
-         * motion 792 / 816 / 817 / ...) + 0xff75e4 (0xff7614 flying): not ported */
-        if (FIELD(uint8_t, REC(self), REC_STEP0) == 0) {
-            static int s_n;
-            if (++s_n <= 20) logf("gogport: em089 react 10/%u not ported -> placeholder", num);
-        }
-        return 0;
+        /* 0x8c2f78 / 0x8c2f4c / 0x8c3440 / 0x8c33f0: work+0xe5 >= 2 (third knock-down within 900 frames, slot 47)
+         * -> 0xff758c (108 / 109) / 0xff7644 (202 / 203), else the slide 0x8bdaec + 0xff71f4; flag 3 (108, 202) or 1 */
+        flag = (num == 108 || num == 202) ? 3 : 1;
+        if (em089_knock_count(self) >= 2) t = num < 200 ? T_ff758c : T_ff7644;
+        else { em089_knock_slide(self); t = T_ff71f4; }
+        break;
+    case 200: case 228:   /* 0x8c2fa4: restraint (GU status 47 -> 0x9afc0 in state classes 0 / 2, 4U 0x93a628) */
+        restrain_turn(self, num);
+        t = fly ? T_ff7614 : T_ff75e4;
+        break;
     default:     /* 0x8c2914: vt+0x164 */
         {
             static int s_n;

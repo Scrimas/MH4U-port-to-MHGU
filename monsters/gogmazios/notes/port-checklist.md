@@ -634,9 +634,9 @@ table main 0x1732c8c, as read by 0x50c64 / 0x50ce0; GU opcode jump table 0x837ac
   only, findTargetEx(0, -1, 0x2000, 4) != -1, a contact of type 4 / 5, owner, kind-1 check of 310 not passed ->
   inside 0..308 (kind 3) step 2 (4/6 at 308), else 4/6 + stopMove now. Log `em089 7/32 interrupted by a type-4/5
   map contact` (20 max).
-- [-] slot-47 category-10 branch (10/108, 109, 114, 202, 203: knock-down reactions; 10/114 builds a 200-B object
+- [~] slot-47 category-10 branch (10/108, 109, 114, 202, 203: knock-down reactions; 10/114 builds a 200-B object
   via the effect manager 0xc088d8 and calls 0xc48378(42, 29, 25); 108/109/202/203 work+0xe5++ / work+0xe8 = 900):
-  category 10 is engine-owned in GU; not ported (logged).
+  the count / timer part is ported (2026-10-23, see "Reactions" below); 10/114's effect object is not.
 - [x] 7/47 wall probe (2026-10-18): 4U 0x2b9cd4(col, owner, from = pos, to = pos + yaw-rotated (0, 0, speedFactor
   * 1567), s0 10, area, pos out, normal out, info out, mask 0x3fff0000) = GU 0x1835b8 (same prologue; core 4U
   0x2b9904 = GU 0x182f70 with pos / normal / info out pointers; info filler 4U 0x2b95a4 = GU 0x1815a4: +5 = wall
@@ -2191,6 +2191,8 @@ stage_cart.c re-inits its state when it changes (pre-test review request).
     stage4u2gu.py): only one of us runs `stage4u2gu.py alias` at a time.
 - [-] 4. Demolisher / pile bunker (coordinator lead, traced 2026-10-18, NOT ported: the records do not exist) (C):
   (2026-10-20: wrong for the pile: the fallen em089 spear registers the kind-36 record, module/em089_pile.c.)
+  (2026-10-23: the Demolisher IS ported, module/stage_demolisher.c + notes/stage.md section 15: 4U fires it when a
+  hunter uses Dense Marcoal in the cart's fire point (kind 31) at S; GU's kind-29 Dense Marcoal path does the same.)
   - Data check (2026-10-18, 4U EUR ROM dump/base/*.3ds via tools/ctr.py): every 4U quest with map byte +0xC4 = 19
     (quest00/01.arc: m01002 Kushala story quest, m11003, m11005, m11007, m11014, m11019, m11024, m11028, m11032,
     m11035; copies in dump/q4u_m19/) holds no interaction record (its only arena coordinates are the boss spawn:
@@ -2270,12 +2272,26 @@ Code: module/em089_react.c (`em089_react_run`, called from the em089_act.c dispa
   ground) and 10/114 the fall + down + get-up. The "tail broke 4 times" is not a reaction issue: GU counts every part
   flinch as a break count (em089_break.h), so check the break visibility code (break agent) (S).
 - Left:
-  - [ ] 10/108, 109, 202, 203 (0x8c2f78 / 0x8c2f4c / 0x8c3440 / 0x8c33f0): need the GU counterpart of 4U
-    [this+0x8d88]+0xe5 (>= 2 -> 0xff758c / 0xff7644, flag 3 or 1) and a port of em089 0x8bdaec (step2 machine:
-    timer, setTarget(5, 8, 18), wanderPoint) + 0xff71f4. Placeholder for now.
-  - [ ] 10/200, 228 (0x8c2fa4): step2 machine (setTarget(5, 8, 9 | 8) + wanderPoint, then per-motion motionCheck(9)
-    windows + turnToTarget for motions 792 / 816 / 817 / literal 0x8c3324 (+1, +5), fallback turn 86 while blending)
-    + 0xff75e4 / 0xff7614 (flying). Placeholder for now.
+  - [x] 10/108, 109, 202, 203 (0x8c2f78 / 0x8c2f4c / 0x8c3440 / 0x8c33f0), 2026-10-23: knock count = own field
+    F_KNOCK_N (+0x92, 4U work+0xe5), timer F_KNOCK_T (+0x98, work+0xe8): em089_action_start increments it and sets
+    900 for 10/108, 109, 202, 203 (and 10/10, as 4U); slot 77 counts the timer down (timerDown) and clears the count
+    at 0 unless the motion is 0x307 / 0x308 / 0x30b / 0x316. Count >= 2 -> 0xff758c (< 200) / 0xff7644, else
+    em089_knock_slide (4U 0x8bdaec: setTarget(5, 8, 18), wanderPoint, setStopDist(1, 0, 0), timer = dist / 8,
+    velocity 8 * dir through 0x7b5f8, inRange) + 0xff71f4; flag 3 for 108 / 202, else 1. 10/114 stays a stub.
+  - [x] 10/200, 228 (0x8c2fa4), 2026-10-23: restrain_turn() in em089_react.c (setTarget(5, 8, 9 | 8, 0) +
+    wanderPoint; turn windows 0x332 / 0x333 frames 10..30 K 9, 0x337 0..180 K 2, 0x330 / 0x331 6..40 K 12 (offset
+    0x8000), 0x318 4..98 K 0.95 (offset 0), else while blending turnToTarget(86, 0); step = (u16)(0.5 + frac * K *
+    65536 / 360) * 0.5) + the op-9 condition jumps of tables 0xff75e4 / 0xff82bc / 0xff829c / 0xff82fc (ground) and
+    0xff7614 / 0xff8478 / 0xff8458 / 0xff84b8 (flying) through em089_cond (GU 0x9f5fc kind 4 = vt+0x214 = 4U
+    0x931c90 vt+0xcc). GU restrainer state map = 4U's (0 / 2 -> 200, 228 if the hit type != 48; 3 -> 202; 4 -> 201
+    = default end in 4U too; 1 / 5 / 6 -> 203). em089_cond: ids 8 / 11..13 / 23 / 24 use target slot 0 while
+    F_NOSYNC == 2 (the arena point).
+  - [x] Variant check (user, test 2026-10-23: keep 4U's sequence, verify the choice): 4U cases 11 / 12 / 13 / 23 /
+    24 = 0x8c95e8 / 0x8c9640 / 0x8c96dc / 0x8c968c / 0x8c9734: angle(W+408 -> W+536) - yaw [this+0xc28]+0x1ac,
+    same ranges as em089_cond (11: 0 inside 0x5556..0xaaaa = behind, 12: < 0x8000, 13: 0x6aac..0x9554, 23 / 24:
+    d - 0x4000 > 0x8000 = in front). Test 05:27: monster (-954, 1124) yaw 0x968c, point 9 (1350, 0, 1200) -> d
+    0xa81c = behind -> cond 11 = 0 -> the default 0x337 turn (back to the point), as 4U. Log `cond N (arena-point
+    target x z) yaw d` added to confirm the branch in game.
   - [ ] category 11 (0x8c3b7c): 11/0 -> 0x8b6ac8 (0x8b6da4 flying), 11/1 -> 0x8b6b80, every other number 0x8b6ac8;
     own step machines (setMotion 781 = 0x30d with blend 6, then 0x926044(this, i, 1, 0) for i = 0, 1 and no action
     end), motions 789 / 791; not the sequence player. Needs 0x926044 mapped. Placeholder kept.
@@ -2637,6 +2653,10 @@ biped attack; Dragonator camera shows only terrain.
   hunter (test 5: dash into the platform at z ~1900). Now F_NOSYNC = 2 holds the point until the next setTarget on
   slot 0 (the think's `01 00 00 00 00` or cond 26). (3) act_7_47 read only the frame-start timer, so a wall hit took
   the stop motion; now the probe's accept sets it too.
+- Fixed 2026-10-23 (test: far from the south high platform): GU's sweep returned a type-4 wall 4016 ahead at
+  (-965, -4710) on the 7/65 dash to point 12, beyond the probe (speedFactor * 1567); the dash stopped at (339, -911).
+  wall_probe now rejects hits farther than the probe + 100 (4U's hits lie inside it). Open: during 7/64 he moved
+  north (51, -2220) -> (377, -800) (not traced).
 - Open (S): a type-0 skin (group 0x02000055 / word 1 0) sits at z 3301..3307 in front of the type-5 face; if the
   sweep returns it first, 7/61 ignores it and the dash ends at the motion end (loop toward point 10). Mask
   0x3fff0000 semantics not traced (0x198250 stores it; filter not read).
@@ -2644,3 +2664,54 @@ biped attack; Dragonator camera shows only terrain.
   now), `7/61 dash end: wall ... (arena point)`, `7/47 wall turn -> 1/22|23`, `arena point released by setTarget
   0/0/0`, `cond N (arena) -> r`; then mode-1 actions (2/63, 7/144, 7/145 ...). User: does he rear up at the
   platform and attack the hunter there?
+
+## Tar on hunters (main agent + two tar helpers), 2026-10-23
+User's rule: 4U's tar look, never GU's white web. Code: module/em089_tarhunter.c (header = full trace); effects
+tools/efl4u2gu.py extra_records 7000 / 7001.
+- [x] Rules: type 63 -> GU web 48 at the reaction dispatcher 0x2f1c60 (r2 / r3) while an em089 exists; GU's web
+  path (0x2f47cc, actions 72 -> 73, 71 -> 66, skills 15 / 0x142 = 4U 0x10d) = 4U's tar path with web numbers.
+  Timer 210 at every struggle start (0x2bba74, after GU's remote 240); 5 presses per step (0x2bbb00); -60 per step
+  and the frame countdown = GU's = 4U's.
+- [x] Look (part): GU's web post (0x2826f4 slot 19, shell 159 = cm101_002 element 28, white web texture, joint 0)
+  skipped; per hunter in GU web actions 66 / 68 / 70..73 (= 4U 106..110): PEL 7000 qe008_026 loop on the hunter's
+  effect-shell attach model ([player+0x2630] vt+0x130), joint 0; on leaving: stop + 7001 qe008_025 once.
+- [x] Coat model qe000_004 (4U sMhEffect 0xc0a360 {255, 1, 4} -> uMhEftModel, a uBaseModel; table 0xef8c4c,
+  parent = hunter joint 1 via vt+0x48, scale 1): GU has no such class / table (helper, C); GU's own code-made model
+  (uShellSt008 0x498c28) is the recipe: uBaseModel 0x88e6dc(1136, 16) + ctor 0x88e71c, sUnit 0xc067ec(mgr, 19,
+  model, u64 mask 0x200000), setModel vt+0x58, release 0x887660, setParent vt+0x48 = 0x45884 (+0x30 / +0x34), kill
+  vt+0x40. Model by path hash 0xcac4d30c + MOD type through sResource vt+0x38 (as port.c); MOD / MRL / texture in
+  em089's arc (efl4u2gu TAR_COAT_MODEL). No kill-with-parent in GU: the module kills it on every exit.
+  Note (existing code, not changed): em089_pile.c / em089_shell051.c / dala_*.c declare 0xc067ec with two u32 mask
+  words; the function takes a u64 on the stack (0x3ea218), so their mask high word is whatever is on the stack.
+- [-] 4U's release call 0x2fff1c(.., 500 / 60, player, 1) (G: sound) and pw+516 = 60 (GU sets +0x28a0 = 60 itself).
+- [x] Fixes after the 2026-10-23 test (user: shared struggle, 4U look):
+  - Stray looks: GU's action 72 is also its ordinary knock-up (00:18:13 / 00:22:58 "tarred" without a tar hit).
+    The look now needs a mark: a tar hit on this machine's hunter (em089_tar_dmg, r0 = player) or a struggle
+    start of any hunter (em089_tar_struggle: a remote hunter's hit is resolved on its own machine, so for others
+    the look starts with the struggle). A mark that enters no web action within 60 ticks lapses (blocked hit).
+  - White shell = the coat drawn with GU's translucent effect template. 4U qe000_004 'XfB_0__m00_' = BSSolid,
+    lit, emission 0.5, diffuse 0.598, specular (0.98, 0.91, 0.91). efl4u2gu convert_model: 4U BSSolid materials
+    -> template efx_solid (em062_00 effect\base\em062_00_000 mat 0, Capcom's opaque lit effect material:
+    FLighting, FDiffuseVertexColor, emission 0.5) + the 4U CBMaterialStd constants (mrl_anim.static_constants);
+    their colourless meshes get white vertex colour. Also applies to the rubble qe000_000 / qe000_001 and one
+    ef_em089 mesh (4U opaque lit too).
+- [ ] Test 2026-10-23 20:06 (user): white mottled shell on the hunter, a black blob beside him, lit look bad in and
+  out of shadow; Ryujinx Vulkan crash (DescriptorSetUpdater.SetUniformBuffers) 0.37 s after the third coat.
+  Findings: the white shell is OURS, not GU's web (its post was skipped): PEL 7000 = qe008_026 draws the model
+  qe000_000 (4 units, unit colours light grey a2..ce, no EFL colour block) = 4U's tar wrap, materials XfB__E0__m00_2
+  / XfB_0__m00_ (BSSolid, emission 0.25 / 0.27) + XfB_0__m00_2 (BSBlendAlpha, emission 0.35); texture
+  qe000_000_BM_NOMIP = dark RGB (mean ~15, thin white sheen lines) + the tar shape in alpha. White blobs = 4U's
+  specular (0.5) on Capcom's lit template with no specular map + the blended layer at efx_blend's fixed emission 1.0.
+  Fixes: specular left at the template's 0 (as Capcom's em062), 4U emission into efx_blend (all other blended
+  effect materials of the set are 1.0 in 4U: unchanged). The coat (black blob = qe000_004 left where it was made:
+  its matrix is set once) is OFF (EM089_TAR_COAT), the crash suspect (an effect material through the model
+  renderer). qe000_001 is tar too (puddle), not rubble.
+  - Test 20:37 (user): "no tar at all, only the web" -> the white shell WAS GU's web after all: the struggle start
+    also posts shell 101 in slot 4 on the attach model (0x2bbe8c, lr 0x2bbe90), not covered by the slot-19 / 159
+    skip; em089_tar_webpost now skips it too (that call site only).
+- Deviations: effects at joint 0 (4U's loop attach joint not traced); every hunter gets the look (4U: displayed area
+  only); any web while an em089 exists is tar (no other webbing monster in its quests); a remote hunter's look
+  starts with its struggle, not at the hit; no coat (qe000_004) for now.
+- Expected logs: `em089 tar: hunter .. hit by tar (type 63 -> GU web 48)`, `GU web look on hunter .. skipped`,
+  `hunter N tarred (action 72, model ..)`, `em089 efx post id 7000 on model .. -> <non-zero>`, `struggle 2 start,
+  hunter .. timer 240 -> 210`, `5 presses -> step`, `hunter N freed (action ..)`, `post id 7001 ..`.
