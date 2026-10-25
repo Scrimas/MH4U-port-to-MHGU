@@ -426,3 +426,87 @@ User: meteor speed fine (log: clock 0.5 = head delta 0.5 at 60 fps); rewards fix
     levels 1..4 on part 0, 3 on parts 1 / 2, 1..2 on parts 3 / 4), tail parts 5..7, the tail sever (rows 22 / 108
     cond 1 param 1; cut piece em024_tail = manifest field 1?) and the 4U break list (emd word 33) for the reward
     groups (goal F rewards).
+
+## Fixes 2026-10-25 (user's nine reports; built, installed at TEST_HP_PCT 25, not tested)
+Evidence: test log 2026-10-24 17:22 (1618 dalaport lines, no kill), static RE. C / S / G as above.
+1. Junction back / tail, 3. no invisible wall, 9. head not hittable and passable: gu-walkable.md 6c (body data off2.z
+   bug in tools/emdata4u.py, C: head part 0 took no damage in the whole Oct 24 fight, parts 3 / 4 / 5..7 did; push
+   left on as 4U; 4U's ground rule in GU's hunter ground function).
+2. Camera on the back: the walk pieces were stage collision for the camera's sweep (C); now off during it.
+4. Severed tail always at one place (C): spawnCutPart 0xc2330 with a NULL position uses the object position + 20,
+   the piece settles there (ground +-350, 0x74388) and the severed tail's carve point uses it (0xabbc8); our halves
+   never leave the spawn point. Now the floor under joint 157 (else 156 .. 140), dala_parts.c.
+5. Meteors at half the shells' pace (user, sure this time; log: 60.8 4U frames / s against the monster's 60.0;
+   4U velocities C). dala_meteor.c METEOR_PACE, meteor shell only.
+6. SnS shield distorted: GU's 2-bone shields bind every mesh to bone 0 (C, w01 16..33), set 0 never moves bone 1
+   (C, wg01_L); 4U's sld055 / sld105 blend bones 0 / 1 in every mesh with identical binds -> weapon4u2gu.py
+   --shield-bone0 puts their vertices on bone 0 (rest shape unchanged; cause S, GU's draw of bone 1 not traced).
+7. DB / HH / SA / LBG / Bow not forgeable: faithful (helper trace, C): both games show a create recipe once every
+   key-2 material was obtained; 4U's records key the first material (4U create table 0xf51dfc, key bytes +20,
+   filter 0x9be7bc / 0x9e6c3c, obtained bits 0xc1bef8); those five start with Dalamadur Talon or Pectus. Shah
+   material weapons are upgrades only (4U and GU list a child under its owned parent, no material gate: 4U
+   0xa02048 / 0xa4b488, GU 0x70ac34), so they show from the third weapon of each line.
+8. Corpse moving after the death motion: no movement in the earlier logs (motion held at 747 / 748, positions
+   constant, jump log > 300 only at the death motion's first frame, 4U's blend 0). Port: dala_carcass_lock
+   (dala_carve.c) snapshots the joint locals, look angles and object transform at the first carcass frame and
+   writes them back every frame after (slot 168); the jump log now reports > 20 once the pose is locked.
+
+## Fixes 2026-10-25, second pass (test 15:58: 3 / 4 / 6 / 9 fixed, 7 confirmed; 1 / 2 / 5 / 8 not)
+Built and installed at TEST_HP_PCT 25 (332 asset files, 0 mismatches); not tested.
+8. Corpse: the log's "carcass head jump" lines after the lock: joint 5 (head) eased ~600 with a 7/8 ratio a frame,
+   j0 still. GU's slope fit (dtbase +0x7c) kept from the donor Kushala: joints 101 and 140 (101 is an ancestor of
+   102..107 -> 5), set up by 0xc1d88, eased by 0xa8724 (`angle += (target - angle) >> 3`), applied by the joint
+   callback 0xab1a0 (C). 4U Dalamadur has none: emd word 40 = 0 in all four halves; word 40 is the slope fit (4U em001
+   word 40 == GU em001_00 +0x7c, C). tools/dt_convert.py ABSENT drops it.
+   Same audit (helper, verified on GU files): Kushala's ailment buildups (+0x98..+0xb4), stamina (+0x94), +0xbc,
+   +0xc8 / +0xcc and dtbase joint points (+0xac) were kept although 4U's words are absent: dropped, with the loader's
+   gates as GU's own files without them (em012 / em084 / em087 ...). Rage +0x8c[0:56] <- 4U etd word 14 (threshold
+   450, duration 4200, x1.0 / 1.3 / 1.0; was Kushala's 700 / 4800 / 1.1 / 1.26 / 0.9). Focus +0xd4 / +0xd8 <- etd
+   word 33 (head joint 5, tail 156, radius 1000; was Kushala's joints 2 / 0). Validation: dttune Teostra rebuilt from
+   4U 57.6 % -> 96.6 % equal to GU's, Kushala 99.5 % (unchanged). Kept: dtbase +0x94 (never null in GU), +0x84 (4U
+   mapping not reproduced), +0x88, +0x90.
+1. Junction: in both attempts the hunter ran up j141 under the overlapping j140 (20..100 higher over j141's last
+   300, FK of the 4U keys, key formats in gu-walkable.md 6d; motions 2 / 102 and bank 3's 1 / 101) and fell at
+   j141's end. GU's contact flipped every 1..2 frames (airborne half the time): the pieces moved continuously, so GU
+   filed them in its moving tree and tried to carry the hunter (refused when its sweep is blocked, Gogmazios'
+   stage_cart.c). Now still entries (teleport flag 1): 4U's strip query only sets the height (C).
+2. Camera: the camera also pushes itself out of the cambodydata capsules (0x17fa4c -> 0x17f750, radius up to 800,
+   the strips lie inside by up to 340). rec+0x528 (skipped there) is set on both halves for the camera step only,
+   while the local hunter is on the body, then restored; the push and its walls are untouched.
+5. Meteors: 4U's code puts the shells on the monster's clock (line 18, every line scale 1.0, global step in 60-fps
+   frames; C / S), i.e. 100 %; the user's 4U memory says between 50 and 100: 75 % (G), switch DALA_METEOR_PACE_PCT.
+   Note: the 4U monster's own pace was not traced to the frame either (its motions play at 60 / s in the port).
+- Seen in the log, not a bug: the tail runs its own AI and motions while the head does something else (head 1/53
+  with tail 7/1); both share bone 0 (dala_join.c), as 4U's tail motions are authored in the head's bone-0 frame.
+- New report (user, 2026-10-25): "3 idle locations, never seen the third". The test log has the head in placements
+  0 and 2 only (mode 1 never). 4U's head EMC (em024_cmd, C, decoded with tools/emc.py): the root picks the selector
+  by HP band (g0 s1..s7 High Rank, s8..s14 G rank: bands >= 90 / 84 / 62 / 56 / 44 / 17 / below %); once cond 4
+  holds (W_T_MODE >= 2700 in placement 0, 5400 in 1 / 2) a selector switches on the placement: from 0 bands 1..2
+  call g1 s52 (1.50 = wait, then 2.0 to placement 1, always), bands 0 / 3 / 4 call s9 (1.50 30 % / 1.53 70 %; 10 / 90
+  enraged); bands 5..6 (below 44 %) have no path into placement 1 (only s16 = 1.53 -> placement 2, s17 / s10). Every
+  test since 2026-10-24 started at 25 % HP: placement 1 cannot occur there in 4U either. Not changed; seen with
+  TEST_HP_PCT 62..90 after 45 s in placement 0. The waits in the log (1/53 x11, 2/3 x3) were cut by reactions (10/7,
+  10/114); the move starts when the tail's AI picks its follow (tail 1/50), 4U's two-half design.
+
+## Fixes 2026-10-25, third pass (test 17:27, release build: 5 / 6 / 8 fixed, 7 OK; 1 partly, 2 not; new 9)
+Built (release, no defines); not tested. Details: gu-walkable.md 6e.
+1. Junction walkable; running off its side toward the wall played no ledge jump (no wall grab). Log: off j140's
+   83 deg side the hunter went airborne 337 above the side, then over the floor at -848. GU picks a plain fall for a
+   moving hunter whose drop is <= 300 (C, 0x2e8a84 -> 0x2a01d8), else action 4/1 (S: the ledge jump), and its ray saw
+   the pieces' steep side. 4U counts a strip only inside a window (local: y - 60 - 50 g on the body, -30 off it; g = 2
+   at 30 fps) and the stage otherwise, so its hunter leaves the side over the floor: ledge jump. Port: pieces off for
+   every hunter's ray, 4U's windows in dala_ground_c (local per 4U frame of hunter time), the height also into the
+   ray's slot GU's landing reads. Remote hunters get 4U's partner window (-300 - 50 g on em024 / em083; user's side
+   note, MP).
+2. Camera: GU tilts its pitch by the slope under the hunter (0x238e0, 0x23d80: pitch = T (1 - |u| / 8192) + u, no
+   stick effect at T = 45 deg; C) and that ray met the walk pieces (S: the cause). Pieces off for it. The 15:58
+   camera-body skip (rec+0x528) is removed: not 4U's, and it did not help.
+7. Head passable (user: hits land now, still passes through; not a regression). 4U's head push volumes (emd word 8,
+   C): record 2 (push only, snout, r 230) and 3 / 4 (push + hurt, head sides, r 340), always on; 57 (snout tip) only
+   while walkable; the upper head (records 0 / 1 / 5) is hurt only. GU's push pass 0x17c9d0 -> 0x17cf40 tests the
+   area, rec+0x528, vt+0x88 and (player vt+0x270) enemy vt+0x164. Open: where the user passes through (asked).
+9. Shah fire on the ground (new). The test armed zone 0 once (7/22, crimson part 4); 7/40 ran with part 3 only (no
+   zone 1: 4U's 0x76f898 needs part 0, C). Fireballs: kind 88 (raging) -> burn sequence (4 steps ran), 89 -> blast
+   161 only (4U data, C). Open: which attacks and grounds the user means (asked).
+- Log: two emulator pauses (00:13:08..00:13:39, 00:15:02..00:16:03: no game lines at all, both halves' frame counters
+  stopped); the zone's 81 s and 7/22's 1496 frames in 74 s are those pauses, not a timer bug.

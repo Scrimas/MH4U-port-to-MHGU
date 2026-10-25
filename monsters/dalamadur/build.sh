@@ -46,7 +46,8 @@ weapons() {   # class:4U arc prefix:HR model:G model (tools/gear_weapons_em090.p
         mkdir -p "$MON/romfs/nativeNX/arc/weapon/w$nn/snd"
         for m in $a $b; do
             python3 tools/weapon4u2gu.py convert $((10#$nn)) "$GS/weapons/4u/data/pl_$pf$m.arc" \
-                "$MON/romfs/nativeNX/arc/weapon/w$nn/$m.arc" "$GS/weapons/out/wpn_mrl_index.pkl" --alpha-test-4u --anim-4u || return 1
+                "$MON/romfs/nativeNX/arc/weapon/w$nn/$m.arc" "$GS/weapons/out/wpn_mrl_index.pkl" --alpha-test-4u --anim-4u \
+                --shield-bone0 || return 1
         done
         python3 tools/wsnd4u2gu.py convert $((10#$nn)) "$GS/weapons/4u/data/pl_$pf$a.arc" \
             "$MON/romfs/nativeNX/arc/weapon/w$nn/snd/$a.arc" || return 1

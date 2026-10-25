@@ -3,7 +3,9 @@
 # (tools/release.py). Bump on every published change of the module or of any data file.
 name = "core"
 title = "MH4U Port core"
-version = "1.4.0"          # 1.4.0: Battlequarters gimmick hooks (cart riders, Demolisher shot, tar on hunters);
+version = "1.5.0"          # 1.5.0: Dalamadur's body hooks (4U's ground windows for local and remote hunters, the
+                           # camera's sweep and tilt rays); 1.4.0: Battlequarters gimmick hooks (cart riders,
+                           # Demolisher shot, tar on hunters);
                            # 1.3.0: multi-entry packages and companions, stage aliases, shared BGM, Dalamadur's hooks
                            # (damage end, heat zone, map position); 1.2.0: Tigerstripe's ported moves, sand blast, ball
                            # posts, area-move hooks; 1.1.0: registry entries run by a GU class (Tigerstripe Zamtrios)

@@ -1,7 +1,7 @@
 # Gogmazios package: what the installer shows and installs (goal 3), and the version written into its data file.
 name = "gogmazios"
 title = "Gogmazios"
-version = "1.1.0"          # bump on every published change of this monster's files (data, assets or code)
+version = "1.1.1"          # bump on every published change of this monster's files (data, assets or code)
 requires_core = "1.4.0"    # oldest core module (exefs) that runs this version: the Demolisher gate's stage data
                            # (mId 6) and the arena gimmicks need its stage hooks
 code = "em089"             # C prefix of its module code: em089_register_class(), g_em089_dti (module/build.py)

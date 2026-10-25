@@ -16,3 +16,6 @@ __pycache__/
 *.pyc
 .venv/
 .claude/
+# personal install script and its saved choices
+/install.sh
+/.install.state

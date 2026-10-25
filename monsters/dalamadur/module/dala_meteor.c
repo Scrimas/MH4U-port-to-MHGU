@@ -316,11 +316,25 @@ static void *shell_owner(void *self)
     return param ? FIELD(void *, param, 0xc) : 0;
 }
 
+/* The meteor's 4U frames per tick, in % of the shells' pace (= the monster's clock, 60 4U frames / s). History: 100
+ * (test 2026-10-24 17:22: a kind-4 meteor fell 9300 in 2.19 s), user 2026-10-25: "2x too fast, this time I'm sure";
+ * 50 (4.4 s), user the same evening: too slow, "something in between". 4U's code gives no value in between (C): the
+ * shell's step this+20 = global step [sMain+0x5c] x its unit line's scale (0x64521c); shells go on line 18
+ * (0x661000), every line is built with scale 1.0 (0x645df0) and no writer of a line scale exists (S: no store to a
+ * line's +20 outside the constructor); the global step counts 60-fps frames (sMain base fps 60.0, 0x644a40), so on
+ * 4U's clock a meteor falls with the monster's frames. 75 is the user's "in between" (G), DALA_METEOR_PACE_PCT
+ * (install.sh switch) tunes it. Velocities stay 4U's (0xd37f20: -120 / -40 / -90 / -70 per frame, C; lifetime 180). */
+#ifndef DALA_METEOR_PACE_PCT
+#define DALA_METEOR_PACE_PCT 75
+#endif
+#define METEOR_PACE (DALA_METEOR_PACE_PCT / 100.0f)
+static float meteor_dt(void *self) { return METEOR_PACE * dala_shell_dt(self); }
+
 /* 4U 0x9aad4c(shell, &t): t -= dt; 1 once t <= 0 (clamped to 0) */
 static int shell_timer(void *self, float *t)
 {
     if (*t <= 0.0f) { *t = 0.0f; return 1; }
-    *t -= dala_shell_dt(self);
+    *t -= meteor_dt(self);
     if (*t > 0.0f) return 0;
     *t = 0.0f;
     return 1;
@@ -380,7 +394,7 @@ static int meteor_step(void *self, void *owner)
         stub_once(owner, &s_n_k01, "meteor kinds 0/1 0xc7d39c", kind, 0);
         return 1;
     }
-    float dt = dala_shell_dt(self), h = dt * dt * 0.5f;   /* 0x9ab0a0: 0x9a94f4 then v += a dt */
+    float dt = meteor_dt(self), h = dt * dt * 0.5f;       /* 0x9ab0a0: 0x9a94f4 then v += a dt */
     for (int i = 0; i < 3; i++) { pos[i] += vel[i] * dt + acc[i] * h; vel[i] += acc[i] * dt; }
     float *p2 = VEC(self, SH_POS2);
     p2[0] = prev[0]; p2[1] = prev[1]; p2[2] = prev[2];

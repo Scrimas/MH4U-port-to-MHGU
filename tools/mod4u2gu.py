@@ -334,8 +334,10 @@ def valpha_classes(tris, alpha, base):
     return out
 
 
-def convert(d, push=None, valpha=(), edges=False, vcolour=False):
-    """vcolour: convert 4U 0x7BA7401B vertex-colour meshes to GU 0xCBF6C01A (COLOUR_GU notes above) in their own
+def convert(d, push=None, valpha=(), edges=False, vcolour=False, rebind=None):
+    """rebind: a global bone id that takes every skinned vertex's whole weight (weapon4u2gu --shield-bone0: only when
+    every bone the vertices use has that bone's bind, so the rest shape is unchanged).
+    vcolour: convert 4U 0x7BA7401B vertex-colour meshes to GU 0xCBF6C01A (COLOUR_GU notes above) in their own
     stream after the normal vertices; their 4U indices must be local to the mesh (weapon4u2gu.normalize_4u).
     Without it such meshes are refused (read_4u_vertices).
     edges: also build GU's edge (crack-fill) meshes as Capcom did for converted armor and weapons (EDGE_FMT notes
@@ -390,6 +392,9 @@ def convert(d, push=None, valpha=(), edges=False, vcolour=False):
             pend_col.append((len(recs) - 1, enc))
             continue
         pos, nrm, uv, gb, w, tan = read_4u_vertices(d, m, x)
+        if rebind is not None and gb is not None:
+            gb = np.full_like(gb, rebind)
+            w = np.zeros_like(w); w[:, 0] = 1
         if x['material'] in push:
             pos = push_out(pos, nrm, push[x['material']] / L)
         assert len(vb) == x['vertexStart'] * stride, 'meshes must be stored in vertex order'

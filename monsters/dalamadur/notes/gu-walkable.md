@@ -146,8 +146,8 @@ gotref.py pc-relative refs, sbcinfo.py SBC summaries; em08x_ls.txt listings).
 - The strip measurement below used word 9 (the camera list), not the push list: the push on a rider is S only.
   Measured (word 9, head 34 capsules, tail 19, radius up to 800; FK of motions 1 / 101): walk-strip vertices sit
   inside them by up to 340 (chest j4 14 / 73 vertices, junction j140 7 / 14, j1, j3, head j5). C. Ahtal-Neset ships an
-  empty cambodydata (em087_00 / em088_00: 0 records), so the camera sphere ignores it. Port: dala_walk.c walk_push
-  sets rec+0x528 on both halves while
+  empty cambodydata (em087_00 / em088_00: 0 records), so the camera sphere ignores it. Port until 2026-10-24 (removed
+  2026-10-25, section 6c): dala_walk.c walk_push set rec+0x528 on both halves while
   the LOCAL hunter's ground contact (hunter+0x2f00: +0x100 found, +0x10+8 handle, +0x10+0x34 SBC; S) is a walk
   piece, plus 45 frames. G against 4U's own rule (not traced).
 - 4U strip query (C, 0x681e44 -> 0x681c84 -> 0x5a4680): vertical segment from y+50 (x [global+0x5c]) down to y-30
@@ -163,8 +163,78 @@ gotref.py pc-relative refs, sbcinfo.py SBC summaries; em08x_ls.txt listings).
 - uQuestCamera tests sCollision with type mask 3 (0x26934 -> 0x183724 -> 0xc17aa0), so it sees our type-1 ground
   like em087's. C
 
+## 6c. 2026-10-25 rework (user: junction back / tail not walkable, no invisible wall, camera stuck, head passable)
+- Body data bug (C): tools/emdata4u.py zeroed bytes 42..43 of every 4U body record = the high half of off2.z (a
+  float at +40 in both games: GU Rathian em001_00 record 4 = 4U's (0, 10, -215)). Every capsule's far end fell to
+  z ~0: the head's records 0..6 (off2.z 525..1350 along the snout) shrank to the head joint (no head hits, hunters
+  walked through it), the walls 57..60 / tail 23 moved. Fixed; Gogmazios' em089 has 24 / 53 such records (its arc
+  picks the fix up when rebuilt).
+- Push left on while walking, as 4U (C): 4U's player pass 0xbbe688 -> 0xbbf4d8 gates on the local player
+  (0xd04fbc), W+0x55a and the area only; sphere = feet + 50, radius 50 (GU 0x17cf40 the same), horizontal unless
+  player +0x370 == 2; GU keeps only x / z of the hunter's push (0x17d548..0x17d5a8). The +12 bit 0x400 records
+  (head 57..60, tail 23; push only, active only while walkable) are 4U's invisible walls at the ends of the walk.
+  The rec+0x528 rule (dala_walk.c until 2026-10-24) removed them and the head's volumes.
+- Ground: GU's hunter ground function 0x2e846c (stage_cart.c notes): ray 0x18192c, the highest hit up to y + 100;
+  a grounded hunter > 30 above it goes airborne (0x2e86fc). Hook dala_ground at 0x2e85ac (r0 hit, r1 ground y, r4
+  hunter): 4U's strip query over both halves' active pieces ([y - 400, y + 100], highest, two-sided, no slope limit)
+  wins when GU found nothing or lower ground; a grounded hunter on the body last frame follows it down up to 150 a
+  frame. Test 2026-10-24 17:22: walking j1 -> tail, the feet followed j140's height (y 1985 at z -442) but GU's
+  contact never named j140 (no tail push-off), so the tail's volumes shoved him off; with push on and the ground
+  rule this no longer depends on the contact handle.
+- Camera: hooks dala_cam_begin / dala_cam_end at the camera step's entry 0x26934 and only exit 0x26e34 switch the
+  walk pieces off for its stage sweep. 4U's camera tests only the monsters' word-9 bodies (0xc02444 -> 0xbbe810 ->
+  0xbbfc1c mode 1, no em exception, C); its strips are not stage collision.
+
+## 6d. 2026-10-25 second pass (test 15:58: junction and camera still failing)
+- Junction, FK with the 4U keys decoded (LMT key types 4 / 6 / 7 C: type 6 = x, y, z, w 14-bit at bits 42 / 28 /
+  14 / 0, / 4096, frames >> 56; types 4 / 7 = bounds {mult[4], add[4]}): motions 2 / 102 frames 560..600 and bank 3's
+  1 / 101 frames 240..290 put j140 20..100 above j141 over j141's last 300 (x -2600..-2200), then j140 alone
+  rising to j1, which takes over 30 lower: walkable with a +100 window. The log shows the hunter's feet on j141's
+  level up to its end (z -300) and off below j140 there, both attempts. The "walk contact" lines logged the
+  hunter's joint 0 (hip, ~90 above the feet): GU's j141 matched the strips. GU's contact flipped j141 / none every
+  1..2 frames: the hunter was airborne half the time, so neither GU's ground nor ours lifted him onto j140 (an
+  airborne hunter lands only while falling, 0x2e8658).
+- Cause (S, C mechanism): colMove with flag 0 and a changed matrix files the entry in GU's moving tree, the only one
+  the carry probe 0x4f57f0 searches; GU's carry moves the hunter by the entry's old -> new matrix only when its sweep
+  is not blocked (0x4f594c -> 0xc3eb0c), else he stays while the ground slides (Gogmazios' stage_cart.c, logs
+  2026-10-23/24). The static j140 (its key holds 255 frames) stayed in the still tree: GU's contact never named it.
+- Fix: flag 1 (still, teleported each frame) for every piece, as the cart: no carry, the ground query (still and
+  moving trees) still finds the pieces; height = 4U's rule (dala_ground_c). The walk logs now report our own query
+  (piece changes, leaving the body, a trace while j140 lies over or under the hunter: "walk trace").
+- Camera: the camera's monster pass (0x17fa4c -> 0x17f750) pushes its radius-20 sphere out of cambodydata (4U word
+  9, always on: +10 = 0, +12 = 0 but two head records); standing on the back the camera sits inside those capsules.
+  It skips an enemy whose rec+0x528 is set (0x17fabc): set on both halves for the camera step only (dala_cam_begin /
+  end), while the local hunter was on the body within 60 frames, restored after (the player push keeps its walls).
+
+## 6e. 2026-10-25 third pass (test 17:27: junction walkable, no ledge jump off its side; camera still stuck)
+- 4U window (C, 0x681e44 -> 0x6821a0..0x682300, floats 0x682210..0x68222c = 0, 1, -60, -300, -120, -30, 50, -80):
+  top y + 50 g; bottom y - 30 - 50 g when the player was not on the monster last frame (+0x9a8), y - 60 - 50 g for the
+  local player on it (0xd04fbc = "is the local player", C), y - 300 - 50 g for a remote player on em024 / em083
+  (-120 on other monsters); g = [sMain+0x5c] (below 1: top + 50, bottom - 80). A hit there above the player's stage
+  ground (+0x468) sets his position (0x6822c8); none -> +0x9a8 = 0 and his ground is the stage's. Corrects 6b / 6c:
+  the -300 is the remote players' window, the local one is -60 - 50 g.
+- GU airborne choice (C, 0x2e86d0..0x2e8af8): a grounded hunter > 30 above r1 -> air state 2 (vt+0x300), then by
+  state; default: flags +0x2510 high word & 24 (moving) and a drop <= 300 -> 0x2a01d8 (fall without an action: vy -12,
+  gravity -0.227), else action 4/1 (S: the ledge jump). Off j140's 83 deg side GU's ray saw the side 100..300 below:
+  plain fall, no wall grab (user). The landing test 0x2e88e4 and its store 0x2e8908 read the ray's slot [sp+0x1c]
+  (r5), not r1.
+- Port: dala_ground_pre (0x2e8590) switches the pieces off for every hunter's ray; dala_ground (0x2e85ac) puts them
+  back and applies 4U's window: the local hunter's per 4U frame (his heights over the last 2 time units of
+  hunter+0x1c, C 0x2e9a54), remote hunters' per call (300); a hit -> r0 / r1 / [sp+0x1c] = h and a grounded hunter more
+  than 30 above it is set to it. GU's ground function is a virtual of every hunter class (vtables 0x1749524..), so it
+  should run for remote hunters too (S; LDN test: "walk ground remote hunter" lines).
+- Camera tilt (C): 0x238e0 (called from 0x23720 / 0x24e78) casts every 4 frames a type-1 ray (0x182f70) from y + 100
+  to y - 3000 under the hunter, normal -> cam+0xa40, pitch along the view -> cam+0xa54; reset when 0x2a80e8(player)
+  or (cam+0x438 and airborne). 0x23d80: k = (8192 - min(|cam+0x9e0|, 8192)) / 8192 when player flags +0x2510 bit 0
+  and cam+0xa30 = 0, else 1; cam+0xa5c eases toward k T; pitch cam+0x9d8 = cam+0xa5c + cam+0x9e0. At T = 45 deg the
+  stick no longer moves the pitch. The ray met the walk pieces (S: the stuck camera); hooks 0x238e0 / 0x23938 switch
+  them off for it. The second ray 0x25f08 (type 2, only with cam+0x438) cannot see type-1 pieces. The rec+0x528
+  camera-body skip of 6d is removed (not 4U's: its camera pushes out of the camera bodies too, C).
+
 ## 7. Open
 - What em084 motion 833 is in game (S: a down / lying state) and why its placement is a one-shot.
-- The 0xc4754c flag and em087 piece modes (0x16aa288 col 3).
+- The 0xc4754c flag (1 = still / teleport, 0 = continuous: Gogmazios' stage_cart.c) and em087 piece modes
+  (0x16aa288 col 3).
+- Camera on the back: the terrain-tilt ray (6e) is the S cause; to confirm in game ("cam tilt" log lines).
 - File IDs for new SBC files: 0x152960 rejects IDs > 0x106cf (registry.md); a port must hook it or look the
   resource up by path hash itself (sResource vt[0x38/4](mgr, ?, ~crc32(path), DTI rCollision)). G (design)

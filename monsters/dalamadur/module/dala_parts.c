@@ -35,22 +35,55 @@ void dala_break_log(void *self, uint32_t tail);
  * (rows: group 22 stump shown / 108 hidden by cond 1 bit 1). GU counts severs per part at rec+0x3bc + 12 * part + 1;
  * the cut object and the detached bit are monster code (Gogmazios em089_break.c, Kushala at 10/114): spawnCutPart
  * (0xc2330: cut slot 0 = manifest field 1, the shared em090_00_tail piece; sets rec+0x3b4 bit 1 and the reward flag
- * 7) from the 4U sever bone 157 (em083 emd word 35, first record), then setDetached(1) (0xa3c94) if still clear. */
+ * 7) from the 4U sever bone 157 (em083 emd word 35, first record), then setDetached(1) (0xa3c94) if still clear.
+ * Where the piece lands (user, 2026-10-25: always the same place, whatever was cut where and whatever is left of the
+ * arena): 0xc2330 takes a position argument; NULL = the object position + 20 (this+0x40, C 0xc2460), and the piece
+ * starts at the joint (0x742d8) and comes to rest at that position's x / z on the ground found within +-350 of its y
+ * (0x74388..0x74430, C); the severed tail's carve point takes the same position (0xabbc8). Our halves' objects stay on
+ * the spawn point, so every cut tail ended there. 4U drops the cut object from the sever joint onto the ground under
+ * it (Gogmazios' spear, same cut-object code, port-checklist.md). Here: the stage floor under joint 157 (map segment
+ * as dala_carve.c), else under the next joint toward the body (156 .. 140), else GU's default. */
 #define SEVER_PART  7
 #define SEVER_JOINT 157
 typedef void (*spawnCutPart_t)(void *self, uint32_t k, uint32_t flags, uint32_t joint, const float *pos);
 #define spawnCutPart FN(spawnCutPart_t, 0xc2330)
 #define setDetached  FN(void (*)(void *, uint32_t), 0xa3c94)
+typedef uint32_t (*map_segment_t)(void *mgr, const float *from, const float *to, uint32_t area, float *out,
+                                  void *info, uint32_t mask, uint32_t flags);
+#define mapSegment FN(map_segment_t, 0x1838fc)        /* = 4U 0x2b96e4 (dala_carve.c floor test) */
+#define COL_MGR    (*(void **)MAIN(0x21270e0))
+
+/* the stage floor under the tail from its tip toward the body: 1 = found, pos = (joint x, floor y, joint z) */
+static int sever_ground(void *self, float *pos, uint32_t *joint)
+{
+    void *col = COL_MGR;
+    if (!col) return 0;
+    for (uint32_t j = SEVER_JOINT; j >= 140; j--) {
+        float a[4] = {0, 0, 0, 0}, out[4] = {0, 0, 0, 0};
+        jointPos(self, j, a);
+        float hi[4] = {a[0], a[1] + 200.0f, a[2], 0.0f}, lo[4] = {a[0], a[1] - 20000.0f, a[2], 0.0f};
+        if (mapSegment(col, lo, hi, FIELD(uint8_t, self, 0x1054), out, 0, 16, 64)) {   /* lower point first */
+            pos[0] = a[0]; pos[1] = out[1]; pos[2] = a[2]; pos[3] = 0.0f;
+            *joint = j;
+            return 1;
+        }
+    }
+    return 0;
+}
 
 static void tail_sever(void *self)
 {
     uint8_t *rec = REC(self);
     if (!rec[0x3bc + 12 * SEVER_PART + 1] || SEVERED(self)) return;
-    spawnCutPart(self, 0, 0, SEVER_JOINT, 0);
+    float pos[4] = {0, 0, 0, 0};
+    uint32_t j = 0;
+    int ground = sever_ground(self, pos, &j);
+    spawnCutPart(self, 0, 0, SEVER_JOINT, ground ? pos : 0);
     if (!SEVERED(self)) setDetached(self, 1);
-    logf("dalaport: tail severed: cut object %s, detached %x, reward flags %x",
-         FIELD(uint8_t, self, 0x8b94) == 1 ? "spawned" : "missing", FIELD(uint16_t, rec, REC_FLAGS),
-         (uint32_t)rec[0x5cbe]);
+    logf("dalaport: tail severed: cut object %s at %s %d %d %d (joint %u), detached %x, reward flags %x",
+         FIELD(uint8_t, self, 0x8b94) == 1 ? "spawned" : "missing", ground ? "the floor under the tail" :
+         "the object position (no floor found)", (int)pos[0], (int)pos[1], (int)pos[2], j,
+         FIELD(uint16_t, rec, REC_FLAGS), (uint32_t)rec[0x5cbe]);
 }
 
 /* 4U 0x92213c(this, v) = GU 0xbd650 (rec+0x5d02 = 1, rec+0x5d00 = v; callee map S): 4U W+0x7a1a is the cond-0

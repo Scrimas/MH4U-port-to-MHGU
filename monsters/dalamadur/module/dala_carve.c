@@ -193,8 +193,8 @@ void dala_carcass_log(void *self)
     }
     {   /* the death -> carcass jump (user, 2026-10-22: the model shifts between the death motion's end and the
          * carcass): this+0x40 and two joints (head 0 / 5, tail 0 / 142), logged when one moves > 300 in a frame
-         * (test 2026-10-22: the death motion itself moves up to ~210 a frame; its first frame snaps 2861 = 4U's
-         * blend 0, D_fdcbe0) */
+         * while the death motion plays (test 2026-10-22: the motion itself moves up to ~210 a frame; its first frame
+         * snaps 2861 = 4U's blend 0, D_fdcbe0) and > 20 once the carcass holds its pose (dala_carcass_lock) */
         static float s_last[2][9];
         static uint32_t s_nj;
         float now[12];
@@ -203,7 +203,7 @@ void dala_carcass_log(void *self)
         jointPos(self, tail ? 142 : 5, &now[6]);
         float *l = s_last[tail], worst = 0.0f;
         for (int i = 0; i < 9; i++) { float d = now[i] - l[i]; d = d < 0 ? -d : d; if (d > worst) worst = d; }
-        if (s_t[tail] && worst > 300.0f && ++s_nj <= 30)
+        if (s_t[tail] && worst > (rec[REC_END_STEP] ? 20.0f : 300.0f) && ++s_nj <= 30)
             logf("dalaport: carcass %s jump %d: pos %d %d %d -> %d %d %d, j0 %d %d %d -> %d %d %d, j%u %d %d %d -> %d %d "
                  "%d | %u/%u step %u motion %x frame %d", tail ? "tail" : "head", (int)worst, (int)l[0], (int)l[1],
                  (int)l[2], (int)now[0], (int)now[1], (int)now[2], (int)l[3], (int)l[4], (int)l[5], (int)now[3],
@@ -221,4 +221,66 @@ void dala_carcass_log(void *self)
          FIELD(uint16_t, self, LAYER1_MOT), (int)FIELD(float, self, LAYER1_FRAME), (int)(layer1Weight(self) * 1000.0f),
          rec[REC_RAGE], p ? (int)p[0] : 0, p ? (int)p[1] : 0, p ? (int)p[2] : 0, (int)d, p ? (int)(p[1] - c[1]) : 0,
          (int)s_rad[tail], (int)c[0], (int)c[1], (int)c[2]);
+}
+
+/* The carcass keeps the pose its death motion ended in (user, 2026-10-25: the corpse moves between the end of the death
+ * animation and the corpse state; 4U holds the last frame, dala_react.c). What the dead body still owns after the
+ * sequence end (rec+0x550 >= 1): GU's motion player on a held motion (speed 0, dala_react.c), the look system (0xa79f8
+ * runs after slot 168 every frame; with no handler writing mode 3 its mode 0 relaxes the six look joints toward 0,
+ * dala_look.c), the object transform and, for the tail, the join to the head's bone 0 (dala_join.c). At the first
+ * carcass frame this snapshot takes every joint's local transform (+0x60 quaternion, +0x70, +0x80 translation; the
+ * fields dala_join.c and Rajang's 0xde5f80 write), the six look angles and the object's position / rotation / scale
+ * (+0x40..+0x6f); every later frame of the death (11/x, 12/255) writes them back after the motion update (slot 168,
+ * before the joint matrices) and sets the look mode to hold (2). The tail's bone 0 stays with the join (the head
+ * holds, so it holds too). Each machine locks its own replayed death, frozen at the same last frame (MP).
+ * Cause (test 2026-10-25 15:58, "carcass head jump" lines: joint 5 eased ~600 with a ratio of 7/8 a frame after the
+ * lock, j0 still): GU's slope fit, Kushala's (dtbase +0x7c kept from the donor: joints 101 and 140; 101 is an
+ * ancestor of the neck and head 102..107 -> 5), set up by 0xc1d88, eased by 0xa8724 (angle += (target - angle) >> 3)
+ * and applied to the joint's world matrix by the joint callback 0xab1a0, after these locals. 4U Dalamadur has no
+ * slope fit (emd word 40 = 0 in em024 / em083 / em110 / em111, C), so tools/dt_convert.py now drops it. The lock
+ * stays as a guard. */
+#define J_IDS      0x498
+#define J_ARRAY    0x494
+#define J_COUNT    0x490
+#define J_SIZE     160u
+#define J_LOCAL    0x60      /* quaternion, +0x70, translation: 48 B */
+#define LOCK_JOINTS 64
+#define LK_ANGLE   0x7520    /* s16[6] look angles (dala_look.c) */
+#define LK_MODE    0x7548    /* u8: 2 = hold */
+static struct {
+    uint8_t on;
+    uint32_t joints;
+    float local[LOCK_JOINTS][12];
+    uint32_t coord[12];      /* this+0x40..+0x6f */
+    int16_t look[6];
+} s_lock[2];
+
+void dala_carcass_lock(void *self)
+{
+    uint32_t tail = is_tail(self), cat = FIELD(uint8_t, self, EN_ACT_CAT), num = FIELD(uint8_t, self, EN_ACT_NUM);
+    uint8_t *rec = REC(self), *js = FIELD(uint8_t *, self, J_ARRAY), *ids = FIELD(uint8_t *, self, J_IDS);
+    uint32_t n = FIELD(uint32_t, self, J_COUNT);
+    if ((cat != 11 && !(cat == 12 && num == 255)) || !js || !ids) { s_lock[tail].on = 0; return; }
+    if (n > LOCK_JOINTS) n = LOCK_JOINTS;
+    uint32_t skip = tail && ids[0] != 0xff ? ids[0] : 0xffffffffu;   /* the tail's bone 0: the join's */
+    if (!s_lock[tail].on) {
+        if (!rec[REC_END_STEP]) return;      /* the death sequence still plays */
+        for (uint32_t i = 0; i < n; i++)
+            for (uint32_t k = 0; k < 12; k++) s_lock[tail].local[i][k] = FIELD(float, js + J_SIZE * i, J_LOCAL + 4 * k);
+        for (uint32_t k = 0; k < 12; k++) s_lock[tail].coord[k] = FIELD(uint32_t, self, 0x40 + 4 * k);
+        for (uint32_t k = 0; k < 6; k++) s_lock[tail].look[k] = FIELD(int16_t, self, LK_ANGLE + 2 * k);
+        s_lock[tail].joints = n;
+        s_lock[tail].on = 1;
+        logf("dalaport: carcass %s pose locked: %u joints, motion %x frame %d, position %d %d %d, frame %u",
+             tail ? "tail" : "head", n, curMotion(self), (int)motionFrame(self), (int)FIELD(float, self, 0x40),
+             (int)FIELD(float, self, 0x44), (int)FIELD(float, self, 0x48), FIELD(uint32_t, self, F_FRAMES));
+        return;
+    }
+    for (uint32_t i = 0; i < s_lock[tail].joints && i < n; i++) {
+        if (i == skip) continue;
+        for (uint32_t k = 0; k < 12; k++) FIELD(float, js + J_SIZE * i, J_LOCAL + 4 * k) = s_lock[tail].local[i][k];
+    }
+    for (uint32_t k = 0; k < 12; k++) FIELD(uint32_t, self, 0x40 + 4 * k) = s_lock[tail].coord[k];
+    for (uint32_t k = 0; k < 6; k++) FIELD(int16_t, self, LK_ANGLE + 2 * k) = s_lock[tail].look[k];
+    FIELD(uint8_t, self, LK_MODE) = 2;
 }

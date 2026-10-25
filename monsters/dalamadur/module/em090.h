@@ -102,6 +102,7 @@ void dala_carve_install(void *self);                /* dala_carve.c: 4U carve re
 void dala_carve_point(void *self);                  /* GU slot 264: the carcass carve point of this half */
 #define SLOT_CARVE 264                              /* vt+0x420, base 0xac6c4 (death sequence end 0xa19ec) */
 void dala_carcass_log(void *self);                  /* test log while dead (slot 119, both halves) */
+void dala_carcass_lock(void *self);                 /* slot 168: the carcass keeps its death motion's last pose */
 /* dala_psl.c: GU slot 75 = the PSL (motion effect) post 0x70028, logged; dala_psl_watch: slot 119, both halves */
 void *dala_psl_post(void *self, uint32_t list, const uint8_t *data, uint32_t slot, void *req);
 #define SLOT_PSL_POST 75

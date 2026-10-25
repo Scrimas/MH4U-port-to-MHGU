@@ -4,11 +4,13 @@
   weapon4u2gu.py index DIR4U OUT.pkl        material template index from Capcom's own weapon conversions: every
                                             4U DIR4U/pl_<pfx>NNN.arc whose MOD part GU also has (same class and
                                             number, same bones / bounding box / material names)
-  weapon4u2gu.py convert NN IN.arc OUT.arc IDX.pkl [--model M] [--alpha-test-4u] [--anim-4u]
+  weapon4u2gu.py convert NN IN.arc OUT.arc IDX.pkl [--model M] [--alpha-test-4u] [--anim-4u] [--shield-bone0]
                                             --alpha-test-4u: templates keep the 4U alpha test (pick_template;
                                             off = the Gogmazios / Tigerstripe builds, byte-identical)
                                             --anim-4u: a non-exact template gets the 4U material's own animation
                                             (anim_4u), not its own copy; off = byte-identical as above
+                                            --shield-bone0: an SnS shield whose bones share bone 0's bind gets every
+                                            vertex on bone 0, as GU's own shields (shield_bone0); off = as above
   weapon4u2gu.py check OUT.arc              parse every entry back (armor4u2gu.check + MOD/MRL material cover)
 
 Rules, each checked on the 4U -> GU weapon pairs Capcom made (GU keeps 4U weapon model numbers: GS 56/62 same-number
@@ -308,7 +310,19 @@ def anim_4u(d4, m, gw, gblock):
     return mrl_anim.build(ge)
 
 
-def convert(nn, src, idx, model=None, log=print, alpha=False, anim=False):
+def shield_bone0(md):
+    """SnS shield (sld) MOD whose bones all have bone 0's local and inverse-bind matrices: its vertices can take bone 0
+    alone with an unchanged rest shape (convert --shield-bone0). GU's own 2-bone shields (w01 16..33, motion set 0)
+    bind every mesh to bone 0 alone (one envelope, bone 0, C) and set 0's shield track wg01_L animates bone 0 only (C);
+    4U's Dalamadur shields (sld055 / sld105) blend bones 0 and 1 in every mesh (identity binds), which GU drew pulled
+    out of shape (user, 2026-10-25: "the shield is getting all distorted"; S: bone 1 of the shield gets no usable
+    matrix in GU's weapon draw for the 3-weight format)."""
+    m = modlib.parse(md)
+    return len(m['bone_list']) > 1 and all(l == m['local'][0] for l in m['local']) and \
+        all(ib == m['invbind'][0] for ib in m['invbind'])
+
+
+def convert(nn, src, idx, model=None, log=print, alpha=False, anim=False, shield0=False):
     pf = PFX[nn]
     n4 = int(re.search(r'pl_%s(\d+)\.arc$' % pf, src).group(1))
     model = n4 if model is None else model
@@ -415,7 +429,9 @@ def convert(nn, src, idx, model=None, log=print, alpha=False, anim=False):
         if md2 is not md:
             log('  %s: mixed vertex streams normalised, %d 0x7BA7401B mesh(es) -> 0xCBF6C01A (colour kept)' % (
                 mp, sum(x['fmt'] == mod4u2gu.COLOUR_4U for x in modlib.parse(md)['mesh_list'])))
-        gmod = mod4u2gu.convert(md2, vcolour=True, edges=True)
+        rb = 0 if shield0 and nn == 1 and mp.split('\\')[-1].startswith('sld') and shield_bone0(md2) else None
+        if rb is not None: log('  %s: every vertex on bone 0 (--shield-bone0: all bones share its bind)' % mp)
+        gmod = mod4u2gu.convert(md2, vcolour=True, edges=True, rebind=rb)
         gmod, changed = drawmodes(gmod, out[-1][2])
         for name in changed: log('  %s: drawMode 0xECF3 (BSAddAlpha + DSZTest + RSMesh material)' % name)
         out.append((gpath(mp), T_MOD, gmod))
@@ -471,7 +487,7 @@ if __name__ == '__main__':
         a = sys.argv[2:]
         mdl = int(a[a.index('--model') + 1]) if '--model' in a else None
         data = convert(int(a[0]), a[1], pickle.load(open(a[3], 'rb')), model=mdl, alpha='--alpha-test-4u' in a,
-                       anim='--anim-4u' in a)
+                       anim='--anim-4u' in a, shield0='--shield-bone0' in a)
         open(a[2], 'wb').write(data)
         print(len(data), 'bytes ->', a[2])
     elif cmd == 'check':

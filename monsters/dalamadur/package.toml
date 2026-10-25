@@ -3,8 +3,8 @@
 # written into the entries' data files.
 name = "dalamadur"
 title = "Dalamadur"
-version = "0.1.0"          # bump on every published change of this package's files (data, assets or code)
-requires_core = "1.3.0"    # oldest core module (exefs) that runs this version: multi-entry packages, companions
+version = "1.0.0"          # bump on every published change of this package's files (data, assets or code)
+requires_core = "1.5.0"    # oldest core module (exefs) that runs this version: its ground / camera hooks
 
 [classes]                  # C prefix of each entry's class (module/build.py): <code>_register_class(), g_<code>_dti
 dalamadur = "em090"        # uEm090_00: the head half, both variants (4U uEm024 runs em024 and em110)

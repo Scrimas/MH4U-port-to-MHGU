@@ -7,8 +7,9 @@ games (selftest: rebuild GU Rathian em001_00 and Kushala em024_00 from their 4U 
 
 Whole-file formats (GU loads the file into memory and fixes pointers in place, so they are 4U images + header):
   bodydata / cambodydata (BDD 0x20110219): 4U emd header word 8 / 9 -> 44-byte records until bone == 0xFFFF.
-      GU: {'BDD\\0', ver, count, 0} + records (+2 bone B = 0xFFFF unless shape 2, last u16 = 0) + terminator
-      {FFFF FFFF, 0...}. bodydata = the HURT volumes (bone, shape, hitzone/part indexes; GU Rathian/Kushala).
+      GU: {'BDD\\0', ver, count, 0} + the 4U records unchanged (bone B 0 on shapes 0 / 1 as GU's em027_00; off2.z
+      at +40 is a float in both games) + terminator {FFFF FFFF, 0...}. bodydata = the hurt AND push volumes (bone,
+      shape, hitzone/part indexes; GU Rathian/Kushala; Dalamadur's gu-walkable.md 6b).
   attackdata (HDE 0x20160121): 4U etd header word 28 -> 40-byte records up to word 29. GU record = 4U[0:32] with
       byte 18 -> b18 & 3, byte 31 = b18 >> 2 (moved knockback bits), byte 28 = 6 (0xFE on the all-zero record 0).
   hitsize (HTS 0x20131015): 4U etd header word 27 -> one pointer per group, up to word 28; a group is 40-byte
@@ -44,12 +45,14 @@ def bodydata(emd, word):
     while struct.unpack_from('<H', emd, p)[0] != 0xFFFF:
         r = bytearray(emd[p:p + 44])
         # record: u16 bone A, u16 bone B, u16 shape (0 sphere, 1 capsule off1-off2 on A, 2 capsule A+off1 ->
-        # B+off2), u16 x5 (hitzone/part/flags), f32 radius, off1[3], off2[3]. GU writes "no bone B" as 0xFFFF
-        # but keeps B on shape 2 (checked on the shared monsters); forcing 0xFFFF there collapsed em089's
-        # 26 two-bone capsules (wings, neck, tail)
-        if struct.unpack_from('<H', r, 4)[0] != 2:
-            struct.pack_into('<H', r, 2, 0xFFFF)
-        struct.pack_into('<H', r, 42, 0)
+        # B+off2), u16 x5 (hitzone/part/flags), f32 radius, off1[3], off2[3]. Bone B: GU's own files mostly
+        # write 0xFFFF on shapes 0 / 1 where 4U has 0 (em001 / em024 / em084 / em087 / em012), em027_00 keeps
+        # 4U's 0 and loads (C, data); kept as 4U since 2026-10-25 (Dalamadur 1.0.0 and Gogmazios 1.1.1 ship it;
+        # this wrote 0xFFFF on shapes 0 / 1 before). Shape 2 keeps B in both games: forcing 0xFFFF there
+        # collapsed em089's 26 two-bone capsules (wings, neck, tail). Bytes 40..43 are off2.z in both games (GU
+        # Rathian em001_00 record 4 keeps 4U's (0, 10, -215), C); they were zeroed here until 2026-10-25 (the high
+        # half of the float): every capsule's far end fell to z ~0 (Dalamadur's head volumes shrank to the head
+        # joint, user: "can't hit the head, can walk through it"; Gogmazios: 24 of 53 records, fixed in 1.1.1)
         recs.append(bytes(r)); p += 44
     term = struct.pack('<HH', 0xFFFF, 0xFFFF) + bytes(40)
     return struct.pack('<4sIII', b'BDD\0', 0x20110219, len(recs), 0) + b''.join(recs) + term

@@ -116,6 +116,15 @@ HOOKS = [
                                    # head's zone (dala_head25.c)
     ('dala_map_pos', 0xC09C8),     # (out, obj) object position getter: the map icon loop's call (lr 0x61a110) gets
                                    # the Dalamadur halves' 4U icon joints (dala_head25.c)
+    ('dala_ground_pre', 0x2E8590), # hunter ground function 0x2e846c before its ray query (r4 hunter): Dalamadur's
+                                   # walk ground off for the ray, back on at dala_ground (dala_walk.c)
+    ('dala_ground', 0x2E85AC),     # hunter ground function 0x2e846c after its ray query (r0 hit, r1 ground y, r4
+                                   # hunter, r5 &[sp+0x1c]; after stage_cart_ground): 4U's ground windows on
+                                   # Dalamadur's body for local and remote hunters (dala_walk.c)
+    ('dala_cam_begin', 0x26934),   # quest camera collision step entry / its only exit: Dalamadur's walk ground off
+    ('dala_cam_end', 0x26E34),     # during the camera's stage sweep, as 4U's camera never sees it (dala_walk.c)
+    ('dala_camtilt_begin', 0x238E0),  # quest camera terrain tilt (ground ray under the hunter) entry / its only
+    ('dala_camtilt_end', 0x23938),    # exit (r4 camera): the walk ground off for its ray (dala_walk.c)
 ]
 # weapon / sharpness table load exits (gear.c GEAR_HOOK wrappers, out/gear_hooks.inc), "name 0xSITE", written by
 # monsters/gogmazios/tools/gear_weapons_em089.py (gu_class finds and checks each class's site)
