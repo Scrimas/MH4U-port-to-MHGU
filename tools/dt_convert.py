@@ -143,7 +143,7 @@ def convert(kind, donor_bytes, d4, log=None, records=False):
             uc.mem_write(guemu.OBJ + cnt, bytes([len(recs)]))
             applied.append('records +%#x <- %s word %d (%d x %d bytes, count +%#x)' % (off, fk, w, len(recs), size, cnt))
 
-    dropped, nulls = set(), {}
+    dropped, focused, nulls = set(), set(), {}
 
     def modify(uc, st):
         obj = guemu.OBJ
@@ -175,6 +175,7 @@ def convert(kind, donor_bytes, d4, log=None, records=False):
                 applied.append('block +%#x kept (4U word %d, donor size %d)' % (off, FOCUS_WORD, size.get(cur, 0)))
                 continue
             uc.mem_write(cur, want)
+            focused.add(off)
             applied.append('block +%#x <- etd word %d records 0 / 1 (joints %d %d / %d %d)' % (
                 off, FOCUS_WORD, *struct.unpack_from('<i12xi16xi12xi', want)))
         for off, (fk, w, rule, cnt, esz) in BLOCKS[kind].items():
@@ -207,14 +208,15 @@ def convert(kind, donor_bytes, d4, log=None, records=False):
         nulls.update((off, not u32(obj + off)) for off in ptr_fields(kind))
     out, err = guemu.load_modify_write(loader, WRITER[kind], vt, donor_bytes, modify,
                                        alloc=gu_schema.ALLOC, skip={reset})
-    check(kind, out, d4, dropped, nulls)
+    check(kind, out, d4, dropped, focused, nulls)
     if log is not None: log.extend(applied)
     return out
 
 
-def check(kind, out, d4, dropped, nulls):
+def check(kind, out, d4, dropped, focused, nulls):
     """the written file loads back with the edits: dropped blocks null, every other block as present as before the
-    writer (a wrong gate shifts the stream), the 4U prefix / focus bytes in place"""
+    writer (a wrong gate shifts the stream), the 4U prefix / focus bytes in place (focus: only the blocks written;
+    a donor block of another size is kept, e.g. Tigerstripe's)"""
     loader, vt, reset = gu_schema.KINDS[kind]
     st, err, obj, uc = guemu.run(loader, vt, out, alloc=gu_schema.ALLOC, skip={reset})
     u32 = lambda o: struct.unpack_from('<I', obj, o)[0]
@@ -225,9 +227,9 @@ def check(kind, out, d4, dropped, nulls):
         p = block_at(d4[fk], fk, w)
         if p is not None and u32(off) and bytes(uc.mem_read(u32(off), n)) != d4[fk][p:p + n]:
             bad.append('+%#x prefix differs' % off)
-    for off in FOCUS.get(kind, ()):
+    for off in focused:
         want = focus_want(d4['etd'])
-        if want is not None and u32(off) and bytes(uc.mem_read(u32(off), len(want))) != want:
+        if bytes(uc.mem_read(u32(off), len(want))) != want:
             bad.append('+%#x focus differs' % off)
     if bad:
         raise RuntimeError('%s check: %s' % (kind, '; '.join(bad)))

@@ -510,3 +510,6 @@ Built (release, no defines); not tested. Details: gu-walkable.md 6e.
    161 only (4U data, C). Open: which attacks and grounds the user means (asked).
 - Log: two emulator pauses (00:13:08..00:13:39, 00:15:02..00:16:03: no game lines at all, both halves' frame counters
   stopped); the zone's 81 s and 7/22's 1496 frames in 74 s are those pauses, not a timer bug.
+- Test of this build (user, 2026-10-25 evening): 1 (ledge jump off the junction's side, wall grab), 2 (camera on the
+  back) and 9 fixed. 7: the hunter still passes through the head entering by the front (the mouth); left as is for
+  now (user). Released as Dalamadur 1.0.0 / core 1.5.0 (with Gogmazios 1.1.1: the body data capsule fix).
