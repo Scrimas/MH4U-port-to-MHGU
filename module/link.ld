@@ -11,7 +11,8 @@ PHDRS
 SECTIONS
 {
     . = 0;
-    .text : { KEEP(*(.text.crt0)) *(.text .text.*) } :text
+    /* .hookwin last: the hook entry window (build.py hookwin.S); its address must not move between the two links */
+    .text : { KEEP(*(.text.crt0)) *(.text .text.*) KEEP(*(.hookwin)) } :text
 
     . = ALIGN(0x1000);
     .rodata  : { *(.rodata .rodata.*) } :rodata

@@ -47,6 +47,18 @@ MAIN_BUILD_ID = 'FB08F1D20FD1204FE7070672777F869B'
 MODULE_BASE = 0x2E19000   # subsdk1 lands where sdk was (Ryujinx log: image 3)
 MAIN_BASE = 0x704000      # main (image 1)
 MAIN_IMAGE_END = 0x2147000  # text + ro + data + bss
+# Only the GAP between main and subsdk1 is fixed: the bases themselves move with the loader (yuzu / Eden put an
+# argument area after rtld, so their main is not at 0x704000; Ryujinx's is). Nothing in the module or the IPS uses
+# an absolute address: main addresses are relocated by rtld from the module's own base (crt0.S g_main_base,
+# main_ref()), hook entries are pc-relative jumps into the entry window (hookwin_asm()), hook returns go through
+# rtld-relocated words. MODULE_BASE / MAIN_BASE stay for the gap and for the logs' symbols.txt.
+MAIN_GAP = MODULE_BASE - MAIN_BASE
+HOOKWIN_SPAN = 0x40000      # entry granularity: `add pc, pc, #X << 18` reaches tramp - site - 8 = X * 0x40000
+
+
+def main_ref(off):
+    """assembler expression for main + off, relocated by rtld (R_ARM_RELATIVE against the module's own base)"""
+    return '(__module_start - 0x%x)' % (MAIN_GAP - off) if off <= MAIN_GAP else '(__module_start + 0x%x)' % (off - MAIN_GAP)
 # install target: the test data dir by default (tools/ryutest.sh); GOG_MOD_ROOT=~/.config/Ryujinx/mods for the real one
 MOD_ROOT = os.path.expanduser(os.environ.get('GOG_MOD_ROOT', os.path.join(ROOT, 'ryuroot', 'mods')))
 MOD_NAME = 'MH4U Port'
@@ -269,13 +281,13 @@ def reg_tables_asm(img):
             raw = [int.from_bytes(img[addr + i * size:addr + (i + 1) * size], 'little') for i in range(n)]
             if ptr:
                 assert all(0 < v < MAIN_IMAGE_END for v in raw), sym   # DTIs live in bss
-                vals = ['0x%x' % (MAIN_BASE + v) for v in raw]
+                vals = [main_ref(v) for v in raw]
             else:
                 vals = ['0x%x' % v for v in raw]
             for k, m in enumerate(MONSTERS):
                 donor = 0 if CLONE_RATHIAN else m['donor_index']
                 if sym == 'reg_dti' and 'gu_class' in package(m) and not CLONE_RATHIAN:
-                    vals.append('0x%x' % (MAIN_BASE + gu_class_dti(m, raw)))
+                    vals.append(main_ref(gu_class_dti(m, raw)))
                 elif sym == 'reg_dti':
                     vals.append(vals[0] if CLONE_RATHIAN else 'g_%s_dti' % package(m)['code'])
                 elif sym == 'reg_files':
@@ -417,8 +429,25 @@ def trampoline(img, name, site):
             out.append('    .word   0x%08x' % w)
         else:
             sys.exit('hook %s: instruction %08x at %x cannot be displaced' % (name, w, a))
-    out += ['    ldr     pc, [pc, #-4]', '    .word   0x%x' % (MAIN_BASE + site + 8)] + lits
+    # back to main at site + 8 through an rtld-relocated data word (no absolute address in text, which rtld
+    # cannot relocate); every register, the flags and lr are preserved
+    out += ['    sub     sp, sp, #4', '    push    {r0}', '    ldr     r0, .L%s_retoff' % name,
+            '.L%s_retpc:' % name, '    add     r0, pc, r0', '    ldr     r0, [r0]', '    str     r0, [sp, #4]',
+            '    pop     {r0, pc}',
+            '.L%s_retoff: .word %s_ret - (.L%s_retpc + 8)' % (name, name, name)] + lits
+    out += ['    .pushsection .data.hookret, "aw"', '    .align 2', '%s_ret: .word %s' % (name, main_ref(site + 8)),
+            '    .popsection']
     return '\n'.join(out)
+
+
+def hookwin_asm(entries, windows):
+    """the hook entry window: `b name_tramp` at each entry's offset, the rest zero (never executed)"""
+    out = ['    .section .hookwin, "ax"', '    .arm', '    .global __hookwin', '    .hidden __hookwin',
+           '    .balign 4', '__hookwin:']
+    for off, name in sorted(entries):
+        out += ['    .org __hookwin + 0x%x' % off, '    b       %s_tramp' % name]
+    out.append('    .org __hookwin + 0x%x' % (windows * HOOKWIN_SPAN))
+    return '\n'.join(out) + '\n'
 
 
 def main():
@@ -430,6 +459,7 @@ def main():
         if hit is not None: sys.exit('hook %s: branch at %x targets %x (inside the patch)' % (name, hit, site + 4))
         inc.append(trampoline(img, name, site))
     open(os.path.join(OUT, 'hooks.inc'), 'w').write('\n'.join(inc) + '\n')
+    open(os.path.join(OUT, 'layout.inc'), 'w').write('    .equ MAIN_GAP, 0x%x\n' % MAIN_GAP)
     open(os.path.join(OUT, 'tables.S'), 'w').write(reg_tables_asm(img))
     errs = alloc.check()
     if errs: sys.exit('allocations.toml:\n  ' + '\n  '.join(errs))
@@ -451,21 +481,50 @@ def main():
         run('clang', *CFLAGS, *EXTRA_DEFINES, *incs, '-c', path, '-o', o)
         objs.append(o)
     elf = os.path.join(OUT, 'subsdk1.elf')
-    run('ld.lld', '-shared', '-T', os.path.join(HERE, 'link.ld'), '--hash-style=sysv', '-z', 'norelro',
-        '-z', 'max-page-size=0x1000', '-init=module_init', '--no-undefined', '-o', elf, *objs)
+    win_src, win_obj = os.path.join(OUT, 'hookwin.S'), os.path.join(OUT, 'hookwin.S.o')
+
+    def link(entries):
+        """write the entry window (entries: [(window offset, hook name)]) and link; returns the symbols"""
+        open(win_src, 'w').write(hookwin_asm(entries, windows))
+        run('clang', *CFLAGS, *incs, '-c', win_src, '-o', win_obj)
+        run('ld.lld', '-shared', '-T', os.path.join(HERE, 'link.ld'), '--hash-style=sysv', '-z', 'norelro',
+            '-z', 'max-page-size=0x1000', '-init=module_init', '--no-undefined', '-o', elf, *objs, win_obj)
+        syms = {}
+        for line in run('llvm-nm', elf).splitlines():
+            p = line.split()
+            if len(p) == 3: syms[p[2]] = int(p[0], 16)
+        return syms
+
+    # Hook entries: the patched site is one `add pc, pc, #X << 18` into a window of HOOKWIN_SPAN-spaced stubs
+    # (`b name_tramp`), so the jump depends only on MAIN_GAP. Pass 1 places the window, pass 2 fills it.
+    windows = 1
+    while True:
+        syms = link([])
+        win = syms['__hookwin']
+        entries, used = [], set()
+        for name, site in HOOKS:
+            off = (site + 8 - MAIN_GAP - win) % HOOKWIN_SPAN
+            k = 0
+            while (off + k * HOOKWIN_SPAN) in used: k += 1          # two sites with the same residue: next window
+            off += k * HOOKWIN_SPAN
+            used.add(off)
+            entries.append((off, name, site))
+        if max(e[0] for e in entries) < windows * HOOKWIN_SPAN: break
+        windows += 1
+    syms2 = link([(off, name) for off, name, _ in entries])
+    for k in [n + '_tramp' for n, _ in HOOKS] + ['__hookwin']:
+        if syms2[k] != syms[k]: sys.exit('hook entry window: %s moved between the two links' % k)
+    syms = syms2
     data = nso.elf2nso(open(elf, 'rb').read())
     open(os.path.join(OUT, 'subsdk1'), 'wb').write(data)
 
-    syms = {}
-    for line in run('llvm-nm', elf).splitlines():
-        p = line.split()
-        if len(p) == 3: syms[p[2]] = int(p[0], 16)
-
     # IPS32: offsets are NSO image offsets + 0x100 (header), as in Atmosphere/Ryujinx
     recs = b''
-    for name, site in HOOKS:
-        tramp = MODULE_BASE + syms[name + '_tramp']
-        patch = struct.pack('<II', 0xE51FF004, tramp)       # ldr pc, [pc, #-4]; .word tramp
+    for off, name, site in entries:
+        delta = MAIN_GAP + win + off - (site + 8)
+        x = delta // HOOKWIN_SPAN
+        if delta % HOOKWIN_SPAN or not 0 < x < 256: sys.exit('hook %s: entry delta %#x not encodable' % (name, delta))
+        patch = struct.pack('<I', 0xE28FF700 | x)           # add pc, pc, #(x ror 14) = x << 18
         recs += struct.pack('>IH', site + 0x100, len(patch)) + patch
     tables = dict({t[0]: t[1] for t in REG_TABLES}, **NOTES_TABLES)
     for lit, use, sym in LIT_PATCHES:
