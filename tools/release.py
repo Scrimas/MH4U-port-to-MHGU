@@ -195,12 +195,14 @@ def notes(c, pk, out):
     v = c['version']
     lines = ['MH4U monsters in MHGU (Switch 1.4): the monsters, their arenas, music, quests and gear. '
              'Take every zip from this one release.', '',
-             "## What's new"] + '\n'.join(news(v)).strip().split('\n') + ['', '## Monsters']
+             "## What's new"] + '\n'.join(news(v)).strip().split('\n') + ['', '## Monsters and quests',
+             'On the Hub quest board:']
     for p in pk:
         qs = quests(p)
         for t in dict.fromkeys(t for t, _, _ in qs):
-            ranks = list(dict.fromkeys(r.replace('Hub ', '') for tt, r, _ in qs if tt == t))
-            lines.append('- **%s**: %s' % (t, ', '.join(ranks)))
+            mine = [(r.replace('Hub ', ''), q) for tt, r, q in qs if tt == t]
+            lines.append('- **%s**: %s' % (t, ' · '.join('%s: %s' % (r, ', '.join('*%s*' % q for rr, q in mine if rr == r))
+                                                          for r in dict.fromkeys(r for r, _ in mine))))
     lines += ['', '## Install',
               '1. Open the mod folder: Ryujinx: right-click MHGU > Open Mods Directory. yuzu / Eden and others: '
               'right-click MHGU > Open Mod Data Location.',
