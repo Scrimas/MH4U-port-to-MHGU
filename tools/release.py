@@ -26,10 +26,6 @@ ROOT = paths.ROOT
 TITLE_ID = '0100770008DD8000'
 MOD_NAME = 'MH4U Port'
 MODULE_OUT = os.path.join(ROOT, 'module', 'out')
-WARNINGS = [
-    "A monster's armor and weapon models ship with that monster. Before uninstalling a monster, unequip its armor "
-    "and weapons.",
-]                                       # online play: its own section of the release text (notes)
 
 
 def toml(path):
@@ -197,40 +193,27 @@ def notes(c, pk, out):
     """release text: what the mod is, What's new (notes/release-news.md), the monsters and their quests, install /
     update / online play, the files with their sha256, the warnings"""
     v = c['version']
-    lines = ['**MH4U Port %s** brings Monster Hunter 4 Ultimate monsters into Monster Hunter Generations Ultimate '
-             '(Switch version 1.4, title `%s`): the monsters themselves, their arenas, music, quests, materials and gear.'
-             % (v, TITLE_ID), '',
-             'Every file of this release is made to be used together: take all your zips from this one release, '
-             'never mix them with an older one.', '',
-             "## What's new"] + news(v) + ['', '## Monsters and quests', '',
-             '| monster | quests (board, rank: title) |', '|---|---|']
+    lines = ['MH4U monsters in MHGU (Switch 1.4): the monsters, their arenas, music, quests and gear. '
+             'Take every zip from this one release.', '',
+             "## What's new"] + '\n'.join(news(v)).strip().split('\n') + ['', '## Monsters']
     for p in pk:
         qs = quests(p)
         for t in dict.fromkeys(t for t, _, _ in qs):
-            lines.append('| %s | %s |' % (t, '<br>'.join('%s: %s' % (r, q) for tt, r, q in qs if tt == t)))
-    lines += ['', 'The quests appear on the Hub quest boards once the monster is installed; their materials, armor and '
-              'weapons are crafted at the smithy as usual.', '',
-              '## Install',
-              '1. Open the game\'s mod folder. Ryujinx: right-click MHGU > Open Mods Directory '
-              '(`mods/contents/%s/`). yuzu / suyu / sudachi / Eden: right-click MHGU > Open Mod Data Location '
-              '(`load/%s/`).' % (TITLE_ID.lower(), TITLE_ID),
-              '2. Extract **core** there (always needed), then the zip of every monster you want. Each zip holds the '
-              'folder `%s/`: they all merge into that one folder.' % MOD_NAME,
-              '3. Start the game. Nothing else to set up.', '',
-              '## Update',
-              'Delete the `%s` folder, then extract this release\'s zips (core + your monsters). Your save keeps its '
-              'materials and gear.' % MOD_NAME, '',
-              '## Playing online',
-              'Everyone in the room should install this same release with the same monsters: a hunter wearing the gear '
-              'of a monster you did not install can crash your game or show nothing.', '',
-              '## Files', '', '| file | what | sha256 |', '|---|---|---|',
-              '| core-%s.zip | **required**: the game module and every monster\'s data | `%s` |'
-              % (v, sha256(os.path.join(out, 'core-%s.zip' % v)))]
+            ranks = list(dict.fromkeys(r.replace('Hub ', '') for tt, r, _ in qs if tt == t))
+            lines.append('- **%s**: %s' % (t, ', '.join(ranks)))
+    lines += ['', '## Install',
+              '1. Open the mod folder: Ryujinx: right-click MHGU > Open Mods Directory. yuzu / Eden and others: '
+              'right-click MHGU > Open Mod Data Location.',
+              '2. Extract **core** (always), then the monsters you want. They all merge into one `%s` folder.' % MOD_NAME,
+              '3. To update: delete `%s`, then extract the new zips.' % MOD_NAME, '',
+              '- **Online**: everyone needs the same release and the same monsters.',
+              '- **Removing a monster**: unequip its armor and weapons first (their models leave with it).', '',
+              '<details><summary>Files (sha256)</summary>', '',
+              '- core-%s.zip `%s`' % (v, sha256(os.path.join(out, 'core-%s.zip' % v)))]
     for p in pk:
         z = '%s-%s.zip' % (p['name'], p['version'])
-        lines.append('| %s | %s %s: models, arena, music, quests, gear | `%s` |'
-                     % (z, p['title'], p['version'], sha256(os.path.join(out, z))))
-    lines += ['', '## Warnings'] + ['- ' + w for w in WARNINGS]
+        lines.append('- %s `%s`' % (z, sha256(os.path.join(out, z))))
+    lines += ['', '</details>']
     return '\n'.join(lines) + '\n'
 
 
