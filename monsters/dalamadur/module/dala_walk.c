@@ -294,11 +294,30 @@ static void hist_add(float y, float dt)
     if (s_hist_n < HIST) s_hist_n++;
 }
 
+/* GU's ground query, as the ground function calls it at 0x2e85a0 (C): (sCollision, hunter, &{x, y, z, 0} of the
+ * hunter, &{hunter+0x1000..0x1008, 0}, his area hunter+0x1054, &y out, hit hunter+0x1060, polygon attributes
+ * hunter+0x10a0, 0, 0) -> 1 = hit. The attribute block is what the ground effects read: the acid / hot-spring floors'
+ * damage among them (Speartip's lake, stage4u2gu SBC attributes). */
+typedef int (*groundRay_t)(void *scol, void *pl, const float *pos, const float *prev, uint32_t area, float *y,
+                           void *hit, void *attr, uint32_t a8, uint32_t a9);
+#define groundRay  FN(groundRay_t, 0x18192c)
+#define PL_PREV    0x1000
+#define PL_AREA    0x1054
+#define PL_HIT     0x1060
+#define PL_ATTR    0x10a0
+
 /* the strip as this call's ground: r0 / r1 and the query's slot that the landing test reads (r5; the trampoline
- * keeps r0..r5, r12, lr at regs with the hooked frame's sp right above them, so [sp+0x1c] = regs + 60) */
-static void report(uint32_t *regs, float h)
+ * keeps r0..r5, r12, lr at regs with the hooked frame's sp right above them, so [sp+0x1c] = regs + 60).
+ * The query ran with the pieces off (dala_ground_pre), so the hit / attribute blocks it wrote are the stage's under
+ * the body: over Speartip's lake the hunter on the back took the lake's damage (user 2026-10-26, since the third
+ * pass). The query runs again from the strip's height with the pieces on, which puts the body's piece in the
+ * attribute block; its height is not used (the strip's stays). Its hit goes to a scratch block: with the body's piece
+ * at hunter+0x1060 too, running off the back started action 4/1 but played no jump and no wall climb (user
+ * 2026-10-27; the stage's hit there is the third pass's, which jumps: confirmed in game the same day). The lake
+ * damage comes from the hit block's floor effect byte, not the attribute block (below). */
+static void report(uint32_t *regs, uint8_t *pl, float h)
 {
-    static uint32_t s_n;
+    static uint32_t s_n, s_na;
     union { uint32_t u; float f; } v;
     v.f = h;
     regs[R0] = 1;
@@ -307,6 +326,29 @@ static void report(uint32_t *regs, float h)
     else if (++s_n <= 5)
         logf("dalaport: walk ground: r5 %x is not [sp+0x1c] (%x), landing slot kept", regs[R5],
              (uint32_t)(uintptr_t)regs + 60);
+    float pos[4] __attribute__((aligned(16))) = {FIELD(float, pl, 0x40), h, FIELD(float, pl, 0x48), 0.0f};
+    float prev[4] __attribute__((aligned(16))) = {FIELD(float, pl, PL_PREV), FIELD(float, pl, PL_PREV + 4),
+                                                  FIELD(float, pl, PL_PREV + 8), 0.0f};
+    static uint8_t s_hit[0x100] __attribute__((aligned(16)));   /* PL_HIT is 0x40 bytes (up to PL_ATTR) */
+    float y = 0.0f;
+    int hit = groundRay(scol(), pl, pos, prev, FIELD(uint8_t, pl, PL_AREA), &y, s_hit, pl + PL_ATTR, 0, 0);
+    if ((!hit || y < h - 50.0f || y > h + 50.0f) && ++s_na <= 20)
+        logf("dalaport: walk ground: body attributes from %s %d (strip %d) at %d %d", hit ? "a hit at" : "no hit",
+             hit ? (int)y : 0, (int)h, (int)pos[0], (int)pos[2]);
+    /* the floor effect (0x2e959c): an ID at hunter+0x1063 (hit byte 3; 0 = none) per area (0x501e60 / 0x501024),
+     * else the floor byte hunter+0x1065 (hit byte 5) per area (0x504c4c, kind 9 with a rate) -> hunter+0x2ef8 /
+     * 0x2ef9 / 0x2efa; and the heat tick 0x2a3878: hunter+0x1069 (hit byte 9) bit 0 = hot floor, ORed with the heat
+     * tests 0x6a160 / 0x48d4cc (C). The stage's hit kept the lake's (user 2026-10-27, without the heat cheat; bytes 3
+     * and 5 alone did not stop it, the lake's byte 5 = 10 -> body 64): the body's bytes 3, 5 and 9 replace them, the
+     * rest stays the stage's (the ledge jump reads it) */
+    static const uint8_t k_fx[3] = {3, 5, 9};
+    for (uint32_t k = 0; k < 3; k++) {
+        uint8_t fx = hit ? s_hit[k_fx[k]] : 0, *cur = pl + PL_HIT + k_fx[k];
+        if (*cur == fx) continue;
+        static uint32_t s_nf;
+        if (++s_nf <= 20) logf("dalaport: walk ground: floor byte %u: %u -> %u (body)", k_fx[k], *cur, fx);
+        *cur = fx;
+    }
 }
 
 /* a remote hunter: 4U's remote window, per call */
@@ -329,7 +371,7 @@ static void ground_remote(uint32_t *regs, uint8_t *pl)
         h < p[1] - (was ? WIN_REMOTE : WIN_OFF) - WIN_G * span)
         return;
     if (air != 2 && h < p[1] - 30.0f) p[1] = h;
-    report(regs, h);
+    report(regs, pl, h);
     s_walker[i].on = air != 2;
     if (!was && s_walker[i].on && ++s_n <= 40)
         logf("dalaport: walk ground remote hunter %x on j%u at %d %d %d", (uint32_t)(uintptr_t)pl, bj, (int)p[0],
@@ -403,7 +445,7 @@ int dala_ground_c(uint32_t *regs)
                  (int)p[0], (int)p[1], (int)p[2]);
         p[1] = h;
     }
-    report(regs, h);
+    report(regs, pl, h);
     if (air == 2) return 0;                   /* over the body in the air: GU lands him when he reaches it */
     s_on = 1;
     hist_add(h, dt);

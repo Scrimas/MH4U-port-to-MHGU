@@ -14,7 +14,8 @@ em_number = [89, 255]                   # GU large monsters are ems 1..88 (regis
 file_ids = [0x10700, 0x1ffff]           # past the game's file-ID table (IDs up to 0x106d0, file_id hook 0x152960)
 save_index = [105, 111]                 # unused registry slots dummy1..7 (IDs 0x1064..0x106a): save hunt / size arrays
 name_entry = [105, 111]                 # monsterName GMD entries 'dummy1'..'dummy7'
-ui_icon = [146, 195]                    # HD_cmn_micon01 cells after GU's 0..140 and the HD UI v4 cheat's 141, 143-145
+ui_icon = [197, 244]                    # cells 1..48 of our own atlas (UI index 196 + cell, tools/ui_icons.py; cell
+                                        # 0 = 4U's '?'): GU's micon00 / 01 end at 195, both full in HD UI v4
 notes_entry = [123, 127]                # Hunter's Notes save map S+0x35b0: bits 123..127 unused
 quests = [11491, 11492, 11493, 11494, 10790, 10791, 10792, 11495, 11496]   # checked free (no file, no list
                                         # entry; v1.0 RomFS); 107NN = Hub HR 7, 114NN = Hub G4 (the ID's digits decide
@@ -44,7 +45,8 @@ mapicon_class = 18                      # map icon size class of Kushala / Chame
 file_ids = [0x10700, 0x1073f]           # 38 used
 save_index = 105
 name_entry = 105
-ui_icon = 146                           # quest board icon byte = ui_icon + 46 (the user's HD UI cheat)
+ui_icon = 197                           # menus' icon (module/icons.c); the quest board shows 4U's '?' (cell 0)
+icon_4u = 0                             # 4U icon index of its art: 4U has no Gogmazios icon, its quests show '?'
 notes_entry = 123
 quests = [11491, 11492]                 # 4U m11014, m11035
 quest_slots = [1011009, 1011003]        # renamed to quests[0], quests[1]
@@ -105,12 +107,14 @@ donor_index = 56                        # Zamtrios em067_00: its class, cro, fla
 file_ids = [0x10740, 0x1077f]
 save_index = 106
 name_entry = 106
+ui_icon = 198
+icon_4u = 101                           # its quest's board icon (4U m10821 +0xE8 = 102 = index + 1, as GU's
+                                        # board bytes; 102 is Tidal Najarala, user 2026-10-27)
 notes_entry = 124
 items = [2986, 2990]                    # 4U 1357..1361 (T.Zamtrios Shard, Piel, Grandfin, Sawtooth+, Tailbrand)
 standin_id = 0x43                       # its quests name Zamtrios (loader-visible), swapped to 0x143 at spawn
 quests = [11493]                        # 4U m10821 (m10830 dropped: its frenzied spawn needs 4U's frenzy system)
 quest_slots = [1011048]
-# its own icon cell: with the quests' board icon (porting plan Phase 4); until then the registry shows Zamtrios'
 armor_models = [436, 437]               # 4U Zamtrios Z Blademaster / Gunner (unused in GU)
 
 [monster.weapon_models]                 # per weapon class (GU model numbers = 4U's; unused in GU)
@@ -156,6 +160,8 @@ mapicon_class = 18                      # Kushala's size class until the map ico
 file_ids = [0x10780, 0x107ff]
 save_index = 107
 name_entry = 107
+ui_icon = 199
+icon_4u = 72                            # 4U head half (tail 73); its quests' board icon is 4U's '?' (+0xE8: 0)
 notes_entry = 125
 quests = [10790, 10791, 10792, 11494]   # 4U m10709 Advanced: Speartip Menace, m10721 Advanced: Here to Eternity,
                                         # event m60131 Pillar of Strength (HR 7), event m60209 The Speartip's King (G;
@@ -232,6 +238,8 @@ standin_id = 0x18
 file_ids = [0x10800, 0x1087f]
 save_index = 108
 name_entry = 108
+ui_icon = 200
+icon_4u = 120                           # 4U head half (tail 121); board icon '?' as Dalamadur's
 notes_entry = 126
 quests = [11495, 11496]                 # 4U m11030 Advanced: Eternal Emperor, event m60213 The Crimson Shah (both G)
 quest_slots = [1110114, 1110115]
@@ -253,6 +261,8 @@ mapicon_class = 18
 file_ids = [0x10880, 0x1089f]
 save_index = 109                        # tally slot shared by both tails
 name_entry = 107
+ui_icon = 201                           # 4U's own tail icon (target camera / enemy panel)
+icon_4u = 73
 
 [[monster]]
 name = "shah_dalamadur_tail"
@@ -266,3 +276,5 @@ standin_id = 0x0f
 file_ids = [0x108a0, 0x108bf]
 save_index = 109
 name_entry = 108
+ui_icon = 202
+icon_4u = 121

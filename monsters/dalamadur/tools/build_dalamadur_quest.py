@@ -113,7 +113,8 @@ def build(R, out, entry, src, num, tpl_id, ems, subq, qid, hp_table=None):
     t = struct.unpack_from('<HBBBBBBBHBB', qd, 0x64)
     boss = lambda em: struct.pack('<HBBBBBBBHBB', em, t[1], t[2], t[3], hp, atk, other, t[7], 100, t[9], t[10])
     qd[0x64:0x64 + 65] = boss(head['standin_id']) + boss(tail['standin_id']) + bytes(39)
-    qd[0xD6:0xDB] = bytes([head['donor_index'] + 1, 0, 0, 0, 0])   # board icon: the donor's until the icons
+    assert struct.unpack_from('<H', q4, 0xE8)[0] == 0                # 4U board icon '?' (both monsters, all quests)
+    qd[0xD6:0xDB] = bytes([alloc.board_byte(alloc.ICON_PAGE2), 0, 0, 0, 0])   # '?' (module/icons.c)
     for i, lang in enumerate(LANGS):
         qd[0xDF + 20 * i:0xDF + 20 * (i + 1)] = ref(quest4u.T_GMD, '%s_%s' % (sid, lang))
     qd = bytes(qd)

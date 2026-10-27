@@ -66,14 +66,26 @@ words 0x1839b38..). Not finished.
 - reg_icon[index] = UI icon index (0x560ca4). Setter 0x56ef50(ui, obj, kind, i, table): `i < 196`, texture =
   table[i / 98] (0x1635228 = micon00, micon01), rect = 0x560918 kind 3: local = i % 98, col = local % 7,
   row = local / 7, 36 units per cell (72 px in the HD atlases).
-- The game uses 0..140; micon01 cells 43-48 (i 141-146) are empty in all 5 languages. Gogmazios = **141**
-  (build.py ICON_EM089).
-- Art: MH4U eng core_common.arc `cmn_micon_BM_MQ_NOMIP` cell (row 0, col 8), 36x36 pixel art, 2x nearest. Cell
-  picked by eye (dark purple frame, orange tar core; neighbours = Seregios / 4U G-rank variants), G.
-- Atlases differ per language (md5), so each one is patched; only the BC3 blocks of cell 43 are re-encoded
-  (checked: every pixel outside the cell is unchanged).
-- Users: menus/results/Hunter's Notes/quest counter GUIs (14 .gui files name micon00/01); the in-quest HUD and the
-  map do not (map = shape atlas + size class, already relocated).
+- The game uses 0..140; micon01 cells 43-48 (i 141-146) are empty in all 5 languages, and GU's micon01 (512x512,
+  72-px cells) like HD UI v4's (1024x1024, 144-px cells) holds only cells 0..48 (i 98..146). micon00/01 come from
+  resident_<lang>.arc, which HD UI v4 replaces, so patching them is not shippable.
+- **Since 2026-10-26: a third atlas (C for the code paths, untested in game).** UI index 196 + k = cell k of
+  romfs nativeNX/mh4uport/micon_sd.tex / micon_hd.tex (tools/ui_icons.py: GU micon01's size and grid, 4U art 2x / 4x
+  nearest; cell 0 = 4U '?'). module/icons.c hook 0x56ef58: GU skips the bind (i >= 196) and sets rect i % 98 = k;
+  the hook points the sprite (as 0x546f48: [gui +0xf8 / +0x294][obj] +0xd8 [kind]) at a copy of the .gui's micon01
+  texture entry (0xb80fd0([sprite +0x78], ids[1]); 64 B: +4 flags, +8..+0xe s16 rect, +0x28 rTexture) with +0x28 = our
+  rTexture (sResource vt[0x30](mgr, rTexture DTI 0x21255d0, "mh4uport\\micon_sd|hd", 1), picked by micon01's
+  +0xdc / +0xe0 size), sprite +0x100 = 0x4d480000 (0xa4faf0 rebinds any real ID). No atlas -> cell 146 instead.
+- Quest board bytes (0x3a3178): < 142 = UI index + 1, 142..186 = hyper (table 0x162a63c + badge at 0x613318),
+  > 186 = none in GU; icons.c maps 200.. to our cells (tools/alloc.py board_byte) and hands the board loop byte 0
+  (hook 0x6132e0) so no hyper badge shows. The HD UI v4 icon cheat patches 0x3a3188 / 0x613318 only: compatible.
+- Art: MH4U eng core_common.arc `cmn_micon_BM_MQ_NOMIP`, 36x36 pixel art; 4U index i: i < 98 -> column i % 7, row
+  i // 7; else x 256 + 36 * ((i - 98) % 7), row (i - 98) // 7 (the right block starts at 256, not 252; allocations.toml
+  icon_4u). 4U quest board icons = u16
+  +0xE8 = icon index + 1 (Tigerstripe m10821: 102 = icon 101; icon 102 is Tidal Najarala, C by its art); Dalamadur /
+  Shah / Gogmazios quests: 0, shown here as '?'.
+- Users: menus/results/Hunter's Notes/quest counter GUIs (14 .gui files name micon00/01), the target camera / enemy
+  panel (0x657044 -> setter, IDs {2,7}); the map does not (map = shape atlas + size class, already relocated).
 
 ## Name (C, partial coverage)
 - monsterName_<lang>.gmd: 268 strings, entry k = registry index k for 0..136; 137-252 repeat the large monsters

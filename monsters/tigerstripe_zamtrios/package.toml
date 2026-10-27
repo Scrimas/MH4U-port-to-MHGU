@@ -1,7 +1,12 @@
 # Tigerstripe Zamtrios package: what the installer shows and installs (goal 3), and the version written into its data file.
 name = "tigerstripe_zamtrios"
 title = "Tigerstripe Zamtrios"
-version = "1.0.0"          # bump on every published change of this monster's files (data, assets or code)
-requires_core = "1.2.0"    # oldest core module (exefs) that runs this version: its moves / shells / area hooks
+version = "1.1.0"          # bump on every published change of this monster's files (data, assets or code)
+requires_core = "1.6.0"    # oldest core module (exefs) that runs this version: its quest's board icon (byte 202)
+                           # is the core's own atlas
 code = "em067_01"          # C prefix of its module code (hooks gated on GU variant 1)
 gu_class = "uEm067_00"     # GU's Zamtrios class runs it as variant 1 (module/build.py: registry DTI = donor's)
+
+[size]                     # quest-result size record (module/main.c size_data): 4U table 0xf32008 + 16 x em {f32 base
+                           # cm, mini, silver, gold}; em092 (Kiranico: mini < 1474.0, large > 1777.9, king > 1869.1)
+tigerstripe_zamtrios = [1519.6, 0.97, 1.17, 1.23]

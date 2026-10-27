@@ -29,6 +29,8 @@ struct port_monster {
     float map_k[4];
     int16_t map_x[4], map_y[4];
     float whole_k;                        /* package.toml [stage] wholemap_k: whole-map record scale */
+    float size[4];                        /* package.toml [size]: 4U base size (cm), mini / silver / gold ratios
+                                             (0 = no crowns); base 0 = none (module/main.c size_data) */
 };
 #define PORT_OWNER(m) (port_monsters[m].owner >= 0 ? port_monsters[m].owner : (m))
 extern const struct port_monster port_monsters[];   /* out/port_monsters.c */

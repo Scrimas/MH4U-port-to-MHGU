@@ -106,12 +106,11 @@ def main():
     ap.add_argument('--hp-table', type=int,
                     help='boss vital (HP) table byte, default the 4U quest\'s (m11014 65 = HP x 2.05, m11035 69 = '
                          'x 2.17); a lower table = shorter tests')
-    ap.add_argument('--icon', type=int, default=ALLOC['ui_icon'] + 46,
+    ap.add_argument('--icon', type=int, default=alloc.board_byte(alloc.ICON_PAGE2),
                     help='board icon byte qd+0xD6. GU 0x3a3178: bytes < 142 = UI index + 1 (24 = Kushala, verified); '
                          '142..186 = hyper icons (remap table + badge at 0x613318: 147 showed Hyper Khezu in test 3). '
-                         'The user\'s HD UI v4 cheat (0x3a3188 / 0x613318 cave) adds bytes > 186 = UI index + 46, no '
-                         'badge: default 192 = UI 146 (Gogmazios "?", tools/ui_icon_hdui.py). Without that cheat 192 '
-                         'shows no icon')
+                         'module/icons.c: bytes 200.. = our atlas, no badge; default 200 = 4U\'s "?" (4U m11014 / '
+                         'm11035 +0xE8 = 0)')
     ap.add_argument('--legacy', action='store_true',
                     help='old default: Fortress stage 26 with Lao\'s q0011319 spawn record (area 1), no alias layout')
     ap.add_argument('--source', choices=sorted(SOURCES), default='m11014',
@@ -184,7 +183,7 @@ def main():
     if a.hp_table is not None: hp = a.hp_table
     boss = struct.pack('<HBBBBBBBHBB', BOSS_ID, 0, 0, 1, hp, atk, other, 1, 100, 0, 3)
     qd[0x64:0x64 + 65] = boss + bytes(52)
-    qd[0xD6:0xDB] = bytes([a.icon, 0, 0, 0, 0])    # board icon, default Kushala's 24 (= UI index 23 + 1, G)
+    qd[0xD6:0xDB] = bytes([a.icon, 0, 0, 0, 0])    # board icon, default 4U's '?' (module/icons.c)
     for i, lang in enumerate(LANGS):
         qd[0xDF + 20 * i:0xDF + 20 * (i + 1)] = ref(T_GMD, '%s_%s' % (sid, lang))
     qd = bytes(qd)

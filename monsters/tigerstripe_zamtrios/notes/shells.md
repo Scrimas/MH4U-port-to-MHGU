@@ -173,8 +173,10 @@ the stack for variant 1 too (f735bc -> sp+80, f7386c).
   main ones. A full port (em089_shell016-style, from uShell012 0xc61b80 and uShell003) is only needed if GU's flight
   itself turns out wrong in game. Its per-frame path (0xc61ea0..0xc624dc) is not transcribed yet.
 - uShell016 40 / 48: GU's sp_02 + TS data:
-  - HDS 0 byte 0x0c 0x81 -> 0x11 (record 38)
-  - sh000 length 3000 -> 2000
+  - HDS 0 byte 0x0c 0x81 -> 0x11 (record 38). Done 2026-10-26 (build_em067_01_arc.py BEAM_REC): the beam gave
+    iceblight in the user's online session; 0x11 = water in GU's own data too (Plesioth em010, Royal Ludroth em019
+    shells; Zamtrios' ice beam 0x81)
+  - sh000 length 3000 -> 2000 (not done: the beam's reach)
   - sh001 life 45 -> 50 (4U)
   - the effect (4U event-15 kind 7, scaled) is unresolved.
 

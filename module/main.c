@@ -190,3 +190,42 @@ int save_hunts_c(uint32_t *regs)
     if (m >= 0) regs[R1] = (regs[R1] & ~0xffffu) | port_monsters[m].save_id;
     return 0;
 }
+
+/* 0x687b0(mgr) caches the enemy resident tables (file IDs 0xde1a..0xde1f) in mgr+0x257c..0x2590 (C); hook 0x6880c,
+ * r0 = em_size_scale_data (file 0xde1e): count +0x64, element k = 0x51904(res, k) = {+4 u32 registry index, +8 f32
+ * base size (cm), +12 / +16 / +20 mini / silver / gold ratio, +24, +28}, read by the index of an ID (0x67310: size
+ * and crown of a size %, 0x672bc). A ported monster's size record is filed under its save slot (stats_add), whose
+ * GU element (a dummy) is all zero: the quest result showed a wrong size (user 2026-10-26). The slot's element =
+ * the donor's with the 4U base size and crowns (package.toml [size]). 0x67310: mini if size % <= mini x 100, gold
+ * if >= gold x 100, silver if >= silver x 100, so zeros would make every size gold: a monster without crowns in 4U
+ * gets thresholds out of reach. */
+typedef uint8_t *(*size_elem_t)(void *res, uint32_t k);
+#define size_elem FN(size_elem_t, 0x51904)
+int size_data_c(uint32_t *regs)
+{
+    static uint32_t s_n;
+    void *res = (void *)regs[R0];
+    if (!res) return 0;
+    uint32_t n = FIELD(uint32_t, res, 0x64);
+    for (int m = 0; m < PORT_N; m++) {
+        const struct port_monster *p = &port_monsters[m];
+        if (p->owner >= 0 || p->size[0] <= 0.0f) continue;
+        uint8_t *slot = 0, *donor = 0;
+        for (uint32_t k = 0; k < n; k++) {
+            uint8_t *e = size_elem(res, k);
+            if (FIELD(uint32_t, e, 4) == p->save_index) slot = e;
+            if (FIELD(uint32_t, e, 4) == p->donor_index) donor = e;
+        }
+        if (!slot) continue;
+        if (donor)
+            for (uint32_t o = 12; o < 32; o += 4) FIELD(float, slot, o) = FIELD(float, donor, o);
+        FIELD(float, slot, 8) = p->size[0];
+        FIELD(float, slot, 12) = p->size[1];
+        FIELD(float, slot, 16) = p->size[1] > 0.0f ? p->size[2] : 100.0f;
+        FIELD(float, slot, 20) = p->size[1] > 0.0f ? p->size[3] : 100.0f;
+        if (++s_n <= 8)
+            logf("mh4uport: %s size record: slot %u = base %d cm, crowns %d / %d / %d %%", p->name, p->save_index,
+                 (int)p->size[0], (int)(p->size[1] * 100.0f), (int)(p->size[2] * 100.0f), (int)(p->size[3] * 100.0f));
+    }
+    return 0;
+}

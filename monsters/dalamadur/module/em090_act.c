@@ -339,14 +339,17 @@ int em090_cond(void *self, uint32_t id)
     return 0;
 }
 
-/* per-frame part of 4U slot 40 0x76da88 used by the actions: the action / placement timers (4U 0xb052c4 = GU
- * 0x72708: t += time scale, apimap 99), the stage-8 hold, then the meteor machine 0x76db4c..0x76de94 */
-#define timerUp FN(int (*)(void *, float *), 0x72708)
+/* per-frame part of 4U slot 40 0x76da88 used by the actions: the action / placement timers (4U 0xb052c4: t += time
+ * scale this+20), the stage-8 hold, then the meteor machine 0x76db4c..0x76de94. GU 0x72708 -> 0x53aa70 is
+ * t += time scale this+28 * s0 (C): every GU caller sets s0 = 1.0 first. Without the argument the placement timer ran
+ * at whatever float the last call left in s0 (user 2026-10-26: after flinches / topples it stayed in one placement
+ * far too long; the G quest log has placement 0 from 4:57 to 8:16 against 4U's 2700 = 45 s) */
+#define timerUp FN(int (*)(void *, float *, float), 0x72708)
 void em090_state_frame(void *self)
 {
     dala_state_frame(self);
-    timerUp(self, &DALA_WORK(float, self, W_T_ACT));
-    timerUp(self, &DALA_WORK(float, self, W_T_MODE));
+    timerUp(self, &DALA_WORK(float, self, W_T_ACT), 1.0f);
+    timerUp(self, &DALA_WORK(float, self, W_T_MODE), 1.0f);
     dala_arena_frame(self);
     dala_meteor_frame(self);
     dala_shah_frame(self);           /* 4U 0x76de94, right after the meteor machine */

@@ -44,7 +44,7 @@ step() {      # name: command line of one step
     arc)          python3 "$T/build_em089_arc.py" --cmdtbl gog ;;         # monster arc + manifest + FILE section
     stage)        timeout 1800 python3 -I tools/stage4u2gu.py alias ;;    # Battlequarters alias arcs (m28)
     mapui)        timeout 1200 python3 -I tools/mapui4u2gu.py ;;          # area + whole maps (reads stage's m28.arc)
-    ui)           python3 -I "$T/ui_em089.py" ;;                          # HUD icon + name
+    ui)           python3 -I "$T/ui_em089.py" ;;                          # name (icon: tools/ui_icons.py)
     quest1)       python3 "$T/build_gog_quest.py" ;;                      # 11491 (4U m11014)
     quest2)       python3 "$T/build_gog_quest.py" --source m11035 ;;      # 11492
     slot75)       python3 "$T/em089_slot75_gen.py" ;;

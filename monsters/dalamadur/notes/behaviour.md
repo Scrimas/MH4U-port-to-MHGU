@@ -513,3 +513,18 @@ Built (release, no defines); not tested. Details: gu-walkable.md 6e.
 - Test of this build (user, 2026-10-25 evening): 1 (ledge jump off the junction's side, wall grab), 2 (camera on the
   back) and 9 fixed. 7: the hunter still passes through the head entering by the front (the mouth); left as is for
   now (user). Released as Dalamadur 1.0.0 / core 1.5.0 (with Gogmazios 1.1.1: the body data capsule fix).
+
+## Fixes 2026-10-26 (user's online session with friends, 2026-10-25 21:56 log; not tested)
+- Stays too long in one placement after flinches / topples (user; friends: not 4U). The placement timer W_T_MODE
+  (cond 4: 2700 in placement 0, 5400 in 1 / 2, 4U 0x773f34 clears it only when W+0x1c9 changes: same rule as ours,
+  C) advanced through GU 0x72708 -> 0x53aa70 = t += this+28 * s0, and our call never set s0 (every GU caller loads
+  1.0 first, C): the timer ran at whatever float s0 held. G quest log: placement 0 from 4:57 to 8:16 (199 s, 45 s in
+  4U). em090_state_frame passes 1.0 now (both timers; the tail's cond 5 reads the head's W_T_ACT too).
+- Acid / hot-spring damage while standing on the body (user: since the third pass). The ground query 0x18192c writes
+  the hit polygon's attributes into hunter+0x1060 / +0x10a0 (C); the pieces are off for it, so over the lake they were
+  the lake's and only the height was ours. dala_walk.c report() runs the query again from the strip's height with
+  the pieces on: the body's piece fills them, as before the third pass (log line if that second query misses).
+- HR and G "the same HP and damage" (user): not a port error. Quest rows (4U's, C): 10792 HP row 40 (x1.30), attack
+  105 (x7.0), defence 82 (x0.80); 11494 HP 65 (x2.05), attack 107 (x7.6), defence 79 (x0.80). The log has HP 22880 =
+  base 17600 x 1.30 for 10792 (this machine controlled it; 11494's controller was a friend's: 36080 expected, S).
+  Times in the log: 11494 11:31, 10792 6:14. The attack rows are nearly equal in 4U itself.

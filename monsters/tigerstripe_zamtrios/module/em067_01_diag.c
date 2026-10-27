@@ -48,6 +48,41 @@ int em067_01_atransfer_c(uint32_t *regs)
 }
 #define MAX_LINES  600u
 
+/* Clipping while inflated (user 2026-10-27): the volumes, the mask (rec+0x3b4 bit 15 clear in mode 2
+ * = bodydata / cambodydata record 1 on, bone 201 r100 / r110) and bone 201's animated scale (~5, 4U em092 = em022)
+ * match GU Zamtrios (C). This tells the two remaining cases apart: the local hunter INSIDE that sphere (push not
+ * applied) or outside it while clipping (sphere smaller than the inflated mesh). Joint record: 160 B, 0x53ab30 returns
+ * +64 = world position, so the world matrix is +16..+79 (S: rows 0..2 give the joint's scale). */
+static float sqrt_f(float x)
+{
+    if (x <= 0.0f) return 0.0f;
+    float r = x > 1.0f ? x : 1.0f;
+    for (int i = 0; i < 24; i++) r = 0.5f * (r + x / r);
+    return r;
+}
+
+static void inflated_probe(void *self)
+{
+    static uint32_t s_n, s_tick;
+    uint8_t *rec = FIELD(uint8_t *, self, EN_RECORD);
+    if ((rec[0x1bb] & 3) != 2 || s_n >= 80 || ++s_tick % 10) return;
+    void *root = *(void **)PLAYER_ROOT;
+    uint8_t *pl = root ? *(uint8_t **)((uint8_t *)root + 0x58) : 0;
+    uint8_t *idx = FIELD(uint8_t *, self, 0x498), *joints = FIELD(uint8_t *, self, 0x494);
+    if (!pl || !FIELD(void *, pl, 0x498) || !FIELD(void *, pl, 0x494) || !idx || !joints || idx[201] == 255) return;
+    const float *m = (const float *)(joints + 160u * idx[201] + 16);
+    float h[4], s = sqrt_f(m[0] * m[0] + m[1] * m[1] + m[2] * m[2]);
+    float s2 = sqrt_f(m[4] * m[4] + m[5] * m[5] + m[6] * m[6]);
+    jointPos(pl, 0, h);
+    float dx = h[0] - m[12], dy = h[1] - m[13], dz = h[2] - m[14];
+    float d = sqrt_f(dx * dx + dy * dy + dz * dz), r = 110.0f * s;
+    if (d > 2.0f * r + 300.0f) return;
+    s_n++;
+    logf("tzport: inflated probe: hunter %d from bone 201 (%s), sphere r %d (scale %d / %d %%), dy %d, motion %x "
+         "mask %x", (int)d, d < r ? "INSIDE" : "outside", (int)r, (int)(s * 100.0f), (int)(s2 * 100.0f), (int)dy,
+         curMotion(self), FIELD(uint16_t, rec, 0x3b4));
+}
+
 int em067_01_act_c(uint32_t *regs)
 {
     static void *s_self;
@@ -67,6 +102,7 @@ int em067_01_act_c(uint32_t *regs)
         }
     }
 #endif
+    inflated_probe(self);
     if (s_lines >= MAX_LINES) return 0;
     if (!s_self) {
         s_self = self;
@@ -79,9 +115,13 @@ int em067_01_act_c(uint32_t *regs)
     uint32_t act = (uint32_t)FIELD(uint8_t, self, EN_ACT_CAT) << 8 | FIELD(uint8_t, self, EN_ACT_NUM);
     uint32_t mot = curMotion(self);
     if (act != s_act) {
+        /* mode rec+0x1bb (& 3 == 2: inflated) and the volume mask rec+0x3b4 that slot 170 -> 0xf79200 derives from it
+         * (bit 0x8000 clear = bodydata record 1 on: the inflated sphere, bone 201 r100 x its scale; user 2026-10-26:
+         * "we clip inside him in his big form") */
+        uint8_t *rec = FIELD(uint8_t *, self, EN_RECORD);
         s_lines++;
-        logf("tzport: em067_01 action %u/%u (motion %x) area %u", act >> 8, act & 0xff, mot,
-             FIELD(uint8_t, self, EN_AREA));
+        logf("tzport: em067_01 action %u/%u (motion %x) area %u mode %x mask %x", act >> 8, act & 0xff, mot,
+             FIELD(uint8_t, self, EN_AREA), rec[0x1bb], FIELD(uint16_t, rec, 0x3b4));
     } else if (mot != s_mot) {
         s_lines++;
         logf("tzport: em067_01 motion %x (action %u/%u)", mot, act >> 8, act & 0xff);

@@ -496,7 +496,7 @@
  ],
  "notes": [
   "shell em067_00_01: HDS entries [5, 6, 7] = 4U records [169, 171, 172]",
-  "shell em067_00_02: HDS entries [1, 2] = 4U uShell016 records [33, 39], HTS groups [1, 2] (r [208.0, 260.0])",
+  "shell em067_00_02: HDS entry 0 = 4U uShell016 record 38 (water beam), entries [1, 2] = records [33, 39], HTS groups [1, 2] (r [208.0, 260.0])",
   "shell em067_00_13: HDS entries [0, 1, 2, 3] = 4U records [29, 30, 31, 32]",
   "material XfB__E0__m00_body: template solid_sphere, type 0, em092_01_BM, sphere em092_05_BM",
   "material XfB__E0__m00_fatbig: template solid_sphere, type 1, em092_03_BM, sphere em092_07_BM",
@@ -537,7 +537,7 @@
   "em092 sound: 53 waves (53 used by the bank), bank 11 groups / 145 entries, request 313 entries (20 common-bank entries from GU em067_00, 0 converted, + 17 more of its common-bank requests), sound call 41135 B",
   "attackdata: 4U em092 (= em022) with GU byte 28; differs from GU in the flags of records [23, 24, 31, 32, 33]",
   "bodydata: GU em067_00 minus records [12, 13] (bones [131, 142])",
-  "dttune: GU em067_00 + 42 bytes of 4U em022 -> em092 differences (GU retuned 13 other bytes)",
+  "dttune: GU em067_00 + 72 bytes of 4U em022 -> em092 differences (GU retuned 13 other bytes)",
   "area data (fields 40-44): GU em007_00 (map 5 / 22 routes; GU em067_00 covers map 14 only)",
   "kept sound\\se\\em\\em067_00\\snd_em067_00 although replaced: named by ['shell\\\\em\\\\em067_00_shell02\\\\em067_00_02']",
   "shared from em067_00: 505 files kept, 32 dropped (replaced or its model)"

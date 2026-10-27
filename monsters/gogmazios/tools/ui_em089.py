@@ -4,7 +4,9 @@ See notes/data.md.
   ui_em089.py            write the NAME section
   ui_em089.py preview    also save the patched atlases as PNG into the scratch dir given by $UI_PREVIEW
 
-Icon: reg_icon[137] (module/build.py ICON_EM089) = UI index 141. The icon setter 0x56ef50 picks atlas
+Icon (2026-10-26): allocations.toml ui_icon 197 = a cell of the core's own atlas (tools/ui_icons.py, module/icons.c);
+`preview` and ui_icon_hdui.py below date from the micon01 cell 146 era and no longer apply. Old notes:
+reg_icon[137] (module/build.py ICON_EM089) = UI index 141. The icon setter 0x56ef50 picks atlas
 index / 98 (HD_cmn_micon00 / 01, table 0x1635228) and 0x560918 kind 3 computes the cell: local = index % 98,
 column = local % 7, row = local / 7, 36 units (= 72 HD pixels) per cell. 141 -> micon01 cell 43 (row 6, col 1),
 empty in every language. Only the BC3 blocks of that cell are re-encoded; every other block is copied.

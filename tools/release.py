@@ -10,16 +10,17 @@ never be built in hosted CI: the converters read ~15 GB of 4U / GU data and the 
                              CLI); asks first unless --yes. No installer apps (user, 2026-10-21): users extract the zips.
 
 Packages: core-<v>.zip = MH4U Port/exefs/{subsdk1, <build id>.ips} + MH4U Port/romfs/nativeNX/mh4uport/<every
-monster>.bin (always installed together: gear IDs depend on all of them); <monster>-<v>.zip = MH4U Port/romfs/... (that
+monster>.bin (always installed together: gear IDs depend on all of them) + the icon atlases micon_sd/hd.tex; <monster>-<v>.zip = MH4U Port/romfs/... (that
 monster's assets, optional). Every zip extracts into the game's mod directory ('<mods>/contents/<title>/' for Ryujinx,
 '<load>/<TITLE>/' for the yuzu family) and they merge into the one 'MH4U Port' folder. NOTES.md (the release text):
-files, sha256, install steps, warnings.
+what the mod is, What's new (notes/release-news.md, one section per core version: write it before packaging), the
+monsters and their quests (read from the quest files), install / update / online play, files with sha256, warnings.
 """
 import hashlib, os, re, struct, subprocess, sys, tomllib, zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-import alloc, paths, portdata
+import alloc, paths, portdata, ui_icons
 
 ROOT = paths.ROOT
 TITLE_ID = '0100770008DD8000'
@@ -28,9 +29,7 @@ MODULE_OUT = os.path.join(ROOT, 'module', 'out')
 WARNINGS = [
     "A monster's armor and weapon models ship with that monster. Before uninstalling a monster, unequip its armor "
     "and weapons.",
-    "Online, a player wearing gear of a monster you did not install may crash your game or show nothing: install "
-    "the monsters your group uses, in the same versions.",
-]
+]                                       # online play: its own section of the release text (notes)
 
 
 def toml(path):
@@ -148,6 +147,7 @@ def package(out):
                ('exefs/' + build_id(), os.path.join(MODULE_OUT, build_id()))]
     members += [('romfs/nativeNX/mh4uport/%s.bin' % m['name'], os.path.join(paths.gen(m['name']), m['name'] + '.bin'))
                 for p in pk for m in p['entries']]
+    members += [('romfs/nativeNX/mh4uport/' + name, os.path.join(MODULE_OUT, name)) for name, _, _ in ui_icons.ATLASES]
     core_zip = 'core-%s.zip' % c['version']
     write_zip(os.path.join(out, core_zip), [(MOD_NAME + '/' + a, s) for a, s in members])
     for p in pk:
@@ -162,24 +162,75 @@ def package(out):
     return out
 
 
+NEWS = os.path.join(ROOT, 'notes', 'release-news.md')   # "## v<core version>" sections: this release's What's new
+
+
+def news(version):
+    """the What's new section of notes/release-news.md for this core version (its lines up to the next '## v')"""
+    text = open(NEWS).read().split('\n')
+    head = '## v' + version
+    assert head in text, '%s has no section %s' % (NEWS, head)
+    i = text.index(head) + 1
+    j = next((k for k in range(i, len(text)) if text[k].startswith('## v')), len(text))
+    return [l for l in text[i:j]]
+
+
+def quests(p):
+    """[(monster title, rank, quest title)] of a package's shipped quests: rank from questData (+0x11 board 10 = Hub,
+    +0x12 stars: 1..7 = Hub Low / High Rank, 11.. = G1..), title = the English GMD's first string"""
+    sys.path.insert(0, paths.GU_PY)
+    import gmd
+    rf, out = paths.romfs(p['name']), []
+    for m in p['entries']:
+        for q in m.get('quests', []):
+            qd = open(os.path.join(rf, 'nativeNX/loc/quest/questData/questData_%07d.ext' % q), 'rb').read()
+            star = qd[0x12]
+            rank = 'G★%d' % (star - 10) if star > 10 else '%s ★%d' % ('High Rank' if star >= 4 else 'Low Rank', star)
+            board = 'Hub' if qd[0x11] == 10 else 'board %d' % qd[0x11]
+            title = gmd.gmd_strings(open(os.path.join(rf, 'nativeNX/eng/quest/questData/questData_%07d_eng.gmd' % q),
+                                         'rb').read())[0]
+            out.append((m.get('title', p['title']), '%s %s' % (board, rank), title))
+    return out
+
+
 def notes(c, pk, out):
-    """release notes: what each zip is, how to install (extract into the game's mod directory), the warnings"""
-    lines = ['MH4U Port %s for MHGU 1.4 (title %s).' % (c['version'], TITLE_ID), '',
-             '| file | what | sha256 |', '|---|---|---|',
-             '| core-%s.zip | **required**: the module (exefs) and every monster\'s data file | `%s` |'
-             % (c['version'], sha256(os.path.join(out, 'core-%s.zip' % c['version'])))]
+    """release text: what the mod is, What's new (notes/release-news.md), the monsters and their quests, install /
+    update / online play, the files with their sha256, the warnings"""
+    v = c['version']
+    lines = ['**MH4U Port %s** brings Monster Hunter 4 Ultimate monsters into Monster Hunter Generations Ultimate '
+             '(Switch version 1.4, title `%s`): the monsters themselves, their arenas, music, quests, materials and gear.'
+             % (v, TITLE_ID), '',
+             'Every file of this release is made to be used together: take all your zips from this one release, '
+             'never mix them with an older one.', '',
+             "## What's new"] + news(v) + ['', '## Monsters and quests', '',
+             '| monster | quests (board, rank: title) |', '|---|---|']
+    for p in pk:
+        qs = quests(p)
+        for t in dict.fromkeys(t for t, _, _ in qs):
+            lines.append('| %s | %s |' % (t, '<br>'.join('%s: %s' % (r, q) for tt, r, q in qs if tt == t)))
+    lines += ['', 'The quests appear on the Hub quest boards once the monster is installed; their materials, armor and '
+              'weapons are crafted at the smithy as usual.', '',
+              '## Install',
+              '1. Open the game\'s mod folder. Ryujinx: right-click MHGU > Open Mods Directory '
+              '(`mods/contents/%s/`). yuzu / suyu / sudachi / Eden: right-click MHGU > Open Mod Data Location '
+              '(`load/%s/`).' % (TITLE_ID.lower(), TITLE_ID),
+              '2. Extract **core** there (always needed), then the zip of every monster you want. Each zip holds the '
+              'folder `%s/`: they all merge into that one folder.' % MOD_NAME,
+              '3. Start the game. Nothing else to set up.', '',
+              '## Update',
+              'Delete the `%s` folder, then extract this release\'s zips (core + your monsters). Your save keeps its '
+              'materials and gear.' % MOD_NAME, '',
+              '## Playing online',
+              'Everyone in the room should install this same release with the same monsters: a hunter wearing the gear '
+              'of a monster you did not install can crash your game or show nothing.', '',
+              '## Files', '', '| file | what | sha256 |', '|---|---|---|',
+              '| core-%s.zip | **required**: the game module and every monster\'s data | `%s` |'
+              % (v, sha256(os.path.join(out, 'core-%s.zip' % v)))]
     for p in pk:
         z = '%s-%s.zip' % (p['name'], p['version'])
-        lines.append('| %s | %s %s (needs core %s or newer) | `%s` |' % (z, p['title'], p['version'], p['requires_core'],
-                                                                        sha256(os.path.join(out, z))))
-    lines += ['', '## Install',
-              '1. Open the game\'s mod directory: Ryujinx: right-click MHGU > Open Mods Directory '
-              '(`mods/contents/%s/`); yuzu / suyu / sudachi / Eden: right-click > Open Mod Data Location '
-              '(`load/%s/`).' % (TITLE_ID.lower(), TITLE_ID),
-              '2. Extract **core** there, then every monster you want. Each zip holds the folder `%s/`; they merge into '
-              'that one folder.' % MOD_NAME,
-              '3. Updating: delete the `%s` folder, then extract the new zips.' % MOD_NAME, '',
-              '## Warnings'] + ['- ' + w for w in WARNINGS]
+        lines.append('| %s | %s %s: models, arena, music, quests, gear | `%s` |'
+                     % (z, p['title'], p['version'], sha256(os.path.join(out, z))))
+    lines += ['', '## Warnings'] + ['- ' + w for w in WARNINGS]
     return '\n'.join(lines) + '\n'
 
 

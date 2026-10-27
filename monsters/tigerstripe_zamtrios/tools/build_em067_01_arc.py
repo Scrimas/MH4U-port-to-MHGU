@@ -171,6 +171,10 @@ BREATH_FILE_ID = 0x8a76
 S016_REC_4U = 0x102b370 + 96
 BLAST = ((38, 33, 0x102b230, 208.0), (49, 39, 0x102b2d0, 260.0))     # subtype, record, volume, radius
 BLAST_HDS0 = 1                                                         # entry of 38 (49 = + 1): em067_01_shell016.c
+# the breath (water beam, 4U uShell016 40 / 48) = HDS entry 0: 4U record 38, which differs from GU's entry 0 (4U
+# record 12, Zamtrios' ice beam) only in the flags u32 +0x0c, 0x11 (water: GU Plesioth em010 / Royal Ludroth em019
+# shells) against 0x81 (ice); GU's entry kept Zamtrios' iceblight (test 2026-10-25, user)
+BEAM_REC = 38
 # code-posted effects (PEL list 2, efl4u2gu extra2): em092_001 element 1 at the mouth along the blast (4U uEffect015
 # kinds 8 / 9, scale (0.8, 0.8, 1.0) / 1.0), em092_200 at the shell's end (uEffect002 49, all elements)
 BLAST_FX = [('effect\\efl\\em\\em092\\em092_001', dict(id=4238, joint=-1, k=1, pos=(0.0, 0.0, 0.0), rot=(0.0, 0.0, 0.0),
@@ -254,15 +258,19 @@ def shell_data(ents, notes):
             gu[2:4] = hds[18:20]                                   # GU's +2 (9999) on its breath entry
             assert bytes(gu) == hds[16:72], 'GU breath entry is not 4U record 12 converted'
             new = bytearray(hds)
+            beam = hds_entry(exe, S016_REC_4U + 40 * BEAM_REC, 6)
+            beam[0x19], beam[2:4] = gu[0x19], gu[2:4]              # GU's group and +2, as on its entry
+            assert [i for i in range(56) if beam[i] != gu[i]] == [0x0c], 'beam record differs beyond the flags'
+            new[16:72] = beam
             struct.pack_into('<I', new, 8, n + len(BLAST))
             for i, (sub, rec, vol, rad) in enumerate(BLAST):
                 e = hds_entry(exe, S016_REC_4U + 40 * rec, 6)
                 e[0x19] = g0 + i
                 new += e
             blast_hds[0] = bytes(new)
-            notes.append('shell em067_00_02: HDS entries %s = 4U uShell016 records %s, HTS groups %s (r %s)' % (
-                list(range(n, n + len(BLAST))), [b[1] for b in BLAST], list(range(g0, g0 + len(BLAST))),
-                [b[3] for b in BLAST]))
+            notes.append('shell em067_00_02: HDS entry 0 = 4U uShell016 record %d (water beam), entries %s = records '
+                         '%s, HTS groups %s (r %s)' % (BEAM_REC, list(range(n, n + len(BLAST))), [b[1] for b in BLAST],
+                                                       list(range(g0, g0 + len(BLAST))), [b[3] for b in BLAST]))
         if t == SHELL_DEF_T and p.startswith('shell\\em\\em067_00_shell'):
             assert d.count(b'effect\\pel\\em\\em067_00u') == 1, p
             d = d.replace(b'effect\\pel\\em\\em067_00u', PEL_U.encode())

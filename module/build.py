@@ -13,7 +13,7 @@ import glob, os, re, shutil, struct, subprocess, sys, tomllib
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, os.path.join(ROOT, 'tools'))
-import alloc, nso, paths
+import alloc, nso, paths, ui_icons
 
 MONSTERS = alloc.monsters()        # registry order (allocations.toml): registry indexes, append order
 QUESTS_PER_ENTRY = alloc.QUESTS_PER_ENTRY   # port.h PORT_QUESTS
@@ -59,7 +59,9 @@ HOOKS = [
     ('em_record', 0x69C258),   # (res, index): per-index record of the global resource [[g]+0x2590] -> enemy+0x7628
     ('file_id', 0x152960),     # (_, fileId) -> resource: serves the monsters' file IDs (port.c, data file FILE)
     ('gear_pwl', 0x272910),    # rPlayerWeaponList load exit: Gogma HBG / SA motion sets (gear.c)
-    ('stats_add', 0x3A75FC),   # quest-end tally: index from 0x50b64 (obj+0x114/0x116+index*8, no bound)    ('stats_hunted', 0x3A3930),  # reads the same array
+    ('stats_add', 0x3A75FC),   # quest-end tally: index from 0x50b64 (obj+0x114/0x116+index*8, no bound)
+    ('stats_hunted', 0x3A3930),  # reads the same array (lost in a comment by 0815499, restored 2026-10-26)
+    ('size_data', 0x6880C),    # em_size_scale_data cached (r0): the save slots' size records = the monsters' (main.c)
     ('save_hunts', 0x523104),    # save hunts + captures by ID (bound 136): 0x59 -> its save slot 0x1064
     ('set_action', 0x76154),   # enemy setAction(this, cat, num, mode): diagnostic log of em089 action changes
     ('set_target', 0xC6E14),   # enemy setTarget(this, kind, sub, param, slot): em089 arena points -> emd stage-19 table
@@ -125,6 +127,11 @@ HOOKS = [
     ('dala_cam_end', 0x26E34),     # during the camera's stage sweep, as 4U's camera never sees it (dala_walk.c)
     ('dala_camtilt_begin', 0x238E0),  # quest camera terrain tilt (ground ray under the hunter) entry / its only
     ('dala_camtilt_end', 0x23938),    # exit (r4 camera): the walk ground off for its ray (dala_walk.c)
+    ('icon_set', 0x56EF58),    # icon setter 0x56ef50 after its push: UI indexes 196.. = our atlas (icons.c)
+    ('board_icon', 0x3A3178),  # (_, quest board byte) -> UI index + 1: bytes 200.. = our atlas (icons.c)
+    ('board_byte', 0x6132E0),  # board loop before that call: no hyper badge for our bytes (icons.c)
+    ('tex_bind', 0xA4FAF0),    # sprite texture bind (sprite, ID): our icon sprites keep our atlas (icons.c)
+    ('tex_entry', 0xB80FD0),   # .gui texture entry by ID: our IDs -> their entry copies (icons.c)
 ]
 # weapon / sharpness table load exits (gear.c GEAR_HOOK wrappers, out/gear_hooks.inc), "name 0xSITE", written by
 # monsters/gogmazios/tools/gear_weapons_em089.py (gu_class finds and checks each class's site)
@@ -149,8 +156,8 @@ REG_TABLES = [
     ('reg_mapicon', 0x1635354, 89, 4, False),  # map icon size class by EM NUMBER (0..88), via data word 0x183fff0
 ]
 # per monster (allocations.toml): mapicon_class = map icon size class of a NEW em number (Gogmazios 18, as Kushala /
-# Chameleos / Teostra / Fatalis, notes/api-map.md); ui_icon = UI icon index: atlas = i / 98 (HD_cmn_micon00/01),
-# cell = i % 98 in 7 columns (0x56ef50, 0x560918 kind 3); the game uses 0..140, the HD UI v4 cheat 141 / 143-145
+# Chameleos / Teostra / Fatalis, notes/api-map.md); ui_icon = UI icon index: atlas = i / 98 (HD_cmn_micon00/01,
+# then ours from 196: icons.c, tools/ui_icons.py), cell = i % 98 in 7 columns (0x56ef50, 0x560918 kind 3)
 # (literal address, address of the pc-relative add/ldr using it, table symbol)
 LIT_PATCHES = [
     (0x50BD0, 0x50B74, 'reg_pairs'), (0x50BD4, 0x50B78, 'reg_pairs'), (0x50BD8, 0x50BB8, 'reg_pairs'),
@@ -281,9 +288,14 @@ def reg_tables_asm(img):
                         vals += ['0'] * (em + 1 - len(vals))
                         vals[em] = str(m['mapicon_class'])
                 elif sym == 'reg_icon' and not CLONE_RATHIAN and 'ui_icon' in m:
-                    vals.append(str(m['ui_icon']))     # own icon cell (monsters/<name>/tools/ui_*.py), else the donor's
+                    vals.append(str(m['ui_icon']))     # own icon cell (tools/ui_icons.py), else the donor's
                 else:
                     vals.append(vals[donor])
+                if sym == 'reg_icon' and 'companion_of' not in m:
+                    # the save slot (an unused 'dummy' index, main.c stats_add) shows the monster's icon: the quest
+                    # result's size records name the slot's ID (icon accessor 0x560ca4(mgr, id) = table[index of id]),
+                    # GU's dummies have the filler cell 109 (user 2026-10-26: "the icons are all rocks")
+                    vals[m['save_index']] = vals[-1]
         directive = '.hword' if size == 2 else '.word'
         out += ['    .global %s' % sym, '    .hidden %s' % sym, '    .align 2', '%s:' % sym]
         for i in range(0, len(vals), 8):
@@ -307,8 +319,11 @@ def monsters_c():
         q, s = [(m.get(k, []) + [0] * QUESTS_PER_ENTRY)[:QUESTS_PER_ENTRY] for k in ('quests', 'quest_slots')]
         sa, st = m.get('stage_alias', [0, 0]), stage_alias(m)
         mr = st.get('maprec', []) + [[0, 0, 0]] * (4 - len(st.get('maprec', [])))
+        sz = package(m).get('size', {}).get(m['name'], [])
+        assert len(sz) in (0, 1, 4) and all(v > 0 for v in sz), (m['name'], sz)   # [base] or [base, mini, silver, gold]
+        sz = sz + [0] * (4 - len(sz))
         out.append('    {"%s", 0x%x, %d, %d, 0x%x, %d, 0x%x, %d, %d, {%s}, {%s}, %s, %d, '
-                   '%d, %d, 0x%x, 0x%x, %d, {%s}, {%s}, {%s}, %sf},' % (
+                   '%d, %d, 0x%x, 0x%x, %d, {%s}, {%s}, {%s}, %sf, {%s}},' % (
             m['name'], m['em_id'], m['registry_index'], m['donor_index'], m.get('standin_id', 0), m['save_index'],
             0x1064 + m['save_index'] - 105, m['name_entry'], m.get('notes_entry', 0),
             ', '.join('%d' % v for v in q), ', '.join('%d' % v for v in s),
@@ -316,7 +331,8 @@ def monsters_c():
             sa[0], sa[1], sum(1 << a for a in st.get('hold_kobj_areas', [])),
             sum(1 << (k - 48) for k in st.get('kinds', [])), len(st.get('maprec', [])),
             ', '.join('%rf' % float(r[0]) for r in mr), ', '.join('%d' % r[1] for r in mr),
-            ', '.join('%d' % r[2] for r in mr), repr(float(st.get('wholemap_k', 0)))))
+            ', '.join('%d' % r[2] for r in mr), repr(float(st.get('wholemap_k', 0))),
+            ', '.join('%rf' % float(v) for v in sz)))
     return '\n'.join(out + ['};']) + '\n'
 
 
@@ -354,6 +370,8 @@ def displaced_ok(w):
     if (w >> 28) == 0xF: return False
     if (w & 0x0E000000) == 0x0A000000: return False              # b / bl
     if (w & 0x0FFFFFF0) == 0x012FFF10: return False              # bx
+    if (w & 0x0F8003F0) == 0x06800070:                           # sxt*/uxt*: Rn = 15 means no accumulate
+        return ((w >> 12) & 15) != 15 and (w & 15) != 15
     if ((w >> 16) & 15) == 15 and (w & 0x0C000000) in (0x04000000, 0x00000000): return False  # Rn = pc
     if ((w >> 12) & 15) == 15: return False                      # Rd = pc
     if (w & 0x0F000000) == 0x0D000000 and ((w >> 16) & 15) == 15: return False  # vldr [pc]
@@ -424,7 +442,7 @@ def main():
     mods = [os.path.join(paths.monster(p), 'module') for p in alloc.packages()]   # once per package
     incs = ['-I', OUT, '-I', HERE] + [a for d in mods for a in ('-I', d)]
     srcs = [os.path.join(HERE, f) for f in ('crt0.S', 'main.c', 'util.c', 'port.c', 'quest.c', 'items.c', 'gear.c',
-                                            'notes.c', 'stage_alias.c', 'bgm.c')]
+                                            'notes.c', 'stage_alias.c', 'bgm.c', 'icons.c')]
     for d in mods:                                     # every registered monster's code, registry order
         srcs += sorted(glob.glob(os.path.join(d, '*.c')))
     srcs += [os.path.join(OUT, 'port_monsters.c'), os.path.join(OUT, 'tables.S')]
@@ -465,6 +483,7 @@ def main():
         for k, v in sorted(syms.items(), key=lambda kv: kv[1]):
             f.write('%08x %08x %s\n' % (MODULE_BASE + v, v, k))
     open(os.path.join(OUT, 'defines.txt'), 'w').write(' '.join(EXTRA_DEFINES) + '\n')   # tools/release.py: none
+    ui_icons.build(OUT)                                # the icon atlases (romfs nativeNX/mh4uport, icons.c)
     print('built', len(data), 'bytes; hooks', ', '.join('%s@%x' % h for h in HOOKS))
     for k in ('g_init_magic', 'g_hook_count'):
         if k in syms: print('  %s = 0x%x' % (k, MODULE_BASE + syms[k]))
@@ -486,7 +505,9 @@ def install():
         src = os.path.join(paths.gen(m['name']), m['name'] + '.bin')
         if not os.path.exists(src): sys.exit('no data file %s: run monsters/%s/build.sh' % (src, alloc.package(m)))
         shutil.copy(src, os.path.join(dst, 'nativeNX', 'mh4uport'))
-    sel = os.environ.get('PORT_ASSETS', 'all')           # package names (an entry name selects its package)
+    for name, _, _ in ui_icons.ATLASES:
+        shutil.copy(os.path.join(OUT, name), os.path.join(dst, 'nativeNX', 'mh4uport'))
+    sel =os.environ.get('PORT_ASSETS', 'all')           # package names (an entry name selects its package)
     names = alloc.packages() if sel == 'all' else [] if sel == 'none' else \
         list(dict.fromkeys(paths.package(n) for n in sel.split(',')))
     owner = {}

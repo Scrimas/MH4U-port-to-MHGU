@@ -26,6 +26,14 @@ LISTS = ('quests', 'quest_slots', 'bgm_ids')            # explicit values per mo
 SCALARS = ('save_index', 'name_entry', 'ui_icon')       # one value per monster, unique
 ORDERED = ('registry_index', 'notes_entry')             # consecutive in [[monster]] order
 QUESTS_PER_ENTRY = 4                                    # module/port.h PORT_QUESTS
+ICON_PAGE2 = 196            # UI index of our atlas' cell 0 = 4U's '?' (tools/ui_icons.py, module/icons.c ICON_PAGE2)
+BOARD_FIRST = 200           # quest board icon byte of that cell (module/icons.c BOARD_FIRST)
+
+
+def board_byte(ui_index):
+    """quest board icon byte (questData +0xD6) showing UI index ui_index of our atlas"""
+    assert ui_index >= ICON_PAGE2
+    return ui_index - ICON_PAGE2 + BOARD_FIRST
 
 
 def load(path=TOML):
@@ -95,13 +103,15 @@ def check(reg=None, gu_main=paths.GU_MAIN):
             if key not in m: errs.append('%s: missing %s' % (m.get('name', k), key))   # module/build.py needs them
         if m.get('em_id', 0) >> 8 == 0 and 'mapicon_class' not in m:   # a new em number has no GU size class
             errs.append('%s: missing mapicon_class' % m.get('name', k))
+        if ('ui_icon' in m) != ('icon_4u' in m):                        # a cell and its art (tools/ui_icons.py)
+            errs.append('%s: ui_icon and icon_4u go together' % m.get('name', k))
         if comp:
             o = by_name.get(comp)
             if not o or 'companion_of' in o:
                 errs.append('%s: companion_of %r is not a monster entry' % (m['name'], comp))
             elif package(o) != package(m) or m.get('name_entry') != o.get('name_entry'):
                 errs.append('%s: a companion shares its owner\'s package and name entry' % m['name'])
-            for key in ('notes_entry', 'quests', 'quest_slots', 'items', 'decorations', 'append', 'ui_icon',
+            for key in ('notes_entry', 'quests', 'quest_slots', 'items', 'decorations', 'append',
                         'armor_models', 'weapon_models', 'bgm_ids', 'stage_alias'):
                 if key in m: errs.append('%s: a companion has no %s (its owner holds them)' % (m['name'], key))
         for key in ORDERED:

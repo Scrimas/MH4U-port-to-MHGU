@@ -302,6 +302,11 @@ decoration tables, Notes redirect) without a user test; the blacksmith and Notes
 Stop it with `ryutest.sh stop` (matches the cmdline: the gui process's /proc exe link is unreadable).
 
 ## 5. Lessons that cost time on Gogmazios
+- **Declare every float argument of a GU helper.** The FN() typedef is the call's whole contract: a float the
+  prototype leaves out still reaches GU, as whatever s0..s15 held. GU 0x72708 (timer up) is t += this+28 * s0, and
+  every GU caller loads s0 = 1.0; Dalamadur's call without it ran its placement timer at a random rate (2026-10-26:
+  "stays in one place far too long after flinches"). Read the callee's first instructions for vldr / vmul of s0..s3
+  before writing the typedef.
 - **Trace every end condition before calling a report "4U behaviour".** The "permanent puddle" was a missing
   attack-window kill (shell +0x16d), not 4U data. The user checked a 4U video.
 - **Heights:** the rest pair raises y before the hover motion (root track y 720 x scale 2.5 = 1800). A monster
