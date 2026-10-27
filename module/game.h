@@ -3,7 +3,12 @@
 #pragma once
 #include <stdint.h>
 
-#define MAIN_BASE 0x704000u
+/* main's runtime base: not a constant. Emulators place the game's modules differently (yuzu / Eden reserve an
+ * argument area after rtld, Ryujinx does not), so crt0.S derives it from this module's own load address: the gap
+ * between main and subsdk1 is the same everywhere (build.py MODULE_BASE - MAIN_BASE). Relocated by rtld before any
+ * of our code runs. */
+extern uint32_t g_main_base;
+#define MAIN_BASE g_main_base
 #define MAIN(off) (MAIN_BASE + (uint32_t)(off))
 #define FN(type, off) ((type)MAIN(off))
 #define FIELD(T, p, off) (*(T *)((uint8_t *)(p) + (off)))

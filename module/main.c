@@ -26,9 +26,17 @@ static void redirect(const char *what, uint32_t word, uint32_t orig, uint32_t *c
 
 #define GU_FILES 0x1732a68u     /* GU's registry file manifests (pointers, per index) */
 
+/* main's base check (position-independent build: game.h g_main_base = this module's base - build.py MAIN_GAP): the
+ * icon setter's first word, `push {r4-r8, lr}`, must sit at MAIN(0x56ef50); "MISMATCH" = the loader put main and
+ * this module at another distance than Ryujinx (issue #2: yuzu / Eden) */
+#define CHECK_SITE 0x56ef50u
+#define CHECK_WORD 0xe92d41f0u
+
 void module_init(void)
 {
-    logf("mh4uport: module_init, base %x, %d monster(s)", (uint32_t)(uintptr_t)&module_init, PORT_N);
+    uint32_t w = *(volatile uint32_t *)MAIN(CHECK_SITE);
+    logf("mh4uport: module_init, base %x, %d monster(s); main %x: %s (word %x)", (uint32_t)(uintptr_t)&module_init,
+         PORT_N, MAIN_BASE, w == CHECK_WORD ? "ok" : "MISMATCH", w);
     for (int m = 0; m < PORT_N; m++) {
         /* a monster's manifest is its donor's until its data file is read (port.c load) */
 #ifdef CLONE_RATHIAN
