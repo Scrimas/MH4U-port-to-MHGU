@@ -4,6 +4,11 @@ tools/release.py puts the section of the core version being packaged into the re
 groups, **New** (something added) and **Fixed** (what works now, not what was broken), one short plain line each,
 written for players; write the section before `release.py package`.
 
+## v1.6.1
+**Fixed**
+- The game now launches on yuzu and Eden (it hung on the loading screen). Thanks to a developer of the MH4U HD
+  project for the fix.
+
 ## v1.6.0
 **New**
 - Dalamadur, Shah Dalamadur and Tigerstripe Zamtrios have their own icons.
