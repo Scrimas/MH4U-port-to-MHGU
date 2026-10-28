@@ -322,6 +322,11 @@ Stop it with `ryutest.sh stop` (matches the cmdline: the gui process's /proc exe
   white after it was switched off: see the EFL draw-field item) and places effects once
   (+0x36 1), so effects posted on a moving unit stopped following it. efl4u2gu.py: PEL_COLOUR_OFF, pel_follows().
   Check what each default byte does (checklist "White effects after the PEL_TAIL change").
+- **Motion effects on joints follow them (2026-10-28):** 4U re-reads a MEF record's joint every frame (effect slot 6
+  0xc481f8 -> 0xc4838c) and only its ground flag (MEF bit 1) pins y to the ground. With PEL_TAIL everywhere, roars
+  and other head effects stayed where they started (user: "spawned on the ground for all ported monsters").
+  efl4u2gu.py mef_follows: in PEL list 1, joint records without the ground flag take PEL_TAIL_LOCAL (MEF bit 0, the
+  units' local space; Capcom's tail for Zinogre's 0x225 joint records) or PEL_TAIL_PREV; list 2 is unchanged.
 - **Effect reference model:** a pos-only post through the monster uses the monster's attach model as reference: its
   2.5 scale and its height leak into the effect. GU shells post their own effects with the shell as target (flags 3)
   and keep the shell alive until the effect is dead (em089_shell.c pattern).
@@ -403,3 +408,19 @@ Notes: monsters/tigerstripe_zamtrios/notes/ (plan, phase1-variant-map, missing-a
   extend the pools), and its gear tools: the Gogmazios ones compute IDs as the v1.0 counts, a second monster's must
   start at GU's count + alloc.offset(name, table) (allocations.toml [monster.append], frozen once released).
 - Its own folder monsters/<name>/ with a build.sh like Gogmazios'.
+
+## Lessons from Stygian Zinogre's quests and gear (2026-10-28)
+- A quest with a real GU monster of the stand-in's own species (4U m10612: Zinogre + Stygian): name the port by a
+  second stand-in in that quest only (allocations.toml standin_alt = [ID, quest IDs]; module/port.c port_standin;
+  the swap, the arc request and the break rewards use it). Pick an ID of the same GU class (Thunderlord 0x439 for
+  Zinogre). One setEmMain name holds one content in GU (488 names, C): give each quest's boss sets their own names.
+- Monster area data on a stage the donor class never visits: append another GU monster's records for that map
+  (XFS files: tools/xfs.py parse / build round-trip; map_info: 12-B header + 28 x 86-B blocks, block = map number);
+  Stygian's area_files() in build_em057_01_arc.py. Choose a donor of the same build that lives there.
+- Village quest IDs (1000..1099) load like hub ones: the loader filter 0x3b8090 passes village stars 7..10 (C).
+- 4U quest layouts: objectives +0xCB / +0xCC (type 1 hunt, 0x81 capture), subquest +0xDC (0x204 wound / sever with
+  4U part codes, 2 deliver), stat blocks +0x34 + 8 per first-list spawn; spawn byte +0xF = frenzy (1 / 2) or Apex
+  (9), which GU lacks. GU: capture = objective type 2, second target at +0x24 with clear rule +0x1D = 1.
+- Gear converters: a GU template with a sphere map for a 4U material without an extend map now falls back to a
+  template without one (tools/weapon4u2gu.py and tools/armor4u2gu.py pick_template; outputs that converted before
+  are unchanged). Check that every armor model the records name is converted (Stygian's were missing).

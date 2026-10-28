@@ -120,6 +120,18 @@ PEL_TAIL_PREV = bytes.fromhex(
     '000000000000003f0000000000030000000000ff0000803f0000803f000000000000000000000000ffffffffffffffff'
     'ffffffffffffffff0000803f')
 assert len(PEL_TAIL_PREV) == len(PEL_TAIL)
+# World posts with no target (record key world, opt-in: Stygian Zinogre's point posts; 2026-10-28). Transform mode
+# (0x32a548 at +0x36 2 / 3: +0x3e == 6 -> 3, else 4): the unit setup (effect slot 32 0x32aa44) attaches the effect's
+# root node to the target in modes 0-2 and skips that without one, while modes 3 / 4 copy a world position into the
+# node (C). PEL_TAIL (mode 2) posted with no target was drawn away from the point (Stygian test 5: "shifted towards the
+# left of his body"; GU kept the node at 0 0 0). GU's own joint -1 code posts mostly carry +0x36 3, +0x3e 6 = mode 3
+# (298 of the em PEL u list-2 records); this is the most common of them (44: em001_00u 31..34, em001_02u 31, ...),
+# = PEL_TAIL_PREV with +0x36 3, +0x38 2, +0x39 1, +0x3a 0 (and +0x48 = 1, the mask pel_record writes).
+PEL_TAIL_WORLD = bytes.fromhex(
+    '010003040201000003000600000000000000000001000000ffffffff00000000000000000000614400000000000000ff'
+    '000000000000003f0000000000030000000000ff0000803f0000803f000000000000000000000000ffffffffffffffff'
+    'ffffffffffffffff0000803f')
+assert len(PEL_TAIL_WORLD) == len(PEL_TAIL)
 
 
 def pel_follows(rid):
@@ -560,15 +572,48 @@ def pel_colour(path, rid, S=None, soil=M19A03_AREA_SOIL, code=None):
     return code or CODE_COLOUR.get(rid)
 
 
-def pel_record(path, r, S=None, soil=M19A03_AREA_SOIL):
+# MEF flag bit 1 = the ground flag (C, 2026-10-28, user: the roar must move with the head as in 4U, all ports): 4U's
+# motion-effect post 0x391b50 copies the record flags into the effect (bit 1 -> +0x274 bit 0, bit 0 -> 0xc4800c: the
+# units' local space), and the effect's per-frame slot 6 (0xc481f8 -> 0xc4838c) takes the record joint's world
+# position as the base every frame (0xc499a4..), putting y on the owner's ground only with +0x274 bit 0 (0xc49a84..).
+# So a joint record without the ground flag rides its joint (e.g. Zinogre / Stygian roars 1000 / 1001 on joint 3,
+# flags 0x281); in GU that is the follow tail PEL_TAIL_PREV (+0x36 0, +0x38 0, +0x3a 1 = GU's most common joint
+# motion-record tail, 351 records; mode 0 follows, as Gogmazios' shell effects showed), or PEL_TAIL_LOCAL below for
+# records with the local-space flag (MEF bit 0). Ground-flag and joint -1 records keep PEL_TAIL (mode 2, placed where
+# posted; the ground flag's y tracking has no GU tail: a deviation).
+MEF_LOCAL, MEF_GROUND = 1, 2
+# Capcom's tail for a 4U joint record with the local-space flag: GU em057_00u list-1 records 560 / 561 = 4U em048_0
+# ids 21 / 22 (em048_004 on joint 2, flags 0x225), the one such pair in Capcom's conversion of Zinogre (C; asserted
+# by build_em057_01_arc.py); = PEL_TAIL_PREV with +0x38 1 (mode 1), +0x3a 0, +0x86 1 (+0x48 = the mask pel_record
+# writes). S: that MEF bit 0 maps to it for every record.
+PEL_TAIL_LOCAL = bytes.fromhex(
+    '010000040100000003000600000000000000000000000000ffffffff00000000000000000000614400000000000000ff'
+    '000000000000003f0000000000030000000000ff0000803f0000803f000000000000010000000000ffffffffffffffff'
+    'ffffffffffffffff0000803f')
+assert len(PEL_TAIL_LOCAL) == len(PEL_TAIL)
+
+
+def mef_follows(r):
+    """a MEF record posted by its motion sequence follows its joint (MEF_GROUND above)"""
+    return 'flags' in r and r['joint'] >= 0 and not r['flags'] & MEF_GROUND
+
+
+def pel_record(path, r, S=None, soil=M19A03_AREA_SOIL, motion=False):
     """r: a MEF record dict; optional keys for code posts of other monsters (ids are per PEL, so they do not go
-    through em089's id rules): follow (bool, else pel_follows(id)), colour (RGBA bytes, else CODE_COLOUR)."""
+    through em089's id rules): follow (bool, else pel_follows(id)), world (bool: posted at a point with no target,
+    PEL_TAIL_WORLD), colour (RGBA bytes, else CODE_COLOUR). motion: the record of a motion sequence list (PEL list
+    1): MEF records follow the 4U rule (mef_follows)."""
     st = bytearray(160)
     struct.pack_into('<4f', st, 0x00, *r['pos'], 0.0)
     struct.pack_into('<4f', st, 0x10, *r['rot'], 0.0)
     struct.pack_into('<4f', st, 0x20, *r['scl'], 0.0)
     struct.pack_into('<HH', st, 0x30, r['id'], r['joint'] & 0xFFFF)
-    st[0x34:] = PEL_TAIL_PREV if r.get('follow', pel_follows(r['id'])) else PEL_TAIL
+    if r.get('world'):
+        st[0x34:] = PEL_TAIL_WORLD
+    elif motion and 'follow' not in r and mef_follows(r):
+        st[0x34:] = PEL_TAIL_LOCAL if r['flags'] & MEF_LOCAL else PEL_TAIL_PREV
+    else:
+        st[0x34:] = PEL_TAIL_PREV if r.get('follow', pel_follows(r['id'])) else PEL_TAIL
     for o, v in PEL_COLOUR_OFF:
         st[o] = v
     col = pel_colour(path, r['id'], S, soil, r.get('colour'))
@@ -583,9 +628,10 @@ def pel_record(path, r, S=None, soil=M19A03_AREA_SOIL):
 
 def build_pel(recs, S=None, soil=M19A03_AREA_SOIL, list2=None):
     """recs: [(efl path, mef record)] -> PEL v15: list 0 empty, list 1 = all records (motion sequences, PSL kind 4),
-    list 2 (code posts) = all records too, or list2 = (count, record bytes) of another PEL (pel_lists)."""
-    body = b''.join(pel_record(p, r, S, soil) for p, r in recs)
-    n2, body2 = list2 if list2 is not None else (len(recs), body)
+    list 2 (code posts) = all records too, or list2 = (count, record bytes) of another PEL (pel_lists). Only list 1
+    takes the MEF follow rule (mef_follows): 4U applies the MEF flags to motion-sequence posts (0x391b50)."""
+    body = b''.join(pel_record(p, r, S, soil, motion=True) for p, r in recs)
+    n2, body2 = list2 if list2 is not None else (len(recs), b''.join(pel_record(p, r, S, soil) for p, r in recs))
     return b'PEL\0' + struct.pack('<II', 15, 0) + struct.pack('<I', len(recs)) + body + \
         struct.pack('<I', n2) + body2
 

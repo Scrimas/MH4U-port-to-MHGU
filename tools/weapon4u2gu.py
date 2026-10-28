@@ -168,7 +168,32 @@ def index(dir4u, out):
     print(len(idx), 'material pairs ->', out)
 
 
+_SPH = {}
+
+
+def _has_sphere(e):
+    """1 if an index entry's GU material has a tSphereMap texture slot"""
+    gp, mp, gi = e['gu']
+    if (gp, mp) not in _SPH:
+        r = gu_material(e)[3]
+        _SPH[gp, mp] = [any(p[0] == 'tSphereMap' and p[1] == 3 for p in g['params']) for g in r['mats']]
+    return _SPH[gp, mp][gi]
+
+
 def pick_template(idx, d, m, alpha=False):
+    """GU template of a 4U material (_pick_template); when it has a sphere map and the 4U material has no extend-map
+    texture to fill it (convert() used to stop there: Stygian's lan054 / lbg030), picked again among the templates
+    without one. Every material that converted before picks the same template."""
+    t, how = _pick_template(idx, d, m, alpha)
+    tx = mrl.read(d)['textures']
+    ext = [p for p in m['params'] if p[0] == 'tExtendMap' and p[1] == 3 and 0 < p[2] <= len(tx) and tx[p[2] - 1][0]]
+    if ext or not _has_sphere(t):
+        return t, how
+    t, how = _pick_template([e for e in idx if not _has_sphere(e)], d, m, alpha)
+    return t, how + ', no sphere map (4U material has no extend map)'
+
+
+def _pick_template(idx, d, m, alpha=False):
     """GU template (index entry, how) of a 4U material: an exact pair, else the nearest (_nearest). alpha (convert
     --alpha-test-4u): a BSSolid 4U material without an exact pair only takes templates whose alpha test (w7 bit 24)
     equals its own (gu_w7 notes), falling back to any template (logged) when none exists."""

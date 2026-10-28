@@ -164,8 +164,8 @@ def bank_rec_gu(r):
 
 
 def bank_ent_gu(a):
-    # byte 2: 4U 8 (10 on a few) -> GU 0 (5726 of 5750 matched entries; em089: 8 everywhere)
-    assert len(a) == 76 and a[2] in (8, 10) and a[75] == 0, a.hex()
+    # byte 2: 4U 8 (10 on a few; 0 on 4U m05a08d's) -> GU 0 (5726 of 5750 matched entries; em089: 8 everywhere)
+    assert len(a) == 76 and a[2] in (0, 8, 10) and a[75] == 0, a.hex()
     return a[0:2] + b'\0' + a[3:12] + a[16:75] + a[12:16] + b'\0'
 
 

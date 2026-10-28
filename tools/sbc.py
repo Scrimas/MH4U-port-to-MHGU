@@ -94,12 +94,17 @@ def parse(d):
         s['verts'] = d[o:o + 16 * nC]; o += 16 * nC
         s['groups'] = d[o:o + 32 * nG]; o += 32 * nG
         aabb = []
-        for p in s['parts']:            # 4U: each grid is followed by its part's polygon AABBs
-            g, o = _grco(d, o); s['grids'].append(g)
-            n = p['pairs'][1]
-            aabb.append(d[o:o + 28 * n]); o += 28 * n
-        s['aabb'] = b''.join(aabb)
-        s['bvh'], o = _bvhc(d, o)
+        if d[o:o + 4] == b'BVHC':       # 4U m05a01d-a-cam (the only such file seen): two BVHs (7 nodes, then 1) and
+            s['bvh'], o = _bvhc(d, o)   # no grid / polygon AABBs; the first is taken as the BVH (G), convert_4u
+            s['bvh2'], o = _bvhc(d, o)  # rebuilds the AABBs and gives each part a 1 x 1 grid
+            s['nogrid'] = True
+        else:
+            for p in s['parts']:            # 4U: each grid is followed by its part's polygon AABBs
+                g, o = _grco(d, o); s['grids'].append(g)
+                n = p['pairs'][1]
+                aabb.append(d[o:o + 28 * n]); o += 28 * n
+            s['aabb'] = b''.join(aabb)
+            s['bvh'], o = _bvhc(d, o)
     else:
         raise ValueError('unknown SBC class hash %#x' % h)
     assert o == len(d), ('trailing bytes', o, len(d))
@@ -235,7 +240,10 @@ def convert_4u(d, rebuild=True):
     s = dict(s)
     s['bvh'] = dict(s['bvh'], raw=_zero_bvh_pad(s['bvh']['raw']))
     s['groups'] = _groups_gu(s['groups'])
-    if rebuild:
+    if s.get('nogrid'):                 # the grid-less 4U variant (parse): AABBs by the game tools' rule, 1 x 1 grids
+        s['aabb'] = build_aabbs(s)
+        s['grids'] = [build_grid(s, pi, 1, 1) for pi in range(len(s['parts']))]
+    elif rebuild:
         assert build_aabbs(s) == s['aabb'], 'polygon AABB rebuild differs from 4U'
         for pi, g in enumerate(s['grids']):
             assert build_grid(s, pi, g['nx'], g['nz'])['raw'] == g['raw'], 'grid rebuild differs from 4U'

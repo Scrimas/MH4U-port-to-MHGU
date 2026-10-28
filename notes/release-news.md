@@ -4,6 +4,15 @@ tools/release.py puts the section of the core version being packaged into the re
 groups, **New** (something added) and **Fixed** (what works now, not what was broken), one short plain line each,
 written for players; write the section before `release.py package`.
 
+## v1.7.0
+**New**
+- Stygian Zinogre, with his 11 quests from MH4U (Hub High Rank, G★4, Village ★10 and the event quest A Song of
+  Extremes), his Zinogre U / Zinogre Z armor, 37 weapons in 12 Brimstren lines and his Hunter's Notes entry.
+- Heaven's Mount, his MH4U arena, with its weather, music and breakable rocks (used by his Heaven's Mount quests).
+
+**Fixed**
+- Effects attached to a monster's body (roars and similar) now move with it, as in MH4U, for every ported monster.
+
 ## v1.6.1
 **Fixed**
 - The game now launches on yuzu and Eden (it hung on the loading screen). Thanks to a developer of the MH4U HD

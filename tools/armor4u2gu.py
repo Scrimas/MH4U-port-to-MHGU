@@ -117,7 +117,30 @@ def index(dir4u, out):
     print(len(idx), 'material pairs ->', out)
 
 
+_SPH = {}
+
+
+def _has_sphere(e):
+    """1 if an index entry's GU material has a tSphereMap texture slot"""
+    gp, mp, gi = e['gu']
+    if (gp, mp) not in _SPH:
+        gm = mrl.read([d for p, th, d in entries(rom().read(gp)) if th == T_MRL][0])
+        _SPH[gp, mp] = [any(p[0] == 'tSphereMap' and p[1] == 3 for p in g['params']) for g in gm['mats']]
+    return _SPH[gp, mp][gi]
+
+
 def pick_template(idx, m):
+    """GU template of a 4U material (_pick_template); when it has a sphere map and the 4U material has no extend-map
+    texture to fill it (convert() used to stop there: Stygian's Zinogre U m_arm169), picked again among the templates
+    without one. Every material that converted before picks the same template (as tools/weapon4u2gu.py)."""
+    t, how = _pick_template(idx, m)
+    if any(p[0] == 'tExtendMap' and p[1] == 3 and p[2] for p in m['params']) or not _has_sphere(t):
+        return t, how
+    t, how = _pick_template([e for e in idx if not _has_sphere(e)], m)
+    return t, how + ', no sphere map (4U material has no extend map)'
+
+
+def _pick_template(idx, m):
     zb, fl = blk4(m)
     key = hashlib.md5(zb + struct.pack('<10I', *m['words'][3:13])).hexdigest()
     exact = [e for e in idx if e['key'] == key]

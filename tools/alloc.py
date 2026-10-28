@@ -11,7 +11,8 @@
 Entries: one [[monster]] = one registry index. Optional keys: `package` (the monsters/ folder, default the name:
 several entries can share one package), `companion_of` (a second enemy spawned with its owner's monster, e.g. a tail
 half: registry index, em ID, donor and files of its own; its owner's name entry; a save tally slot that companions may
-share with each other, never with a monster; no Notes entry, quests, items or gear).
+share with each other, never with a monster; no Notes entry, quests, items or gear), `quest_append = true` (its quests
+are new quest list entries after GU's, module/quest.c quest_group_append, instead of renaming `quest_slots`).
 """
 import os, struct, sys, tomllib
 
@@ -25,7 +26,8 @@ RANGES = ('file_ids', 'items', 'decorations')           # [first, last] per mons
 LISTS = ('quests', 'quest_slots', 'bgm_ids')            # explicit values per monster
 SCALARS = ('save_index', 'name_entry', 'ui_icon')       # one value per monster, unique
 ORDERED = ('registry_index', 'notes_entry')             # consecutive in [[monster]] order
-QUESTS_PER_ENTRY = 4                                    # module/port.h PORT_QUESTS
+QUESTS_PER_ENTRY = 12                                   # module/port.h PORT_QUESTS
+QUEST_PLACEHOLDER = 1111010      # module/quest.c QG_PLACEHOLDER: an appended quest not installed (never renamed)
 ICON_PAGE2 = 196            # UI index of our atlas' cell 0 = 4U's '?' (tools/ui_icons.py, module/icons.c ICON_PAGE2)
 BOARD_FIRST = 200           # quest board icon byte of that cell (module/icons.c BOARD_FIRST)
 
@@ -92,6 +94,8 @@ def values(m, key):
 def check(reg=None, gu_main=paths.GU_MAIN):
     reg = reg or load()
     pools, ms, errs = reg['pools'], reg['monster'], []
+    if QUEST_PLACEHOLDER in pools['quests'] + pools['quest_slots']:
+        errs.append('quest %d is the appended quests\' placeholder (module/quest.c)' % QUEST_PLACEHOLDER)
     seen = {}
     by_name = {m.get('name'): m for m in ms}
     companions = {m.get('name') for m in ms if 'companion_of' in m}
@@ -111,9 +115,14 @@ def check(reg=None, gu_main=paths.GU_MAIN):
                 errs.append('%s: companion_of %r is not a monster entry' % (m['name'], comp))
             elif package(o) != package(m) or m.get('name_entry') != o.get('name_entry'):
                 errs.append('%s: a companion shares its owner\'s package and name entry' % m['name'])
-            for key in ('notes_entry', 'quests', 'quest_slots', 'items', 'decorations', 'append',
+            for key in ('notes_entry', 'quests', 'quest_slots', 'quest_append', 'items', 'decorations', 'append',
                         'armor_models', 'weapon_models', 'bgm_ids', 'stage_alias'):
                 if key in m: errs.append('%s: a companion has no %s (its owner holds them)' % (m['name'], key))
+        elif 'save_index' in m and m.get('name_entry') != m['save_index']:
+            # the quest result's size record names the save slot's ID: GMD entry = the slot's registry index
+            # (module/main.c name_index_c; Stygian test 2026-10-28 showed the slot's dummy name)
+            errs.append('%s: name_entry %s != save_index %d (the size record names the save slot)' % (
+                m['name'], m.get('name_entry'), m['save_index']))
         for key in ORDERED:
             if key in m and m[key] != pools[key][0] + order[key]:
                 errs.append('%s: %s %d, expected %d (consecutive in [[monster]] order)' %
@@ -157,7 +166,11 @@ def check(reg=None, gu_main=paths.GU_MAIN):
                 if (key, v) in seen and seen[key, v] != m['name']:
                     errs.append('%s: %s %d already taken by %s' % (m['name'], key, v, seen[key, v]))
                 seen[key, v] = m['name']
-        if len(m.get('quest_slots', [])) != len(m.get('quests', [])):
+        if m.get('quest_append', False) not in (True, False):
+            errs.append('%s: quest_append is true or false' % m['name'])
+        elif m.get('quest_append'):                     # appended (module/quest.c): nothing renamed
+            if m.get('quest_slots'): errs.append('%s: quest_append takes no quest_slots' % m['name'])
+        elif len(m.get('quest_slots', [])) != len(m.get('quests', [])):
             errs.append('%s: one quest_slot per quest' % m['name'])
         if len(m.get('quests', [])) > QUESTS_PER_ENTRY:
             errs.append('%s: more than %d quests' % (m['name'], QUESTS_PER_ENTRY))

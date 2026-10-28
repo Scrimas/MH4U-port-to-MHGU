@@ -60,6 +60,60 @@ int stage_kobj_bcast_c(uint32_t *regs)
     return 0;
 }
 
+/* Stage name on the boards / quest info (allocations.toml [monster.append] stage_name, its TXTA string). GU's only
+ * readers of the stage-name table 0x1634f74 (questMessage index per stage, 24 -> 116 "Ruined Pinnacle"; word
+ * 0x183ff9c) store the index at this+0xf8 (C, xref of the word):
+ *   stage_name_list @0x614840 `str r0, [r4, #0xf8]`: r5 = a quest record (stage +0x10 via `ldrsb [r5, #16]`);
+ *   stage_name_quest @0x6149c8 the same store for the quest manager's record [[0x188ad90]+0xa4] (0x3a30f4 reads its
+ *     stage +0x10 the same way).
+ * Record +8 = quest ID (questData file +12; the setup 0x3ade34 copies it to [[0x188ad90]+0xe0], port.c), +0x10 = s8
+ * stage (file +20). S for the record layout, C for the reads. */
+static void stage_name_swap(uint32_t *regs, uint32_t rec, const char *site)
+{
+    static uint32_t s_n;
+    int m;
+    if (!rec || (m = port_quest_owner(FIELD(uint32_t, rec, 8), 0)) < 0 || !port_monsters[m].stage_name ||
+        FIELD(int8_t, rec, 0x10) != port_monsters[m].stage_from || !port_installed(m)) return;
+    if (++s_n <= 8) logf("port: %s stage name %s quest %u: %u -> %u", port_monsters[m].name, site,
+                         FIELD(uint32_t, rec, 8), regs[R0], port_monsters[m].stage_name);
+    regs[R0] = port_monsters[m].stage_name;
+}
+
+int stage_name_list_c(uint32_t *regs)
+{
+    stage_name_swap(regs, regs[R5], "list");
+    return 0;
+}
+
+int stage_name_quest_c(uint32_t *regs)
+{
+    uint32_t mgr = *(volatile uint32_t *)MAIN(0x188ad90u);
+    stage_name_swap(regs, mgr ? FIELD(uint32_t, mgr, 0xa4) : 0, "quest");
+    return 0;
+}
+
+/* The quest boards' detail panel (test 2026-10-28: still "Ruined Pinnacle" with the two hooks above, which it never
+ * passes) reads the name from another per-stage table, 0x1634c00 (12 B: GUI picture id, frame id, questMessage index;
+ * stage 24 = {1000044, 1000030, 116}; word 0x183ff74, C): 0x61340c `add r0, r1, r0, lsl #2` (r0 = the entry, r4 = the
+ * quest record, stage +0x10 as above), 0x613414 `ldr r2, [r0, #8]`, then 0x55bc4c(msg, 2, r2) = the text. Hook
+ * stage_name_board @0x613410 (before `mov r1, #2`; r0 is reloaded at 0x613418): r0 -> a copy of the entry with the
+ * alias's name. The table's other reader 0x613860 and 0x1634804's 0x61244c read words 0 / 1 only (the stage picture). */
+int stage_name_board_c(uint32_t *regs)
+{
+    static uint32_t s_entry[3];
+    const uint32_t *e = (const uint32_t *)(uintptr_t)regs[R0];
+    if (!e) return 0;
+    regs[R0] = e[2];                              /* the name index, for the swap and its log */
+    stage_name_swap(regs, regs[R4], "board");
+    if (regs[R0] != e[2]) {
+        s_entry[0] = e[0]; s_entry[1] = e[1]; s_entry[2] = regs[R0];
+        regs[R0] = (uint32_t)(uintptr_t)s_entry;
+    } else {
+        regs[R0] = (uint32_t)(uintptr_t)e;
+    }
+    return 0;
+}
+
 /* Area map placement (tools/mapui4u2gu.py, monsters/dalamadur/tools/build_speartip_ui.py). cUIOEnlargeMap setup
  * 0x61c318 (this = r4, stage +0x94, area +0x98) loads r0 = table[stage][area] (0x1774dec, 14 pointers per stage) and
  * stores it at this+0x15c (site 0x61c394). Record (0x34 B, .rodata): +0..+0x10 GUI file IDs per language (0x61c288),

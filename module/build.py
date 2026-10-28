@@ -80,9 +80,12 @@ HOOKS = [
     ('stage_path', 0x15339C),  # stage arc path builder: alias stage -> its folder while the quest runs (stage_alias.c)
     ('stage_maprec', 0x61C394),  # cUIOEnlargeMap setup: per-area map record -> 4U m19 scale / offset (stage.c)
     ('stage_wholerec', 0x61B608),  # cUIOEnlargeMap setup: whole-map record -> scale 60000 / 40000 (4U m19) (stage.c)
+    ('stage_name_list', 0x614840), ('stage_name_quest', 0x6149C8),  # stage-name index stores: the alias's name
+    ('stage_name_board', 0x613410),                                 # for its quests (stage_alias.c)
     ('quest_group_fix', 0x3B7DE8),  # quest list loader step: placeholder 1011009 -> quest 11491 in memory
     ('quest_unlocked', 0x3B2174),   # (_, id) -> 1 for quest 11491
     ('quest_clear_fix', 0x388D40),  # results-scene clear write: rename the freshly loaded quest list first
+    ('quest_group_append', 0x39BB6C),  # quest_group parser exit (r4 = the list): append the quest_append quests
     ('notes_unlock_check', 0x554DA4),  # Hunter's Notes unlock condition (talk action 6 / condition 44): log entry 123
     ('utf8_null_guard', 0x7CA340),  # (out, s, n) UTF-8 helper: s = NULL -> "" (abandon crash safety net, stage.c)
     ('stage_gimmicks', 0x50249C),   # stage gimmick shell spawner (Fortress st003/004/006/007/008): log only (stage.c)
@@ -124,6 +127,19 @@ HOOKS = [
     ('em067_01_end7', 0xCA10C),    # (em067_01_moves.c)
     ('em067_01_amove', 0x8F004),   # area move setup / transfer: Tigerstripe log lines (em067_01_diag.c)
     ('em067_01_atransfer', 0xB5D6C),
+    ('em057_01_act', 0xF03620),    # uEm057_00 slot 125 action dispatcher: Stygian Zinogre (variant 1) action / motion
+                                   # log and its own actions (monsters/stygian_zinogre/module/em057_01_diag.c, _moves.c)
+    ('em057_01_remap', 0xEEF31C),  # uEm057_00 slot 127 action remap: 4U's remap for variant 1 (em057_01_moves.c)
+    ('em057_01_atk', 0x7DC2C),     # GU attackEx: Stygian's attack indices in the GU handlers it keeps (em057_01_fix.c)
+    ('em057_01_start', 0xEEFED0),  # uEm057_00 slot 129 action start: 4U's start work for variant 1 (em057_01_start.c)
+    ('em057_01_glow', 0xEF3214),   # uEm057_00 slot 132 material charge glow (GU only): skipped for variant 1 (_fix.c)
+    ('em057_01_efx', 0xF060C4),    # uEm057_00 slot 116 effect gateway: 4U Stygian's records for variant 1 (_efx.c)
+    ('em057_01_pstance', 0xEF4484),  # mid hooks (return 0) at GU's pillar frame loops, whose posts GU removed: the 4U
+    ('em057_01_pwalk1', 0xEF6450),   # posts for variant 1: charge stance 1/6.. (ef4280 step 1), charge walk 2/40 steps
+    ('em057_01_pwalk2', 0xEF6338),   # 1 / 2 (ef62e4) (em057_01_posts.c)
+    ('em057_01_vparams', 0xEFA930),  # orb family efa930 (= 4U 0x84c280) entry: keeps its 4U parameters, then mid hooks
+    ('em057_01_volley1', 0xEFAA6C),  # at its frame-88 / frame-58 posts (GU posts no orb for variant 1): Stygian's orbs
+    ('em057_01_volley2', 0xEFAAB4),  # (em057_01_posts.c, em057_01_shell046.c)
     ('dala_dmg_end', 0x98E44),     # enemy damage update 0x97ddc, after the rage add, before the reaction dispatcher
                                    # (r0 = this): Dalamadur tail rage -> head, shared reactions (dala_react.c)
     ('dala_heat_zone', 0x6A160),   # (mgr, area, pos) heat-aura zone test (Teostra only): 1 inside the Dalamadur
@@ -226,6 +242,8 @@ ITEM_SORT_FRAME = (0x199AE8, 0x199D4C)    # sub / add sp, sp, #708 (+ #11264): t
 if ITEMS_APPENDED:
     HOOKS += [('obtained_set', 0x1943D4), ('obtained_clear', 0x194408), ('obtained_test', 0x19443C)]
     REPLACE_HOOKS |= {'obtained_set', 'obtained_clear', 'obtained_test'}
+if 'TEST_QUEST_RANK' in os.environ.get('GOG_DEFINES', ''):   # test: Stygian's quests at that rank (em057_01_ai.c)
+    HOOKS += [('em057_01_rank', 0x3A8D68)]                   # GU quest rank getter (4U 0x69ae70)
 
 
 def movw_imm(word, imm):
@@ -334,8 +352,14 @@ def monsters_c():
         sz = package(m).get('size', {}).get(m['name'], [])
         assert len(sz) in (0, 1, 4) and all(v > 0 for v in sz), (m['name'], sz)   # [base] or [base, mini, silver, gold]
         sz = sz + [0] * (4 - len(sz))
+        alt = m.get('standin_alt', [0])         # [stand-in ID, quest IDs...] (port.h standin_alt)
+        assert not alt[0] or (len(alt) > 1 and set(alt[1:]) <= set(m.get('quests', []))), (m['name'], alt)
+        alt_mask = sum(1 << m['quests'].index(qid) for qid in alt[1:])
+        sn = m.get('append', {}).get('stage_name', 0)   # the alias's board name (port.h stage_name)
+        assert sn in (0, 1) and (not sn or 'stage_alias' in m), (m['name'], sn)
+        sn = GU_QUEST_MESSAGE + alloc.offset(m['name'], 'stage_name') if sn else 0
         out.append('    {"%s", 0x%x, %d, %d, 0x%x, %d, 0x%x, %d, %d, {%s}, {%s}, %s, %d, '
-                   '%d, %d, 0x%x, 0x%x, %d, {%s}, {%s}, {%s}, %sf, {%s}},' % (
+                   '%d, %d, 0x%x, 0x%x, %d, {%s}, {%s}, {%s}, %sf, {%s}, %d, 0x%x, 0x%x, %d},' % (
             m['name'], m['em_id'], m['registry_index'], m['donor_index'], m.get('standin_id', 0), m['save_index'],
             0x1064 + m['save_index'] - 105, m['name_entry'], m.get('notes_entry', 0),
             ', '.join('%d' % v for v in q), ', '.join('%d' % v for v in s),
@@ -344,8 +368,11 @@ def monsters_c():
             sum(1 << (k - 48) for k in st.get('kinds', [])), len(st.get('maprec', [])),
             ', '.join('%rf' % float(r[0]) for r in mr), ', '.join('%d' % r[1] for r in mr),
             ', '.join('%d' % r[2] for r in mr), repr(float(st.get('wholemap_k', 0))),
-            ', '.join('%rf' % float(v) for v in sz)))
+            ', '.join('%rf' % float(v) for v in sz), int(m.get('quest_append', False)), alt[0], alt_mask, sn))
     return '\n'.join(out + ['};']) + '\n'
+
+
+GU_QUEST_MESSAGE = 120   # GU's questMessage strings (resident_eng.arc GUI\06_msg): stage names 4..28, 114..119
 
 
 def stage_alias(m):

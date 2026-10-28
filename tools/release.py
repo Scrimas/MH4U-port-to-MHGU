@@ -172,8 +172,10 @@ def news(version):
 
 
 def quests(p):
-    """[(monster title, rank, quest title)] of a package's shipped quests: rank from questData (+0x11 board 10 = Hub,
-    +0x12 stars: 1..7 = Hub Low / High Rank, 11.. = G1..), title = the English GMD's first string"""
+    """[(monster title, rank, quest title)] of a package's shipped quests: board from the ID (below 10000 = Village,
+    GU's numbering; questData +0x11 is a quest type, not the board: GU uses 0..10 on both), rank from questData +0x12
+    stars (Hub: 1..7 = Low / High Rank, 11.. = G1..; Village: the star count), title = the English GMD's first
+    string"""
     sys.path.insert(0, paths.GU_PY)
     import gmd
     rf, out = paths.romfs(p['name']), []
@@ -181,8 +183,11 @@ def quests(p):
         for q in m.get('quests', []):
             qd = open(os.path.join(rf, 'nativeNX/loc/quest/questData/questData_%07d.ext' % q), 'rb').read()
             star = qd[0x12]
-            rank = 'G★%d' % (star - 10) if star > 10 else '%s ★%d' % ('High Rank' if star >= 4 else 'Low Rank', star)
-            board = 'Hub' if qd[0x11] == 10 else 'board %d' % qd[0x11]
+            if q < 10000:
+                board, rank = 'Village', '★%d' % star
+            else:
+                board = 'Hub'
+                rank = 'G★%d' % (star - 10) if star > 10 else '%s ★%d' % ('High Rank' if star >= 4 else 'Low Rank', star)
             title = gmd.gmd_strings(open(os.path.join(rf, 'nativeNX/eng/quest/questData/questData_%07d_eng.gmd' % q),
                                          'rb').read())[0]
             out.append((m.get('title', p['title']), '%s %s' % (board, rank), title))
@@ -196,7 +201,7 @@ def notes(c, pk, out):
     lines = ['MH4U monsters in MHGU (Switch 1.4): the monsters, their arenas, music, quests and gear. '
              'Take every zip from this one release.', '',
              "## What's new"] + '\n'.join(news(v)).strip().split('\n') + ['', '## Monsters and quests',
-             'On the Hub quest board:']
+             'On the Hub quest board (Village: on the village board):']
     for p in pk:
         qs = quests(p)
         for t in dict.fromkeys(t for t, _, _ in qs):

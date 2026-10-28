@@ -17,9 +17,11 @@ name_entry = [105, 111]                 # monsterName GMD entries 'dummy1'..'dum
 ui_icon = [197, 244]                    # cells 1..48 of our own atlas (UI index 196 + cell, tools/ui_icons.py; cell
                                         # 0 = 4U's '?'): GU's micon00 / 01 end at 195, both full in HD UI v4
 notes_entry = [123, 127]                # Hunter's Notes save map S+0x35b0: bits 123..127 unused
-quests = [11491, 11492, 11493, 11494, 10790, 10791, 10792, 11495, 11496]   # checked free (no file, no list
+quests = [11491, 11492, 11493, 11494, 10790, 10791, 10792, 11495, 11496,   # checked free (no file, no list
+          10775, 10776, 10777, 10778, 10779, 11426, 11427, 11428, 11429, 1023, 1024]
                                         # entry; v1.0 RomFS); 107NN = Hub HR 7, 114NN = Hub G4 (the ID's digits decide
-                                        # which hub loads it, the questData bytes the rank: plan.md Dalamadur 6.)
+                                        # which hub loads it, the questData bytes the rank: plan.md Dalamadur 6.),
+                                        # 10NN = village ★10 (Stygian Zinogre, 2026-10-28)
 quest_slots = [1011009, 1011003, 1011048, 1011049, 1010007, 1010177, 1110009, 1110114, 1110115]
                                         # quest_group group-127 entries renamed in memory. 1010007 / 1010177 / 1110009 /
                                         # 1110114 / 1110115 (indexes 1307 / 1329 / 1314 / 1393 / 1394, 2026-10-21):
@@ -278,3 +280,72 @@ save_index = 109
 name_entry = 108
 ui_icon = 202
 icon_4u = 121
+
+[[monster]]
+name = "stygian_zinogre"                # folder monsters/stygian_zinogre (4U em049, run by 4U's Zinogre class uEm048)
+title = "Stygian Zinogre"
+em_id = 0x139                           # Zinogre (em 57) variant 1: GU's own class runs it (package.toml gu_class);
+                                        # GU ships em057_00 and em057_04 (Thunderlord) only
+registry_index = 143
+donor_index = 44                        # Zinogre em057_00 (GU pair 0x39 -> 44): its class, flags, records, map icon
+standin_id = 0x39                       # its quests name Zinogre (loader-visible), swapped to 0x139 at spawn
+file_ids = [0x108c0, 0x108ff]
+save_index = 110
+name_entry = 110                        # = save_index: the quest result names the size record by the save slot
+ui_icon = 203
+icon_4u = 50                            # its quests' board icon (4U m10603 / m10607 / m10925 +0xE8 lists 50; Zinogre's
+                                        # m10520 lists 49): left-block values are the index itself, only values above
+                                        # 98 (98 = none) are index + 1 (Tigerstripe 102 -> 101)
+notes_entry = 127                       # the last free Notes save bit (123..127)
+quests = [10775, 10776, 10777, 10778, 10779, 11426, 11427, 11428, 11429, 1023, 1024]
+                                        # 4U m10603 m10607 m10608 m10612 m10616 (Hub HR 7), m10925 m10930 m11010
+                                        # m60205 (Hub G4), m00907 m01029 (village ★10); quests[0] unlocks the Notes
+                                        # entry (monsters/stygian_zinogre/notes/quests.md)
+quest_append = true                     # new quest list entries after GU's (module/quest.c), no quest_slots
+standin_alt = [0x439, 10778]            # 4U m10612 has a real Zinogre next to him: that quest names him by Thunderlord
+                                        # (em057_04, the same class), swapped like standin_id (module/port.c port_standin)
+stage_alias = [24, 30]                  # the Ruined Pinnacle (10 areas) loads folder m30 = Heaven's Mount (4U m05,
+                                        # 9 areas) while his quests run (tools/build_heavens_mount.py)
+items = [3021, 3035]                    # appended after Dalamadur's: its 15 materials, 4U 534..541 + 1507..1513
+                                        # (monsters/stygian_zinogre/tools/items_em057_01.py)
+armor_models = [169, 170, 438, 439]     # 4U Zinogre U / Zinogre Z, Blademaster / Gunner (unused in GU)
+
+[monster.weapon_models]                 # per weapon class (GU model numbers = 4U's, unused in GU): wNN = the line's
+w00 = 38                                # model, gNN = the LS / Bow "Charonian" one (tools/gear_weapons_em057_01.py)
+w01 = 42
+w02 = 46
+w03 = 54
+w04 = 46                                # sounds: GU's own set 019 (Loyal Thunder; 4U hbg046 holds that set)
+w06 = 30
+w07 = 36
+g07 = 82
+w08 = 38
+w09 = 26
+w10 = 34
+g10 = 81
+w11 = 40
+w12 = 28
+
+[monster.append]
+items = 15
+armor_series = 4                        # Zinogre U, Zinogre Z (Blademaster + Gunner each)
+armor_create = 2
+armor_process = 14                      # the templates' level rows: EX Zinogre 9, Zinogre X 5
+notes_text = 1                          # description only (4U has no Stygian tip: tools/notes_em057_01.py)
+kireaji = 20                           # the weapons' 4U sharpness entries (tools/gear_weapons_em057_01.py)
+stage_name = 1                          # questMessage: 4U mapName[5] "H. Mount", the boards' name of his stage-24
+                                        # quests (module/stage_alias.c, tools/stage_name_em057_01.py)
+
+[monster.append.weapons]                # BaseData / MsgData / LevelData rows per class: one Brimstren line each
+w00 = 3                                 # (tools/gear_weapons_em057_01.py; no CB, no IG)
+w01 = 3
+w02 = 3
+w03 = 3
+w04 = 2
+w06 = 4
+w07 = 3
+w08 = 3
+w09 = 3
+w10 = 4
+w11 = 3
+w12 = 3

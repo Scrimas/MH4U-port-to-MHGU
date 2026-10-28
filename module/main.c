@@ -70,13 +70,16 @@ static uint32_t swap_id(uint32_t id)
  * kept out of the quest setup's per-monster tables; it is swapped to the monster at spawn prep and creation while
  * one of its quests runs (port_running_quest: quest ID [[0x188ae38]+0xd68] until the setup 0x3ade34, then the
  * running quest [[0x188ad90]+0xe0]; the spawn loader's r4 is that object). Its companions (allocations.toml
- * companion_of, e.g. a tail half) are bosses of the same quests under stand-ins of their own. */
+ * companion_of, e.g. a tail half) are bosses of the same quests under stand-ins of their own. A quest listed in
+ * standin_alt names the alternative stand-in instead (port_standin), and its standin_id boss stays a GU monster (e.g.
+ * the Zinogre next to Stygian in 4U m10612). */
 static uint32_t standin_swap(uint32_t id)
 {
-    int q = port_running_quest(0);
-    for (int m = 0; q >= 0 && m < PORT_N; m++)
-        if (PORT_OWNER(m) == q && port_monsters[m].standin_id && (id & 0xffff) == port_monsters[m].standin_id)
-            return port_monsters[m].em_id;
+    int k = -1, q = port_running_quest(&k);
+    for (int m = 0; q >= 0 && m < PORT_N; m++) {
+        uint16_t s = PORT_OWNER(m) == q ? port_standin(m, k) : 0;
+        if (s && (id & 0xffff) == s) return port_monsters[m].em_id;
+    }
     return id;
 }
 
@@ -125,7 +128,8 @@ int em_arc_request_c(uint32_t *regs)
      * monster's ID and passes through). Its other quests skip the arc, but only when the quest is KNOWN (0 = load) */
     for (m = 0; m < PORT_N; m++) {
         const struct port_monster *p = &port_monsters[m];
-        if (!p->standin_id || id != p->standin_id || !port_installed(m)) continue;
+        if (!((p->standin_id && id == p->standin_id) || (p->standin_alt && id == p->standin_alt)) ||
+            !port_installed(m)) continue;
         if (q && port_quest_owner(q, 0) != PORT_OWNER(m)) continue;
         FN(void (*)(uint32_t, uint32_t), 0x15334c)(regs[R0], p->em_id);
     }

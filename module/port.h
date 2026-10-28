@@ -10,13 +10,14 @@
 
 #define PORT_N ((int)PORT_MONSTER_COUNT)
 #define PORT_LANGS 5          /* eng fre ger ita spa: text order in every data section */
-#define PORT_QUESTS 4         /* quests per entry (module/build.py QUESTS_PER_ENTRY) */
+#define PORT_QUESTS 12        /* quests per entry (module/build.py QUESTS_PER_ENTRY) */
 
 struct port_monster {
     const char *name;                     /* data file + log name */
     uint16_t em_id, index, donor_index, standin_id;   /* standin 0 = none */
     uint16_t save_index, save_id, name_entry, notes_entry;   /* notes_entry 0 = none (a companion) */
-    uint32_t quests[PORT_QUESTS], quest_slots[PORT_QUESTS];   /* 0 = none; quests[0] unlocks the Notes entry */
+    uint32_t quests[PORT_QUESTS], quest_slots[PORT_QUESTS];   /* 0 = none; quests[0] unlocks the Notes entry; slots
+                                                                 = the quest list entries renamed (module/quest.c) */
     void (*register_class)(void);         /* 0 = a GU class runs it (package.toml gu_class), or an earlier entry
                                              registered the same class */
     int owner;                            /* a companion (allocations.toml companion_of): its owner's port index;
@@ -31,6 +32,14 @@ struct port_monster {
     float whole_k;                        /* package.toml [stage] wholemap_k: whole-map record scale */
     float size[4];                        /* package.toml [size]: 4U base size (cm), mini / silver / gold ratios
                                              (0 = no crowns); base 0 = none (module/main.c size_data) */
+    uint8_t quest_append;                 /* allocations.toml quest_append: its quests are new quest list entries
+                                             after GU's (module/quest.c quest_group_append), no quest_slots */
+    uint16_t standin_alt, standin_alt_mask;   /* allocations.toml standin_alt = [ID, quest...]: in those quests
+                                             (bit k = quests[k]) its boss record names this stand-in instead, so
+                                             standin_id can be a real GU boss next to it; 0 = none */
+    uint16_t stage_name;                  /* allocations.toml [monster.append] stage_name: questMessage index of the
+                                             alias's name (its TXTA string), shown for its quests on stage_from
+                                             (module/stage_alias.c); 0 = GU's name */
 };
 #define PORT_OWNER(m) (port_monsters[m].owner >= 0 ? port_monsters[m].owner : (m))
 extern const struct port_monster port_monsters[];   /* out/port_monsters.c */
@@ -45,6 +54,8 @@ const uint8_t *port_section(int m, const char *tag, int nth, uint32_t *size);
 #define PORT_STR(sec, off) ((const char *)(sec) + PORT_U32(sec, off))
 /* 1 = its assets are installed (monster arc present) */
 int port_installed(int m);
+/* 1 = quests[k]'s loose questData file is present (the quest builders write it with the quest arc) */
+int port_quest_present(int m, int k);
 
 int port_by_em(uint32_t em_id);           /* -1 = none */
 int port_by_index(uint32_t index);
@@ -52,6 +63,8 @@ int port_by_index(uint32_t index);
 uint32_t port_quest_id(void);
 int port_quest_owner(uint32_t quest_id, int *which);
 int port_running_quest(int *which);       /* owner of the current quest if installed, else -1 */
+/* the stand-in ID monster m's quests[k] name (standin_alt where its mask has bit k, else standin_id; 0 = none) */
+uint16_t port_standin(int m, int k);
 
 void notes_data_loaded(int m);            /* notes.c: the monster's Notes entry, after its data loaded */
 

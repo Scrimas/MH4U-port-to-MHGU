@@ -41,6 +41,8 @@ def gu_drawmode(dm4):
 
 
 RIGID_4U = 0x82917009       # 24 B: f32 pos[3] (model space), snorm8 N[4], f32 uv[2]
+RIGID_TAN_4U = 0x6180300A   # 32 B: RIGID_4U + 4 zero bytes + snorm8 T[4] (unit xyz, w +-127): 4U em049_tail
+                            # (Stygian Zinogre's severed tail; GU's own em057_00_tail is RIGID_GU)
 RIGID_GU = 0x5E7F2030       # 28 B "P3f_N4c_T4c_U2h_U2h"
 RIGID_STRIDE = 28
 
@@ -103,6 +105,9 @@ def read_4u_vertices(d, m, x):
         tan = v[:, 28:32].view(np.int8)
     elif x['fmt'] == RIGID_4U and st == 24:
         return pos, nrm, uv, None, None, np.zeros((len(v), 4), np.int8)
+    elif x['fmt'] == RIGID_TAN_4U and st == 32:
+        assert not v[:, 24:28].any(), '4U 0x6180300A bytes 24..27 are not zero'
+        return pos, nrm, uv, None, None, v[:, 28:32].view(np.int8)
     else:
         raise SystemExit('4U vertex format %#x (stride %d) not handled' % (x['fmt'], st))
     pal = m['skin_list'][x['envelopes']] if m['skin_list'] else list(range(256))

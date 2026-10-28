@@ -13,9 +13,9 @@ If you're interested into porting monsters, here is a (non-exhaustive) list of w
 
 Brings Monster Hunter 4 Ultimate monsters into Monster Hunter Generations Ultimate (Switch, v1.4), with their quests, armor, weapons and skills. They are added to the game; nothing is replaced.
 
-**Monsters:** Gogmazios, Dalamadur, Shah Dalamadur, and Tigerstripe Zamtrios.
+**Monsters:** Gogmazios, Dalamadur, Shah Dalamadur, Tigerstripe Zamtrios, and Stygian Zinogre.
 
-Next up is... hum... I have no idea. Maybe Tidal Najarala or Stygian Zinogre.
+Next up is... hum... I have no idea. Maybe Tidal Najarala.
 
 ## Install
 

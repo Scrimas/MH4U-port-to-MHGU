@@ -50,7 +50,7 @@ CACHE = os.path.join(ROOT, 'dump', 'stage_cache')        # converted textures (s
 
 T_MOD, T_MRL, T_TEX = 0x58A15856, 0x2749C8A8, 0x241F5DEB
 KEEP = set()            # alias --keep-* fallbacks: 'sets', 'filters', 'gimmicks', 'koware'
-FMT_4U = {0x59DC400B: 28, 0x3F78800C: 32}
+FMT_4U = {0x59DC400B: 28, 0x3F78800C: 32, 0x82917009: 24}
 GU_FMT, GU_STRIDE = 0x207D603B, 24
 NORMAL_W = 3            # top 2 bits of the packed normal: 3 on the GU stage vertices (see check)
 
@@ -77,7 +77,8 @@ def read_mesh_4u(d, m, x):
     pos = np.frombuffer(v[:, 0:12].tobytes(), '<f4').reshape(-1, 3)
     nrm = v[:, 12:15].view(np.int8).astype(np.float64) / 127.0
     uv = np.frombuffer(v[:, 16:24].tobytes(), '<f4').reshape(-1, 2)
-    col = v[:, 24:28].copy()
+    # 0x82917009 (24 B, 4U Heaven's Mount m05a02d -sky00 / -river): the 28-B layout without the colour -> white
+    col = v[:, 24:28].copy() if st >= 28 else np.full((len(v), 4), 255, np.uint8)
     return pos, nrm, uv, col
 
 
@@ -90,6 +91,14 @@ def encode_mesh_gu(pos, nrm, uv, col):
     out[:, 16:20] = uvh.view(np.uint8).reshape(n, 4)
     out[:, 20:24] = col
     return out
+
+
+def hidden_4u(col):
+    """a 4U stage mesh whose vertex alpha is 0 everywhere draws nothing in 4U (S: 4U's XfB shaders scale by vertex
+    alpha), while GU's templates ignore it: dropped. The only one in m05 / m08 / m19 (C, scan 2026-10-28): m05a03d's
+    XfBAW_1__m00_52, 31 vertices, unlit rock00 over a 6700 x 2900 x 6300 span (a flat fogged sheet in area 3, test
+    2026-10-28)."""
+    return not col[:, 3].any()
 
 
 def convert_models(sources):
@@ -116,6 +125,7 @@ def convert_models(sources):
         eo = m['envelopes_off']
         for mi, x in enumerate(m['mesh_list']):
             pos, nrm, uv, col = read_mesh_4u(d, m, x)
+            if hidden_4u(col): continue
             lo = np.minimum(lo, pos.min(0)); hi = np.maximum(hi, pos.max(0))
             vb += encode_mesh_gu(pos, nrm, uv, col).tobytes()
             idx = src_ib[x['indexStart']:x['indexStart'] + x['numIndices']].astype(np.int64)
@@ -176,8 +186,9 @@ def check_model(dg, sources):
         m = modlib.parse(d)
         ib4 = np.frombuffer(m['ib'], '<u2')
         for x in m['mesh_list']:
-            xg = mg['mesh_list'][k]; k += 1
             pos, nrm, uv, col = read_mesh_4u(d, m, x)
+            if hidden_4u(col): continue
+            xg = mg['mesh_list'][k]; k += 1
             b = mg['offsets']['vb'] + xg['vertexStart'] * GU_STRIDE
             v = np.frombuffer(dg[b:b + xg['numVertices'] * GU_STRIDE], np.uint8).reshape(-1, GU_STRIDE)
             p = np.frombuffer(v[:, 0:12].tobytes(), '<f4').reshape(-1, 3)

@@ -213,12 +213,13 @@ static int bui_build(int m, int rank)
 int bui_record_c(uint32_t *regs)
 {
     uint32_t id = regs[R1] & 0xffff;
-    int q = port_running_quest(0);
+    int k = -1, q = port_running_quest(&k);
     const uint8_t *info = (const uint8_t *)FIELD(uint32_t, (void *)regs[R0], 0xa4);
     int rank = info ? (int8_t)info[44] : -1;      /* GU returns no record without it */
     for (int m = 0; m < PORT_N; m++) {
         const struct port_monster *p = &port_monsters[m];
-        if (id != p->em_id && id != p->save_id && !(q == m && p->standin_id && id == p->standin_id)) continue;
+        if (id != p->em_id && id != p->save_id && !(q == m && port_standin(m, k) && id == port_standin(m, k)))
+            continue;
         if ((!FIELD(uint16_t, s_bui[m], 4) || s_bui_rank[m] != rank + 1) && !bui_build(m, rank)) return 0;
         regs[R0] = (uint32_t)s_bui[m];
         logf("mh4uport: break rewards for id %x: %s record (rank %d)", id, p->name, rank);

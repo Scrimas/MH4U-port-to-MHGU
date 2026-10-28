@@ -3,7 +3,7 @@
 # written into the entries' data files.
 name = "dalamadur"
 title = "Dalamadur"
-version = "1.0.1"          # bump on every published change of this package's files (data, assets or code)
+version = "1.0.2"          # bump on every published change of this package's files (data, assets or code)
 requires_core = "1.6.0"    # oldest core module (exefs) that runs this version: its quests' board icon (byte 200)
                            # is the core's own atlas
 

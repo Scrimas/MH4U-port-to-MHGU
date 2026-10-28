@@ -163,6 +163,21 @@ int port_installed(int m)
     return s_installed[m] == 1;
 }
 
+/* present = nativeNX/loc/quest/questData/questData_%07d.ext exists */
+int port_quest_present(int m, int k)
+{
+    static uint8_t s_present[PORT_N][PORT_QUESTS];   /* 0 not checked, 1 yes, 2 no */
+    if (s_present[m][k]) return s_present[m][k] == 1;
+    uint32_t id = port_monsters[m].quests[k], type = 0;
+    char path[64], *p = put(path, "app:/nativeNX/loc/quest/questData/questData_");
+    for (uint32_t d = 1000000; d; d /= 10) *p++ = (char)('0' + id / d % 10);
+    put(p, ".ext");
+    uint32_t r = fs_entry_type(&type, path);
+    s_present[m][k] = !r && type == 1 ? 1 : 2;
+    if (s_present[m][k] != 1) logf("mh4uport: %s quest %u NOT present (%s)", port_monsters[m].name, id, path);
+    return s_present[m][k] == 1;
+}
+
 int port_by_em(uint32_t em_id)
 {
     for (int m = 0; m < PORT_N; m++)
@@ -211,6 +226,13 @@ int port_running_quest(int *which)
 {
     int m = port_quest_owner(port_quest_id(), which);
     return m >= 0 && port_installed(m) ? m : -1;
+}
+
+uint16_t port_standin(int m, int k)
+{
+    const struct port_monster *p = &port_monsters[m];
+    if (p->standin_alt && k >= 0 && k < PORT_QUESTS && (p->standin_alt_mask >> k & 1)) return p->standin_alt;
+    return p->standin_id;
 }
 
 /* hook 0x152960(_, fileId) -> resource. The game indexes its (path hash, type) table with IDs up to 0x106d0,

@@ -16,7 +16,8 @@ bow=dict(kyoku, tame, bottles, cshot={4U id: expected charge shots}; each option
 stand-in's (not in the 4U record), bottles default the 4U record's coatings, tame / cshot given = checked against the
 record), hh=(4U note set, GU fueMusicData) (optional: default the 4U set's own index, the two tables being equal),
 insect=GU mInsectType, srqr=sound set (default the model number: the 4U arc's own sounds converted by
-tools/wsnd4u2gu.py; a 4U arc holding another weapon's set uses GU's arc of that number)).
+tools/wsnd4u2gu.py; a 4U arc holding another weapon's set uses GU's arc of that number), first_upgrade=True (the
+first weapon has no 4U create recipe: it is forged from its own 4U upgrade recipe's materials, the parent left out)).
 
 Sources:
   - GU base RomFS tables (loc/arc/resident.arc, arc/facility/blacksmith.arc, <lang>/arc/resident_<lang>.arc).
@@ -48,7 +49,8 @@ Rules (notes section 8; port choices made for Gogmazios, kept for every monster)
     from tools/wsnd4u2gu.py); mSndMaterial 1; mRare = 4U rarity - 1; mPrice = the 4U price; mPriceChangeLv 0,
     mColorIndex 0, mNamed 0, mSpecialSkill 0, mSortID = after GU's and the earlier monsters'.
   - Element / status (melee and bows): the 4U value (value / 10 in both games), hidden (negative, needs Awaken)
-    made visible (GU has no Awaken); statuses through spec status, a weapon with both: refused.
+    made visible (GU has no Awaken); statuses through spec status, a weapon with both: refused. DB: mElement1 = the
+    record's, mElement2 = its DB2_4U entry's (S: the GU same-name dual DBs keep that order).
   - Sharpness: the monster's 4U entries appended to kireajiData; mKireLevel = 2 x the 4U level.
   - Recipes: the 4U exe's, items by English name in GU itemData_eng (our materials included; spec substitutes for 4U
     items GU lacks); create: mLv 1, mKey[0] 2, no provision, no scraps; process: one level-1 record per weapon,
@@ -75,6 +77,10 @@ CREATE_4U = (0xf3f000, 0xf55400)
 AMMO_4U = {6: 0xfb2bf4, 4: 0xfb4739}     # bowgun ammo count records (39 B: 4U ammo index -> clip size), per class
 NOTES_4U = 0xf31da4                      # HH note sets, 50 x 3 colours (= GU table\fueMusicData)
 ELEMENT_4U = {1: 1, 2: 2, 3: 3, 4: 4, 5: 5}   # 4U element -> GU mElement (fire, water, thunder, dragon, ice)
+# DB second element (C: read by 0x2f8a00 / 0x2f8d64, DB only, index = the melee record's +17 via 0x2f81c4): 4 B per
+# index {u8 element, s8 value, u8 status, s8 value} (the melee record's types and units); index 0 = none. Indexes 1..30
+# are the 28 4U dual-element DBs (Twin Nails 1 blast record + ice 40 here: the GU same-name weapons all have mElement2)
+DB2_4U = 0xf588f4
 # 4U ammo index -> GU ammo slot (section 2): 0..19 the same (Normal .. Dragon), 20 none (Slicing, G), 21..30 -> 20..29
 # (Poison .. Recover), 31 / 32 none (G: Demon / Armor), 33 / 34 -> 30 / 31 (Paint / Tranq; order G, both 2 everywhere)
 AMMO_SLOT = dict([(k, k) for k in range(20)] + [(k, k - 1) for k in range(21, 31)] + [(33, 30), (34, 31)])
@@ -201,6 +207,17 @@ def elem_status(w, status):
     return 0, 0
 
 
+def db_second_4u(exe, w, status):
+    """(GU mElement2, value / 10) of a 4U DB record: its +17 indexes DB2_4U (0 = single element); the entry's element,
+    else its status (spec status: 4U -> GU), visible as the first one"""
+    if not w['extra']:
+        return 0, 0
+    et, ev, st, sv = struct.unpack_from('<BbBb', exe, DB2_4U + 4 * w['extra'] - EXE_BASE)
+    if bool(et) == bool(st):
+        sys.exit('4U DB second element %d: element %d and status %d' % (w['extra'], et, st))
+    return (ELEMENT_4U[et], abs(ev)) if et else (status[st], abs(sv))
+
+
 def ammo_4u(w):
     """bowgun ammo string (spec format, GU slots 0..31) of a 4U record + [4U ammo indexes loadable without a GU slot]:
     a loadable ammo = its count; one that is not: (count) on slots 0..14, 0 on 15..31 (as GU zeroes those, S)"""
@@ -220,14 +237,20 @@ def bottles_4u(mask):
     return tuple(out)
 
 
-def recipes_4u(exe, t4, ctype, ids4u, nn):
-    """[(4U item name, count)] per weapon: create recipe for the first, upgrade recipe for the others"""
+def recipes_4u(exe, t4, ctype, ids4u, nn, first_upgrade=False):
+    """[(4U item name, count)] per weapon: create recipe for the first, upgrade recipe for the others;
+    first_upgrade: the first weapon has no 4U create recipe (checked) and is forged from the materials of its own 4U
+    upgrade recipe (the parent weapon left out: the upgrade table lists only the materials)"""
     name = lambda pairs: [(t4['itemName'][it], c) for it, c in pairs if it]
     out = []
     hits = [a for a in range(CREATE_4U[0], CREATE_4U[1], 24) if struct.unpack_from('<HH', exe, a + 4 - EXE_BASE) ==
             (ctype, ids4u[0])]
-    assert len(hits) == 1, (ctype, ids4u[0], hits)
-    v = struct.unpack_from('<8H', exe, hits[0] + 8 - EXE_BASE)
+    if first_upgrade:
+        assert not hits and nn != 13, (ctype, ids4u[0], hits)
+        v = struct.unpack_from('<8H', exe, u32(exe, UPGRADE_4U + 4 * (ctype - 7)) + 24 * ids4u[0] - EXE_BASE)
+    else:
+        assert len(hits) == 1, (ctype, ids4u[0], hits)
+        v = struct.unpack_from('<8H', exe, hits[0] + 8 - EXE_BASE)
     out.append(name(zip(v[0::2], v[1::2])))
     for i in ids4u[1:]:
         if nn == 13:
@@ -338,7 +361,7 @@ def build(spec):
         off = alloc.offset(name, 'weapons', wkey)                  # rows of the earlier monsters' weapons
         lines = sum(1 for m in prior if m.get('append', {}).get('weapons', {}).get(wkey))   # one create row each
         w4 = [weapon_4u(exe, nn, ptab, i) for i in ids4u]
-        rec4 = recipes_4u(exe, t4['eng'], ctype, ids4u, nn)
+        rec4 = recipes_4u(exe, t4['eng'], ctype, ids4u, nn, cs.get('first_upgrade', False))
         for k, (r, plan) in enumerate(zip(rec4, cs.get('recipes', ()))):     # optional cross-check
             if dict(r) != plan or len(r) != len(plan):
                 sys.exit('%s %d: 4U recipe %s != the spec\'s %s' % (short, ids4u[k], r, plan))
@@ -406,8 +429,9 @@ def build(spec):
                 elem, val = elem_status(w, status)               # 4U hidden (negative) -> visible
                 r.update(mKireType=kn + kire_4u.index(w['sharp']), mKireLevel=2 * w['kire'])
                 if nn == 11:
-                    b.update(mElement1=elem, mElement2=0)
-                    r.update(mElementValue1=val, mElementValue2=0)
+                    elem2, val2 = db_second_4u(exe, w, status)
+                    b.update(mElement1=elem, mElement2=elem2)
+                    r.update(mElementValue1=val, mElementValue2=val2)
                 else:
                     b['mElement'] = elem
                     r['mElementValue'] = val
