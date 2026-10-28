@@ -1,0 +1,21 @@
+# Stygian Zinogre package: what the installer shows and installs, and the version written into its data file.
+name = "stygian_zinogre"
+title = "Stygian Zinogre"
+version = "1.0.0"          # bump on every published change of this monster's files (data, assets or code)
+requires_core = "1.7.0"    # oldest core module (exefs) that runs this version: the release that registers it
+code = "em057_01"          # C prefix of its module code (hooks gated on GU variant 1)
+gu_class = "uEm057_00"     # GU's Zinogre class runs it as variant 1 (module/build.py: registry DTI = donor's)
+
+[stage]                    # Heaven's Mount (4U m05) as an alias of the Ruined Pinnacle (allocations.toml stage_alias,
+                           # module/stage_alias.c; tools/build_heavens_mount.py, notes/heavens-mount.md)
+kinds = [49, 54, 55, 56, 58]   # arc paths -> m30: mapUI, map_com, language map_com, stage, area
+hold_kobj_areas = [6]      # area 6: the four hit-breakable rocks (GU's quest-start command 0 would break them);
+                           # area 8's s00 scheduler has no action 0 (ids 3..14), and the core's mask holds areas 0..7
+maprec = [[2.8, 0, 0], [1.6, 4, -12], [1.8, 0, 10], [1.3, -4, 16]]   # area maps 0..3: 4U m05 records {k, x, y}
+                           # (4U table 0xeebe0c + 0x18 * 5, checked by tools/build_heavens_mount_ui.py); the core
+                           # holds 4: areas 4..8 keep GU's m24 records, their pictures are resampled to them
+wholemap_k = 1.0           # whole map: GU dims[24] / 4U m05 W = 60000 / 60000 (build_heavens_mount_ui.py)
+
+[size]                     # quest-result size record (module/main.c size_data): 4U table 0xf32008 + 16 x em {f32 base
+                           # cm, mini, silver, gold}; em049 (Zinogre em048: 1455.4, 0.9, 1.15, 1.23)
+stygian_zinogre = [1455.4, 0.97, 1.17, 1.23]
