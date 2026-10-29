@@ -27,6 +27,7 @@ import aan, fskl, fmod, msgrip
 ROT = 2 * math.pi / 16384
 M = 0.01  # cm -> m
 GAP, HOLD = 20, 6  # frames between two motions on the timeline; of those, frames that keep the last pose
+FPS = 60  # MHF motion frames per second (S, notes/assets.md: run cadence, set-motion halving the step blends)
 BODY_MESHES = (0, 32, 59)  # m_editpl: body variant 0, face 0, hair 0 (0-31 bodies, 32-58 faces, 59-76 hair)
 
 
@@ -216,7 +217,7 @@ def bake_root(warm, cb, parm, scn, holder):
 def main():
     out, body, bskl, wdir, w13, w13w, hand, render, motions = args()
     bpy.ops.wm.read_factory_settings(use_empty=True)
-    scn = bpy.context.scene; scn.render.fps = 30
+    scn = bpy.context.scene; scn.render.fps = FPS
     # player
     _, pbones = fskl.parse(open(bskl, 'rb').read())
     pby, pfake, ptrue = rest_matrices(pbones)

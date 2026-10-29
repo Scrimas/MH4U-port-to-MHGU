@@ -5,6 +5,9 @@ monsters/*/romfs/
 monsters/*/romfs-*/
 # generated tables holding 4U text / records (monsters/<name>/tools/*.py -> monsters/<name>/gen/)
 monsters/*/gen/
+# ported weapon classes: converted RomFS files and generated tables (weapons/<name>/tools -> romfs/, gen/)
+weapons/*/romfs/
+weapons/*/gen/
 # emulator data dir of tools/ryutest.sh (holds prod.keys / title.keys and a save copy)
 ryuroot/
 save-backup-*/

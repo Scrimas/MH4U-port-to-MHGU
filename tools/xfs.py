@@ -7,7 +7,9 @@ area-data fix; every area file of the 94 GU monster arcs parses to its exact end
        fields of 0x28 bytes {u32 name offset (from 0x18), u8 type, u8 attribute, u16 size, ...}}
   0x18 + definition size: the root object; object = {u16 tag (class << 1 | 1, 0 = null), u16 serial (depth-first
        object number), u32 size (4 + body bytes)}, then per field u32 count and count values: types 1 (class) /
-       2 (class ref) = nested objects, others = size-byte LE ints (GU stage cameras m26a00d-cam: checked byte-exact)
+       2 (class ref) = nested objects, 128 (resource) = u8 kind (0 = none, GU uses 2) + class name + path (C
+       strings; the value is (class name, path, kind) or None), others = size-byte LE ints (GU stage cameras
+       m26a00d-cam: checked byte-exact; player command tables plcmd_wNN_<style>: 2026-10-29)
 
   defs(d) -> (object count, [(hash, [(name, type, attribute, size)])], data offset)
   parse(d) -> root object: {'_class': hash, field: value} (a field with count != 1 holds a list)
@@ -48,6 +50,12 @@ def parse(d):
             for _ in range(n):
                 if ty in (1, 2):
                     q, v = obj(q)
+                elif ty == 128:
+                    v, q = None, q + 1
+                    if d[q - 1]:
+                        e = d.index(b'\0', q)
+                        f = d.index(b'\0', e + 1)
+                        v, q = (d[q:e].decode(), d[e + 1:f].decode(), d[q - 1]), f + 1
                 else:
                     v = int.from_bytes(d[q:q + sz], 'little')
                     q += sz
@@ -91,6 +99,8 @@ def build(d, root):
             for v in vals:
                 if ty in (1, 2):
                     obj(v)
+                elif ty == 128:
+                    out.extend(b'\0' if v is None else bytes([v[2]]) + v[0].encode() + b'\0' + v[1].encode() + b'\0')
                 else:
                     out.extend(int(v).to_bytes(sz, 'little'))
         struct.pack_into('<I', out, start + 4, len(out) - start - 4)

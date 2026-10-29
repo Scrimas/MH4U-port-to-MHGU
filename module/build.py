@@ -245,6 +245,75 @@ if ITEMS_APPENDED:
 if 'TEST_QUEST_RANK' in os.environ.get('GOG_DEFINES', ''):   # test: Stygian's quests at that rank (em057_01_ai.c)
     HOOKS += [('em057_01_rank', 0x3A8D68)]                   # GU quest rank getter (4U 0x69ae70)
 
+# Magnet Spike (MHF) as class 5 / box type 12: Phase 2 vertical slice, test builds only (GOG_DEFINES="MS_SLICE";
+# weapons/magnet_spike/notes/phase2.md). Saves keep type-12 entries and class 5 raw: vanilla GU cannot load them.
+MS_SLICE = 'MS_SLICE' in os.environ.get('GOG_DEFINES', '')
+MS_DIR = os.path.join(ROOT, 'weapons', 'magnet_spike')
+if MS_SLICE:
+    HOOKS += [
+        ('ms_factory', 0x275BC8),     # factory after a class constructor (r8 info, r10 object): class 5's vtable
+        ('ms_base', 0x13C208),        # (sEquip, type, id) -> base record: type 12 = ours (ms_class.c)
+        ('ms_level', 0x13ED08),       # (sEquip, type, row) -> level row: type 12 = ours
+        ('ms_pwl_gmk', 0x13F554), ('ms_pwl_disp', 0x13F594), ('ms_pwl_carry', 0x13F5D4), ('ms_pwl_sub', 0x13F614),
+        ('ms_box_ptr', 0x14B0B0),     # item box loader entry (r0 = the box)
+        ('ms_box_loaded', 0x3E7804),  # after the box load: one Magnet Spike in the box (test build)
+        ('ms_motion', 0x281998),      # set-motion (p, motion): class-5 motion log (diagnostic)
+        ('ms_attach', 0x3078B8),      # weapon attach (weapon, hunter, part type): class 5 in hand on joint 8
+        ('ms_setmotion', 0x53A164),   # unit set-motion (unit, motion, mode): class 5's Impact idle / walk slots
+    ]
+MS_GUNNER_SITES = [0x144968, 0x144A0C, 0x144B24, 0x6ECEFC, 0x6ED884, 0x6FCB2C, 0x7037A8, 0x70B738]
+
+
+def ms_patches(img):
+    """(site, old, new) words for class 5 (MS_SLICE only). GU still treats class 5 as the leftover MH3 bowgun slot:
+    gunner tests `class - 4 < 3`, masks 0x47 over classes 4..10 (GU's own 0x172314 already uses 0x45), bowgun cases
+    in two class switches and two per-class tables, the bowgun weapon part; gu-weapon-class.md "Class 5 in GU"."""
+    if not MS_SLICE: return []
+    word = lambda a: struct.unpack_from('<I', img, a)[0]
+    out = [
+        (0x275B2C, 0x29C, 0x40),               # factory class jump table entry 5: return 0 -> the Great Sword case
+        (0x16283D0, 6, 0),                     # weapon part type per class (0x277830): bowgun 6 -> GS's single part
+        (0x27C860, 0xE3A01047, 0xE3A01045),    # gunner helper kind 1: classes {4,5,6,10} -> {4,6,10}
+        (0x28AC94, 0xE3A01047, 0xE3A01045),    # the same mask at 0x28ac80
+        (0x180DA8, 0xA0, 0x40),                # switch(class) 0x180d78: class 5 -> class 0's case (was 4 / 6 / 10)
+        (0x665B34, 0x58, 0x3C),                # switch(class) 0x665b04: class 5 -> class 0's case (was 4 / 6)
+        (0x1630594, 6, 5), (0x16309C4, 6, 5),  # per-class values for classes 4..10 (0x58a1d4 / 0x58eff4): 6 -> 5
+        (0x1628064, 2, 1),                     # gunner table by type - 7 (0x26ee8c strips blademaster armor)
+        (0x145B94, 0xE3072FDF, 0xE3072FFF),    # item box blademaster / gunner mask 0x7fdf -> 0x7fff
+        # gunner helper kind 0 (0x27c804): r0 = (5 >> (class - 4)) & 1, classes 4 and 6 only
+        (0x27C814, 0xE3A00001, 0xE3A00005), (0x27C818, 0xE3510003, 0xE1A00130),
+        (0x27C81C, 0x3A000012, 0xE2000001), (0x27C820, 0xEA000012, 0xE12FFF1E)]
+    # the weapon setup's file-ID bases (0x288d10; one-time .bss tables of 0x286ac0 / 0x286c2c / 0x286e28 / 0x287024)
+    # skip class 5: its entries get "no file" (0, read-only 0x15a0cd8), so no model, weapon motions or pwl. GU's file
+    # table still names MH3's class-5 files at the gaps: model base = class * 2 + part -> weapon\w05\mbg001 - 1 (part 1
+    # keeps the .bss 0); weapon motions wg05_00 / wg05_sa_00; pwl = the Great Sword's pl_w00_gNN (stand-in, as the
+    # pwl getters ms_class.c answers)
+    mv = word(0x286B5C)                        # movw r2, #0x591e (LBG's base, entry 12)
+    out += [(0x286B5C, mv, movw_imm(mv, 0x5536)), (0x286B64, 0xE5801028, 0xE5802028), (0x286B68, 0xE580102C, mv),
+            (0x286CC4, 0xE5911000, 0xE30014B0),     # ldr r1, [r1] (the "no file" value) -> movw r1, #0x4b0
+            (0x286EC0, 0xE5911000, 0xE3001653),     # -> movw r1, #0x653
+            (0x2870B4, 0xE5911000, 0xE300175B)]     # -> movw r1, #0x75b
+    for s in MS_GUNNER_SITES:                  # sub rA, rB, #4; cmp rA, #3; blo -> cmp rB, #4; cmpne rB, #6; beq
+        sub, cmp, blo = word(s), word(s + 4), word(s + 8)
+        ra, rb = (sub >> 12) & 15, (sub >> 16) & 15
+        assert sub & 0xFFF00FFF == 0xE2400004 and cmp == 0xE3500003 | ra << 16 and blo >> 24 == 0x3A, hex(s)
+        out += [(s, sub, 0xE3500004 | rb << 16), (s + 4, cmp, 0x13500006 | rb << 16), (s + 8, blo, blo & 0x0FFFFFFF)]
+    # per-class value tables whose class-5 entry holds the bowgun values: class 0's (the generic melee values; phase2.md
+    # lists them with the Great Sword stand-ins): (table, entry size) as read at 0x29ab40 / 0x2aca3c / 0x2ad1e8 /
+    # 0x2cdbd4 / 0x2dfb84 / 0x2e21a4
+    for base, size in MS_CLASS_TABLES:
+        new = bytearray(img[base + 5 * size & ~3:base + 6 * size + 3 & ~3])
+        lo = (base + 5 * size) - (base + 5 * size & ~3)
+        new[lo:lo + size] = img[base:base + size]
+        for k in range(0, len(new), 4):
+            a = (base + 5 * size & ~3) + k
+            old_w, new_w = word(a), struct.unpack_from('<I', new, k)[0]
+            if old_w != new_w: out.append((a, old_w, new_w))
+    return out
+
+
+MS_CLASS_TABLES = [(0x162543C, 2), (0x162882C, 2), (0x16287AC, 4), (0x1628D90, 10), (0x1628F14, 4), (0x1629578, 4)]
+
 
 def movw_imm(word, imm):
     """the same `movw rD, #imm16` with another immediate"""
@@ -502,6 +571,11 @@ def main():
                                             'notes.c', 'stage_alias.c', 'bgm.c', 'icons.c')]
     for d in mods:                                     # every registered monster's code, registry order
         srcs += sorted(glob.glob(os.path.join(d, '*.c')))
+    if MS_SLICE:                                       # the Magnet Spike's code and its generated action tables
+        gen = os.path.join(MS_DIR, 'gen', 'ms_data.inc')
+        if not os.path.exists(gen): sys.exit('no %s: run weapons/magnet_spike/tools/msbuild.py' % gen)
+        incs += ['-I', os.path.join(MS_DIR, 'module'), '-I', os.path.dirname(gen)]
+        srcs += sorted(glob.glob(os.path.join(MS_DIR, 'module', '*.c')))
     srcs += [os.path.join(OUT, 'port_monsters.c'), os.path.join(OUT, 'tables.S')]
     for path in srcs:
         o = os.path.join(OUT, os.path.basename(path) + '.o')
@@ -560,7 +634,7 @@ def main():
         if delta > 0x10: sys.exit('literal %x: expected %s (+small), got target %x' % (lit, sym, use + 8 + old))
         new = (MODULE_BASE + syms[sym] - MAIN_BASE + delta - (use + 8)) & 0xFFFFFFFF
         recs += struct.pack('>IH', lit + 0x100, 4) + struct.pack('<I', new)
-    for site, old, new in WORD_PATCHES + item_patches(img):
+    for site, old, new in WORD_PATCHES + item_patches(img) + ms_patches(img):
         if struct.unpack_from('<I', img, site)[0] != old: sys.exit('word patch %x: unexpected original' % site)
         recs += struct.pack('>IH', site + 0x100, 4) + struct.pack('<I', new)
     open(os.path.join(OUT, MAIN_BUILD_ID + '.ips'), 'wb').write(b'IPS32' + recs + b'EEOF')
@@ -606,6 +680,19 @@ def install():
                 owner[rel] = name
                 os.makedirs(os.path.join(dst, os.path.dirname(rel)), exist_ok=True)
                 shutil.copy(os.path.join(d, f), os.path.join(dst, rel))
+    # the Magnet Spike's files (weapons/magnet_spike/tools/msbuild.py), when the BUILT module has it: the switch comes
+    # from the last build's defines.txt (install.sh runs the install step without GOG_DEFINES)
+    built = open(os.path.join(OUT, 'defines.txt')).read().split() if os.path.exists(os.path.join(OUT, 'defines.txt')) else []
+    if MS_SLICE or '-DMS_SLICE' in built:
+        src = os.path.join(MS_DIR, 'romfs')
+        if not os.path.isdir(src): sys.exit('no %s: run weapons/magnet_spike/tools/msbuild.py' % src)
+        for d, _, files in os.walk(src):
+            for f in files:
+                rel = os.path.relpath(os.path.join(d, f), src)
+                if rel in owner: sys.exit('RomFS path %s shipped by both %s and the Magnet Spike' % (rel, owner[rel]))
+                os.makedirs(os.path.join(dst, os.path.dirname(rel)), exist_ok=True)
+                shutil.copy(os.path.join(d, f), os.path.join(dst, rel))
+        names = names + ['magnet_spike']
     print('installed into %s: data of %s, assets of %s' % (MOD_DIR, ', '.join(m['name'] for m in MONSTERS),
                                                            ', '.join(names) or 'none'))
 

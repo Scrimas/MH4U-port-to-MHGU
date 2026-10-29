@@ -11,6 +11,7 @@ enum { R0, R1, R2, R3, R4, R5, R12, LR };
 extern uint32_t reg_files[], reg_mapicon[];   /* tables.S */
 extern uint8_t notes_list[];                  /* notes.c */
 void notes_init(void);                        /* notes.c */
+void ms_init(void);                           /* weapons/magnet_spike/module/ms_class.c (MS_SLICE builds) */
 
 /* data words (GOT-like) through which every reader reaches a table: point them at our extended copies */
 static void redirect(const char *what, uint32_t word, uint32_t orig, uint32_t *copy)
@@ -50,6 +51,9 @@ void module_init(void)
     redirect("file manifest", 0x1839618, GU_FILES, reg_files);   /* ~40 readers, indexes 137.. */
     redirect("map icon size", 0x183fff0, 0x1635354, reg_mapicon); /* cUIOQuestMapIcon 0x61a994, by em number */
     notes_init();
+#ifdef MS_SLICE
+    ms_init();
+#endif
     redirect("hunter's notes", 0x183ec4c, 0x162d9f0, (uint32_t *)notes_list);   /* 6 readers, entries 123.. */
 }
 

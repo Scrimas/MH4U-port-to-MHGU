@@ -14,9 +14,15 @@ dump/mhf/player/{m,f}_editpl.* (character-edit body: parts 0 FMOD, 1 FSKL, 2 tex
   bone 1 carries the root motion (Vertical 1 moves 88 cm forward). The skeleton's rest origin is the hips.
 - Euler order / sign: R = Rz Ry Rx, standard right-handed (checked on the weapon: arm bone 5's local +Z turned by
   its -40 deg rest rotation points along its 252 vertices).
-- Frame rate: the preview plays at 30 fps (Paxlord's choice). MHF timers count 30 per second (Magnetise 2400 =
-  80 s); whether motion frames advance 1 or 2 per tick (the per-layer speed at player +0x1e0 + 0x50 n) is still
-  open (S: 30).
+- Frame rate: **motion frames are 1/60 s** (S, strong; 2026-10-29). MHF timers count 30 per second (Magnetise 2400 =
+  80 s), so a game tick moves the motion two frames. Evidence:
+  - The drawn run loops cover 4.3 m per stride cycle of 41-49 frames (1430 / 1435, foot plants by forward
+    kinematics). That is 0.7-0.8 s per cycle at 60 fps, a running cadence; at 30 fps it would be 1.5 s with 2.2 m
+    steps, i.e. slow motion.
+  - The set-motion routine 0x10a92cd0 halves the step's blend (`blend / 2`) before storing it in a counter.
+
+  The preview plays at 60 fps (Paxlord's plugin used 30). For GU's 30 fps lists, MHF frames, event frames and cancel
+  windows divide by 2. To confirm with the first in-game walk.
 
 ## Skeletons (C)
 MHF player (FSKL, 21 bones) and MHGU player (bone ids 0-19 + root track 255 in GU's LMTs) are the same skeleton,
@@ -62,10 +68,12 @@ Shapes in the hand frame (wk400):
 Guard Counter (1034) lets the right hand go for the counter swing (29-34 cm off the weapon at frames 30-45, back by
 frame 60): MHF's animation, the keys keep the weapon in the left fist. Not read yet (Phase 2): the sheathed placement.
 
-## Weapon motions in MHGU (C)
-No MHGU weapon arc (w00-w14) and no player class arc holds weapon motions: the player LMTs animate the player bones
-only. Magnet Spike's horseshoe opens and closes in 163 MHF weapon motions, so the class will have to pose the weapon
-model's bones itself from the MHF weapon keys (Phase 2 design).
+## Weapon motions in MHGU (C, corrected 2026-10-29)
+The player LMTs animate the player bones only, and the model arcs (weapon\wNN\%03d) hold no motions. The weapon
+motions are separate arcs: arc/weapon/wNN/gMM.arc = weapon\wNN\mot\wgNN_MM (LMT), plus wgNN_sa_MM for Hunter Arts and
+L / R lists for two-part weapons. All 14 classes have them, and each model's rPlayerWeaponList record (mGmkMotNo)
+picks the set. The Magnet Spike's 163 MHF weapon motions therefore become one GU weapon list (wg05_00) instead of
+code that poses the bones (Phase 2).
 
 ## Preview (Phase 1 check)
 `blender -b --factory-startup -P tools/mhf2blend.py -- OUT.blend BODY.fmod BODY.fskl WKDIR w13.aan w13w.aan
