@@ -52,6 +52,10 @@ cmd_type / cmd_param = the input and its condition (meaning still to read from t
 - **Hit data** `pl_we14_hitdata` (HDP, u32 version 0x20160209, u32 count 80, then 56 B entries): i16 [2] = motion value
   (CB 14..42), repeated at [24]; [26] = 2 x MV (S: KO or exhaust).
 
+## Decisions (user, 2026-10-29, end of Phase 1)
+- Styles: **Guild only for now** (MHF's Magnet Spike has one moveset); other styles are not excluded for later.
+- Hunter Arts: **the 10 shared arts only** (`plcmd_com_sa0000..0009` in com_m.arc); no Magnet Spike arts.
+
 ## Porting consequence (Phase 2 design input)
 MHF drives Magnet Spike from data (step scripts, cancel windows, frame events, mhfsdt attacks); GU classes hard-code
 the same things in a per-action switch. The faithful and smallest route is a new class (slot 5) whose action function
