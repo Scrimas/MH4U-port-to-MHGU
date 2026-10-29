@@ -6,7 +6,7 @@ In the meantime, I will still be working on porting monsters and make releases. 
 If you are a contributor, I would accept PR, but understand that as it's going to be merged, there are some monsters that are already done and therefore working on them isn't useful.
 If you're interested into porting monsters, here is a (non-exhaustive) list of what monsters are actually useful to be ported:
 - Dah'ren Mohran (from MH4U) and Jhen Mohran (from MH3U)
-- Dire Miralis (from MH3U
+- Dire Miralis (from MH3U)
 
 
 --- 
@@ -15,7 +15,7 @@ Brings Monster Hunter 4 Ultimate monsters into Monster Hunter Generations Ultima
 
 **Monsters:** Gogmazios, Dalamadur, Shah Dalamadur, Tigerstripe Zamtrios, and Stygian Zinogre.
 
-Next up is... hum... I have no idea. Maybe Tidal Najarala.
+Next up is the Magnet Spike from MHFZZ (yeah it's not a monster)
 
 ## Install
 
