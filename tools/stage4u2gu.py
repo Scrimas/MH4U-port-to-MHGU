@@ -77,8 +77,9 @@ def read_mesh_4u(d, m, x):
     pos = np.frombuffer(v[:, 0:12].tobytes(), '<f4').reshape(-1, 3)
     nrm = v[:, 12:15].view(np.int8).astype(np.float64) / 127.0
     uv = np.frombuffer(v[:, 16:24].tobytes(), '<f4').reshape(-1, 2)
-    # 0x82917009 (24 B, 4U Heaven's Mount m05a02d -sky00 / -river): the 28-B layout without the colour -> white
-    col = v[:, 24:28].copy() if st >= 28 else np.full((len(v), 4), 255, np.uint8)
+    # 0x82917009 (24 B, 4U Heaven's Mount m05a02d -sky00 / -river): the 28-B layout without the colour -> neutral
+    # RGB 127 (= 1.0 in both games' vertex colour scale; 255 was 2.0), alpha 255
+    col = v[:, 24:28].copy() if st >= 28 else np.tile(np.uint8([127, 127, 127, 255]), (len(v), 1))
     return pos, nrm, uv, col
 
 
@@ -101,9 +102,31 @@ def hidden_4u(col):
     return not col[:, 3].any()
 
 
-def convert_models(sources):
+# 4U vertex colour floor (convert_models; 0 = off, set by the alias builds that opt in). 4U stage vertex RGB (127 =
+# 1.0 in both games) goes to 0 far more often than GU's (vertices with mean RGB < 16: 4U m05 7.7 %, m08 13.6 %, m19
+# 4.3 %; GU m18 1.1 %, m26 1.8 %), e.g. m05a02d mesh 24 (iseki02 pillars under the vine floor) is RGB 0 on every
+# vertex yet textured in 4U. S: 4U's vertex colour darkens the direct light only (baked shadow) and its hemisphere
+# ambient comes on top; GU's FDiffuseVertexColor multiplies all of it, so those surfaces went pure black (issue 7).
+# v' = v + f * (127 - v) for v < 127; f = 0.15 maps m05's per-vertex 5th percentile / median 11 / 56 to 28 / 67, GU's
+# own 26..33 / 64..66 (G: a calibration, not 4U's shader).
+VCOL_FLOOR = 0.0
+
+
+def alpha_tested_4u(mrl4):
+    """name hashes of a 4U MRL's alpha-tested solid materials (BSSolid + w7 alpha test: the XfBAW_1 cards).
+    GU's alpha-tested stage template cuts by texture alpha x VERTEX alpha (S: 77 of the 78 alpha-tested GU stage
+    meshes of m18 / m26 keep vertex alpha >= 128, opaque ones often go to 0), while 4U's vertex alpha on these cards
+    is not a cut-out: m05a02d-tuta's underside (mesh 2, 18 % of its vertices at alpha 0, in bands along the vine
+    trails) shows solid in 4U (user, issue 7) and had holes from below in GU. convert_models(solid_alpha=) -> 255."""
+    return {m['name'] for m in mrllib.read(mrl4)['mats']
+            if [s for s in m['states'] if s][0] == 'BSSolid' and m['words'][7] & mrl_build.W7_ALPHATEST}
+
+
+def convert_models(sources, drop_groups=(), solid_alpha=()):
     """sources: [(4U MOD bytes, material-name suffix)] -> (GU MOD bytes, [(new material name, src index, old name)]).
-    Several 4U models are merged into one GU model (meshes concatenated, materials renamed per source)."""
+    Several 4U models are merged into one GU model (meshes concatenated, materials renamed per source).
+    drop_groups: 4U mesh group ids left out (a group the 4U stage code always hides, e.g. m05a00d group 1);
+    solid_alpha: 4U material name hashes whose vertex alpha is written 255 (alpha_tested_4u)."""
     vb = bytearray(); ib = bytearray(); meshes = []; envs = []; mats = []; groups = None
     vcount = 0; icount = 0; edges = 0
     lo = np.full(3, np.inf); hi = np.full(3, -np.inf)
@@ -125,7 +148,11 @@ def convert_models(sources):
         eo = m['envelopes_off']
         for mi, x in enumerate(m['mesh_list']):
             pos, nrm, uv, col = read_mesh_4u(d, m, x)
-            if hidden_4u(col): continue
+            if hidden_4u(col) or x['group'] in drop_groups: continue
+            if mrllib.name_hash(m['material_names'][x['material']]) in solid_alpha: col[:, 3] = 255
+            if VCOL_FLOOR:
+                c = col[:, :3].astype(np.float64)
+                col[:, :3] = np.where(c < 127, np.round(c + VCOL_FLOOR * (127 - c)), c).astype(np.uint8)
             lo = np.minimum(lo, pos.min(0)); hi = np.maximum(hi, pos.max(0))
             vb += encode_mesh_gu(pos, nrm, uv, col).tobytes()
             idx = src_ib[x['indexStart']:x['indexStart'] + x['numIndices']].astype(np.int64)
@@ -177,7 +204,7 @@ def convert_models(sources):
     return out + b'\0' * 4, mats
 
 
-def check_model(dg, sources):
+def check_model(dg, sources, drop_groups=()):
     """decode our GU model and compare positions / normals / uvs / index topology with the 4U sources."""
     mg = modlib.parse(dg)
     worst = dict(pos=0.0, nrm=0.0, uv=0.0); k = 0
@@ -187,7 +214,7 @@ def check_model(dg, sources):
         ib4 = np.frombuffer(m['ib'], '<u2')
         for x in m['mesh_list']:
             pos, nrm, uv, col = read_mesh_4u(d, m, x)
-            if hidden_4u(col): continue
+            if hidden_4u(col) or x['group'] in drop_groups: continue
             xg = mg['mesh_list'][k]; k += 1
             b = mg['offsets']['vb'] + xg['vertexStart'] * GU_STRIDE
             v = np.frombuffer(dg[b:b + xg['numVertices'] * GU_STRIDE], np.uint8).reshape(-1, GU_STRIDE)
@@ -285,8 +312,11 @@ def build_mrl(mats, mrl4_by_src):
         st = [s for s in m4['states'] if s]
         w4 = m4['words']
         # 4U lit flag = w6 bit 31: clear only on the 14 sky / cloud / distant forest / effect-card materials of m19
-        # (every opaque 4U stage material lists tLutShininess, sky included; GU's sky is FConstantColor = unlit)
-        lit = bool(w4[6] >> 31)
+        # (every opaque 4U stage material lists tLutShininess, sky included; GU's sky is FConstantColor = unlit).
+        # w7 top byte 0x82 = 4U's sky-layer pass (m05 / m08 / m19: only sky domes, distant views, distant forests;
+        # all unlit but m05a02d-sky00's tree00 mist-forest cards, a ring ~40 km out): unlit too, as GU's sky (S; lit,
+        # they came out as pale flat slabs, issue 7)
+        lit = bool(w4[6] >> 31) and w4[7] >> 24 != 0x82
         at = st[0] == 'BSSolid' and bool(w4[7] & mrl_build.W7_ALPHATEST)
         albedo = [p[2] for p in m4['params'] if p[0] == 'tAlbedoMap']
         tpath = r4['textures'][albedo[0] - 1][1] if albedo and albedo[0] else None
@@ -450,6 +480,45 @@ FILTER_MAP = [  # (GU object names, 4U object name, tracks)
 ]
 
 
+# STAGE_LIGHTS (alias builds opt in; 0 = Battlequarters' rule above): GU's AmbientLight carries 4U's hemisphere light.
+# GU skips a light unless light.mGroup & model mask and the light's Draw bit (C: collector 0xbd0f44 / 0xbd0f6c, unit
+# +0x30 bit 1). Both games give s2-InfiniteLight mGroup 4 and base01 / EM0x mGroup 1 (C, every m05 / m08 / m24
+# filter). The stage terrain takes both: Speartip's terrain was lit with s2 and AmbientLight off (test 2026-10-21, so
+# EM01 = 4U base01 reaches it), and putting base01 on s2 as well made both maps far too bright (issue 7, test
+# 2026-10-29: the sun counted twice, so not done). FILTER_MAP's s2 -> s2 stands (off where 4U has none). 4U's ambient
+# comes from base01-HemiSphereLight. GU's stage shader takes its ambient from AmbientLight only: with that light off,
+# shadowed parts were pure black (S). AmbientLight mColor = AMBIENT_SCALE x the hemisphere average (Color +
+# RevColor) / 2. AmbientLight scales the system DefaultCube_CM SH, DC 1.91 / 2.00 / 2.09 (C, the coefficients in the
+# .tex header); that the shader uses the DC unscaled is G. AMBIENT_SCALE 0.75, not 0.5: every 4U m05 area also lights
+# the terrain with a CameraLight (class uCameraLight, mGroup 0xF001, colour 1.0, balance -0.8: C), and GU has no such
+# class (C, DTI table), so its fill goes into the ambient (G). With 0.5, shadows went black whenever the camera faced
+# away from 4U's sun (MhFilter haze 16 % instead of 50 %, uMhFilter 0x697478: Front / Back by camera vs mSunPos
+# heading, C; issue 7 test 2026-10-29).
+# Fog: 4U ColorFog type 1 has no curve (linear, S); GU's carries mCurve, 8 x knots then 8 y knots, and the host's is an
+# ease-out (y 0.38 at x 0.18: C) that put far more cyan on the middle distance than 4U. Type-1 areas get y = x;
+# 4U type 2 (exponential, mExponentDensity) keeps the host curve (its formula is not traced: G).
+STAGE_LIGHTS = False
+AMBIENT_SCALE = 0.75
+
+
+def stage_lights(g, go, u, uo, done):
+    import sdl
+    if 'AmbientLight' in go and 'base01-HemiSphereLight' in uo:
+        ut = uo['base01-HemiSphereLight'][1]
+        c, r = ut['mColor'], ut['mRevColor']
+        cv, rv = sdl.values(u, c), sdl.values(u, r)
+        if c['times'] != r['times']: cv, rv, c = cv[:1], rv[:1], dict(c, times=c['times'][:1])
+        t = go['AmbientLight'][1]['mColor']
+        sdl.set_values(g, t, [tuple(AMBIENT_SCALE * (a + b) / 2 for a, b in zip(x[:3], y[:3])) for x, y in zip(cv, rv)],
+                       times=c['times'])
+        done.append('AmbientLight.mColor <- %.2f x base01 hemi average' % AMBIENT_SCALE)
+    if 'ColorFog' in go and 'ColorFog' in uo and 'mCurve' in go['ColorFog'][1] and \
+            set(sdl.values(u, uo['ColorFog'][1]['mDistanceType'])) == {1}:
+        t = go['ColorFog'][1]['mCurve']
+        sdl.set_values(g, t, [b[:32] + b[:32] + b[64:] for b in sdl.values(g, t)], times=t['times'])
+        done.append('ColorFog.mCurve linear')
+
+
 def port_filter(gu, u4d):
     import sdl
     g = sdl.parse(gu); u = sdl.parse(u4d)
@@ -468,6 +537,7 @@ def port_filter(gu, u4d):
     if 'MhFilter' in uo and sdl.values(u, uo['MhFilter'][1]['Draw']) == [0] and 'MhFilter_top' in go:
         t = go['MhFilter_top'][1]['Draw']                     # 4U draws no gradient filter at all here
         sdl.set_values(g, t, [0] * len(t['times'])); done.append('MhFilter_top.Draw=0')
+    if STAGE_LIGHTS: stage_lights(g, go, u, uo, done)
     return sdl.build(g), done
 
 
@@ -496,12 +566,14 @@ def u4_find(path, typ):
     return open(_U4IDX[(path, '%08x' % typ)], 'rb').read()
 
 
-def convert_prop(path4):
-    """one static 4U model -> (GU MOD, GU MRL, [4U texture paths], material report rows)."""
+def convert_prop(path4, solid_alpha=False):
+    """one static 4U model -> (GU MOD, GU MRL, [4U texture paths], material report rows); solid_alpha: the
+    alpha-tested materials' vertex alpha -> 255 (alpha_tested_4u)."""
     d = u4_find(path4, T_MOD)
-    gmod, mats = convert_models([(d, '')])
+    mrl4 = u4_find(path4, T_MRL)
+    gmod, mats = convert_models([(d, '')], solid_alpha=alpha_tested_4u(mrl4) if solid_alpha else ())
     check_model(gmod, [d])
-    gmrl, texs, rows = build_mrl(mats, {0: u4_find(path4, T_MRL)})
+    gmrl, texs, rows = build_mrl(mats, {0: mrl4})
     return gmod, gmrl, texs, rows
 
 

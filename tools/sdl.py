@@ -106,14 +106,17 @@ def values(s, e):
 
 
 def set_values(s, e, vals, times=None):
-    """replace a track's keys (vec4 / f32 / int tracks)."""
+    """replace a track's keys (vec4 / f32 / int / 64-B curve tracks)."""
     ver, k = s['ver'], e['kind']
     if times is not None: e['times'] = list(times)
     nk = len(e['times']); assert len(vals) == nk, (len(vals), nk)
     if k == VEC_KIND[ver]: e['values'] = b''.join(struct.pack('<4f', *(tuple(x) + (0.0,) * (4 - len(x)))) for x in vals)
     elif k == F32_KIND[ver]: e['values'] = struct.pack('<%df' % nk, *vals)
     elif k == BOOL_KIND[ver]: e['values'] = bytes(vals)
-    else: e['values'] = struct.pack('<%dI' % nk, *vals)
+    elif VSIZE[ver][k] == 4: e['values'] = struct.pack('<%dI' % nk, *vals)
+    else:
+        assert all(len(x) == 64 for x in vals), 'curve keys are 64 B'
+        e['values'] = b''.join(vals)
 
 
 def objects(s):

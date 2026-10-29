@@ -75,6 +75,64 @@ game rule, 1 x 1 grid, first BVH kept, G).
   element cloned). G: GU's area 2 keeps its own Weather-* keys (4U area 2 has no -f01) over 4U's static values.
 - DEVIATION: the -col / -e0N Effect schedulers (incl. a08's effect models qe000_001 / ef_m05a08) not ported (GU lacks
   the Effect controller); 4U grass (Grass2 in -f01) absent.
+- Issue 7 (GitHub, 2026-10-29), three fixes:
+  - Camp boulder blocking the exit (C): m05a00d has mesh groups 1 / 2 (model group table: 3 entries; the only m05
+    model with more than one) and w00 parts 1 / 2 at the same places. 4U's stage-5 area loader 0x656598 ends with
+    `if area == 0: 0x6c2f34(stage, 0, 1, 0)` on every camp load (no quest / story test): group 1 hidden, part 1 off,
+    part 2 on (0x6c2f34 sets model group bit n and part n to `on`, part n + 1 to !on). Group 1 = the boulder on the
+    path to the area-1 exit. Its 4 meshes are left out (build_heavens_mount.py HIDDEN_GROUPS, stage4u2gu
+    convert_models drop_groups) and part 1 is dropped from the camp collision (HIDDEN_PARTS, sbc.drop_parts).
+  - Holes in area 2's vine floor seen from below (S): the vine prop m05a02d-tuta (in the -sky set) has an up-facing
+    layer (mesh 1, vertex alpha 255) and a down-facing underside (mesh 2, 18 % of its vertices at alpha 0, in bands
+    along the trails). GU's alpha-tested template cuts by texture x vertex alpha (77 of 78 GU alpha-tested stage
+    meshes keep vertex alpha >= 128); 4U shows the underside solid (user). Alpha-tested materials (stage4u2gu
+    alpha_tested_4u) get vertex alpha 255 in every m05 model (main models, props, kobjs): m05a00d's vine cards, a03's
+    XfBAW_1__m00_4 / _61 are the other meshes affected. Not applied to Speartip (m08a00d has 6 such cards: not
+    reported, its output left unchanged).
+  - Shadowed surfaces pure black (here and Speartip): GU's AmbientLight (mGroup 5, mMode 3, system DefaultCube_CM,
+    no host-terrain data) was switched off with the GU-only lights; it is GU's ambient term. Left on (GU_ONLY_OFF).
+  - Follow-up test (user, same day): the vines OK; some surfaces still pure black (area 2's pillars under the vine
+    floor, canopy), and area 2's distant forest cards (main-model meshes 26 / 27, tree01 / tree02: an opaque forest
+    wall, alpha only above the crowns) showed as pale slabs.
+    - Black: m05a02d mesh 24 (iseki02) has vertex RGB 0 on every vertex, mesh 15 nearly so. 4U vertex RGB reaches 0
+      far more often than GU's (stage4u2gu VCOL_FLOOR comment: < 16 on 7.7 % of m05 / 13.6 % of m08 vertices vs
+      1.1..1.8 % in GU m18 / m26), S: 4U's vertex colour darkens the direct light only and its hemisphere ambient
+      comes on top, GU's FDiffuseVertexColor multiplies everything. Both alias builds set VCOL_FLOOR = 0.15
+      (v' = v + 0.15 (127 - v); G: calibrated on GU's own percentiles, not on 4U's shader).
+    - Slabs: GU's MhFilter (pale grey gradient, lens flare) stayed on in areas 2 and 7, whose 4U filters have no
+      MhFilter (the other areas' do). Now in GU_ONLY_OFF: off only where 4U lacks it. Did NOT fix the slabs.
+  - Second follow-up (user): camp still not leavable ("path ends, no exit"), slabs still there, lighting dim with some
+    parts too bright (area 3 floor).
+    - Camp exit (S): the boulder and its collision are gone and a flood fill over the collision reaches the exit
+      zone (4400, 0, 1500) r 3000 (13 floor triangles inside, |dy| <= h/2). The exit record's +00 field is 1.0, the
+      only nonzero one among 4U m05 / m08 / m19's 38 exits; GU's 14 exits with 1.0 all sit on climbable walls
+      (floor groups w0 0x7d / 0x5d, w2 0x10), so GU takes them while climbing. build_heavens_mount.py
+      exits_walkable writes it 0 (walking exit). The 0 -> 7 change in the 2026-10-29 08:38 log was not a camp exit.
+    - Slabs (S): they are m05a02d-sky00 meshes 2..4, the tree00 mist-forest cards (pale grey -> white texture,
+      crown silhouettes; a ring of 6000..19000-unit quads ~40 km out). Their 4U material is in pass 0x82 (w7 top
+      byte) = 4U's sky layer (only sky domes, distant views, distant forests use it; all unlit but this one). They
+      were converted lit (sun + stage shading); now unlit like the rest of the sky layer (stage4u2gu build_mrl).
+      GU's sampler (SSAlbedoMap, wrap) and the texture conversion were checked and are fine.
+    - Lighting (see stage4u2gu STAGE_LIGHTS): GU skips a light unless its mGroup shares a bit with the model's mask
+      and its Draw bit is set (C). 4U and GU both use s2 = group 4 and base01 / EM0x = group 1. The terrain takes
+      both groups (S: lit on Speartip with s2 and AmbientLight off). First attempt: base01 -> s2 as well (test
+      2026-10-29: "too bright everywhere", the sun counted twice). Reverted. Now: s2 = 4U s2, off where 4U has
+      none (areas 3, 5, 6). AmbientLight mColor = 0.75 x the 4U base01 hemisphere average (DefaultCube_CM SH DC
+      1.91 / 2.00 / 2.09, C; unscaled use G). Meshes without vertex colour (0x82917009) get RGB 127 (was 255).
+      VCOL_FLOOR 0.15 stays.
+    - Black shadows by camera direction (test 2026-10-29, both maps, whole screen): 4U's MhFilter is a top-of-screen
+      haze (bottom colour alpha 0, blend 0 on every m05 / m08 / m19 MhFilter = GU's MhFilter_top use of 0: S) whose
+      strength follows the camera heading vs mSunPos (uMhFilter 0x697478, Front / Back: C); area 3 50 % facing the
+      sun, 16 % away. The user remembers 4U doing the same (kept). Facing away, the haze no longer lifts the shadows,
+      which were too dark: every 4U m05 area also has a CameraLight (uCameraLight, mGroup 0xF001, 1.0, balance -0.8:
+      C) that GU has no class for (C), so AMBIENT_SCALE 0.5 -> 0.75 stands in for it (G).
+    - Fog curve: GU ColorFog mCurve = 8 x then 8 y knots; the host's ease-out (y 0.38 at x 0.18) fogged the middle
+      distance far more than 4U's linear type 1. Areas 2 and 3 now y = x (area 7, also type 1, has no GU curve).
+    - Cyan / glare (test 2026-10-29): MhFilter kept GU's mBreandState 15 under 4U's alpha-0.5 cyan colours (areas 0,
+      2..4); it now takes every 4U MhFilter track (4U: 0, a GU value too). Bloom mThrethold stays GU's (0.9 on every
+      GU stage sampled; 4U's 0.5 was copied before). Open (G): 4U fog type 2 (exponential, mExponentDensity) in
+      areas 0, 1, 4..6, 8 runs as GU's own type (1 / 4, mCurve) with 4U's start / end / density: GU's ColorFog object
+      has no mExponentDensity track to carry it.
 - Area 3: 4U mesh XfBAW_1__m00_52 (31 vertices, unlit rock00 over a 6700 x 2900 x 6300 span, vertex alpha 0
   everywhere) is dropped (stage4u2gu hidden_4u; S: 4U draws nothing with alpha 0, GU's template ignores it and drew a
   flat fogged sheet, test 2026-10-28). The only such mesh of 1836 in m05 / m08 / m19 (C).

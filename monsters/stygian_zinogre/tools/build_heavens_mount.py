@@ -99,16 +99,35 @@ for _a in range(N4):
 KOBJ = {'stage\\%sd\\%sa06d\\sdl\\%sa06d-k%02d' % (G, G, G, k): ('stage\\m05d\\m05a06d\\sdl\\m05a06d-k%02d' % k, k, 6)
         for k in (1, 2, 3, 4)}
 KOBJ['stage\\%sd\\%sa08d\\sdl\\%sa08d-k01' % (G, G, G)] = ('stage\\m05d\\m05a08d\\sdl\\m05a08d-k00', 8, 8)
+# The camp model m05a00d carries two alternative mesh groups with matching wall-collision parts: group / w00 part 1 =
+# a boulder on the path to the exit (rock01 x 839..2464, z 456..1704; SIS exit to area 1 at (4400, 1500)), group /
+# part 2 = a rock, cloth and cards at the back (x -2733..-1180, z -2576..-984). 4U's stage-5 area loader 0x656598
+# (its set list 0xecca14: m05a00d-a01..a03, so the m05 class, C) ends with `if area == 0: 0x6c2f34(stage, 0, 1, 0)`
+# on every camp load, no other condition: 0x6c2f34(stage, area, n, on) sets model group bit n (stage+0x64 ..+0x108)
+# and collision part n to `on`, part n + 1 to !on -> group 1 hidden, part 1 off, part 2 on (C). Both were left on
+# (issue 7: camp exit blocked). Group 1's meshes are left out, part 1 dropped from the camp collision (sbc.drop_parts).
+HIDDEN_GROUPS = {0: {1}}                             # 4U area -> mesh groups the 4U code always hides
+HIDDEN_PARTS = {0: {1}}                              # 4U area -> collision part ids it always switches off
 ITEM_POPS = {('stage\\%sd\\%sd' % (G, G), T_IPS): 'stage\\m05d\\m05d',
              ('stage\\%sd\\%sd_low' % (G, G), T_IPL): 'stage\\m05d\\m05d',
              ('stage\\%sd\\%sd_high' % (G, G), T_IPL): 'stage\\m05d\\m05d_high',
              ('stage\\%sd\\%sd_g' % (G, G), T_IPL): 'stage\\m05d\\m05d_g'}
 # Speartip's lighting rule (memory "stage lighting"): after port_filter, GU-only light objects that 4U's filter lacks
 # are switched off (Draw 0), the screen filters both games have take every 4U track; EM02-InfiniteLight stays on;
-# PL01..03 / StableShadow / StageDataSet stay GU's
-GU_ONLY_OFF = ('DEF02-InfiniteLight', 's2-InfiniteLight', 'GodRaysFilter', 'AmbientLight',
-               'MhFilter_top', 'MhFilter_bottom')
-SAME_FILTERS = ('BloomFilter', 'ColorCorrectFilter')
+# PL01..03 / StableShadow / StageDataSet stay GU's. AmbientLight stays ON (issue 7: with it off every surface out of
+# direct light was pure black, here and on Speartip Crag): it is GU's ambient term (mGroup 5, mMode 3, the system
+# DefaultCube_CM env cube, no host-terrain data), not an extra light; 4U's ambient comes from its hemisphere light
+# MhFilter (GU's main height / distance gradient, pale grey, lens flare on) is off where 4U's filter has none (areas 2
+# and 7; issue 7: it washed area 2's distant forest cards into pale slabs). Where 4U has one, it takes every 4U
+# track (SAME_FILTERS), its blend state too: 4U m05 uses mBreandState 0 (a GU value: 6 GU MhFilter + 65 MhFilter_top
+# filters), GU's 15 under 4U's alpha-0.5 cyan colours tinted areas 0 / 2..4 (issue 7, test 2026-10-29: "too much cyan")
+# s2-InfiniteLight carries 4U's s2 (port_filter) and is off where 4U has none (areas 3, 5, 6): stage4u2gu STAGE_LIGHTS
+# Bloom mThrethold stays GU's (0.9 on every GU stage sampled; 4U's 0.5 in GU's renderer blew the floors out white,
+# issue 7, G)
+GU_ONLY_OFF = ('DEF02-InfiniteLight', 's2-InfiniteLight', 'GodRaysFilter', 'MhFilter_top', 'MhFilter_bottom',
+               'MhFilter')
+SAME_FILTERS = ('BloomFilter', 'ColorCorrectFilter', 'MhFilter')
+GU_TRACKS = ('mThrethold',)
 
 
 def gu_file(rel):
@@ -169,7 +188,7 @@ def filter_4u_only(gd, u4d):
         (gc, gt), (uc, ut) = go[n], uo[n]
         assert gc == uc, (n, hex(gc), hex(uc))
         for k, e in ut.items():
-            if k in gt and gt[k]['kind'] == sdl.KIND_4U_TO_GU[e['kind']]:
+            if k in gt and k not in GU_TRACKS and gt[k]['kind'] == sdl.KIND_4U_TO_GU[e['kind']]:
                 sdl.set_values(g, gt[k], sdl.values(u, e), times=e['times'])
                 done.append('%s.%s' % (n, k))
     return sdl.build(g), done
@@ -277,7 +296,7 @@ def props_of(ns, rep):
         if '\\collision\\' in p and u4_has(p, T_SBC):
             cols.append((p, T_SBC, sbc.convert_4u(u4(p, T_SBC))))
         elif u4_has(p, T_MOD):
-            pm, pr, pt, prow = s4.convert_prop(p)
+            pm, pr, pt, prow = s4.convert_prop(p, solid_alpha=True)
             models.append((p, pr, pm, pt))
         else:
             rep.setdefault('unresolved_resources', []).append(p)
@@ -296,10 +315,11 @@ def build_area(k, rep):
     ver, ents = arcpack.read(gu_file('arc/stage/%sd/a%02d.arc' % (G, k)))
     main4, sets4 = AREAS[k]
     gmain = 'stage\\%sd\\%s\\%s' % (G, g, g)
-    d4 = u4(main4, T_MOD)
-    gmod, mats = s4.convert_models([(d4, '')])
-    s4.check_model(gmod, [d4])
-    gmrl, texs, rows = s4.build_mrl(mats, {0: u4(main4, T_MRL)})
+    d4, mrl4 = u4(main4, T_MOD), u4(main4, T_MRL)
+    hide = HIDDEN_GROUPS.get(k, set())
+    gmod, mats = s4.convert_models([(d4, '')], drop_groups=hide, solid_alpha=s4.alpha_tested_4u(mrl4))
+    s4.check_model(gmod, [d4], drop_groups=hide)
+    gmrl, texs, rows = s4.build_mrl(mats, {0: mrl4})
     models = [(gmain, gmrl, gmod, texs)]
     r = rep['a%02d' % k] = dict(model=gmain, source=main4, meshes=len(mats), materials=len(rows))
     drop = {gmain}
@@ -387,6 +407,21 @@ def collision_4u(area, kind):
         if u4_has(p, T_SBC):
             return kk, u4(p, T_SBC)
     raise SystemExit('4U collision %s %s missing' % (area, kind))
+
+
+# SIS exit record +00 (u32 / f32 "type"): 0 on every 4U m05 exit but the camp's (m05a00d -> 1: 1.0, the only nonzero
+# value in the 38 exits of 4U m05 / m08 / m19, C). GU uses 1.0 on 14 of 478 exits (m01a08d / a09d, m12a01d / a08d,
+# m13a03d, m11a09d, m06a10d), each one on a climbable wall (floor groups w0 0x7d / 0x5d, w2 0x10 inside the zone, C):
+# S, GU = an exit taken while climbing. The camp has no climbable surface near its zone (4400, 0, 1500) r 3000 and the
+# hunter walked into it without a transition (issue 7, user 2026-10-29), so a 1.0 exit is written as a walking exit
+# (0). What 4U's 1.0 means is not traced (G).
+def exits_walkable(d):
+    import sis
+    s = sis.parse(d); n = 0
+    for r in s['sec'][1]:
+        if struct.unpack_from('<f', r, 0)[0] == 1.0:
+            struct.pack_into('<f', r, 0, 0.0); n += 1
+    return sis.write(s), '; %d climb-type exit(s) -> walking' % n if n else ''
 
 
 def wholemap_4u():
@@ -513,14 +548,14 @@ def build_map_com(rep):
         if t == T_SBC and m:
             a4 = 'm05a%sd' % m.group(1)
             src, d4 = collision_4u(a4, m.group(2))
-            d = sbc.convert_4u(d4)
+            d = sbc.drop_parts(sbc.convert_4u(d4), HIDDEN_PARTS.get(int(m.group(1)), set()))
             s = sbc.parse(d)
             if m.group(2) == 'g00': g00[int(m.group(1))] = d
             rows.append((p, a4 + '-a-' + src, len(s['parts']), s['nA'], s['nB'], s['nC']))
         elif t == T_SIS and re.match(r'%sa(%s)d-info$' % (G, area_rx), name):
             a = name[4:6]
-            d = u4('stage\\m05d\\m05a%sd\\m05a%sd-info' % (a, a), T_SIS)
-            rows.append((p, 'm05a%sd-info (verbatim: same area numbers)' % a))
+            d, walk = exits_walkable(u4('stage\\m05d\\m05a%sd\\m05a%sd-info' % (a, a), T_SIS))
+            rows.append((p, 'm05a%sd-info (verbatim: same area numbers%s)' % (a, walk)))
         elif (p, t) in ITEM_POPS:
             d = u4(ITEM_POPS[(p, t)], t)
             rows.append((p, ITEM_POPS[(p, t)] + ' (4U item pops)'))
@@ -646,6 +681,8 @@ def main():
     a = ap.parse_args()
     unpack_4u()
     s4.set_source(U4, 'm05')
+    s4.VCOL_FLOOR = 0.15                             # issue 7: surfaces with 4U vertex RGB 0 were pure black
+    s4.STAGE_LIGHTS = True                           # issue 7: 4U's hemisphere light -> GU AmbientLight
     rep = {}
     sdir = os.path.join(a.out, 'nativeNX', 'arc', 'stage', 'm%02dd' % FOLDER)
     os.makedirs(sdir, exist_ok=True)

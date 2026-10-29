@@ -254,6 +254,41 @@ def convert_4u(d, rebuild=True):
     return out
 
 
+def drop_parts(d, ids):
+    """GU SBC bytes without the parts whose id is in ids (a part the 4U stage code always switches off, e.g.
+    m05a00d-a-w00 part 1). Indices inside a part are local, so the kept parts' polygons / triangles / vertices /
+    AABBs / grids move as blocks; BVH leaves are renumbered and the dropped parts' leaf slots emptied (their boxes
+    stay: an empty slot is never visited). Attribute groups and the header bbox are kept."""
+    s = parse(d)
+    assert s['ver'] == 'gu'
+    keep = [i for i, p in enumerate(s['parts']) if p['id'] not in ids]
+    if len(keep) == len(s['parts']): return d
+    new = {i: k for k, i in enumerate(keep)}
+    blocks = dict(polys=[], tris=[], verts=[], aabb=[])
+    size = dict(polys=10, tris=32, verts=16, aabb=28)
+    parts, n = [], [0, 0, 0]
+    for i in keep:
+        p = s['parts'][i]
+        pr = p['pairs']
+        for key, (st, cnt) in (('polys', pr[0:2]), ('aabb', pr[0:2]), ('tris', pr[2:4]), ('verts', pr[4:6])):
+            blocks[key].append(s[key][size[key] * st:size[key] * (st + cnt)])
+        parts.append(dict(p, pairs=(n[0], pr[1], n[1], pr[3], n[2], pr[5])))
+        n = [n[0] + pr[1], n[1] + pr[3], n[2] + pr[5]]
+    raw = bytearray(s['bvh']['raw'])
+    for o in range(64, len(raw), 112):
+        mask = raw[o]
+        for slot in range(4):
+            if mask >> (4 + slot) & 1:
+                i = struct.unpack_from('<H', raw, o + 4 + 2 * slot)[0]
+                if i in new: struct.pack_into('<H', raw, o + 4 + 2 * slot, new[i])
+                else: mask &= ~(1 << (4 + slot))
+        raw[o:o + 4] = bytes([mask]) * 4
+    s = dict(s, parts=parts, grids=[s['grids'][i] for i in keep], bvh=dict(s['bvh'], raw=bytes(raw)),
+             nA=n[0], nB=n[1], nC=n[2], **{k: b''.join(v) for k, v in blocks.items()})
+    assert build_aabbs(s) == s['aabb']
+    return write_gu(s)
+
+
 # ------------------------------------------------------------------ CLI
 
 def info(s):

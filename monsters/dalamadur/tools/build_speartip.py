@@ -112,15 +112,21 @@ def u4(path, typ):
 # Speartip's lighting is 4U's alone (test 2026-10-21, user: the arena is far brighter than in 4U): after port_filter
 # (the lights / fog both games have take 4U's values), the host's objects that 4U's filter lacks are switched off
 # (Draw 0: its second infinite light, an always-on s2 light (4U's lightning flash is the a00 set's), god rays, the
-# ambient light, the top / bottom gradient layers) and the screen filters both have take every 4U track (bloom,
-# colour correction). Kept GU's: the player lights PL01..03 (4U lights hunters with camera lights of another class),
-# StableShadow, StageDataSet.
+# top / bottom gradient layers) and the screen filters both have take every 4U track (bloom, colour correction).
+# Kept GU's: the player lights PL01..03 (4U lights hunters with camera lights of another class), StableShadow,
+# StageDataSet.
 # EM02-InfiniteLight (GU's second monster light, no 4U counterpart) stays ON: with it off the monster's skin showed
 # a cell pattern all over (tests 2026-10-21, from the filter's first build on); back on = skin right, and the user
 # prefers the arena this way (test 2026-10-21 evening)
-GU_ONLY_OFF = ('DEF02-InfiniteLight', 's2-InfiniteLight', 'GodRaysFilter', 'AmbientLight',
-               'MhFilter_top', 'MhFilter_bottom')
-SAME_FILTERS = ('BloomFilter', 'ColorCorrectFilter')
+# AmbientLight stays ON (issue 7: with it off every surface out of direct light was pure black, here and on Heaven's
+# Mount): it is GU's ambient term (mGroup 5, mMode 3, the system DefaultCube_CM env cube, no host-terrain data), not
+# an extra light; 4U's ambient comes from its hemisphere light
+# MhFilter (GU's main gradient) is off where 4U's filter has none and takes every 4U track (blend state included)
+# where it has one; bloom mThrethold stays GU's; s2 off (4U m08 has none): as on Heaven's Mount (build_heavens_mount)
+GU_ONLY_OFF = ('DEF02-InfiniteLight', 's2-InfiniteLight', 'GodRaysFilter', 'MhFilter_top', 'MhFilter_bottom',
+               'MhFilter')
+SAME_FILTERS = ('BloomFilter', 'ColorCorrectFilter', 'MhFilter')
+GU_TRACKS = ('mThrethold',)
 
 
 def filter_4u_only(gd, u4d):
@@ -138,7 +144,7 @@ def filter_4u_only(gd, u4d):
         (gc, gt), (uc, ut) = go[n], uo[n]
         assert gc == uc, (n, hex(gc), hex(uc))
         for k, e in ut.items():
-            if k in gt and gt[k]['kind'] == sdl.KIND_4U_TO_GU[e['kind']]:
+            if k in gt and k not in GU_TRACKS and gt[k]['kind'] == sdl.KIND_4U_TO_GU[e['kind']]:
                 sdl.set_values(g, gt[k], sdl.values(u, e), times=e['times'])
                 done.append('%s.%s' % (n, k))
     return sdl.build(g), done
@@ -380,6 +386,8 @@ def main():
     a = ap.parse_args()
     unpack_4u()
     s4.set_source(U4, 'm08')
+    s4.VCOL_FLOOR = 0.15                             # issue 7: surfaces with 4U vertex RGB 0 were pure black
+    s4.STAGE_LIGHTS = True                           # issue 7: 4U's hemisphere light -> GU AmbientLight
     rep = {}
     sdir = os.path.join(a.out, 'nativeNX', 'arc', 'stage', 'm%02dd' % FOLDER)
     os.makedirs(sdir, exist_ok=True)
