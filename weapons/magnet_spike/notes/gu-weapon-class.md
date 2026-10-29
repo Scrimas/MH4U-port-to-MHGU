@@ -61,3 +61,6 @@ MHF drives Magnet Spike from data (step scripts, cancel windows, frame events, m
 the same things in a per-action switch. The faithful and smallest route is a new class (slot 5) whose action function
 is a small interpreter of the MHF action records (converted 1:1: steps -> motion descriptors, cancels -> plcmd + frame
 windows, events -> attack / effect / state calls), with MHF's motion values in a generated HDP.
+The weapon model needs the class's own placement too: its bones posed from the MHF weapon motions (GU has none) and
+its root on the holding hand, GU bone 8 or 12 (MHF 14 / 18), switched per frame from `tools/msgrip.py`'s table
+(assets.md, "Weapon grip").
