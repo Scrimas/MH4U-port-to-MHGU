@@ -58,6 +58,46 @@ static uint32_t s_log;
 #define REQ_FIELDS     0x14
 #define REQ_ROT        0x30
 #define REQ_SCALE      0x40
+#define REQ_GROUND     0x6c     /* u32 ground flags = body field 19 (req+0x14 bit 19; GU's own post helper 0x179d3c) */
+
+/* Ground sets (C, ISSUE_6.md; monsters/stygian_zinogre/notes/b5-shells.md 8b): an EFL holds one element set per
+ * ground (element word 4: soil 0x22, 0x54 / 0x14, lava 0x8; here only the qe006 dust files have them) and the effect
+ * keeps the elements whose word meets (2 << kind) | 1 (4U 0xc07440 / 0xafc574). 4U takes the kind from the
+ * monster's ground record W+0x5f0 (attribute word +8; 0xc09908's enemy branch, the bit tests of 0xc094e8) for its
+ * motion posts (0x391b50 -> 0xc09908) and 0x954e5c; Battlequarters' floor is kind 0 everywhere (soil only). GU's PEL
+ * records and requests default to -1 = every set at once: the white "snow debris" of issue #6 (the 0x54 set). A
+ * request overrides it with req+0x14 bit 19 + req+0x6c. GU's twin of W+0x5f0 is not identified: the attribute word
+ * comes from the Stygian slam ray (0x183ad0, mask 64) down through the ground under the monster (rec+0x5b4) (S). */
+typedef float (*ground_ray_t)(void *mgr, const float *from, const float *to, uint32_t area, uint8_t *hit, void *out,
+                              uint32_t mask);
+#define groundRay    FN(ground_ray_t, 0x183ad0)  /* [0x2bad24] */
+#define COLL_MGR     (*(void **)MAIN(0x21270e0)) /* its manager [*0x10574fc] */
+#define REC_GROUND_Y 0x5b4
+
+static uint32_t ground_flags(void *self)
+{
+    static uint32_t s_key, s_n;
+    uint8_t *rec = FIELD(uint8_t *, self, EN_RECORD);
+    uint32_t out[16] = {0}, w = 0, kind;
+    uint8_t hit = 0;
+    float gy = FIELD(float, rec, REC_GROUND_Y);
+    float from[4] = {FIELD(float, rec, REC_POS_X), gy + 100.0f, FIELD(float, rec, REC_POS_Z), 0.0f};
+    float to[4] = {from[0], gy - 300.0f, from[2], 0.0f};
+    void *mgr = COLL_MGR;
+    if (mgr) groundRay(mgr, from, to, FIELD(uint8_t, self, 0x1054), &hit, out, 64);
+    if (hit) w = out[2];
+    if (w & 0x800000) kind = 5;
+    else if (w & 0x200) kind = 3;
+    else if (w & 6) kind = 1;
+    else if (w & 0x1040) kind = 2;
+    else kind = (w & 8) ? 4 : 0;
+    if ((w ^ (uint32_t)!hit << 31) != s_key && ++s_n <= 20) {
+        s_key = w ^ (uint32_t)!hit << 31;
+        logf("gogport: em089 efx ground %s word %x -> kind %u at %d %d %d", hit ? "hit" : "none (kind 0)", w, kind,
+             (int32_t)from[0], (int32_t)gy, (int32_t)from[2]);
+    }
+    return (2u << kind) | 1u;
+}
 
 static void *post_full(void *self, uint32_t id, const float *pos, void *unit, const float *rot, const float *scale,
                        uint32_t req8)
@@ -65,6 +105,11 @@ static void *post_full(void *self, uint32_t id, const float *pos, void *unit, co
     uint32_t buf[REQ_SIZE / 4 + 4];
     void *req = (void *)(((uint32_t)buf + 15u) & ~15u);
     efx_req_ctor(req);
+    /* the ground set: 4U's code-post requests default to kind 0 (flags 3); 0x954e5c (3100, qe006_000, the only
+     * code-posted file with sets: no em089 / qe008 / qe016 / m19a03 EFL has them) takes the monster's. The ray stays
+     * off the other posts: they come from deep shell paths (the 5101 tar splash, shell impact) */
+    FIELD(uint32_t, req, REQ_FIELDS) |= 0x80000u;
+    FIELD(uint32_t, req, REQ_GROUND) = id == EM089_EFX_IMPACT ? ground_flags(self) : 3u;
     if (req8) {   /* GU's own moving beam (0x10b04c4): req+8 = 3, req+0xc = the monster's area (meaning not traced) */
         FIELD(uint32_t, req, 0x8) = req8;
         FIELD(uint8_t, req, 0xc) = FIELD(uint8_t, self, 0x1054);
@@ -127,6 +172,65 @@ void *em089_efx_post_on(void *owner, uint32_t id, void *unit) { return post_req(
 void em089_efx_stop(void *eff)
 {
     if (eff) efx_stop_fn(eff, 0);
+}
+
+/* GU slot 75 (vt+0x12c) = the PSL post 0x70028(this, list, PSL entry data, slot, req) of the motion-synced records
+ * (dala_psl.c); GU's PSL player builds a fresh request per post (0x53b7e0: 0x40b10 on its stack, vt+0x12c, 0x40b50,
+ * C). The ground set as 4U's motion post (0x391b50 -> 0xc09908): qe006 dust 15..17, 46..49, 1008 (walk 25, flying
+ * turns 65 / 66, 2/35 motion 264, tar dash 536, reactions 771..823) */
+typedef void *(*psl_post_t)(void *self, uint32_t list, const uint8_t *data, uint32_t slot, void *req);
+#define pslPostBase FN(psl_post_t, 0x70028)
+
+void *em089_psl_post(void *self, uint32_t list, const uint8_t *data, uint32_t slot, void *req)
+{
+    if (req) {
+        FIELD(uint32_t, req, REQ_FIELDS) |= 0x80000u;
+        FIELD(uint32_t, req, REQ_GROUND) = ground_flags(self);
+    }
+    void *eff = pslPostBase(self, list, data, slot, req);
+    static uint32_t s_n;   /* issue #6 diagnostic (test only): what the both-arms slam 7/17 posts */
+    if (data && slot < 32 && FIELD(uint8_t, self, EN_ACT_CAT) == 7 && FIELD(uint8_t, self, EN_ACT_NUM) == 17 &&
+        ++s_n <= 60)
+        logf("gogport: diag psl 7/17 motion %x frame %d slot %u id %u kind %u -> %x", curMotion(self),
+             (int)motionFrame(self), slot, FIELD(uint16_t, data, 4 + 2 * slot), FIELD(uint32_t, data, 0x44 + 4 * slot),
+             (uint32_t)eff);
+    return eff;
+}
+
+/* Issue #6 diagnostic (test only): GU slot 78 (vt+0x138) = 0x6fe48(this, PEL object, list, id, req, tied), the
+ * monster's generic post (0x6ff74 goes through it, C): every post on a PEL other than our PEL u (this+0xb624), e.g.
+ * the donor's common PEL c (this+0x1358, Kushala's em024_00c), goes to a ring that efx_tick logs (no log call on
+ * the post path: the 0x40978 hook crashed on a deep one). Test 13:18: nothing outside PEL u (no 7/17 that fight). */
+typedef void *(*post78_t)(void *self, void *pel, uint32_t list, uint32_t id, void *req, void *tied);
+#define post78Base FN(post78_t, 0x6fe48)
+#define PEL_C_OBJ  0x1358
+#define PEL_U_OBJ  0xb624
+#define P78_N      16
+static struct { void *pel; uint32_t list, id, lr; uint16_t frame; uint8_t cat, num; } s_p78[P78_N];
+static uint32_t s_p78_w, s_p78_r, s_p78_total;
+
+void *em089_post78(void *self, void *pel, uint32_t list, uint32_t id, void *req, void *tied)
+{
+    if (pel != FIELD(void *, self, PEL_U_OBJ) && s_p78_total < 120 && s_p78_w - s_p78_r < P78_N) {
+        uint32_t k = s_p78_w++ % P78_N;
+        s_p78_total++;
+        s_p78[k].pel = pel; s_p78[k].list = list; s_p78[k].id = id;
+        s_p78[k].lr = (uint32_t)__builtin_return_address(0) - MAIN(0);
+        s_p78[k].frame = (uint16_t)motionFrame(self);
+        s_p78[k].cat = FIELD(uint8_t, self, EN_ACT_CAT); s_p78[k].num = FIELD(uint8_t, self, EN_ACT_NUM);
+    }
+    return post78Base(self, pel, list, id, req, tied);
+}
+
+static void p78_flush(void *self)
+{
+    for (; s_p78_r != s_p78_w; s_p78_r++) {
+        uint32_t k = s_p78_r % P78_N;
+        void *pel = s_p78[k].pel;
+        logf("gogport: diag post78 %s pel %x list %u id %u caller main+%x during %u/%u frame %u",
+             pel == FIELD(void *, self, PEL_C_OBJ) ? "PEL c (donor common)" : "other", (uint32_t)pel, s_p78[k].list,
+             s_p78[k].id, s_p78[k].lr, s_p78[k].cat, s_p78[k].num, s_p78[k].frame);
+    }
 }
 
 void em089_efx_kill(void *eff)
@@ -383,7 +487,6 @@ static void tail_tick(void *self)
 
 typedef float (*size_factor_t)(void *self);
 #define sizeFactor  FN(size_factor_t, 0xbecf0)
-#define REC_GROUND_Y 0x5b4
 void em089_efx_ground_impact(void *self, uint32_t kind, const float *off, float scale, float height)
 {
     static uint32_t s_n;
@@ -498,6 +601,7 @@ void em089_efx_init(void)
 static void efx_tick(void *self)
 {
     s_efx_owner = self;
+    p78_flush(self);
     em089_efx_init();
     s016_tick(self);
     aura_tick(self);

@@ -270,8 +270,14 @@ UNIT_GU_B19 = 1 << 19
 # return), mode 0 follows the header block (pel_colour). 404 of 519 4U mode-5 units are pure grey (dust tinted at run
 # time); GU authors its 29 mode-5 units already coloured (1 grey) and no GU reader tints them (test 11: em089_022 /
 # 024 / 030 tail-sweep / slam dust white). -> baked into words 18 / 19 with the Battlequarters soil (the only area),
-# when the file has no header block; with an area block the PEL multiply already covers every unit.
+# when the file has no header block; with an area block the PEL multiply covers the particle units.
+# Model units (type 5) of an area-block file (2026-10-29, issue #6 "snow debris"): the PEL multiply does not reach
+# them (S: 0x327cb8 tests each unit's class, cParticleGenerator first; the colour-tag test showed em089_021's rock
+# chunks u0 / u2 (qe000_001 / ef_em089, ff7f7f7f) and em089_031's u1 (cm000, ff2f2f2f) as the white "snowflakes" of
+# the arm slams / tar-jump landing / steps, where 4U draws them soil-multiplied = dark brown) -> the soil is baked into
+# their words 18 / 19 too (model_area).
 UNIT_COLOUR_MODE, UNIT_AREA_MODE = 0xF, 5
+UNIT_MODEL = 5
 
 
 def unit_curve_props(blk):
@@ -298,14 +304,19 @@ def area_multiply(word, rgba):
     return struct.unpack('<I', c.astype(np.uint32).astype(np.uint8).tobytes())[0]
 
 
-def unit_4u_to_gu(blk, utype, area=None):
-    """area: the colour baked into mode-5 units (None = left to the PEL multiply, 'code' = code-coloured file)."""
+def unit_4u_to_gu(blk, utype, area=None, model_area=None):
+    """area: the colour baked into mode-5 units (None = left to the PEL multiply, 'code' = code-coloured file);
+    model_area: the colour baked into model units (type 5) of an area-block file (the PEL multiply misses them)."""
     w = struct.unpack_from('<I', blk, 0x18)[0] & ~UNIT_INTENSITY
     if utype in (0, 1, 2):
         w |= UNIT_GU_B19
     out = bytearray(blk)
     struct.pack_into('<I', out, 0x18, w)
-    if utype != 9 and w & UNIT_COLOUR_MODE == UNIT_AREA_MODE and area:
+    if utype == UNIT_MODEL and model_area:
+        area = model_area
+    elif w & UNIT_COLOUR_MODE != UNIT_AREA_MODE:
+        area = None
+    if utype != 9 and area:
         assert area != 'code', 'mode-5 unit in a code-coloured EFL (area colour per unit: not mapped)'
         for o in (0x48, 0x4c):
             struct.pack_into('<I', out, o, area_multiply(struct.unpack_from('<I', blk, o)[0], area))
@@ -333,10 +344,11 @@ def convert_efl(d, log=None, soil=M19A03_AREA_SOIL):
     pos = p['first']
     b = efl_colour_block(d)
     area = (soil if not b or not b[0] & 0x10 else None if not (b[3] >> 16) & 0xFF else 'code')
+    model_area = soil if b and b[0] & 0x10 and not (b[3] >> 16) & 0xFF else None
     for o, size, k in p['blocks']:
         blk = d[o:o + size]
         if k and k[0] == 1:
-            blk = unit_4u_to_gu(blk, k[1], area)
+            blk = unit_4u_to_gu(blk, k[1], area, model_area)
         if k == (1, 9):
             assert size == 0xC0, size
             blk = filter_4u_to_gu(blk)

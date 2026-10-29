@@ -271,3 +271,34 @@ int em057_01_efx_c(uint32_t *regs)
         return 1;
     }
 }
+
+/* Ground sets of the motion-synced records (issue #6; C unless marked): 4U's motion post (0x391b50 -> 0xc09908, enemy
+ * branch) takes the ground kind from the monster's ground record W+0x5f0 (attribute word +8, sz_effect_c094e8's bits)
+ * and the effect keeps the EFL elements whose ground word meets sz_ground_flags(kind). GU's PEL records and requests
+ * default to -1 = every set at once; here the sets are em049_018 (MEF 3000 / 3001: 0x22, 0x54, lava 0x8, 3001 also
+ * 0x7e) and em049_007 (3008: 0x22, 0x54, 0x8, 0x76). Hook on GU 0x70028 (uEm057_00 slot 75 = uFestaEnemy's, the
+ * PSL post (this, list, PSL entry data, slot, req), req = its fifth argument = regs[8], the caller's stack: GU's PSL
+ * player builds a fresh request per post, 0x53b7e0). GU's twin of W+0x5f0 is not identified: the ray of the slams
+ * (0x183ad0, mask 64) down through the ground under the monster (rec+0x5b4) (S). */
+typedef float (*groundRay_t)(void *mgr, const float *from, const float *to, uint32_t area, uint8_t *hit, void *out,
+                             uint32_t mask);
+#define groundRay    FN(groundRay_t, 0x183ad0)  /* [0x2bad24] */
+#define COLL_MGR     (*(void **)MAIN(0x21270e0)) /* its manager [*0x10574fc] */
+#define REC_GROUND_Y 0x5b4
+
+int em057_01_psl_c(uint32_t *regs)
+{
+    void *self = (void *)regs[R0], *req = (void *)regs[8];
+    if (!self || !req || FIELD(uint16_t, self, EN_ID) != STYGIAN_ZINOGRE_EM_ID) return 0;
+    uint8_t *rec = REC(self);
+    uint32_t out[16] = { 0 };
+    uint8_t hit = 0;
+    float gy = FIELD(float, rec, REC_GROUND_Y);
+    float from[4] = { FIELD(float, rec, REC_POS_X), gy + 100.0f, FIELD(float, rec, REC_POS_Z), 0.0f };
+    float to[4] = { from[0], gy - 300.0f, from[2], 0.0f };
+    void *mgr = COLL_MGR;
+    if (mgr) groundRay(mgr, from, to, FIELD(uint8_t, self, EN_AREA), &hit, out, 64);
+    FIELD(uint32_t, req, REQ_FIELDS) |= 0x80000u;
+    FIELD(uint32_t, req, REQ_GROUND) = sz_ground_flags(sz_effect_c094e8(self, hit ? out[2] : 0, 0x391e3c));
+    return 0;
+}
