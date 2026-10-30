@@ -873,11 +873,48 @@ def stage_records():
 TAR_COAT_MODEL = 'effect\\base\\qe\\qe000\\qe000_004'
 
 
+# Grey rock-chunk model units dropped (2026-10-30, issue #6, user: "I want these particles to be gone entirely"; a
+# DEVIATION from 4U, which draws them dark brown): they stayed white in GU after the soil bake (test 2026-10-30 16:29,
+# 7/26 / 7/112), while the colour-tag test had tinted them (pure red stays red): S, GU's effect model material applies
+# a gain that washes the dark colours out. Their element mask -> 0 (the build keeps an element only when mask & the
+# request mask, 0xafc574 / GU twin), so GU never builds them. Files = the arm slam / step / landing / dash debris.
+HIDE_GREY_MODELS = {'em089_021', 'em089_022', 'em089_023', 'em089_024', 'em089_030', 'em089_031', 'em089_032',
+                    'qe006_000', 'qe006_001', 'qe006_003', 'qe006_035', 'qe006_036'}
+
+
+def hide_grey_models(d, d4, log=None):
+    """converted EFL d (4U source d4): element mask 0 on the entries whose unit is a model (type 5) with a grey 4U
+    colour (R = G = B); an element block shared with another entry is copied to the file end for it first."""
+    p, p4 = efl_parse(d), efl_parse(d4)
+    users = collections.Counter(e[0] >> 8 for e in p['ents'] if e[0] >> 8)
+    out = bytearray(d)
+    for i, (e, e4) in enumerate(zip(p['ents'], p4['ents'])):
+        if not (e[0] >> 8 and e[1] >> 8) or e[1] & 0xFF != UNIT_MODEL:
+            continue
+        c = struct.unpack_from('<I', d4, (e4[1] >> 8) + 0x30 + 0x48)[0]
+        if not (c & 0xFF == (c >> 8) & 0xFF == (c >> 16) & 0xFF):
+            continue
+        eo = (e[0] >> 8) + 0x30
+        if users[e[0] >> 8] > 1:     # shared with a kept entry: a private copy at the file end, mask 0
+            size = {o: s for o, s, k in p['blocks']}[eo]
+            while len(out) % 16: out += b'\0'
+            new = len(out)
+            out += out[eo:eo + size]
+            struct.pack_into('<I', out, new, 0)
+            struct.pack_into('<I', out, 0x30 + 16 * i, ((new - 0x30) << 8) | (e[0] & 0xFF))
+            struct.pack_into('<I', out, 8, len(out) - 0x30)
+            if log is not None: log.append('entry %d: grey model %08x hidden (element copied)' % (i, c))
+            continue
+        struct.pack_into('<I', out, eo, 0)
+        if log is not None: log.append('entry %d: grey model %08x hidden' % (i, c))
+    return bytes(out)
+
+
 def em089_spec():
     """Gogmazios' effect set (tools/build_em089_arc.py) for effect_set"""
     return dict(arc=SRC_EM089, stage_unpacked=STAGE_UNPACKED, mef=MEF_PATH, em_efl='effect\\efl\\em\\em089\\',
                 groups=GROUP_EFL, extra=extra_records(), lmts=[(LMT_PATH % i, PSL[i]) for i in range(4)], pel=PEL_U,
-                soil=M19A03_AREA_SOIL, list2=None, models=[TAR_COAT_MODEL])
+                soil=M19A03_AREA_SOIL, list2=None, models=[TAR_COAT_MODEL], hide_grey_models=HIDE_GREY_MODELS)
 
 
 def em089_set(log):
@@ -919,6 +956,8 @@ def effect_set(spec, log):
         d4 = S[(p, T['EFL'])]
         l = []
         conv['EFL'][p] = convert_efl(d4, l, spec['soil'])
+        if p.split('\\')[-1] in spec.get('hide_grey_models', ()):
+            conv['EFL'][p] = hide_grey_models(conv['EFL'][p], d4, l)
         _, bad = check_efl(conv['EFL'][p])
         assert not bad, (p, bad)
         log.append('EFL %s: %d entries, %d B -> %d B%s' % (p, efl_parse(d4)['n'], len(d4), len(conv['EFL'][p]),
