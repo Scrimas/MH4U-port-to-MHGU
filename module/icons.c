@@ -158,6 +158,10 @@ int tex_bind_c(uint32_t *regs)
  * readers of +0x100 (0x547e5c) expect an entry for it */
 int tex_entry_c(uint32_t *regs)
 {
+#ifdef MS_SLICE
+    void ms_gui_seen(uint8_t *gui);
+    ms_gui_seen((uint8_t *)regs[R0]);    /* the Magnet Spike's gauge look (weapons/magnet_spike/module/ms_class.c) */
+#endif
     if (!ours(regs[R1])) return 0;
     regs[R0] = (uint32_t)(uintptr_t)s_pool[regs[R1] & 0xffu];
     return 1;

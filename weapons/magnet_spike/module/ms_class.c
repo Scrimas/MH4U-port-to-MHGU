@@ -160,14 +160,16 @@ int ms_factory_cc(uint32_t *regs, uint8_t *info, uint8_t *obj, uint32_t kind)
 /* the gauge's look (test 1: "the HUD is the Charge Blade's"; tools/mshud.py): the widget's .gui (+0x24) draws CB's
  * vials and shield from HD_hud00. While our hunter drives it, the .gui's HD_hud00 texture entry points at
  * mh4uport\ms_hud00 (that atlas with MHF's gauge cells and horseshoe painted over them), back to HD_hud00 for anyone
- * else. The entry is found through the .gui's sprites as module/icons.c reads them (objects +0xf8 / count +0x298,
- * object +0xd8 -> sprites, sprite +0x78 table and +0x100 bound ID -> 0xb80fd0 -> 64-byte entry, +0x28 rTexture with
- * its path at +8 and size +0xdc / +0xe0, GPU texture +0xd0) */
+ * else. The entry sits in the .gui resource's texture table: GU's lookup 0xb80fd0(rGUI, ID) gets the rGUI as a
+ * sprite's +0x78 and reads its loaded file (+0x64): table +0xe8, count +0x70, 64-byte entries with the rTexture at
+ * +0x28 (size +0xdc / +0xe0, GPU texture +0xd0), as the loader 0xb7f988 fills them. module/icons.c's hook on that
+ * lookup hands us each rGUI (ms_gui_seen); the gauge's is the one named hud14_chargeAx. (Test 2 crash: walking the
+ * .gui's objects read a non-sprite's +0x78 as a table.) The gauge's .gui releases its entries' textures with itself,
+ * so ours gets one more reference per swap and HD_hud00 keeps the one the .gui held. */
 #define RES_MGR      0x2126a64      /* sResource (module/icons.c) */
 #define DTI_RTEXTURE 0x21255d0
 typedef void *(*res_get_t)(void *mgr, void *dti, const char *path, uint32_t mode);
-#define GUI_TEX_ENTRY FN(uint8_t *(*)(void *, uint32_t), 0xb80fd0)
-static uint8_t *s_hud_tex, *s_hud_orig;
+static uint8_t *s_hud_tex, *s_hud_orig, *s_hud_gui;
 static uint8_t s_hud_tried;
 
 static void *res_get(const char *path)
@@ -176,35 +178,46 @@ static void *res_get(const char *path)
     return mgr ? (*(res_get_t **)mgr)[0x30 / 4](mgr, (void *)MAIN(DTI_RTEXTURE), path, 1) : 0;
 }
 
+/* s in a resource's path (cResource keeps it near the top: bytes 4 .. 84 are searched, NULs included) */
 static int path_has(const uint8_t *res, const char *s)
 {
-    const char *p = (const char *)res + 8;
-    for (int i = 0; i < 64 && p[i]; i++) {
+    for (int i = 4; i < 84; i++) {
         int k = 0;
-        while (s[k] && p[i + k] == s[k]) k++;
+        while (s[k] && res[i + k] == (uint8_t)s[k]) k++;
         if (!s[k]) return 1;
     }
     return 0;
 }
 
-static void hud_look(uint8_t *w, int ours)
+/* icons.c tex_entry_c: an rGUI that GU looks a texture up in (valid: GU reads it right after) */
+void ms_gui_seen(uint8_t *gui)
 {
-    uint8_t *gui = FIELD(uint8_t *, w, 0x24), **list = gui ? FIELD(uint8_t **, gui, 0xf8) : 0;
-    uint32_t n = gui ? FIELD(uint32_t, gui, 0x298) : 0;
+    static uint8_t *s_last;
+    if (gui == s_last || gui == s_hud_gui) return;
+    s_last = gui;
+    if (!path_has(gui, "chargeAx")) return;
+    s_hud_gui = gui;
+    logf("msport: HUD gauge .gui %x", (uint32_t)(uintptr_t)gui);
+}
+
+static void hud_look(int ours)
+{
     if (ours && !s_hud_tried) {
         s_hud_tried = 1;
         s_hud_tex = res_get("mh4uport\\ms_hud00");
         logf("msport: HUD atlas mh4uport\\ms_hud00 -> %x", (uint32_t)(uintptr_t)s_hud_tex);
     }
-    if (!s_hud_tex || !FIELD(void *, s_hud_tex, 0xd0) || !list || n > 256) return;
-    for (uint32_t o = 0; o < n; o++) {
-        uint8_t **spr = list[o] ? FIELD(uint8_t **, list[o], 0xd8) : 0, *s = spr ? spr[0] : 0;
-        uint8_t *e = s && FIELD(void *, s, 0x78) ? GUI_TEX_ENTRY(FIELD(void *, s, 0x78), FIELD(uint32_t, s, 0x100)) : 0;
-        uint8_t *t = e ? FIELD(uint8_t *, e, 0x28) : 0;
+    uint8_t *g = s_hud_gui && path_has(s_hud_gui, "chargeAx") ? s_hud_gui : 0, *d = g ? FIELD(uint8_t *, g, 0x64) : 0;
+    uint8_t *tab = d ? FIELD(uint8_t *, d, 0xe8) : 0;
+    uint32_t n = d ? FIELD(uint32_t, d, 0x70) : 0;
+    if (!s_hud_tex || !FIELD(void *, s_hud_tex, 0xd0) || !tab || n > 64) return;
+    for (uint32_t i = 0; i < n; i++) {
+        uint8_t *e = tab + 64 * i, *t = FIELD(uint8_t *, e, 0x28);
         if (!t) continue;
         if (ours && t != s_hud_tex && path_has(t, "HD_hud00") && FIELD(uint32_t, t, 0xdc) == FIELD(uint32_t, s_hud_tex,
             0xdc) && FIELD(uint32_t, t, 0xe0) == FIELD(uint32_t, s_hud_tex, 0xe0)) {
-            if (!s_hud_orig) s_hud_orig = res_get((const char *)t + 8);  /* a reference: it stays loaded for the way back */
+            s_hud_orig = t;
+            res_get("mh4uport\\ms_hud00");
             FIELD(uint8_t *, e, 0x28) = s_hud_tex;
             logf("msport: HUD gauge entry %x: Magnet Spike atlas", (uint32_t)(uintptr_t)e);
         } else if (!ours && t == s_hud_tex && s_hud_orig) {
@@ -217,9 +230,8 @@ static void hud_look(uint8_t *w, int ours)
 int ms_hud_c(uint32_t *regs)
 {
     uint8_t *w = (uint8_t *)regs[R4], *p = (uint8_t *)regs[R5];
-    if (w && s_hud_tex) hud_look(w, p && *(uint32_t **)p == ms_vt);
+    if (w) hud_look(p && *(uint32_t **)p == ms_vt);
     if (!w || !p || *(uint32_t **)p != ms_vt) return 0;
-    if (!s_hud_tried) hud_look(w, 1);
     struct ms_state *s = ms_of(p);
     uint32_t m = s->mode, st = s->mag[m];
     FIELD(uint32_t, w, 0x70) = 5;
@@ -251,13 +263,49 @@ typedef void (*ms_rot_t)(void *obj, const float *euler);
  * viewer stands the weapon up): Ry(+90 deg), radians as SET_ROTATION's Rz Ry Rx */
 static const float s_grip[8] = {0, 0, 0, 0, 0, 1.5707964f, 0, 0};
 
+/* GU's own attach (on the back = state 2, the village's only state; other states mid draw / sheathe): it applies the
+ * Great Sword's record 0x308334(weapon, hunter, type, state) when weapon +0x1408 is not that record (position +0x40,
+ * rotation in degrees -> SET_ROTATION -> quaternion +0x50, x y z w), the state filtered as 0x3078b8 does for type 0
+ * (mask 0xc40e4 kept, 15 -> 14 in the second mode, else 4). Applied here first with the model turn undone in the
+ * weapon's frame (q = record's (x) hand grip's, Hamilton: the grip's turn acts first), so GU finds it applied (test
+ * 2: the back turned 90 deg) */
+typedef const float *(*ms_carry_t)(void *weapon, void *hunter, uint32_t type, uint32_t state);
+#define CARRY_RECORD FN(ms_carry_t, 0x308334)
+
+static void back_record(uint8_t *w, uint8_t *pl, uint32_t type, uint32_t st)
+{
+    if (st >= 0x14 || !(1u << st & 0xc40e4u)) st = st == 0xf && second_mode(pl) ? 0xe : 4;
+    const float *rec = CARRY_RECORD(w, pl, type, st);
+    if (!rec || FIELD(const float *, w, 0x1408) == rec) return;
+    FIELD(const float *, w, 0x1408) = rec;
+    for (int i = 0; i < 3; i++) FIELD(float, w, 0x40 + 4 * i) = rec[i];
+    FIELD(float, w, 0x4c) = 0.0f;
+    const float deg = 0.017453292f, e[4] = {rec[4] * deg, rec[5] * deg, rec[6] * deg, 0};
+    float *q = &FIELD(float, w, 0x50), u[4], g[4];
+    SET_ROTATION(w, s_grip + 4);
+    for (int i = 0; i < 4; i++) u[i] = q[i];
+    SET_ROTATION(w, e);
+    for (int i = 0; i < 4; i++) g[i] = q[i];
+    q[0] = g[3] * u[0] + g[0] * u[3] + g[1] * u[2] - g[2] * u[1];
+    q[1] = g[3] * u[1] - g[0] * u[2] + g[1] * u[3] + g[2] * u[0];
+    q[2] = g[3] * u[2] + g[0] * u[1] - g[1] * u[0] + g[2] * u[3];
+    q[3] = g[3] * u[3] - g[0] * u[0] - g[1] * u[1] - g[2] * u[2];
+    static int s_n;
+    if (s_n++ < 8) logf("msport: carry record %x (state %u): (%d, %d, %d) cm, (%d, %d, %d) deg, turn undone",
+                        (uint32_t)(uintptr_t)rec, st, (int)rec[0], (int)rec[1], (int)rec[2], (int)rec[4], (int)rec[5],
+                        (int)rec[6]);
+}
+
 int ms_attach_c(uint32_t *regs)
 {
     uint8_t *w = (uint8_t *)regs[R0], *pl = (uint8_t *)regs[R1];
     uint8_t *info = pl ? FIELD(uint8_t *, pl, 0x13c4) : 0;
     if (!info || info[0x4d4] != MS_CLASS || IS_PROWLER(pl)) return 0;
-    if (FIELD(uint32_t, pl, 0x13c8) != 0) return 0; /* not the quest class: on the back (0x308834 answers 2) */
     uint32_t st = ATTACH_STATE(0, pl, regs[R2]);
+    if (FIELD(uint32_t, pl, 0x13c8) != 0) {         /* not the quest class: on the back (0x308834 answers 2) */
+        back_record(w, pl, regs[R2], st);
+        return 0;
+    }
     int hand = st != 2 && (CUR_MOTION(pl) / 1000 == 5 || state178(pl));
     static int s_n, s_last = -1;
     if (hand != s_last && s_n < 100) {
@@ -266,7 +314,10 @@ int ms_attach_c(uint32_t *regs)
              CUR_MOTION(pl));
     }
     s_last = hand;
-    if (!hand) return 0;
+    if (!hand) {
+        back_record(w, pl, regs[R2], st);
+        return 0;
+    }
     FIELD(uint32_t, w, 0x13c8) = FIELD(uint32_t, w, 0x13cc);
     FIELD(uint32_t, w, 0x13d4) = 1;                 /* GU's state for joint 8 (the weapon sync reads it) */
     FIELD(uint32_t, w, 0x13cc) = 8;
@@ -500,8 +551,7 @@ int ms_forge_process_c(uint32_t *regs)      /* 0x70153c (smithy, type, row) -> p
 /* the forge's category menu (build.py MS_LIT_PATCHES repoint its code here; the count byte 14 -> 15 is a word
  * patch): category index -> box type (GU's u8[14] at 0x1650022 + the Magnet Spike, page 3), labels (LbShop_
  * EqMakeMsg IDs, 7 read per page: 21 entries; 206 = our appended "Magnet Spike"), and the top panel's icon lists
- * by kind (GU's pointer table 0x176f3e4, kind 8 = the weapon categories: GU's 14 icons + MS_ICON_ID, MHF's Magnet
- * Spike icon in HD_cmn_icon cell 121: tools/ms_icon_hdui.py, build.py MS_ICON_ID) */
+ * by kind (GU's pointer table 0x176f3e4, kind 8 = the weapon categories: GU's 14 icons + MS_ICON_ID: ms_icon_rect) */
 #define MS_ICON_ID 121
 const uint8_t ms_forge_order[15] = {7, 14, 8, 18, 9, 19, 10, 16, 15, 21, 20, 13, 11, 17, MS_TYPE};
 const uint16_t ms_forge_label[21] = {2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 206, 206, 206, 206, 206, 206,
@@ -510,6 +560,21 @@ static const uint8_t s_weapon_icons[21] = {0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0
                                            0x41, 0x42, MS_ICON_ID, 0x46, 0x47, 0x49, 0x48, 0x4a, 0};
 uint32_t ms_shop_icons[10];
 #define MS_LABEL_COUNT 206          /* LbShop_EqMakeMsg's strings: "Magnet Spike" appended as 206 */
+
+/* hook 0x560920: GU's icon rectangle 0x560918(_, kind, icon, float out[4]) after its kind check. Kinds 0 / 1 (the
+ * 16 / 24-unit equipment icons of HD_cmn_icon, in a 256 x 512 space) put icons < 95 on a 10-column grid and 95..106
+ * at a position list (0x162e208 / 0x162e1a0); every grid cell is taken in GU's and HD UI's atlases, and icon 121 read
+ * past the list (test 2: a piece of other icons). MS_ICON_ID = a spot empty in both atlases, where
+ * tools/ms_icon_hdui.py paints MHF's icon; out = 2x units as GU writes them (its 512 x 1024 atlas) */
+int ms_icon_rect_c(uint32_t *regs)
+{
+    static const uint16_t at[2][3] = {{184, 48, 16}, {208, 32, 24}};    /* ms_icon_hdui.py SPOTS */
+    if (regs[R1] > 1 || regs[R2] != MS_ICON_ID) return 0;
+    const uint16_t *a = at[regs[R1]];
+    float *r = (float *)regs[R3];
+    r[0] = 2.0f * a[0], r[1] = 2.0f * a[1], r[2] = 2.0f * (a[0] + a[2]), r[3] = 2.0f * (a[1] + a[2]);
+    return 1;
+}
 
 static void forge_tables_init(void)
 {

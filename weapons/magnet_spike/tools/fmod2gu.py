@@ -42,7 +42,9 @@ def euler(r):
 
 
 def skeleton(bones):
-    """-> nodes in order, parent index list, local (column-vector) 4x4s, world 4x4s; the roots carry msgrip.TURN"""
+    """-> nodes in order, parent index list, local (column-vector) 4x4s, world 4x4s; the roots' children carry
+    msgrip.TURN, the roots stay identity as GU's weapon roots are: the smithy viewer replaces joint 0's transform
+    (test 2: a turn on the root changed nothing there, only on the back). No vertex is skinned to a root (build_mod)"""
     by = {b['node']: b for b in bones}
     order = sorted(by)
     assert order == list(range(len(order))), 'FSKL node ids must be 0..n-1'
@@ -50,7 +52,8 @@ def skeleton(bones):
     turn = np.eye(4); turn[:3, :3] = TURN
     def walk(n):
         b = by[n]; L = np.eye(4); L[:3, :3] = euler(b['rot']); L[:3, 3] = b['pos']
-        if b['parent'] < 0: L = turn @ L
+        if b['parent'] < 0: assert np.allclose(L, np.eye(4), atol=1e-5), 'root %d is not at identity' % n
+        elif by[b['parent']]['parent'] < 0: L = turn @ L
         local[n] = L; world[n] = (world[b['parent']] if b['parent'] >= 0 else np.eye(4)) @ L
         c = b['child']
         while c >= 0: walk(c); c = by[c]['sibling']
@@ -76,6 +79,7 @@ def build_mod(fm, fs, material):
             ws = sorted(ws, key=lambda t: -t[1])[:4]
             for k, (b, pc) in enumerate(ws):
                 gb[i, k] = m['bones'][b] if m['bones'] else b; w[i, k] = pc / 100.0
+                assert by[gb[i, k]]['parent'] >= 0 or not pc, 'a vertex skinned to a root (skeleton(): TURN)'
         for i in range(n):
             for k in range(4):
                 if w[i, k] > 0:

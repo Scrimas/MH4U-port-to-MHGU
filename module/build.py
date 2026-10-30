@@ -265,6 +265,7 @@ if MS_SLICE:
         ('ms_hud', 0x646560),         # CB phial widget update after its hunter reads (r4 widget, r5 hunter)
         ('ms_snd_file', 0x4EA0DC),    # weapon sound-request file ID (?, class, equipment, k): class 5 asks as GS
         ('ms_wsync', 0x308DDC), ('ms_wsync2', 0x308E68),  # weapon sync's class reads: class 5 picks by mode as SA
+        ('ms_icon_rect', 0x560920),   # icon rectangle (_, kind, icon, out) after its kind check: MS_ICON_ID's spot
     ]
 # the forge's category menu (ms_class.c "the forge's category menu"): order, labels, top-panel icon lists
 MS_TABLES = {'ms_forge_order': 0x1650022, 'ms_forge_label': 0x1650058, 'ms_shop_icons': 0x176F3E4}
@@ -317,8 +318,9 @@ def ms_patches(img):
         out.append((site, w, movw_imm(w, new)))
     # the forge: weapon categories 14 -> 15 (cursor config {kind 8, 7 per page, count, 0}, read only by 0x6f29c8);
     # the per-type icon id (three u8 tables by box type, 0x162e7dc / 0x164ff08 / 0x165000c: the item box read one of
-    # the first two, test 1): type 12 = LBG's 0x3f -> MS_ICON_ID, the HD_cmn_icon cell holding MHF's Magnet Spike icon
-    # (weapons/magnet_spike/tools/ms_icon_hdui.py patches the user's HD UI atlas; GU's own atlas has it empty)
+    # the first two, test 1): type 12 = LBG's 0x3f -> MS_ICON_ID, an icon past GU's that hook ms_icon_rect places at a
+    # spot of HD_cmn_icon holding MHF's Magnet Spike icon (weapons/magnet_spike/tools/ms_icon_hdui.py patches the
+    # user's HD UI atlas; GU's own atlas has the spot empty)
     out += [(0x1650080, 0x0509000E, 0x0509000F)]
     out += [(t + 12, 0x43383F3F, 0x43383F00 | MS_ICON_ID) for t in (0x162E7DC, 0x164FF08, 0x165000C)]
     # per-class value tables whose class-5 entry holds the bowgun values: class 0's (the generic melee values; phase2.md

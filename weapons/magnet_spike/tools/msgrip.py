@@ -46,8 +46,9 @@ def euler(r):
 
 
 # the model turn (test 1: "the models lay flat" in the smithy viewer, which stands a weapon on its model z axis, GS's
-# blade z -80..224, where MHF's Magnet Spike lies along x, -140..140): the GU model and the weapon motions' root carry
-# TURN (x -> z), the hand grip undoes it (ms_class.c s_grip); hit shapes and arcs stay in the hand's frame
+# blade z -80..224, where MHF's Magnet Spike lies along x, -140..140): the GU model (its root's child: fmod2gu
+# skeleton(), as the viewer replaces the root joint) and the weapon motions' root carry TURN (x -> z); the hand grip and
+# the back's carry record undo it (ms_class.c s_grip, back_record); hit shapes and arcs stay in the hand's frame
 TURN = euler((0.0, -math.pi / 2, 0.0))
 
 
