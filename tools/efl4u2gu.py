@@ -619,8 +619,10 @@ def mef_follows(r):
 def pel_record(path, r, S=None, soil=M19A03_AREA_SOIL, motion=False):
     """r: a MEF record dict; optional keys for code posts of other monsters (ids are per PEL, so they do not go
     through em089's id rules): follow (bool, else pel_follows(id)), world (bool: posted at a point with no target,
-    PEL_TAIL_WORLD), colour (RGBA bytes, else CODE_COLOUR). motion: the record of a motion sequence list (PEL list
-    1): MEF records follow the 4U rule (mef_follows)."""
+    PEL_TAIL_WORLD), colour (RGBA bytes, else CODE_COLOUR), once (bool: a follow record that plays once, +0x38 1,
+    +0x3a 0 = GU em057_00u records 90 / 120, the charge change; PEL_TAIL_PREV's +0x3a 1 restarts the effect each time
+    it ends until stopped: Stygian's discharge pulsed every 1-2 s, issue #8 test). motion: the record of a motion
+    sequence list (PEL list 1): MEF records follow the 4U rule (mef_follows)."""
     st = bytearray(160)
     struct.pack_into('<4f', st, 0x00, *r['pos'], 0.0)
     struct.pack_into('<4f', st, 0x10, *r['rot'], 0.0)
@@ -632,6 +634,8 @@ def pel_record(path, r, S=None, soil=M19A03_AREA_SOIL, motion=False):
         st[0x34:] = PEL_TAIL_LOCAL if r['flags'] & MEF_LOCAL else PEL_TAIL_PREV
     else:
         st[0x34:] = PEL_TAIL_PREV if r.get('follow', pel_follows(r['id'])) else PEL_TAIL
+    if r.get('once'):
+        st[0x38], st[0x3a] = 1, 0
     for o, v in PEL_COLOUR_OFF:
         st[o] = v
     col = pel_colour(path, r['id'], S, soil, r.get('colour'))
