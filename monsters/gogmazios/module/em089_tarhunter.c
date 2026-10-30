@@ -22,10 +22,12 @@
  *   em089_tar_mash @0x2bbb00 (r1 = word + 0x10000, count in bits 16..23): 5 presses make a step.
  *   em089_tar_webpost @0x2826f4: GU's web look (slot 19, shell 159) and its web wrap (slot 4, shell 101, posted at
  *       0x2baef0 and 0x2bbe8c) not posted.
+ *   em089_tar_shellpost @0x44cdd0 (the shell post 0x2826f4 wraps): GU's status look unit 0x44d260 posts the white
+ *       wrap (web status bit 0x100000 -> slot 4 shell 135) every frame from 0x44d4f8; not posted.
  *   em089_tar_hunters_tick (from the em089 effect tick): a hunter in GU's web actions (66, 68, 70..73 = 4U 106..110)
  *       after a tar hit (em089_tar_dmg, this machine's hunter) or a struggle start (em089_tar_struggle, any hunter:
- *       a remote hunter's hit is resolved on its own machine) gets PEL 7000 (qe008_026) on its effect shell's attach
- *       model and the coat; leaving them: 7000 stopped, the coat killed, 7001 (qe008_025). GU's action 72 alone is
+ *       a remote hunter's hit is resolved on its own machine) gets PEL 7000 (qe008_026) on its own attach model
+ *       (player vt+0x130) and the coat; leaving them: 7000 stopped, the coat killed, 7001 (qe008_025). GU's action 72 alone is
  *       not tar: it is also GU's knock-up (test 2026-10-23).
  * Coat: 4U's effect-model object (sMhEffect 0xc0a360 -> uMhEftModel, a uBaseModel: path table 0xef8c4c[1][4] =
  * effect\base\qe\qe000\qe000_004, parent = the hunter at joint 1 via vt+0x48, scale 1, hunter +0x8 copied) has no GU
@@ -144,6 +146,24 @@ int em089_tar_webpost_c(uint32_t *regs)
     return 1;
 }
 
+/* 0x44cdd0(shell, slot, shell index, req, force) = the player effect shell's post (vt+0x158), which 0x2826f4 wraps.
+ * GU's white wrap = its status look unit 0x44d260 (twin of 4U 0x3284ac, per frame): web status bit 0x100000 ->
+ * slot 4 shell 135, posted every frame from 0x44d4f8 (test 2026-10-30 18:3x, our wrap off: the wrap stayed, with no
+ * web post through 0x2826f4). Skipped here for every hunter (the unit runs for players only; any web while an em089
+ * exists is tar, as em089_tar_dmg). */
+#define STATUS_WEB_SHELL  135u
+#define LR_STATUS_WEB     0x44d4fcu
+int em089_tar_shellpost_c(uint32_t *regs)
+{
+    static uint32_t s_n;
+    uint32_t lr = regs[LR] - MAIN_BASE;
+    if (lr != LR_STATUS_WEB || regs[R1] != WRAP_SLOT || regs[R2] != STATUS_WEB_SHELL || !em089_efx_present())
+        return 0;
+    if (++s_n <= 20) logf("gogport: em089 tar: GU web shell (slot %u shell %u, lr %x) skipped", regs[R1], regs[R2], lr);
+    regs[R0] = 0;
+    return 1;
+}
+
 static struct {
     void *pl;
     uint8_t on;
@@ -172,12 +192,13 @@ typedef void (*unit_add_t)(void *mgr, uint32_t line, void *unit, uint64_t mask);
 #define unitAdd    FN(unit_add_t, 0xc067ec)
 #define VT(o, off) ((*(uint32_t **)(o))[(off) / 4])
 
-/* The coat is OFF unless built with EM089_TAR_COAT (test 2026-10-23 20:06): it stayed where it was made (a black blob
- * beside the knocked hunter: the uBaseModel's matrix is only updated at creation, vt+0x4c / +0x50), and Ryujinx's
- * Vulkan renderer crashed (DescriptorSetUpdater.SetUniformBuffers, index out of range) 0.37 s after the third coat
- * was made: the only effect material drawn through the model renderer. The tar look on the hunter is then 4U's
- * loop effect qe008_026 (the qe000_000 wrap) alone. */
-#ifdef EM089_TAR_COAT
+/* The coat is 4U's visible tar look (qe008_026 only adds small dark drips). Test 2026-10-23 20:06 showed two faults,
+ * fixed since: (1) it stayed where it was made (a black blob beside the knocked hunter): GU updates a uBaseModel's
+ * matrices only when vt+0x4c (local, 0x8a8384: pos +0x40, quat +0x50) and vt+0x50 (world, 0x890e20 -> 0x8a8448:
+ * times the parent joint of +0x30 / +0x34 while the parent lives) are called, and GU's own code-made models
+ * (uShellSt008 0x498ae4) are static -> coat_follow every tick; (2) Ryujinx's Vulkan renderer crashed
+ * (DescriptorSetUpdater.SetUniformBuffers, index out of range) 0.37 s after the third coat: an effect material drawn
+ * through the model renderer -> the coat now has a stage material (tools/efl4u2gu.py MODEL_RENDERER_MODELS). */
 static uint8_t *coat_make(uint8_t *pl)
 {
     void *mgr = *(void **)MAIN(RES_MGR);
@@ -203,19 +224,29 @@ static uint8_t *coat_make(uint8_t *pl)
     FIELD(uint32_t, m, 0xc) &= ~(1u << 10);
     return m;
 }
-#endif
+
+static int coat_alive(uint8_t *m) { return m && (FIELD(uint32_t, m, 0xc) & 7) - 1 <= 1; }
 
 static void coat_kill(uint8_t *m)
 {
-    if (m && (FIELD(uint32_t, m, 0xc) & 7) - 1 <= 1) ((void (*)(void *))VT(m, 0x40))(m);
+    if (coat_alive(m)) ((void (*)(void *))VT(m, 0x40))(m);
 }
 
+/* local then world matrix: at the hunter's joint 1 this frame */
+static void coat_follow(uint8_t *m)
+{
+    if (!coat_alive(m)) return;
+    ((void (*)(void *))VT(m, 0x4c))(m);
+    ((void (*)(void *))VT(m, 0x50))(m);
+}
+
+/* the hunter's own attach model (vt+0x130 of the PLAYER), as GU's player effect request player+0x2550 (init
+ * 0x27a7ec: +0x2620 = req+0xd0 = player vt+0x130, req+0x1c |= 2), which its web look posts with. The shell's vt+0x130
+ * is another object (test 2026-10-30: 47e8bcc0 for hunter 48606910): 7000 / 7001 were never drawn on the hunter. */
 static void *attach_model(uint8_t *pl, uint32_t *area)
 {
-    void *sh = FIELD(void *, pl, PL_EFX_SHELL);
     *area = FIELD(uint8_t, pl, PL_AREA);
-    if (!sh) return 0;
-    return ((void *(*)(void *))((*(uint32_t **)sh)[VT_ATTACH / 4]))(sh);
+    return ((void *(*)(void *))((*(uint32_t **)pl)[VT_ATTACH / 4]))(pl);
 }
 
 void em089_tar_hunters_tick(void *self)
@@ -235,14 +266,13 @@ void em089_tar_hunters_tick(void *self)
         if (s_th[i].hit && !web && !s_th[i].on && s_th[i].wait && !--s_th[i].wait) s_th[i].hit = 0;
         int tar = s_th[i].hit && web;
         if (s_th[i].on && !tar) s_th[i].hit = 0;   /* left the web actions: this tar is over */
+        coat_follow(s_th[i].coat);
         if (tar == s_th[i].on) continue;
         s_th[i].on = (uint8_t)tar;
         void *m = attach_model(pl, &area);
         if (tar) {
             s_th[i].loop = em089_efx_post_model(self, EM089_EFX_TAR_LOOP, m, area);
-#ifdef EM089_TAR_COAT
             s_th[i].coat = coat_make(pl);
-#endif
         } else {
             if (s_th[i].loop && em089_efx_alive(s_th[i].loop)) em089_efx_stop(s_th[i].loop);
             s_th[i].loop = 0;
