@@ -268,6 +268,7 @@ if MS_SLICE:
     ]
 # the forge's category menu (ms_class.c "the forge's category menu"): order, labels, top-panel icon lists
 MS_TABLES = {'ms_forge_order': 0x1650022, 'ms_forge_label': 0x1650058, 'ms_shop_icons': 0x176F3E4}
+MS_ICON_ID = 121                    # weapons/magnet_spike/tools/ms_icon_hdui.py ICON_ID
 MS_LIT_PATCHES = [(0x6F2DA8, 0x6F2CEC, 'ms_forge_order'), (0x6F2B1C, 0x6F2A94, 'ms_forge_label'),
                   (0x6F29AC, 0x6F1D2C, 'ms_forge_label'), (0x5933F8, 0x5930B8, 'ms_shop_icons')] if MS_SLICE else []
 MS_GUNNER_SITES = [0x144968, 0x144A0C, 0x144B24, 0x6ECEFC, 0x6ED884, 0x6FCB2C, 0x7037A8, 0x70B738]
@@ -315,8 +316,11 @@ def ms_patches(img):
         assert (w >> 4 & 0xF000 | w & 0xFFF) == old, hex(site)
         out.append((site, w, movw_imm(w, new)))
     # the forge: weapon categories 14 -> 15 (cursor config {kind 8, 7 per page, count, 0}, read only by 0x6f29c8);
-    # the per-type list icon (u8 at 0x165000c + type): type 12 = LBG's 0x3f -> the Great Sword's 0x37 (stand-in)
-    out += [(0x1650080, 0x0509000E, 0x0509000F), (0x1650018, 0x43383F3F, 0x43383F37)]
+    # the per-type icon id (three u8 tables by box type, 0x162e7dc / 0x164ff08 / 0x165000c: the item box read one of
+    # the first two, test 1): type 12 = LBG's 0x3f -> MS_ICON_ID, the HD_cmn_icon cell holding MHF's Magnet Spike icon
+    # (weapons/magnet_spike/tools/ms_icon_hdui.py patches the user's HD UI atlas; GU's own atlas has it empty)
+    out += [(0x1650080, 0x0509000E, 0x0509000F)]
+    out += [(t + 12, 0x43383F3F, 0x43383F00 | MS_ICON_ID) for t in (0x162E7DC, 0x164FF08, 0x165000C)]
     # per-class value tables whose class-5 entry holds the bowgun values: class 0's (the generic melee values; phase2.md
     # lists them with the Great Sword stand-ins): (table, entry size) as read at 0x29ab40 / 0x2aca3c / 0x2ad1e8 /
     # 0x2cdbd4 / 0x2dfb84 / 0x2e21a4

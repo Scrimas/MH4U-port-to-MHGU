@@ -157,10 +157,69 @@ int ms_factory_cc(uint32_t *regs, uint8_t *info, uint8_t *obj, uint32_t kind)
  * 0), after those reads: for our class, 5 phial slots = the magnet gauge's bars (full bars lit), the colour = the
  * mode, element 0's animation (6-entry table) = this mode's Magnetise: ready 2, on 1, lockout 5 (S: CB's
  * steady / flashing pairs, to check in a test); the shield and second indicators off */
+/* the gauge's look (test 1: "the HUD is the Charge Blade's"; tools/mshud.py): the widget's .gui (+0x24) draws CB's
+ * vials and shield from HD_hud00. While our hunter drives it, the .gui's HD_hud00 texture entry points at
+ * mh4uport\ms_hud00 (that atlas with MHF's gauge cells and horseshoe painted over them), back to HD_hud00 for anyone
+ * else. The entry is found through the .gui's sprites as module/icons.c reads them (objects +0xf8 / count +0x298,
+ * object +0xd8 -> sprites, sprite +0x78 table and +0x100 bound ID -> 0xb80fd0 -> 64-byte entry, +0x28 rTexture with
+ * its path at +8 and size +0xdc / +0xe0, GPU texture +0xd0) */
+#define RES_MGR      0x2126a64      /* sResource (module/icons.c) */
+#define DTI_RTEXTURE 0x21255d0
+typedef void *(*res_get_t)(void *mgr, void *dti, const char *path, uint32_t mode);
+#define GUI_TEX_ENTRY FN(uint8_t *(*)(void *, uint32_t), 0xb80fd0)
+static uint8_t *s_hud_tex, *s_hud_orig;
+static uint8_t s_hud_tried;
+
+static void *res_get(const char *path)
+{
+    void *mgr = *(void **)MAIN(RES_MGR);
+    return mgr ? (*(res_get_t **)mgr)[0x30 / 4](mgr, (void *)MAIN(DTI_RTEXTURE), path, 1) : 0;
+}
+
+static int path_has(const uint8_t *res, const char *s)
+{
+    const char *p = (const char *)res + 8;
+    for (int i = 0; i < 64 && p[i]; i++) {
+        int k = 0;
+        while (s[k] && p[i + k] == s[k]) k++;
+        if (!s[k]) return 1;
+    }
+    return 0;
+}
+
+static void hud_look(uint8_t *w, int ours)
+{
+    uint8_t *gui = FIELD(uint8_t *, w, 0x24), **list = gui ? FIELD(uint8_t **, gui, 0xf8) : 0;
+    uint32_t n = gui ? FIELD(uint32_t, gui, 0x298) : 0;
+    if (ours && !s_hud_tried) {
+        s_hud_tried = 1;
+        s_hud_tex = res_get("mh4uport\\ms_hud00");
+        logf("msport: HUD atlas mh4uport\\ms_hud00 -> %x", (uint32_t)(uintptr_t)s_hud_tex);
+    }
+    if (!s_hud_tex || !FIELD(void *, s_hud_tex, 0xd0) || !list || n > 256) return;
+    for (uint32_t o = 0; o < n; o++) {
+        uint8_t **spr = list[o] ? FIELD(uint8_t **, list[o], 0xd8) : 0, *s = spr ? spr[0] : 0;
+        uint8_t *e = s && FIELD(void *, s, 0x78) ? GUI_TEX_ENTRY(FIELD(void *, s, 0x78), FIELD(uint32_t, s, 0x100)) : 0;
+        uint8_t *t = e ? FIELD(uint8_t *, e, 0x28) : 0;
+        if (!t) continue;
+        if (ours && t != s_hud_tex && path_has(t, "HD_hud00") && FIELD(uint32_t, t, 0xdc) == FIELD(uint32_t, s_hud_tex,
+            0xdc) && FIELD(uint32_t, t, 0xe0) == FIELD(uint32_t, s_hud_tex, 0xe0)) {
+            if (!s_hud_orig) s_hud_orig = res_get((const char *)t + 8);  /* a reference: it stays loaded for the way back */
+            FIELD(uint8_t *, e, 0x28) = s_hud_tex;
+            logf("msport: HUD gauge entry %x: Magnet Spike atlas", (uint32_t)(uintptr_t)e);
+        } else if (!ours && t == s_hud_tex && s_hud_orig) {
+            FIELD(uint8_t *, e, 0x28) = s_hud_orig;
+            logf("msport: HUD gauge entry %x: back to HD_hud00", (uint32_t)(uintptr_t)e);
+        }
+    }
+}
+
 int ms_hud_c(uint32_t *regs)
 {
     uint8_t *w = (uint8_t *)regs[R4], *p = (uint8_t *)regs[R5];
+    if (w && s_hud_tex) hud_look(w, p && *(uint32_t **)p == ms_vt);
     if (!w || !p || *(uint32_t **)p != ms_vt) return 0;
+    if (!s_hud_tried) hud_look(w, 1);
     struct ms_state *s = ms_of(p);
     uint32_t m = s->mode, st = s->mag[m];
     FIELD(uint32_t, w, 0x70) = 5;
@@ -272,33 +331,48 @@ int ms_snd_file_c(uint32_t *regs)
 /* The Magnet Spikes (GU has no type-12 tables): base / level records built from Great Sword 1's (vtable copy,
  * retyped, names from s_weapons), the smithy's create / process rows and its 15th forge category (notes/phase3.md
  * "Smithy"). Weapons 2-7 = MHF-Z rarity-12 Magnet Spikes (dump/mhf/ms_weapons.json; model n = arc/weapon/w05/
- * 00n.arc, msbuild MODELS), stats scaled into GU's G rank (S: raw x 0.55, element x 0.3, sharpness = GU's
- * kireaji 106 of its endgame Great Swords, rarity 8); weapon 1 = the Phase 2 test weapon (not forged). Recipes: GU
- * G-rank materials of the element's monsters (item ID = itemData string / 2). Names / descriptions: English. */
+ * 00n.arc, msbuild MODELS), stats scaled into GU's G rank (S: raw x 0.55, element x 0.3, rarity 8; MHF's own: all
+ * rarity 12, 3 slots, 0 % affinity, the user kept them, test 1), sharpness = MHF's bars (ms_kire_rows); weapon 1 =
+ * the Phase 2 test weapon (not forged). Recipes: GU G-rank materials of the element's monsters (item ID = itemData
+ * string / 2). Names / descriptions: English. */
 struct ms_weapon {
     const char *name, *desc;
-    uint8_t model, rare, element, kire;          /* rare 0-based; element 1 fire, 2 water, 3 thunder, 4 dragon, 5 ice */
+    uint8_t model, rare, element, kire;          /* rare 0-based; element 1 fire, 2 water, 3 thunder, 4 dragon, 5 ice;
+                                                    kire = row of ms_kire_rows */
     uint16_t raw, elem;                          /* GU true raw, element / 10 */
     uint16_t item[4];
     uint8_t num[4];
 };
 static const struct ms_weapon s_weapons[] = {
-    {"Magnet Spike", "", 1, 0, 0, 106, 100, 0, {0}, {0}},                      /* 0: the equip fallback's dummy */
+    {"Magnet Spike", "", 1, 0, 0, 0, 100, 0, {0}, {0}},                        /* 0: the equip fallback's dummy */
     /* descriptions as GU's: up to 3 lines of <= 32 characters (test 1: one long line ran out of the box) */
-    {"Proto Spike", "A test-built Magnet Spike\r\nfrom the Frontier.", 1, 3, 0, 106, 200, 0, {0}, {0}},
+    {"Proto Spike", "A test-built Magnet Spike\r\nfrom the Frontier.", 1, 3, 0, 0, 200, 0, {0}, {0}},
     {"Demon Flamespike \"Flash\"", "A Magnet Spike that burns\r\nwith a demon's flame. Its\r\nmagnetism scorches.",
-     2, 7, 1, 106, 352, 24, {1576, 1570, 1585, 335}, {2, 4, 1, 5}},            /* MHF 17516: raw 640, fire 80 */
+     2, 7, 1, 0, 352, 24, {1576, 1570, 1585, 335}, {2, 4, 1, 5}},              /* MHF 17516: raw 640, fire 80 */
     {"Volnoborin IV", "A Magnet Spike that surges\r\nlike a riptide. Its poles\r\ndrip with seawater.",
-     3, 7, 2, 106, 310, 45, {890, 888, 818, 332}, {2, 3, 4, 5}},               /* MHF 17563: 564, water 150 */
+     3, 7, 2, 3, 310, 45, {890, 888, 818, 332}, {2, 3, 4, 5}},                 /* MHF 17563: 564, water 150 */
     {"Torid Pillar \"Uzi\"", "A Magnet Spike charged with\r\nthunder. Its field crackles\r\nwith every swing.",
-     4, 7, 3, 106, 309, 47, {1246, 1249, 1256, 330}, {2, 4, 1, 5}},            /* MHF 16964: 562, thunder 155 */
+     4, 7, 3, 1, 309, 47, {1246, 1249, 1256, 330}, {2, 4, 1, 5}},              /* MHF 16964: 562, thunder 155 */
     {"Anoru Pillar \"Wandemu\"", "A Magnet Spike of frozen\r\niron. Its field freezes the\r\nair around it.",
-     5, 7, 5, 106, 303, 50, {1145, 332, 331, 330}, {6, 6, 5, 5}},              /* MHF 16968: 551, ice 165 */
+     5, 7, 5, 2, 303, 50, {1145, 332, 331, 330}, {6, 6, 5, 5}},                /* MHF 16968: 551, ice 165 */
     {"Apophis Pillar \"Flash\"", "A Magnet Spike that draws\r\ndragon power into its core.",
-     6, 7, 4, 106, 352, 24, {1695, 1693, 1457, 332}, {3, 4, 1, 5}},            /* MHF 16933: 640, dragon 80 */
+     6, 7, 4, 0, 352, 24, {1695, 1693, 1457, 332}, {3, 4, 1, 5}},              /* MHF 16933: 640, dragon 80 */
     {"Apophis Pillar \"Clear\"", "A pure Magnet Spike: no\r\nelement, all force.",
-     7, 7, 0, 106, 374, 0, {1488, 1490, 1523, 330}, {2, 3, 1, 5}},             /* MHF 16936: raw 680 */
+     7, 7, 0, 0, 374, 0, {1488, 1490, 1523, 330}, {2, 3, 1, 5}},               /* MHF 16936: raw 680 */
 };
+
+/* the sharpness (C): MHF's bars, mhfdat header +0xac -> per weapon type, the Magnet Spike's (13) at 0x18ff500 = 8
+ * cumulative thresholds of 400 (red .. purple + an 8th colour) by the record's +8 sharpness id; GU's kireajiData rows
+ * = 7 cumulative thresholds of 450 (the last 50 = Handicraft's): GU's first six = MHF's, purple = MHF's purple + 8th
+ * colour, on to 450. gear.c appends the rows; ms_kire_base = the first one's index (0 = refused: GU's 106) */
+const uint16_t ms_kire_rows[][7] = {
+    {170, 170, 170, 170, 170, 200, 450},    /* MHF id 2 (17516, 16933, 16936): red 170, white 30, purple 50 + 150 */
+    {0, 0, 110, 110, 200, 270, 450},        /* id 13 (16964): yellow 110, blue 90, white 70, purple 50 + 80 */
+    {0, 0, 0, 0, 300, 300, 450},            /* id 17 (16968): blue 300, purple 45 + 55 */
+    {150, 150, 150, 150, 310, 310, 450},    /* id 21 (17563): red 150, blue 160, purple 50 + 40 */
+};
+const uint32_t ms_nkire = sizeof ms_kire_rows / sizeof ms_kire_rows[0];
+uint32_t ms_kire_base;
 #define MS_NWEAPONS (sizeof s_weapons / sizeof s_weapons[0])
 #define MS_FIRST_FORGED 2
 #define MS_NFORGED (MS_NWEAPONS - MS_FIRST_FORGED)
@@ -353,7 +427,9 @@ static void build_records(void *equip)
         FIELD(uint16_t, r, 0x26) = (uint16_t)id;          /* its level row */
         for (int i = 0; i < 20; i++) l[i] = row[i];
         FIELD(uint32_t, l, 4) = id; FIELD(uint8_t, l, 8) = (uint8_t)id; FIELD(uint8_t, l, 9) = 1;
-        FIELD(uint8_t, l, 10) = w->kire; FIELD(uint8_t, l, 11) = 10;      /* kireaji type, bar length step */
+        FIELD(uint8_t, l, 10) = (uint8_t)(ms_kire_base ? ms_kire_base + w->kire : 106);   /* kireaji row (GU's
+                                                                           endgame GS's if ours were refused) */
+        FIELD(uint8_t, l, 11) = 10;                                      /* bar length step */
         FIELD(uint16_t, l, 12) = w->raw;
         FIELD(uint8_t, l, 14) = 0; FIELD(uint8_t, l, 15) = 0;            /* defense, affinity (MHF: 0) */
         FIELD(uint16_t, l, 16) = w->elem;
@@ -424,13 +500,14 @@ int ms_forge_process_c(uint32_t *regs)      /* 0x70153c (smithy, type, row) -> p
 /* the forge's category menu (build.py MS_LIT_PATCHES repoint its code here; the count byte 14 -> 15 is a word
  * patch): category index -> box type (GU's u8[14] at 0x1650022 + the Magnet Spike, page 3), labels (LbShop_
  * EqMakeMsg IDs, 7 read per page: 21 entries; 206 = our appended "Magnet Spike"), and the top panel's icon lists
- * by kind (GU's pointer table 0x176f3e4, kind 8 = the weapon categories: GU's 14 icons + the Great Sword's 0x37
- * as the Magnet Spike's stand-in) */
+ * by kind (GU's pointer table 0x176f3e4, kind 8 = the weapon categories: GU's 14 icons + MS_ICON_ID, MHF's Magnet
+ * Spike icon in HD_cmn_icon cell 121: tools/ms_icon_hdui.py, build.py MS_ICON_ID) */
+#define MS_ICON_ID 121
 const uint8_t ms_forge_order[15] = {7, 14, 8, 18, 9, 19, 10, 16, 15, 21, 20, 13, 11, 17, MS_TYPE};
 const uint16_t ms_forge_label[21] = {2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 206, 206, 206, 206, 206, 206,
                                      206};
 static const uint8_t s_weapon_icons[21] = {0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x43, 0x45, 0x44, 0x3f,
-                                           0x41, 0x42, 0x37, 0x46, 0x47, 0x49, 0x48, 0x4a, 0};
+                                           0x41, 0x42, MS_ICON_ID, 0x46, 0x47, 0x49, 0x48, 0x4a, 0};
 uint32_t ms_shop_icons[10];
 #define MS_LABEL_COUNT 206          /* LbShop_EqMakeMsg's strings: "Magnet Spike" appended as 206 */
 

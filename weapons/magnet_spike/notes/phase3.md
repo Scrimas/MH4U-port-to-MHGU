@@ -61,11 +61,12 @@ the Magnetic Shock spots follow the hunter; R1 + evade = R + Y.
 | 16 | crescent too big | scale = tip radius / 109 cm (2.4x GS's for a 2.6 m reach) | scale = tip radius / 260 cm (GS's blade reach at scale 1) |
 | 4 | models lie flat in the viewer | the viewer stands a weapon on model z (GS: z -80..224); ours lay along x | model + weapon motions' root turned Ry(-90) (msgrip.TURN), the hand grip undoes it |
 | 1 | descriptions out of the box | one long line | GU's 3 lines of <= 32 characters |
-| 2 | same sharpness / rarity / affinity / slots | MHF's own records of the six: rarity 12, 3 slots, 0 % affinity; sharpness ids differ (2 / 13 / 17 / 21), MHF's sharpness table not located | open |
+| 2 | same sharpness / rarity / affinity / slots | MHF's own records of the six: rarity 12, 3 slots, 0 % affinity (user: keep MHF's); sharpness ids differ (2 / 13 / 17 / 21): mhfdat header +0xac -> per-type pointers, MS = 0x18ff500, 8 cumulative thresholds of 400 (C) | MHF's bars as 4 appended kireajiData rows (gear.c, MS_SLICE; GU = 7 cumulative of 450: purple = MHF purple + 8th colour + Handicraft's 50) |
 | 9 | X + A after the Guard Counter | MHF: only after a guarded hit (57 / 76 / 77, from f68); 57's table had GU's move before it | move last (above) |
 | 17 | hits miss | capsules checked against MHF's mesh in the hand frame (they match bone by bone); the oversized crescent suggested a reach the blade does not have | crescent fix; to re-check in test 2 |
 | 6 | no sound | not diagnosed (no log of the resolver) | resolver calls logged |
-| 3, 7 | GS / bowgun icons, CB's HUD | stand-ins | open |
+| 3 | GS / bowgun icons | three type -> icon id tables (0x162e7dc / 0x164ff08 / 0x165000c), only the forge's was patched; HD_cmn_icon = 64-px cells, 10 per row, id n = cell (n % 10, n // 10) | MHF-Z's Magnet Spike icon (UI bank dat/mhf_90c.bin.xbox PNG 6) in the empty cell 121 of the user's HD UI atlas (tools/ms_icon_hdui.py, backup .pre-magnet-spike; GU's own atlas: cell empty, a release needs a module-side atlas); type 12 -> 121 in the three tables and the forge's category icons |
+| 7 | CB's HUD | class 5 drives CB's gauge widget; its .gui (hud14_chargeAx, quest_eng.arc) draws vials / shield from HD_hud00 | MHF's MS HUD art (UI bank PNG 4: horseshoe head, 5-cell bar, red / blue / grey horseshoes) painted over CB's vials / shield in a copy of HD_hud00 (tools/mshud.py -> mh4uport\ms_hud00), swapped into that .gui's texture entry while a Magnet Spike hunter drives it (ms_class.c hud_look). Layout = CB's (5 cells where the vials sit), not MHF's bar |
 
 ## Test 1 (Phase 3; save backup dump/save_backups/2026-10-29_before_magnet_spike)
 Test 2 changes the buttons: ZR held = aim, R + ZR = Guard Counter.

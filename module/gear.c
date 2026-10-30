@@ -88,6 +88,12 @@ static int tbl_append(void *res, const struct tbl_cls *c, const uint8_t *recs, u
 #define TBL_KIREAJI 1u          /* the sharpness table */
 #define TBL_NEEDS_KIREAJI 2u    /* LevelData rows use the monster's sharpness entries: skipped if those were refused */
 static int s_kire[PORT_N];      /* 0 not loaded, 1 appended, -1 refused */
+#ifdef MS_SLICE
+extern const uint16_t ms_kire_rows[][7];  /* the Magnet Spikes' MHF sharpness (weapons/magnet_spike ms_class.c) */
+extern const uint32_t ms_nkire;
+extern uint32_t ms_kire_base;
+static struct tbl_cls s_kire_cls;         /* rKireajiData's class, as the monsters' sharpness blocks give it */
+#endif
 
 void gear_tables_loaded(void *res)        /* also items.c: the item table's TBLA blocks (appended items) */
 {
@@ -108,9 +114,19 @@ void gear_tables_loaded(void *res)        /* also items.c: the item table's TBLA
                 int ok = tbl_append(res, &c, s + PORT_U32(t, 36), PORT_U32(t, 32), FIELD(uint16_t, t, 26),
                                     PORT_U32(t, 28), path);
                 if (flags & TBL_KIREAJI) s_kire[m] = ok ? 1 : -1;
+#ifdef MS_SLICE
+                if (flags & TBL_KIREAJI) s_kire_cls = c;
+#endif
             }
         }
     }
+#ifdef MS_SLICE
+    if (s_kire_cls.parse && path_ends(res, "kireajiData")) {      /* after the monsters': whatever count it has */
+        uint32_t base = FIELD(uint32_t, res, 0x64);
+        if (tbl_append(res, &s_kire_cls, (const uint8_t *)ms_kire_rows, ms_nkire, 14, base, "kireajiData (Magnet Spike)"))
+            ms_kire_base = base;
+    }
+#endif
 }
 
 /* one load-exit hook per table class: armor (build.py HOOKS) and weapons / sharpness (gear_hooks.txt) */

@@ -27,7 +27,7 @@ ROOT = os.path.dirname(os.path.dirname(WEAPON))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(ROOT, 'tools'))
 import paths, arcpack, xfs, lmt
-import aan, fskl, msact, sdt, msgrip, msmot, mshit, msfx, fmod2gu
+import aan, fskl, msact, sdt, msgrip, msmot, mshit, msfx, fmod2gu, mshud
 sys.path.append(paths.GU_PY)
 from romfs import RomFS
 from arc import arc_entries, arc_read
@@ -595,6 +595,7 @@ def main(report_only=False):
         write('weapon/w05/snd/%s.arc' % name, rom().read('/nativeNX/arc/weapon/w00/snd/%s.arc' % name))
     write('weapon/w05/g00.arc', arcpack.build([('weapon\\w05\\mot\\wg05_00', T_LMT, wlist),
                                                ('weapon\\w05\\mot\\wg05_sa_00', T_LMT, empty_list())]))
+    print('HUD: ' + mshud.build())                      # the gauge's look (ms_class.c hud_look)
     print('motions: %d body slots (%d KB), weapon list %d KB; %d hits; %d tables, %d command files' % (
         len(plan), len(body) // 1024, len(wlist) // 1024, len(hit_index), len(tbl_index) + 47, len(cmds)))
     print('report: %s' % os.path.join(OUT_GEN, 'report.txt'))
