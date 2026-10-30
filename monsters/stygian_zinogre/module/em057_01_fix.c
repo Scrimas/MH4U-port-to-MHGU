@@ -52,9 +52,18 @@ int em057_01_atk_c(uint32_t *regs)
  * 4U's slot 50 (between 47 = GU 129 and 51 = GU 133) is the empty default 0x9428d4 `bx lr`, and Stygian's 4U model has
  * no type-52 material (its animations: 'Normal_to_VirusLv1' / 'VirusLv1_to_Normal', the frenzy, and the effect's
  * 'Animation'), so +0xcac4 stayed 0 and slot 132 wrote through it (test 1: 0xb0cab0 from 0xef3434). Skipped for
- * Stygian, as 4U (return 1 = the hooked function returns at once). */
+ * Stygian, as 4U (return 1 = the hooked function returns at once).
+ * But slot 132 starts with the parts visibility (C: ef321c..ef323c): variant byte +0xb5f5 == 4 (Thunderlord) ->
+ * 0xef34e8, else 0xef37b4 = applyPartsState of the charge (state 1 / 0, 19 frenzy) and of every break / sever pair.
+ * Skipping it left every mesh group drawn (issue #8: charged spikes at spawn, breaks and the tail cut never shown),
+ * so Stygian (variant 1) runs 0xef37b4 itself; it reads none of the glow fields +0xcac4..+0xcae0. */
+typedef void (*em057_parts_t)(void *self);
+#define em057Parts FN(em057_parts_t, 0xef37b4)
+
 int em057_01_glow_c(uint32_t *regs)
 {
     void *self = (void *)regs[R0];
-    return self && FIELD(uint16_t, self, EN_ID) == STYGIAN_ZINOGRE_EM_ID;
+    if (!self || FIELD(uint16_t, self, EN_ID) != STYGIAN_ZINOGRE_EM_ID) return 0;
+    em057Parts(self);
+    return 1;
 }

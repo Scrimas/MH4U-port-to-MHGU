@@ -256,6 +256,9 @@ SHELL_FX = [   # (id, 4U group, element, k, joint, follow, 4U post)
     (3225, 58, 9, 2, 2, True, 'aura controller 0x322f18: slot-51 query 1 answers 2, mask 4'),
     (3211, 58, 17, -1, 2, True, 'aura controller 0x322f18: enraged (rageOn 0x954e48), mask left at the ctor\'s -1'),
 ]
+# follow records posted once with no handle (4U 0x856f0c keeps none): GU's one-shot follow tail (efl4u2gu pel_record
+# once = GU's own charge-change records 90 / 120); the looping tail replayed the discharge every 1-2 s (issue #8 test)
+SHELL_FX_ONCE = (3202, 3205)
 # the 4U request ids of the shells' and effect posts' sounds (notes/b5-shells.md 1): asserted in our converted request,
 # own bank (word 21 = 0): 205 vt77 hit, 210 / 213 charge change, 215 / 216 / 224 orb, 217 / 218 pillar, 226 blast
 SHELL_SOUNDS = (205, 210, 213, 215, 216, 217, 218, 224, 226)
@@ -478,11 +481,12 @@ def effects(S, gu_pel_u, code, notes):
         f = int(path[-3:])                                             # the id scheme: 3200 + file (+ 50 / + 25)
         assert f < 25 and rid - 3200 == f + {1: 50, 2: 25}.get(k, 0), (rid, path, k)
         extra2.append((path, dict(id=rid, joint=joint, k=k, pos=(0.0, 0.0, 0.0), rot=(0.0, 0.0, 0.0),
-                                  scl=(1.0, 1.0, 1.0), follow=follow, world=joint == -1 and not follow)))
+                                  scl=(1.0, 1.0, 1.0), follow=follow, world=joint == -1 and not follow,
+                                  once=rid in SHELL_FX_ONCE)))
     spec = dict(arc=SRC_4U, stage_unpacked=[], mef='effect\\mef\\em\\em048_0', em_efl='effect\\efl\\em\\em049\\',
                 groups=groups, extra=[(groups[49] % r['file'], r) for r in own],
                 lmts=[(P48 + 'mot\\em048_%d' % b, PSL % b) for b in BANKS], pel=PEL_U, soil=arena_soil(notes),
-                list2=list2, extra2=extra2)
+                list2=list2, extra2=extra2, hide_grey_models='chunks')   # issue #6 white debris (efl4u2gu.CHUNK_MODELS)
     log = []
     out = efl4u2gu.effect_set(spec, log)
     lists = efl4u2gu.pel_lists(out[(PEL_U, efl4u2gu.T['PEL'])])

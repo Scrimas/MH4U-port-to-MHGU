@@ -17,7 +17,8 @@ void em089_efx_stop(void *eff);
 void em089_efx_kill(void *eff);
 /* unit state 1 / 2 (the check GU shells do on their effect handles) */
 int em089_efx_alive(void *eff);
-
+/* GU slot 75: the PSL (motion effect) post 0x70028 with 4U's ground set (em089_efx.c ground_flags) */
+void *em089_psl_post(void *self, uint32_t list, const uint8_t *data, uint32_t slot, void *req);
 /* PEL ids of the code posts (tools/efl4u2gu.py extra_records) */
 enum {
     EM089_EFX_BLOB_DRIP = 3000,   /* uShell050 kinds 0, 1, 6-9: em089_003 on the shell */

@@ -34,7 +34,7 @@ What is converted (all formats were compared on both games' code and on corpora,
   PSL  rProofEffectMotSequenceList v2 x 4 (one per motion list), from the 4U LMT animation event group 2 (MEF id
        remap[32] + run-length {bits, frames} events): same encoding in GU; slot kind 4 = PEL u list 1.
 """
-import os, struct, sys, zlib, collections
+import os, re, struct, sys, zlib, collections
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -270,8 +270,19 @@ UNIT_GU_B19 = 1 << 19
 # return), mode 0 follows the header block (pel_colour). 404 of 519 4U mode-5 units are pure grey (dust tinted at run
 # time); GU authors its 29 mode-5 units already coloured (1 grey) and no GU reader tints them (test 11: em089_022 /
 # 024 / 030 tail-sweep / slam dust white). -> baked into words 18 / 19 with the Battlequarters soil (the only area),
-# when the file has no header block; with an area block the PEL multiply already covers every unit.
+# when the file has no header block; with an area block the PEL multiply covers the particle units.
+# Model units (type 5) of an area-block file (2026-10-29, issue #6 "snow debris"): the PEL multiply does not reach
+# them (S: 0x327cb8 tests each unit's class, cParticleGenerator first; the colour-tag test showed em089_021's rock
+# chunks u0 / u2 (qe000_001 / ef_em089, ff7f7f7f) and em089_031's u1 (cm000, ff2f2f2f) as the white "snowflakes" of
+# the arm slams / tar-jump landing / steps, where 4U draws them soil-multiplied = dark brown) -> the soil is baked into
+# their words 18 / 19 too.
+# All units of an area-block file (2026-10-30, issue #6, user: "some arm slams fixed, some aren't"): 0x327cb8 recolours
+# only units whose class isKindOf cParticleGenerator (DTI 0x212361c) or cParticleNode (C), and the unit-type -> class
+# map is not traced; em089_021's type-1 units (ffdbdbdb / ffffffff) and qe006_003's type-2 unit stayed bright (S). ->
+# the soil is baked into every unit 4U multiplies (colour mode 0 on the header-block path 0xc476c4, mode 5 on the
+# area path) and pel_colour leaves GU's override off for these files (no double multiply). block_area below.
 UNIT_COLOUR_MODE, UNIT_AREA_MODE = 0xF, 5
+UNIT_MODEL = 5
 
 
 def unit_curve_props(blk):
@@ -298,14 +309,19 @@ def area_multiply(word, rgba):
     return struct.unpack('<I', c.astype(np.uint32).astype(np.uint8).tobytes())[0]
 
 
-def unit_4u_to_gu(blk, utype, area=None):
-    """area: the colour baked into mode-5 units (None = left to the PEL multiply, 'code' = code-coloured file)."""
+def unit_4u_to_gu(blk, utype, area=None, block_area=None):
+    """area: the colour baked into mode-5 units (None = none, 'code' = code-coloured file); block_area: the colour
+    baked into the mode-0 / mode-5 units of an area-block file (4U multiplies every one of them)."""
     w = struct.unpack_from('<I', blk, 0x18)[0] & ~UNIT_INTENSITY
     if utype in (0, 1, 2):
         w |= UNIT_GU_B19
     out = bytearray(blk)
     struct.pack_into('<I', out, 0x18, w)
-    if utype != 9 and w & UNIT_COLOUR_MODE == UNIT_AREA_MODE and area:
+    if block_area and w & UNIT_COLOUR_MODE in (0, UNIT_AREA_MODE):
+        area = block_area
+    elif w & UNIT_COLOUR_MODE != UNIT_AREA_MODE:
+        area = None
+    if utype != 9 and area:
         assert area != 'code', 'mode-5 unit in a code-coloured EFL (area colour per unit: not mapped)'
         for o in (0x48, 0x4c):
             struct.pack_into('<I', out, o, area_multiply(struct.unpack_from('<I', blk, o)[0], area))
@@ -333,10 +349,11 @@ def convert_efl(d, log=None, soil=M19A03_AREA_SOIL):
     pos = p['first']
     b = efl_colour_block(d)
     area = (soil if not b or not b[0] & 0x10 else None if not (b[3] >> 16) & 0xFF else 'code')
+    block_area = soil if b and b[0] & 0x10 and not (b[3] >> 16) & 0xFF else None
     for o, size, k in p['blocks']:
         blk = d[o:o + size]
         if k and k[0] == 1:
-            blk = unit_4u_to_gu(blk, k[1], area)
+            blk = unit_4u_to_gu(blk, k[1], area, block_area)
         if k == (1, 9):
             assert size == 0xC0, size
             blk = filter_4u_to_gu(blk)
@@ -562,13 +579,14 @@ def efl_colour_block(d):
 
 
 def pel_colour(path, rid, S=None, soil=M19A03_AREA_SOIL, code=None):
-    """RGBA 4U multiplies into the units of record `rid` (EFL `path`), None = 4U keeps the unit colours. code = the
-    record's own 0xc48378 colour (other monsters' code posts), else CODE_COLOUR (em089)."""
+    """RGBA GU's PEL override multiplies into the units of record `rid` (EFL `path`), None = off: 4U keeps the unit
+    colours, or the area colour is baked into the units (convert_efl block_area). code = the record's own 0xc48378
+    colour (other monsters' code posts), else CODE_COLOUR (em089)."""
     b = efl_colour_block((S or sources())[(path, T['EFL'])])
     if not b or not b[0] & 0x10:
         return None
     if not (b[3] >> 16) & 0xFF:
-        return soil
+        return None
     return code or CODE_COLOUR.get(rid)
 
 
@@ -601,8 +619,10 @@ def mef_follows(r):
 def pel_record(path, r, S=None, soil=M19A03_AREA_SOIL, motion=False):
     """r: a MEF record dict; optional keys for code posts of other monsters (ids are per PEL, so they do not go
     through em089's id rules): follow (bool, else pel_follows(id)), world (bool: posted at a point with no target,
-    PEL_TAIL_WORLD), colour (RGBA bytes, else CODE_COLOUR). motion: the record of a motion sequence list (PEL list
-    1): MEF records follow the 4U rule (mef_follows)."""
+    PEL_TAIL_WORLD), colour (RGBA bytes, else CODE_COLOUR), once (bool: a follow record that plays once, +0x38 1,
+    +0x3a 0 = GU em057_00u records 90 / 120, the charge change; PEL_TAIL_PREV's +0x3a 1 restarts the effect each time
+    it ends until stopped: Stygian's discharge pulsed every 1-2 s, issue #8 test). motion: the record of a motion
+    sequence list (PEL list 1): MEF records follow the 4U rule (mef_follows)."""
     st = bytearray(160)
     struct.pack_into('<4f', st, 0x00, *r['pos'], 0.0)
     struct.pack_into('<4f', st, 0x10, *r['rot'], 0.0)
@@ -614,6 +634,8 @@ def pel_record(path, r, S=None, soil=M19A03_AREA_SOIL, motion=False):
         st[0x34:] = PEL_TAIL_LOCAL if r['flags'] & MEF_LOCAL else PEL_TAIL_PREV
     else:
         st[0x34:] = PEL_TAIL_PREV if r.get('follow', pel_follows(r['id'])) else PEL_TAIL
+    if r.get('once'):
+        st[0x38], st[0x3a] = 1, 0
     for o, v in PEL_COLOUR_OFF:
         st[o] = v
     col = pel_colour(path, r['id'], S, soil, r.get('colour'))
@@ -855,11 +877,63 @@ def stage_records():
 TAR_COAT_MODEL = 'effect\\base\\qe\\qe000\\qe000_004'
 
 
+# Grey rock-chunk model units dropped (2026-10-30, issue #6, user: "I want these particles to be gone entirely"; a
+# DEVIATION from 4U, which draws them dark brown): they stayed white in GU after the soil bake (test 2026-10-30 16:29,
+# 7/26 / 7/112), while the colour-tag test had tinted them (pure red stays red): S, GU's effect model material applies
+# a gain that washes the dark colours out. Their element mask -> 0 (the build keeps an element only when mask & the
+# request mask, 0xafc574 / GU twin), so GU never builds them. Files = the arm slam / step / landing / dash debris.
+HIDE_GREY_MODELS = {'em089_021', 'em089_022', 'em089_023', 'em089_024', 'em089_030', 'em089_031', 'em089_032',
+                    'qe006_000', 'qe006_001', 'qe006_003', 'qe006_035', 'qe006_036'}
+# Dalamadur / Stygian Zinogre (2026-10-30, user: "similar issues on S.Zinogre and Dalamadur's attack / movements"):
+# spec hide_grey_models = 'chunks' = every EFL of the set, only for units drawing the shared rock-chunk models.
+CHUNK_MODELS = {'cm000_000', 'cm000_002', 'qe000_001', 'qe001_000'}
+# "grey" = channel spread <= 8 (Stygian's leap / slam chunks: qe006_005 ffe4e5e6, em048_021 ffa4a4a5; test 16:46)
+GREY_SPREAD = 8
+GREY_MIN = 0x20     # near-black rubble kept (Dalamadur em024_001 ff0a0b0d; darkest confirmed white chunk ff2f2f2f)
+
+
+def hide_grey_models(d, d4, log=None, models=None):
+    """converted EFL d (4U source d4): element mask 0 on the entries whose unit is a model (type 5) with a grey 4U
+    colour (GREY_SPREAD), drawing one of `models` (None = any); an element block shared with another entry is copied to
+    the file end for it first."""
+    p, p4 = efl_parse(d), efl_parse(d4)
+    users = collections.Counter(e[0] >> 8 for e in p['ents'] if e[0] >> 8)
+    size = {o: s for o, s, k in p['blocks']}
+    out = bytearray(d)
+    for i, (e, e4) in enumerate(zip(p['ents'], p4['ents'])):
+        if not (e[0] >> 8 and e[1] >> 8) or e[1] & 0xFF != UNIT_MODEL:
+            continue
+        c = struct.unpack_from('<I', d4, (e4[1] >> 8) + 0x30 + 0x48)[0]
+        rgb = (c & 0xFF, (c >> 8) & 0xFF, (c >> 16) & 0xFF)
+        if max(rgb) - min(rgb) > GREY_SPREAD or max(rgb) < GREY_MIN:
+            continue
+        if models is not None:
+            offs = [(w >> 8) + 0x30 for w in e if w >> 8]
+            if i < len(p['tail']) and p['tail'][i]: offs.append(p['tail'][i] + 0x30)
+            names = {m.decode().split('\\')[-1] for o in offs
+                     for m in re.findall(rb'effect\\[ -~]+?(?=\0)', d[o:o + size[o]])}
+            if not names & models:
+                continue
+        eo = (e[0] >> 8) + 0x30
+        if users[e[0] >> 8] > 1:     # shared with a kept entry: a private copy at the file end, mask 0
+            while len(out) % 16: out += b'\0'
+            new = len(out)
+            out += out[eo:eo + size[eo]]
+            struct.pack_into('<I', out, new, 0)
+            struct.pack_into('<I', out, 0x30 + 16 * i, ((new - 0x30) << 8) | (e[0] & 0xFF))
+            struct.pack_into('<I', out, 8, len(out) - 0x30)
+            if log is not None: log.append('entry %d: grey model %08x hidden (element copied)' % (i, c))
+            continue
+        struct.pack_into('<I', out, eo, 0)
+        if log is not None: log.append('entry %d: grey model %08x hidden' % (i, c))
+    return bytes(out)
+
+
 def em089_spec():
     """Gogmazios' effect set (tools/build_em089_arc.py) for effect_set"""
     return dict(arc=SRC_EM089, stage_unpacked=STAGE_UNPACKED, mef=MEF_PATH, em_efl='effect\\efl\\em\\em089\\',
                 groups=GROUP_EFL, extra=extra_records(), lmts=[(LMT_PATH % i, PSL[i]) for i in range(4)], pel=PEL_U,
-                soil=M19A03_AREA_SOIL, list2=None, models=[TAR_COAT_MODEL])
+                soil=M19A03_AREA_SOIL, list2=None, models=[TAR_COAT_MODEL], hide_grey_models=HIDE_GREY_MODELS)
 
 
 def em089_set(log):
@@ -901,6 +975,11 @@ def effect_set(spec, log):
         d4 = S[(p, T['EFL'])]
         l = []
         conv['EFL'][p] = convert_efl(d4, l, spec['soil'])
+        hide = spec.get('hide_grey_models', ())
+        if hide == 'chunks':
+            conv['EFL'][p] = hide_grey_models(conv['EFL'][p], d4, l, CHUNK_MODELS)
+        elif p.split('\\')[-1] in hide:
+            conv['EFL'][p] = hide_grey_models(conv['EFL'][p], d4, l)
         _, bad = check_efl(conv['EFL'][p])
         assert not bad, (p, bad)
         log.append('EFL %s: %d entries, %d B -> %d B%s' % (p, efl_parse(d4)['n'], len(d4), len(conv['EFL'][p]),

@@ -140,6 +140,7 @@ HOOKS = [
     ('em057_01_vparams', 0xEFA930),  # orb family efa930 (= 4U 0x84c280) entry: keeps its 4U parameters, then mid hooks
     ('em057_01_volley1', 0xEFAA6C),  # at its frame-88 / frame-58 posts (GU posts no orb for variant 1): Stygian's orbs
     ('em057_01_volley2', 0xEFAAB4),  # (em057_01_posts.c, em057_01_shell046.c)
+    ('em057_01_psl', 0x70028),     # uFestaEnemy slot 75 PSL post (uEm057_00's too): 4U's ground set for variant 1 (_efx.c)
     ('dala_dmg_end', 0x98E44),     # enemy damage update 0x97ddc, after the rage add, before the reaction dispatcher
                                    # (r0 = this): Dalamadur tail rage -> head, shared reactions (dala_react.c)
     ('dala_heat_zone', 0x6A160),   # (mgr, area, pos) heat-aura zone test (Teostra only): 1 inside the Dalamadur
