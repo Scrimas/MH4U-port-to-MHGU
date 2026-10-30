@@ -800,7 +800,8 @@ def extra_records():
         out.append(_rec(6200 + k, 24, -1, k))
     # 7000 / 7001: tar on a hunter (module/em089_tarhunter.c), 4U per-hunter status unit 0x3284ac state 3: 0xc08698
     # group 1 file 120 (flat table) = qe008_026 looping on the hunter, back to state 0: 0xc088d8 file 119 = qe008_025
-    # once; posted on the hunter's effect-shell attach model at joint 0 (GU web record 119's joint, 4U's not traced)
+    # once; posted on the hunter's own attach model (player vt+0x130) at joint 0 (GU web record 119's joint, 4U's not
+    # traced)
     for rid, path in ((7000, 'effect\\efl\\qe\\qe008\\qe008_026'), (7001, 'effect\\efl\\qe\\qe008\\qe008_025')):
         out.append((path, dict(id=rid, joint=0, k=-1, pos=(0.0, 0.0, 0.0), rot=(0.0, 0.0, 0.0),
                                scl=(1.0, 1.0, 1.0))))
@@ -875,6 +876,11 @@ def stage_records():
 # 4U tar coat (per-hunter status unit 0x3284ac state 3: effect-model object 0xc0a360 {255, 1, 4} -> table 0xef8c4c
 # [1][4]): created by module/em089_tarhunter.c as a GU uBaseModel parented to the hunter, fetched by path hash + type
 TAR_COAT_MODEL = 'effect\\base\\qe\\qe000\\qe000_004'
+# Models drawn by GU's model renderer (a uBaseModel, not an effect unit) get a STAGE material (tools/stage4u2gu.py
+# build_mrl, Fortress templates, as GU's own code-made models of uShellSt008 0x498ae4): with the effect template the
+# coat crashed Ryujinx's Vulkan renderer (test 2026-10-23, SetUniformBuffers index out of range: the effect shader's
+# constant buffers are bound by the effect renderer only). Same vertex format (0x207D603B) in both conversions.
+MODEL_RENDERER_MODELS = [TAR_COAT_MODEL]
 
 
 # Grey rock-chunk model units dropped (2026-10-30, issue #6, user: "I want these particles to be gone entirely"; a
@@ -933,7 +939,8 @@ def em089_spec():
     """Gogmazios' effect set (tools/build_em089_arc.py) for effect_set"""
     return dict(arc=SRC_EM089, stage_unpacked=STAGE_UNPACKED, mef=MEF_PATH, em_efl='effect\\efl\\em\\em089\\',
                 groups=GROUP_EFL, extra=extra_records(), lmts=[(LMT_PATH % i, PSL[i]) for i in range(4)], pel=PEL_U,
-                soil=M19A03_AREA_SOIL, list2=None, models=[TAR_COAT_MODEL], hide_grey_models=HIDE_GREY_MODELS)
+                soil=M19A03_AREA_SOIL, list2=None, models=[TAR_COAT_MODEL], hide_grey_models=HIDE_GREY_MODELS,
+                model_renderer=MODEL_RENDERER_MODELS)
 
 
 def em089_set(log):
@@ -1006,6 +1013,14 @@ def effect_set(spec, log):
                     elif (tp, T['TEX']) not in S:
                         log.append('MISSING texture %s (material of %s)' % (tp, p))
                 log.append('MODEL %s: %d materials' % (p, len(modlib.parse(gmod)['material_names'])))
+    for p in spec.get('model_renderer', ()):
+        import stage4u2gu
+        gmod, mats = stage4u2gu.convert_models([(S[(p, T['MOD'])], '')])
+        stage4u2gu.check_model(gmod, [S[(p, T['MOD'])]])
+        gmrl, texs, rows = stage4u2gu.build_mrl(mats, {0: S[(p, T['MRL'])]})
+        assert all(t in conv['TEX'] for t in texs), (p, texs)
+        conv['MOD'][p], conv['MRL'][p] = gmod, gmrl
+        log.append('MODEL %s: stage material (model renderer): %s' % (p, '; '.join(' '.join(map(str, r)) for r in rows)))
     for kind in ('TEX', 'EAN', 'MRL', 'MOD', 'EFL'):
         for p in sorted(conv[kind]):
             out[(p, T[kind])] = conv[kind][p]
