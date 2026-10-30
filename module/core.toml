@@ -3,7 +3,8 @@
 # (tools/release.py). Bump on every published change of the module or of any data file.
 name = "core"
 title = "MH4U Port core"
-version = "1.7.0"          # 1.7.0: Stygian Zinogre (registered as a Zinogre variant, Thunderlord stand-in per quest),
+version = "1.7.1"          # 1.7.1: effect fixes (issues #6 / #7 / #8: ground sets, Stygian parts, Gogmazios tar);
+                           # 1.7.0: Stygian Zinogre (registered as a Zinogre variant, Thunderlord stand-in per quest),
                            # stage-alias board name and weather, data file 12 sections;
                            # 1.6.1: position-independent module (yuzu / Eden: main's base from the module's own);
                            # 1.6.0: own icon atlas (icon setter, quest board, texture bind / entry hooks), size

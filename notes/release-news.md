@@ -4,6 +4,16 @@ tools/release.py puts the section of the core version being packaged into the re
 groups, **New** (something added) and **Fixed** (what works now, not what was broken), one short plain line each,
 written for players; write the section before `release.py package`.
 
+## v1.7.1
+**Fixed**
+- Gogmazios' tar now covers you in black tar, as in MH4U, instead of white spider web.
+- Gogmazios' arm slams no longer throw white "snow" debris.
+- Dalamadur's fire breath charges at his mouth again (it showed in the wrong place).
+- Stygian Zinogre's horns, spikes and tail now show breaks and the tail cut, and he no longer starts the hunt in his charged state.
+- Stygian Zinogre's discharge effect plays once instead of looping every few seconds.
+- Heaven's Mount and Speartip Crag: the camp rock is gone, the camp exits work, and vines and lighting look as in MH4U.
+- Grey rock chunks from Gogmazios', Dalamadur's and Stygian Zinogre's attacks are no longer shown (they rendered white in MHGU).
+
 ## v1.7.0
 **New**
 - Stygian Zinogre, with his 11 quests from MH4U (Hub High Rank, G★4, Village ★10 and the event quest A Song of
