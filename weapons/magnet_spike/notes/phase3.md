@@ -17,7 +17,7 @@ switch MS_SLICE (test builds only).
 | pin | leap -> pin on hit -> QTE (X / A mash) -> finisher / pin over; the hunter rides the monster |
 | HUD | the Charge Blade's phial widget (class 5's HUD case -> CB's, hook 0x646560): 5 phials = gauge bars, colour = mode, first element = Magnetise (ready 2 / on 1 / lockout 5, S) |
 | swing arcs | GU has no blade ribbon: a swing = GS's ring mesh (cm010_000, crescent texture) posted once by the class PSL. msfx.py fits each attack's blade-tip path (MHF FK, live frames) and writes its own PEL list-1 record (ids 1000+: plane, head on the blade, scale = tip radius; GU's effect Euler order = MHF's, 0x8a7dc4 case 0): 34 arcs on 29 motions (attacks with no weapon capsule or < 35 deg of sweep: none). MHF's swings: radius 1.4-4.5 m, sweeps 70-480 deg |
-| effects | GU stand-ins posted by code (vt+0x39c = PEL list 1; GS's 0-5 / 20 / 21 = its slash arcs, 6-11 / 30 / 31 its charge flashes): Triple Strike charged = flash 7, guarded hit = flash 9, Magnetise on = flash 11 (S). MHF's own effects (dat/effect.bin, Frontier's format) not converted |
+| effects | GU stand-ins posted by code (vt+0x39c = PEL list 1; GS's 0-5 / 20 / 21 = its slash arcs, 6-11 / 30 / 31 its charge flashes): Triple Strike charged = flash 7, guarded hit = flash 9, Magnetise on = flash 11; Magnetic Shock 5 x 3 = GS's ground impact (105) at each spot; the marker = flash 9's copy (1200, no sound) at the marker point every 2 s (world-position request 0x40b10, as em089_efx.c); Magnetise running = flash 11's copy (1201) on the weapon hand every 1.5 s (S). MHF's own effects (dat/effect.bin, Frontier's format) not converted; MHF's 0x10b43370 calls are rumble presets |
 | sounds | the motion sound sequence pl_wp05 (msfx.py): GS's records on GS's motion slots, ours = GS's whoosh_b + layered whoosh (fast in Cutting, slow in Impact) 2 frames before each attack. Class 5's weapon sound requests were "no file" (resolver 0x4ea0dc's class-5 case): hook ms_snd_file asks as class 0, so our record's mSrqrNo 1 / material give GS's two001 / two_bcom, packed into w05.arc. GS's flash sound plays with the flashes (its PTS). MHF's weapon banks (wkNNN.snd) = MOMO + JPK-packed Sony HD + PS-ADPCM: decodable, but MHF plays them from code (0x103339d0 per-action extras), triggers not traced; GU waves are DSP-ADPCM (needs an encoder) |
 | weapons, smithy | 6 forgeable weapons in a 15th forge category (below) |
 Mechanics and deviations: mechanics.md. Hit / motion pipeline: phase2.md.
@@ -63,5 +63,8 @@ aim L (or ZL). The gauge starts empty and fills 1 bar / 10 s and by hits; R move
 8. HUD: the Charge Blade's phial gauge = the magnet gauge (5 bars); its first element's look when Magnetise is
    ready / on / locked out.
 9. Arcs and sounds: a white crescent along each swing (does it follow the blade, the right side, the right way
-   round?), whooshes on swings, a flash (+ GS's flash sound) at Triple Strike charged / guarded hit / Magnetise on.
+   round?), whooshes on swings, a flash (+ GS's flash sound) at Triple Strike charged / guarded hit / Magnetise on,
+   a silent flash on the marked monster every 2 s and on the weapon every 1.5 s while magnetised.
+10. Magnetic Shock 5 x 3: evade through a monster attack with R + Y (or R + A) in Impact, then X / A: four ground
+   impacts marching forward, each hitting (log "Magnetic Shock 5 x 3").
 Report: crashes, stuck actions, which aim button worked, what looked wrong.

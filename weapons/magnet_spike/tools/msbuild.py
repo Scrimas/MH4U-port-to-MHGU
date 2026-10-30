@@ -436,7 +436,9 @@ def c_tables(acts, modes, own, tbl_index, hit_index, mvs):
           if ('code', n) in hit_index]
     L += ['#define MS_NSHOCK %d' % len(SHOCK),
           '#define MS_HIT_SHOCK %d  /* + k: Magnetic Shock 5 x 3 spot k (SHOCK) */' % hit_index[('shock', 0)],
-          '#define MS_EFX_SHOCK %d  /* + k: its effect (msfx.SHOCK_TEMPLATE moved to spot k) */' % msfx.SHOCK_EFX]
+          '#define MS_EFX_SHOCK %d  /* + k: its effect (msfx.SHOCK_TEMPLATE moved to spot k) */' % msfx.SHOCK_EFX,
+          '#define MS_EFX_MARKER %d  /* msfx.MARKER_EFX */' % msfx.MARKER_EFX[0],
+          '#define MS_EFX_AURA %d  /* msfx.AURA_EFX */' % msfx.AURA_EFX[0]]
     L += ['#define MS_NHITS %d' % len(mvs), 'static const uint16_t ms_hit_mv[] = {'] + [
         '    %s,' % ', '.join(str(v) for v in mvs[i:i + 20]) for i in range(0, len(mvs), 20)] + ['};']
     steps, events, rows = [], [], []
@@ -512,7 +514,7 @@ def main(report_only=False):
     freport = []
     arcs, posts, snd_drop, sounds = msfx.build(swings, wdata, holders, own, GU_COPY, COMMON, freport)
     arcs += [(msfx.SHOCK_EFX + k, (x, 0.0, z), (0.0, 0.0, 0.0), 1.0, msfx.SHOCK_TEMPLATE)
-             for k, (x, z) in enumerate(SHOCK)]
+             for k, (x, z) in enumerate(SHOCK)] + [msfx.MARKER_EFX, msfx.AURA_EFX]
     rep = mreport + hreport + creport + freport
     open(os.path.join(OUT_GEN, 'report.txt'), 'w').write('\n'.join(rep) + '\n')
     if report_only:

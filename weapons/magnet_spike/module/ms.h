@@ -58,6 +58,7 @@ struct ms_state {
     uint16_t armed[2];              /* hit-data entry armed in each attack slot */
     uint8_t shock_on, shock_k;      /* Magnetic Shock 5 x 3 task running, spots spawned */
     float shock_t;                  /* its ticks */
+    float mk_blink, aura_t;         /* ticks to the marker's and Magnetise's next flash */
 };
 struct ms_state *ms_of(uint8_t *p);
 void ms_reset(struct ms_state *s);
@@ -126,6 +127,10 @@ typedef void *(*ms_efx_t)(void *p, uint32_t id, void *req, uint32_t one);
 #define MS_EFFECT(p, id) ((ms_efx_t)MS_VT(p, 0x39c))(p, id, (uint8_t *)(p) + 0x2550, 1)   /* 0x282624: post the
                                      class PEL's list-1 record id (GS's w00_000 copy as w05_000) on the hunter's
                                      request (GU's classes: arg 1 in 112 of 115 calls) */
+typedef void (*ms_req_t)(void *req);
+#define MS_REQ_CTOR FN(ms_req_t, 0x40b10)             /* a proof-effect request (~0xd8 B, em089_efx.c): +0x1c flags (bit
+                                                         0 = at the world position +0xc0), +0xd0 attach model */
+#define MS_REQ_DTOR FN(ms_req_t, 0x40b50)
 enum { MS_EFX_CHARGED = 7, MS_EFX_GUARD = 9, MS_EFX_MAGNETISE = 11 };   /* GS's charge flashes (list-1 6-11 / 30 /
                                      31, its PTS ties GS's flash sound 150; 0-5 / 20 / 21 are its slash arcs, 1000+
                                      ours, msfx.py): S, stand-ins for MHF's effects */

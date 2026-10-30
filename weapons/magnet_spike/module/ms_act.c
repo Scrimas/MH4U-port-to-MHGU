@@ -212,11 +212,39 @@ static void shock_tick(uint8_t *p, struct ms_state *s, float tk)
     if (s->shock_k >= MS_NSHOCK) s->shock_on = 0;
 }
 
+/* the marker's and Magnetise's looks (S: MHF's effects, dat/effect.bin, not converted): GS charge flashes (msfx
+ * MARKER_EFX / AURA_EFX, no sound tied) every MARKER_BLINK / AURA_EVERY ticks, the marker's at its point through a
+ * world-position request (em089_efx.c), Magnetise's on the weapon hand */
+#define MARKER_BLINK 60.0f
+#define AURA_EVERY 45.0f
+
+static void marker_blink(uint8_t *p, struct ms_state *s)
+{
+    float t[3];
+    if (!marker(s, t)) return;
+    uint32_t buf[0x100 / 4 + 4];
+    void *req = (void *)(((uint32_t)buf + 15u) & ~15u);
+    MS_REQ_CTOR(req);
+    FIELD(uint32_t, req, 0x1c) |= 1u;
+    for (int i = 0; i < 3; i++) FIELD(float, req, 0xc0 + 4 * i) = t[i];
+    FIELD(float, req, 0xcc) = 0.0f;
+    void *h = ((ms_efx_t)MS_VT(p, 0x39c))(p, MS_EFX_MARKER, req, 1);
+    MS_REQ_DTOR(req);
+    static int s_n;
+    if (s_n++ < 5) logf("msport: marker flash at %d %d %d (effect %x)", (int)t[0], (int)t[1], (int)t[2],
+                        (uint32_t)(uintptr_t)h);
+}
+
 /* every update, drawn or not: gauge regen, Magnetise timers, the marker's life, mode reset when sheathed, the
- * Magnetic Shock task */
+ * Magnetic Shock task, the marker's and Magnetise's looks */
 static void tick(uint8_t *p, struct ms_state *s, float tk)
 {
     shock_tick(p, s, tk);
+    if (s->mk_mon && (s->mk_blink -= tk) <= 0) { s->mk_blink = MARKER_BLINK; marker_blink(p, s); }
+    if (s->mag[s->mode] == 1 && ms_drawn(p) && (s->aura_t -= tk) <= 0) {
+        s->aura_t = AURA_EVERY;
+        MS_EFFECT(p, MS_EFX_AURA);
+    }
     if (s->gauge < GAUGE_MAX && (s->regen += tk) >= 30) { s->regen -= 30; gauge_add(s, REGEN); }
     for (int m = 0; m < 2; m++) {
         if (!s->mag[m] || (s->mag_v[m] -= tk) > 0) continue;
