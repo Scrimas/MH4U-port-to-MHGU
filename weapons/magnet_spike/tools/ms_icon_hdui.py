@@ -5,8 +5,8 @@ GU draws an equipment icon by icon id from HD_cmn_icon_GSM_NOMIP through 0x56091
 units, in a 256 x 512 space: GU's atlas is 2x that, HD UI's 4x): ids < 95 on a 10-column grid, 95..106 from a
 position list. Box type -> icon id: three u8 tables (0x162e7dc, 0x164ff08, 0x165000c), type 12 = 63 (the bowguns');
 build.py ms_patches sets ICON_ID there, and ms_class.c ms_icon_rect places it at SPOTS (empty in GU's and HD UI's
-atlases: no grid cell is). The art = MHF-Z's Magnet Spike type icon (UI bank dat/mhf_90c.bin.xbox, PNG 6: 32-pixel
-silhouettes; cell (0, 10): the Cutting blade and the Impact pillar), nearest-scaled. Only that entry's data changes
+atlases: no grid cell is). The art = the Magnet Spike icon the user gave (test 3: dump/mhf/ui/ms_icon_user.png, a
+225 x 225 GU-style drawing on white; test 2 had MHF-Z's type icon, the wrong one). Only that entry's data changes
 (new zlib stream appended, its size / offset words updated), as monsters/gogmazios/tools/ui_icon_hdui.py does for
 micon01; it patches the arc as it is now, so it keeps Gogmazios' patch (re-running that tool, which starts from its
 own backup, drops this one: run this again after it). OLD_CELL (test 1's wrong spot) gets the backup's pixels back.
@@ -27,8 +27,25 @@ ARC = os.path.expanduser('~/.config/Ryujinx/mods/contents/0100770008dd8000/HD UI
 ENTRY = 'eng\\GUI\\99_texture\\HD_cmn_icon_GSM_NOMIP'
 SPOTS = ((184, 48, 16), (208, 32, 24))                          # ms_class.c ms_icon_rect: kind 0 / 1 (x, y, size)
 OLD_CELL = (64, 768, 64)                                        # test 1's paint (HD UI pixels)
-MHF_ICONS = os.path.join(ROOT, 'dump', 'mhf', 'ui', 'mhf_90c_06.png')
-MHF_CELL = (0, 320, 32, 352)
+ICON_SRC = os.path.join(ROOT, 'dump', 'mhf', 'ui', 'ms_icon_user.png')
+
+
+def icon(size):
+    """the user's icon as size x size RGBA: its pure white cleared, around the drawing and inside it (user, test 3: "the
+    interior should be transparent too"; the shell's fill is an off-white 247 / 243 / 246 and stays), cropped, a 1/16
+    margin, premultiplied Lanczos"""
+    a = np.array(Image.open(ICON_SRC).convert('RGBA'))
+    a[(a[..., :3] >= 253).all(-1)] = 0
+    ys, xs = np.nonzero(a[..., 3])
+    a = a[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
+    n = max(a.shape[:2])
+    sq = np.zeros((n, n, 4), np.uint8)
+    sq[(n - a.shape[0]) // 2:(n - a.shape[0]) // 2 + a.shape[0], (n - a.shape[1]) // 2:(n - a.shape[1]) // 2 + a.shape[1]] = a
+    m = max(1, size // 16)
+    small = Image.fromarray(sq).convert('RGBa').resize((size - 2 * m, size - 2 * m), Image.LANCZOS).convert('RGBA')
+    out = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+    out.paste(small, (m, m))
+    return np.array(out)
 
 
 def atlas(d):
@@ -61,11 +78,12 @@ def main():
     img = old.copy()
     x, y, c = OLD_CELL
     img[y:y + c, x:x + c] = atlas(open(bak, 'rb').read())[3][y:y + c, x:x + c]
-    src = Image.open(MHF_ICONS).convert('RGBA').crop(MHF_CELL)
+    assert old.shape == img.shape
     boxes = [(x * s, y * s, c * s) for (x, y, c) in SPOTS] + [OLD_CELL]
+    base = atlas(open(bak, 'rb').read())[3]
     for x, y, c in boxes[:2]:
-        assert old[y:y + c, x:x + c, 3].max() <= 8, 'spot (%d, %d) is not empty' % (x, y)
-        img[y:y + c, x:x + c] = np.array(src.resize((c, c), Image.NEAREST))
+        assert base[y:y + c, x:x + c, 3].max() <= 8, 'spot (%d, %d) is not empty' % (x, y)
+        img[y:y + c, x:x + c] = icon(c)
     t_new = tex.encode_gu(img, 'rgba8', mips=1)
     back = np.array(tex.decode(t_new), np.uint8)
     keep = old.copy()

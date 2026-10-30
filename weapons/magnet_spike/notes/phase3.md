@@ -76,6 +76,25 @@ the Magnetic Shock spots follow the hunter; R1 + evade = R + Y.
 | 4 | viewer still flat; the back turned 90 deg | GU weapon roots are identity; the viewer replaces joint 0's transform, so the turn on our root cancelled (in the root's bind frame the vertices still ran along x); GS's carry records do not undo the turn | the turn moves to the root's child (no vertex is skinned to the root; animated frames unchanged); the carry records GU applies off-hand get the turn undone (ms_class.c back_record, quaternion record (x) grip) |
 | 2 | bars do not follow red .. purple; 3 slots, 10 % affinity | the bars are MHF's (type 13 rows skip colours: id 2 = red 170, white 30, purple 50, sky 150); level row +15 mAffinity = 0 (10 % = the user's cheats) | none (reported) |
 
+## Test 3 results (user, 2026-10-30) and fixes
+The user names buttons by the Xbox pad's letters (HD UI shows Xbox glyphs; Ryujinx maps by position: Switch A = Xbox B,
+B = A, X = Y, Y = X). Test notes must use them. GU's player bits (+0x13f4) under the user's control type: d-pad 0x1-0x8,
+B 0x10, X 0x20, R 0x40, Y 0x80, A 0x100, ZL 0x200, L 0x400, ZR 0x800 (roles 0x65f93c / 0x65f8ec / 0x65f9b4 swap
+0x40 / 0x800 and 0x200 / 0x400 with the other type; 0x400 = GU's camera-reset handler 0x27e970). Minus is not 0x200.
+| # | report | cause | fix |
+|---|---|---|---|
+| 10 | ZL switches modes | MHF's SELECT read 0x200 = ZL | SELECT = bits 0xf000 (S, Minus not identified: the "other buttons" log) |
+| 13 | R + left does the back step, R + bottom the left step | R1 + special / R1 + evade on Y / B | swapped: R + left (Y) = 106 / 158, R + bottom (B) = 107 / 116 |
+| 5, 12 | walking / after a roll: the idle attacks | GU's walk shared table 0; MHF's walk (40 / 44) has its own attacks (48 / 49 / 51 / 61, 52 / 54 / 53 / 146 / 71: a quicker lead-in into chain swing 2) | table 1 (pick392 for 2/0), 11, 12, 13: the walk's attacks first (user: after a roll = "the second Y -> Y, B -> B, faster") |
+| 17 | visible hits miss ("A misses, A misses, A hits") | MHF counts attack life in 30 Hz ticks, motions run 2 frames a tick (Triple Strike cue: 20 ticks = f40); Impact 1 / 2 (14) and 3 (22) share one shape | live frames = 2 x MHF's; hit view: the marker flashes at both ends of each armed hit's capsule (ms_act.c MS_HIT_VIEW) |
+| 8, 9, 11, 18 | no charged strike, no X+A after GC, no jump attack, no pin | wrong buttons (Switch letters in the checklist; the log: B mashed during the charge, the GC caught hits) | instructions in Xbox letters |
+| 20 | a second GC before the first ends | MHF's GC 14 cancels to 14 from f60 (of 133) | none (MHF) |
+| 3 | the icon is wrong | MHF's type icon was not the one | the user's icon (dump/mhf/ui/ms_icon_user.png), pure white cleared |
+| 4 | viewer too close | the viewer frames as GS's (sphere centre (8, 0, 72)); ours sat at (-22, 0, 0) | bind pose moved by (30, 0, 72) (fmod2gu VIEW_SHIFT; every motion keys the bones, so only the viewer sees it) |
+| 16 | crescent slightly too small | scale = r / 260 | r / 200 |
+| 2 | same slots / affinity | MHF's six share them (record +19 slots, +14 affinity) | MHF's 16932 (3 slots, 50 %), 16926 / 17511 (0 slots, sharpness id 0: a full red-to-purple bar) added |
+| 6 | sound only on draw / sheathe | not traced yet | - |
+
 ## Test 1 (Phase 3; save backup dump/save_backups/2026-10-29_before_magnet_spike)
 Test 2 changes the buttons: ZR held = aim, R + ZR = Guard Counter.
 Buttons (MHF -> Switch by position): tri X, circle A, tri + circle X + A, special B, R1 R, R2 ZR, SELECT Minus,

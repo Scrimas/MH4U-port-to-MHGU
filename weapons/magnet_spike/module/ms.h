@@ -30,6 +30,7 @@ struct ms_state {
     uint8_t slot;                   /* the GU attack slot armed last (0 / 1) */
     uint8_t gc_hits;                /* MS+0x66: guarded hits of the current guard */
     uint16_t held;                  /* last update's virtual buttons (player +0x13f4) */
+    uint32_t held32;                /* the whole word (+0x13fc): its unknown bits are logged (Minus, test 3) */
     uint16_t action;                /* the action ms_act last ran */
     float last_frame;
     uint32_t fired;                 /* events of the current action already run */

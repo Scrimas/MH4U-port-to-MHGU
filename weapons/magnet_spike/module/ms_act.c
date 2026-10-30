@@ -28,9 +28,12 @@
 #define BTN_X 0x20
 #define BTN_Y 0x80
 #define BTN_A 0x100
-#define BTN_SELECT 0x200            /* Minus, ZR: the user's Back / RT (test 1 runs 5-6) */
-#define BTN_ZR 0x800                /* MHF's R2 and L2 (user, test 2): ZR held = aim, R + ZR = Guard Counter (L / ZL =
-                                       GU's camera reset / lock-on, 0x400) */
+/* GU's player bits (+0x13f4; the control type swaps 0x40 / 0x800 and 0x200 / 0x400, roles 0x65f93c / 0x65f9b4 /
+ * 0x65f8ec): d-pad 0x1-0x8, B 0x10, X 0x20, R 0x40, Y 0x80, A 0x100, ZL 0x200, L 0x400, ZR 0x800 under the user's type
+ * (0x400 = GU's camera-reset role 0x27e970; test 3: ZL switched modes, as MHF's SELECT read 0x200) */
+#define BTN_MINUS 0xf000u           /* S: MHF's SELECT = the user's Minus (Back): the bits above ZR, narrowed by the
+                                       "other buttons" log */
+#define BTN_ZR 0x800                /* MHF's R2 and L2 (user, test 2): ZR held = aim, R + ZR = Guard Counter */
 #define CID_SHEATHE (3u << 13)      /* GU's common ids 0xd / 0xe (+0x1414): sheathe standing / moving (1/2, 1/3) */
 typedef uint32_t (*ms_mask_t)(void);
 #define R_MASK FN(ms_mask_t, 0x65f93c)   /* GU's R role: 0x40, or 0x800 under the other option (GS's translator) */
@@ -176,17 +179,18 @@ static int input(struct ms_state *s, uint32_t inp, uint32_t held, uint32_t trig,
     case 2: return (combo & 2) != 0;                    /* tri (22 = stick + tri: cmd_type 0xc adds the stick) */
     case 3: return (combo & 4) != 0;                    /* circle (6 = stick + circle) */
     case 4: return (combo & 0x40) != 0;                 /* tri + circle */
-    case 5: return (trig & BTN_SELECT) != 0;
+    case 5: return (trig & BTN_MINUS) != 0;
     case 7: return rh && (combo & 2);
     case 8: return rh && (combo & 4);
     case 9: return rh && (combo & 0x40);
-    case 10: return rh && (trig & BTN_B);
-    case 11: return rh && (trig & BTN_SELECT);
+    case 10: return rh && (trig & BTN_Y);               /* R1 + special (the left step): R + the left button */
+    case 11: return rh && (trig & BTN_MINUS);
     case 13: return (rh && (trig & BTN_ZR)) || ((held & BTN_ZR) && (trig & r));     /* R + ZR, either order */
     case 14: return (held & BTN_A) != 0;
     case 15: return !(held & BTN_A);                    /* circle not held (a level) */
     case 16: return (trig & r) != 0;
-    case 17: return rh && (trig & BTN_Y);
+    case 17: return rh && (trig & BTN_B);               /* R1 + evade (cross, the back step): R + the bottom one
+                                                           (test 3: positions; they were the other way round) */
     case 19: return aim && (combo & 4);
     case 20: return 1;
     case 21: return !(held & BTN_X);
@@ -221,10 +225,8 @@ static void shock_tick(uint8_t *p, struct ms_state *s, float tk)
 #define MARKER_BLINK 60.0f
 #define AURA_EVERY 45.0f
 
-static void marker_blink(uint8_t *p, struct ms_state *s)
+static void *flash_at(uint8_t *p, const float *t)       /* the marker's flash at a world point */
 {
-    float t[3];
-    if (!marker(s, t)) return;
     uint32_t buf[0x100 / 4 + 4];
     void *req = (void *)(((uint32_t)buf + 15u) & ~15u);
     MS_REQ_CTOR(req);
@@ -233,6 +235,14 @@ static void marker_blink(uint8_t *p, struct ms_state *s)
     FIELD(float, req, 0xcc) = 0.0f;
     void *h = ((ms_efx_t)MS_VT(p, 0x39c))(p, MS_EFX_MARKER, req, 1);
     MS_REQ_DTOR(req);
+    return h;
+}
+
+static void marker_blink(uint8_t *p, struct ms_state *s)
+{
+    float t[3];
+    if (!marker(s, t)) return;
+    void *h = flash_at(p, t);
     static int s_n;
     if (s_n++ < 5) logf("msport: marker flash at %d %d %d (effect %x)", (int)t[0], (int)t[1], (int)t[2],
                         (uint32_t)(uintptr_t)h);
@@ -290,6 +300,13 @@ void ms_input(uint8_t *p)
         FIELD(uint32_t, p, 0x1418) &= ~(3u << 17);
         if (set && (trig & (BTN_B | BTN_Y))) FIELD(uint32_t, p, 0x1414) &= ~CID_SHEATHE;
     }
+    if (s->flags & 1) FIELD(uint32_t, p, 0x1414) &= ~CID_SHEATHE;   /* aiming: Y is not GU's sheathe (test 3) */
+    uint32_t held32 = FIELD(uint32_t, p, 0x13fc);
+    if ((held32 ^ s->held32) & ~0xfffu) {
+        static int s_n;
+        if (s_n++ < 60) logf("msport: other buttons %x (was %x)", held32, s->held32);
+    }
+    s->held32 = held32;
     if (held != s->held) {
         static int s_n;
         if (s_n == 0) logf("msport: GU's R role mask %x, dt %d/100", r, (int)(FIELD(float, p, 0x1c) * 100));
@@ -300,9 +317,34 @@ void ms_input(uint8_t *p)
 
 /* ------------------------------------------------------------------------------------------------ hits, guard */
 
+/* the hit view (test build; test 3: "misses visible hits"): an armed attack flashes the marker at both ends of its
+ * first hand capsule (msbuild HIT_CAPS), placed with the joint's world matrix: the joint record (joints +0x494, its
+ * index from the id table +0x498, 160 bytes) has its rows at +0x10 / +0x20 / +0x30 and the position at +0x40, which
+ * GU's lookup 0x53ab30 returns */
+#define MS_HIT_VIEW 1
+
+static void hit_view(uint8_t *p, struct ms_state *s, uint32_t hit)
+{
+    const uint8_t *ids = FIELD(const uint8_t *, p, 0x498), *js = FIELD(const uint8_t *, p, 0x494);
+    if (!MS_HIT_VIEW || hit >= MS_NCAPS || !ms_hit_cap[hit][0] || !ids || !js) return;
+    const int16_t *c = ms_hit_cap[hit];
+    uint32_t i = ids[c[0] & 0xff];
+    if (i == 0xff) return;
+    const float *m = (const float *)(js + 0xa0 * i + 0x10);
+    for (int e = 0; e < 2; e++) {
+        const int16_t *v = c + 1 + 3 * e;
+        float t[3];
+        for (int k = 0; k < 3; k++) t[k] = v[0] * m[k] + v[1] * m[4 + k] + v[2] * m[8 + k] + m[12 + k];
+        flash_at(p, t);
+    }
+    static int s_n;
+    if (s_n++ < 60) logf("msport: armed hit %u in action %u at f%d", hit, s->action, (int)MS_FRAME(p));
+}
+
 static void arm(uint8_t *p, struct ms_state *s, uint32_t hit)
 {
     if (!hit) return;
+    hit_view(p, s, hit);
     if (s->mag[s->mode] == 1) hit += MS_MAG_BASE;       /* Magnetise: MV x 1.1 (msbuild's copies) */
     s->slot ^= 1;                                       /* two slots: an attack may still be live when the next arms */
     s->armed[s->slot] = (uint16_t)hit;

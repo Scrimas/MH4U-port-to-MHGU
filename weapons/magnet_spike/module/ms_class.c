@@ -45,7 +45,10 @@ void ms_reset(struct ms_state *s)   /* a new hunter object: MHF's quest-start st
  * the sheathed pose otherwise). */
 static int state178(uint8_t *p) { return ((int (*)(void *))MS_VT(p, 0x178))(p) == 1; }
 static void tbl(uint8_t *p, uint32_t id, int frame) { MS_SET_TABLE(p, id, frame); }
-static void pick392(uint8_t *p, int frame) { tbl(p, 2000, frame); }
+static void pick392(uint8_t *p, int frame)       /* drawn idle 1/0; the drawn walk 2/0 has MHF's walk attacks */
+{
+    tbl(p, FIELD(uint16_t, p, 0x2506) == 2 ? 2001 : 2000, frame);
+}
 static void pick398(uint8_t *p) { tbl(p, 2010, 0); }
 static void pick404(uint8_t *p) { tbl(p, 2011, 0); }
 static void pick412(uint8_t *p) { tbl(p, state178(p) ? 2015 : 2014, 0); }
@@ -393,23 +396,33 @@ struct ms_weapon {
     uint16_t raw, elem;                          /* GU true raw, element / 10 */
     uint16_t item[4];
     uint8_t num[4];
+    uint8_t slots;
+    int8_t aff;                                  /* MHF record +19 slots, +14 affinity % */
 };
 static const struct ms_weapon s_weapons[] = {
-    {"Magnet Spike", "", 1, 0, 0, 0, 100, 0, {0}, {0}},                        /* 0: the equip fallback's dummy */
+    {"Magnet Spike", "", 1, 0, 0, 0, 100, 0, {0}, {0}, 3, 0},                  /* 0: the equip fallback's dummy */
     /* descriptions as GU's: up to 3 lines of <= 32 characters (test 1: one long line ran out of the box) */
-    {"Proto Spike", "A test-built Magnet Spike\r\nfrom the Frontier.", 1, 3, 0, 0, 200, 0, {0}, {0}},
+    {"Proto Spike", "A test-built Magnet Spike\r\nfrom the Frontier.", 1, 3, 0, 0, 200, 0, {0}, {0}, 3, 0},
     {"Demon Flamespike \"Flash\"", "A Magnet Spike that burns\r\nwith a demon's flame. Its\r\nmagnetism scorches.",
-     2, 7, 1, 0, 352, 24, {1576, 1570, 1585, 335}, {2, 4, 1, 5}},              /* MHF 17516: raw 640, fire 80 */
+     2, 7, 1, 0, 352, 24, {1576, 1570, 1585, 335}, {2, 4, 1, 5}, 3, 0},        /* MHF 17516: raw 640, fire 80 */
     {"Volnoborin IV", "A Magnet Spike that surges\r\nlike a riptide. Its poles\r\ndrip with seawater.",
-     3, 7, 2, 3, 310, 45, {890, 888, 818, 332}, {2, 3, 4, 5}},                 /* MHF 17563: 564, water 150 */
+     3, 7, 2, 3, 310, 45, {890, 888, 818, 332}, {2, 3, 4, 5}, 3, 0},           /* MHF 17563: 564, water 150 */
     {"Torid Pillar \"Uzi\"", "A Magnet Spike charged with\r\nthunder. Its field crackles\r\nwith every swing.",
-     4, 7, 3, 1, 309, 47, {1246, 1249, 1256, 330}, {2, 4, 1, 5}},              /* MHF 16964: 562, thunder 155 */
+     4, 7, 3, 1, 309, 47, {1246, 1249, 1256, 330}, {2, 4, 1, 5}, 3, 0},        /* MHF 16964: 562, thunder 155 */
     {"Anoru Pillar \"Wandemu\"", "A Magnet Spike of frozen\r\niron. Its field freezes the\r\nair around it.",
-     5, 7, 5, 2, 303, 50, {1145, 332, 331, 330}, {6, 6, 5, 5}},                /* MHF 16968: 551, ice 165 */
+     5, 7, 5, 2, 303, 50, {1145, 332, 331, 330}, {6, 6, 5, 5}, 3, 0},          /* MHF 16968: 551, ice 165 */
     {"Apophis Pillar \"Flash\"", "A Magnet Spike that draws\r\ndragon power into its core.",
-     6, 7, 4, 0, 352, 24, {1695, 1693, 1457, 332}, {3, 4, 1, 5}},              /* MHF 16933: 640, dragon 80 */
+     6, 7, 4, 0, 352, 24, {1695, 1693, 1457, 332}, {3, 4, 1, 5}, 3, 0},        /* MHF 16933: 640, dragon 80 */
     {"Apophis Pillar \"Clear\"", "A pure Magnet Spike: no\r\nelement, all force.",
-     7, 7, 0, 0, 374, 0, {1488, 1490, 1523, 330}, {2, 3, 1, 5}},               /* MHF 16936: raw 680 */
+     7, 7, 0, 0, 374, 0, {1488, 1490, 1523, 330}, {2, 3, 1, 5}, 3, 0},         /* MHF 16936: raw 680 */
+    /* test 3 (user: "add other Magnet Spikes whose values differ"): MHF's own lower ones on the same models, rarity
+     * scaled 12 -> 8; recipes from GU's ores and parts of the tier */
+    {"Shesha Pillar \"Clear\"", "A pure Magnet Spike honed\r\nfor critical blows.",
+     7, 6, 0, 5, 165, 0, {329, 1494, 334, 409}, {5, 2, 3, 3}, 3, 50},          /* MHF 16932: rarity 11, raw 300 */
+    {"Ophion Pillar \"Flash\"", "A Magnet Spike whose dragon\r\nmagnet drags prey into\r\nreach.",
+     6, 3, 4, 4, 116, 7, {325, 1439, 1441, 324}, {4, 2, 2, 3}, 0, 0},          /* MHF 16926: 6, 210, dragon 22 */
+    {"Demon Flamespike", "A first Magnet Spike forged\r\naround a flame sac.",
+     2, 1, 1, 4, 83, 6, {318, 320, 460, 1172}, {5, 3, 1, 2}, 0, 0},            /* MHF 17511: 2, 150, fire 20 */
 };
 
 /* the sharpness (C): MHF's bars, mhfdat header +0xac -> per weapon type, the Magnet Spike's (13) at 0x18ff500 = 8
@@ -421,6 +434,9 @@ const uint16_t ms_kire_rows[][7] = {
     {0, 0, 110, 110, 200, 270, 450},        /* id 13 (16964): yellow 110, blue 90, white 70, purple 50 + 80 */
     {0, 0, 0, 0, 300, 300, 450},            /* id 17 (16968): blue 300, purple 45 + 55 */
     {150, 150, 150, 150, 310, 310, 450},    /* id 21 (17563): red 150, blue 160, purple 50 + 40 */
+    {40, 90, 160, 240, 320, 380, 450},      /* id 0 (16926, 17511): red 40, orange 50, yellow 70, green 80, blue 80,
+                                               white 60, purple 20 */
+    {270, 270, 270, 270, 270, 300, 450},    /* id 1 (16932): red 270, white 30, purple 50 + 50 */
 };
 const uint32_t ms_nkire = sizeof ms_kire_rows / sizeof ms_kire_rows[0];
 uint32_t ms_kire_base;
@@ -482,9 +498,9 @@ static void build_records(void *equip)
                                                                            endgame GS's if ours were refused) */
         FIELD(uint8_t, l, 11) = 10;                                      /* bar length step */
         FIELD(uint16_t, l, 12) = w->raw;
-        FIELD(uint8_t, l, 14) = 0; FIELD(uint8_t, l, 15) = 0;            /* defense, affinity (MHF: 0) */
+        FIELD(uint8_t, l, 14) = 0; FIELD(int8_t, l, 15) = w->aff;        /* defense, affinity */
         FIELD(uint16_t, l, 16) = w->elem;
-        FIELD(uint8_t, l, 18) = 3;                                       /* slots */
+        FIELD(uint8_t, l, 18) = w->slots;
     }
     s_records = 1;
     logf("msport: %u type-12 weapons from Great Sword 1's records", (uint32_t)MS_NWEAPONS);

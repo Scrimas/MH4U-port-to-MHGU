@@ -199,7 +199,11 @@ def attack_instances(acts):
     return out
 
 
+HIT_CAPS = []        # per hit entry: its first hand capsule (joint, end A, end B; cm) for ms_act.c's hit view
+
+
 def build_hits(acts, sdt_d, w00, w02, own, holders, wdata):
+    HIT_CAPS[:] = [(0,) * 7]
     es = sdt.entries(sdt_d)
     kinds = {}
     for kind in (0x78, 0x79):
@@ -223,7 +227,9 @@ def build_hits(acts, sdt_d, w00, w02, own, holders, wdata):
             report.append('hit   -: %s MHF special %2d MV 0: not armed (ms_act.c does its job)' % (where, aid))
             continue                             # grab 8 m, #11): GU would land 0-damage hits
         cut = bool(r['type'] & 0x200)            # attacks 0x20a cut / 0x10a impact, specials 0x200 / 0x100
-        dur = r['raw'][1]
+        dur = 2 * r['raw'][1]                    # MHF's live time counts its 30 Hz ticks, motions run 2 frames a
+                                                 # tick (Triple Strike: 20-tick cue at f40); test 3: hits lived half
+                                                 # as long ("A misses, A misses, A hits": 14 ticks vs 22, one shape)
         mid_f = frame + dur // 2
         part, s = (mot - 1000) // 100, (mot - 1000) % 100
         mo = w13w[part].get(s)
@@ -246,6 +252,8 @@ def build_hits(acts, sdt_d, w00, w02, own, holders, wdata):
                 off = np.array([SHOCK[key[1]][0], 0.0, SHOCK[key[1]][1]]) if key[0] == 'shock' else 0.0
                 shp.append(mshit.capsule(255, rad, pa[:3] + off, pb[:3] + off))
         sets.append(shp)
+        cap = next((c for c in shp if c[0] != 255), None)
+        HIT_CAPS.append((cap[0],) + tuple(int(round(v)) for v in cap[6:9] + cap[10:13]) if cap else (0,) * 7)
         swings.append(dict(mot=mot, frame=frame, dur=dur, cut=cut, special=special, tip=tip and tip[:2]))
         e = mshit.hdp_entry(tmpl_cut if cut else tmpl_imp, r['mv'], dur, mshit.CUT if cut else mshit.IMPACT,
                             len(sets) - 1, None if cut else r['ko'])
@@ -379,16 +387,27 @@ def idle_commands(C, window):
 # 59 Cutting / 73 Impact (the attraction flight's tri, 58 -> 59 / 68 -> 73), which run airborne until they land
 FALLING = (59, 73)
 JUMP_TABLES = (18, 19)
+# MHF's drawn walk (stick: 40 Cutting / 44 Impact) has attacks of its own (Cutting tri 48, circle 49, R1+tri+circle 51,
+# aimed tri 61; Impact tri 52, circle 54, R1+tri+circle 53, R1+tri 146, aimed tri 71; test 3: "attacks while walking
+# are the idle ones"): GU's drawn walk (2/0: table 1, ms_class.c pick392), walk start (1/6: table 11) and rolls
+# (tables 12 / 13) list them before the idle inputs. MHF's roll is a shared action (no MS data of its own); after it
+# the user knows "the second Y -> Y and B -> B moves, but faster": the walk attacks (48 = a lead-in into tri 2's
+# swing, 49 into circle 2's)
+WALK = (40, 44)
+WALK_TABLES = (1, 11, 12, 13)
+WALK_CANCELS = []                     # (mode, input, cond, next), MHF's walk cancels unlike idle's (build_commands)
 
 
 def weapon_commands(C, k, window):
     """the Magnet Spike's commands for a GU common-action table k that had GS's weapon commands (in their place, with
-    their window): 18 / 19 jumps = the falling attacks, else the drawn-idle inputs (0 drawn idle, 10, 11 drawn move,
-    12 / 13 rolls)"""
+    their window): 18 / 19 jumps = the falling attacks, 1 / 11 walking = the walk's own attacks then the drawn-idle
+    inputs, else the drawn-idle inputs (0 drawn idle, 10, 12 / 13 rolls)"""
     if k in JUMP_TABLES:
         return [cmd_obj(p, *window) for mode, act in enumerate(FALLING) if act in ACTIONS
                 for p in cancel_commands(C, None, dict(next=act, input=2, cond=0), mode)]
-    return idle_commands(C, window)
+    walk = [cmd_obj(p, *window) for mode, inp, cond, nxt in WALK_CANCELS
+            for p in cancel_commands(C, None, dict(next=nxt, input=inp, cond=cond), mode)] if k in WALK_TABLES else []
+    return walk + idle_commands(C, window)
 
 
 def build_commands(acts, gs_m0):
@@ -396,13 +415,17 @@ def build_commands(acts, gs_m0):
     C = Commands(gs_m0)
     gst = gs_tables(gs_m0)
     tables, report = [], []
+    WALK_CANCELS[:] = [(mode, c['input'], c['cond'], c['next']) for mode, a in enumerate(WALK)
+                       for c in sorted(acts[a]['cancels'], key=lambda c: -c['pri'])
+                       if c['input'] not in (0, 1) and msact.IDLE.get(c['input'], (None, None))[mode] != c['next']]
+    report.append('walk attacks (mode, input, cond, action): %s' % WALK_CANCELS)
     # 0 = drawn idle, 10-46 = GS's common-action tables (the table pickers ms_class.c keep GS's indexes), GS's weapon
     # commands replaced by ours at their place: before GU's move / Hunter Arts commands (GU takes the first ready
-    # command: test 1's idle table had them after, so attacks never started while the stick was tilted); 1-9 = GS's
-    # attack tables have no Magnet Spike counterpart (empty)
-    def common_table(k):
+    # command: test 1's idle table had them after, so attacks never started while the stick was tilted); 1 = the
+    # drawn walk (WALK_TABLES); 2-9 = GS's attack tables have no Magnet Spike counterpart (empty)
+    def common_table(k, src=None):
         out, done = [], False
-        for c in gst[k]:
+        for c in gst[k if src is None else src]:
             name = c['CmdBase'][1].split('\\')[-1]
             window = [struct.unpack('<f', struct.pack('<I', c[f]))[0] for f in ('PreFrame', 'StartFrame', 'EndFrame')]
             if name.startswith('plcmd_w00'):
@@ -415,7 +438,8 @@ def build_commands(acts, gs_m0):
                 o['CmdBase'][1].split('\\')[-1].replace('plcmd_', '') for o in out)))
         return out
     tables.append(common_table(0))
-    tables += [[] for _ in range(9)]
+    tables.append(common_table(1, src=0))           # the drawn walk: the idle table + MHF's walk attacks
+    tables += [[] for _ in range(8)]
     tables += [common_table(k) for k in range(10, len(gst))]
     # one table per (action, step), the cancels in priority order (GU takes the first ready command; GU's move last
     # among equals: test 1's X + A after the Guard Counter lost to a tilted stick)
@@ -469,6 +493,9 @@ def c_tables(acts, modes, own, tbl_index, hit_index, mvs):
           '#define MS_EFX_AURA %d  /* msfx.AURA_EFX */' % msfx.AURA_EFX[0]]
     L += ['#define MS_NHITS %d' % len(mvs), 'static const uint16_t ms_hit_mv[] = {'] + [
         '    %s,' % ', '.join(str(v) for v in mvs[i:i + 20]) for i in range(0, len(mvs), 20)] + ['};']
+    L += ['#define MS_NCAPS %d' % len(HIT_CAPS),
+          'static const int16_t ms_hit_cap[][7] = {   /* hit view: joint, end A, end B (cm, the joint\'s frame) */'] + [
+        '    {%s},' % ', '.join(map(str, c)) for c in HIT_CAPS] + ['};']
     steps, events, rows = [], [], []
     for a in ACTIONS:
         s0, e0 = len(steps), len(events)

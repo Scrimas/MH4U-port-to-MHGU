@@ -29,6 +29,10 @@ import mod4u2gu, arcpack, tex
 from msgrip import TURN
 
 T_TEX, T_MRL, T_MOD = 0x241f5deb, 0x2749c8a8, 0x58a15856
+# the smithy viewer frames a weapon as it frames GS's (test 3: ours "too close", cut at the bottom and side; GS's
+# bounding sphere centre (8, 0, 72), ours (-22, 0, 0)): the bind pose moves by VIEW_SHIFT (vertices and the roots'
+# children). Every motion keys those bones (the sheathed weapon = weapon motion 0), so only the viewer sees it
+VIEW_SHIFT = np.array([30.0, 0.0, 72.0])
 GU_FMT, STRIDE = 0x14D40022, 28
 
 
@@ -49,7 +53,7 @@ def skeleton(bones):
     order = sorted(by)
     assert order == list(range(len(order))), 'FSKL node ids must be 0..n-1'
     local, world = {}, {}
-    turn = np.eye(4); turn[:3, :3] = TURN
+    turn = np.eye(4); turn[:3, :3] = TURN; turn[:3, 3] = VIEW_SHIFT
     def walk(n):
         b = by[n]; L = np.eye(4); L[:3, :3] = euler(b['rot']); L[:3, 3] = b['pos']
         if b['parent'] < 0: assert np.allclose(L, np.eye(4), atol=1e-5), 'root %d is not at identity' % n
@@ -66,11 +70,11 @@ def build_mod(fm, fs, material):
     meshes = fmod.parse(fm); _, bones = fskl.parse(fs)
     order, parents, local, world, by = skeleton(bones)
     nb = len(order)
-    allpos = np.concatenate([np.array(m['pos'], float) for m in meshes]) @ TURN.T
+    allpos = np.concatenate([np.array(m['pos'], float) for m in meshes]) @ TURN.T + VIEW_SHIFT
     lo, hi = allpos.min(0), allpos.max(0); cube = float((hi - lo).max())
     vb = bytearray(); ib = bytearray(); recs = []; envs = []; ntri = 0; furthest = np.zeros(nb)
     for mi, m in enumerate(meshes):
-        P = np.array(m['pos'], float) @ TURN.T; n = len(P)
+        P = np.array(m['pos'], float) @ TURN.T + VIEW_SHIFT; n = len(P)
         N = np.clip(np.round(np.array(m['normal'], float) @ TURN.T * 127), -127, 127).astype(np.int8)
         N = np.concatenate([N, np.full((n, 1), 127, np.int8)], 1)
         UV = np.array(m['uv'], float) if m['uv'] else np.zeros((n, 2))
