@@ -199,7 +199,8 @@ def attack_instances(acts):
     return out
 
 
-HIT_CAPS = []        # per hit entry: its first hand capsule (joint, end A, end B; cm) for ms_act.c's hit view
+HIT_CAPS = []        # per hit entry: its first hand capsule (joint, end A, end B; cm), then the same ends on its weapon
+                     # bone (bone, A, B in its frame) for ms_act.c's hit check
 
 
 GHOST = 0.5                           # the ghost's lag behind the blade, motion frames (GU: one motion frame an update)
@@ -239,7 +240,7 @@ def ghosts(mot, f0, dur, hs, hm, tr, wsh, shp, tip, w13, bbones, weapon):
 
 
 def build_hits(acts, sdt_d, w00, w02, own, holders, wdata):
-    HIT_CAPS[:] = [(0,) * 7]
+    HIT_CAPS[:] = [(0,) * 14]
     es = sdt.entries(sdt_d)
     kinds = {}
     for kind in (0x78, 0x79):
@@ -292,8 +293,12 @@ def build_hits(acts, sdt_d, w00, w02, own, holders, wdata):
         gh, back = ghosts(mot, frame, dur, hs, hand, tr, wsh, shp, tip, w13, bbones, weapon) if wsh and tip else ([], 0)
         shp += gh
         sets.append(shp)
-        cap = next((c for c in shp if c[0] != 255), None)
-        HIT_CAPS.append((cap[0],) + tuple(int(round(v)) for v in cap[6:9] + cap[10:13]) if cap else (0,) * 7)
+        if wsh:                                      # + the same ends in their weapon bone's frame (the model check)
+            k, kb, pa, pb = wsh[0]
+            HIT_CAPS.append((shp[k][0],) + tuple(int(round(v)) for v in tuple(shp[k][6:9]) + tuple(shp[k][10:13])) +
+                            (kb,) + tuple(int(round(v)) for v in tuple(pa[:3]) + tuple(pb[:3])))
+        else:
+            HIT_CAPS.append((0,) * 14)
         swings.append(dict(mot=mot, frame=frame, dur=dur, cut=cut, special=special, tip=tip and tip[:2]))
         e = mshit.hdp_entry(tmpl_cut if cut else tmpl_imp, r['mv'], dur, mshit.CUT if cut else mshit.IMPACT,
                             len(sets) - 1, None if cut else r['ko'])
@@ -535,7 +540,8 @@ def c_tables(acts, modes, own, tbl_index, hit_index, mvs):
     L += ['#define MS_NHITS %d' % len(mvs), 'static const uint16_t ms_hit_mv[] = {'] + [
         '    %s,' % ', '.join(str(v) for v in mvs[i:i + 20]) for i in range(0, len(mvs), 20)] + ['};']
     L += ['#define MS_NCAPS %d' % len(HIT_CAPS),
-          'static const int16_t ms_hit_cap[][7] = {   /* hit view: joint, end A, end B (cm, the joint\'s frame) */'] + [
+          'static const int16_t ms_hit_cap[][14] = {   /* hit check: joint, end A, end B (cm, the joint\'s frame), '
+          'weapon bone, end A, end B (its frame) */'] + [
         '    {%s},' % ', '.join(map(str, c)) for c in HIT_CAPS] + ['};']
     steps, events, rows = [], [], []
     for a in ACTIONS:

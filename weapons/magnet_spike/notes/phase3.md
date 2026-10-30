@@ -111,6 +111,19 @@ B 0x10, X 0x20, R 0x40, Y 0x80, A 0x100, ZL 0x200, L 0x400, ZR 0x800 (roles 0x65
 | 11 | sheathed weapon carried like a GS | GS's carry record; MHF's: a ∩ on the back (curve behind the shoulders, prongs down past the hips), MHF keys it in code or its draw / sheathe motions (1471-1473 candidates) | later |
 | - | test 4's armed-hit log (cap 60) ran out in the village | - | quest-only, with the nearest monster's distance (cap 400) |
 
+## Test 5 results (user, 2026-10-30) and fixes
+
+| # | report | finding | change |
+|---|---|---|---|
+| 1 | not every visible hit lands, some late; the crescent late too | with a large monster 1.5-3 m away most armed attacks landed (ghosts), but actions 48 / 5 / 3 / 4 (armed f6-f13) landed 0.34-0.45 s later, at motion frames 33-35 whatever their arming frame, while MHF's blade peaks f15-21 (motion 1047: f18): the capsule does not sit where GU draws the blade (MHF FK: 0 cm). The crescents posted at the live window's middle, 14-24 frames after arming since test 3 doubled the windows | hit check log (ms_act.c hit_check: capsule end via the hunter's joint vs the same point on the drawn weapon's bone, at arming and +8 frames); msfx posts each arc at the swing's fastest frame (4-5 frames after arming) |
+| 2 / 4 | no charged / marker flash | GU's code post vt+0x39c is called as GU's classes do (p, id, p + 0x2550, 1; GS: 6 / 7 / 36 = list 1, so test 4's list-2 reading was wrong) and returned 0 for every id under class 5 (GS's own 7 in test 3). The class list exists: 0x29adbc reads file ID 0x162868c[class] (class 5 = 0x89a = effect\pel\pl\w05_000) into +0x3304 | ms.h ms_post: 0x282548(p, +0x3304, list 1, id, req, 0) -> 0x53b500 -> 0x40978 (extra 0 null-checked); the guard log prints the handle |
+| 4 | marker never placed | all six shots "missed": no large monster alive (em_ok, large only) | none (aim at the large monster) |
+| 5 | pin | the leap's grab never hit (2 landings) | waits on 1 |
+| 6 | jump attack | three hops (1/137, 0.7 s): no press logged in any | the jump log adds held buttons |
+| 8 | no element (smithy, hits) | the attack's element comes from the hunter's stats vt+0x15c (0x11 type, 2 value), filled at equip time; the smithy reads the weapon data through per-class code (13 class readers of mElement, 0x1014d8..0x125350) | log of the hunter's stats at the first quest frame |
+| 9 | viewer unchanged | the bounding sphere does not set its framing | reverted |
+| user | ghost size | tuned to ~60 updates / s (the 120 FPS cheat, dt 0.5): native 30 fps moves 2 frames per check | before release: a hunt without the cheat, resize (a dt-based second set would pass GU's 255-set limit) |
+
 ## Test 1 (Phase 3; save backup dump/save_backups/2026-10-29_before_magnet_spike)
 Test 2 changes the buttons: ZR held = aim, R + ZR = Guard Counter.
 Buttons (MHF -> Switch by position): tri X, circle A, tri + circle X + A, special B, R1 R, R2 ZR, SELECT Minus,

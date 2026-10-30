@@ -57,6 +57,8 @@ struct ms_state {
     float pin_hold, pin_cd, qte, pin_off[3];
     uint16_t pin_yaw_m, pin_yaw_p;
     uint16_t armed[2];              /* hit-data entry armed in each attack slot */
+    uint16_t chk_hit;               /* hit check pending (ms_act.c hit_check) at motion frame chk_f */
+    float chk_f;
     uint8_t shock_on, shock_k;      /* Magnetic Shock 5 x 3 task running, spots spawned */
     float shock_t;                  /* its ticks */
     float mk_blink, aura_t;         /* ticks to the marker's and Magnetise's next flash */
@@ -124,10 +126,19 @@ typedef uint8_t *(*ms_em_t)(void *mgr, int i);
 #define MS_EM_MGR (*(void **)MAIN(0x1851fe0))
 #define MS_CAM_MGR (*(uint8_t **)MAIN(0x2126504))     /* +0x54 = the camera: eye +0x40, look-at +0x60 */
 #define MS_U16_RAD 9.58738e-5f                        /* u16 angle -> radians */
-typedef void *(*ms_efx_t)(void *p, uint32_t id, void *req, uint32_t one);
-#define MS_EFFECT(p, id) ((ms_efx_t)MS_VT(p, 0x39c))(p, id, (uint8_t *)(p) + 0x2550, 1)   /* 0x282624: post the
-                                     class PEL's list-1 record id (GS's w00_000 copy as w05_000) on the hunter's
-                                     request (GU's classes: arg 1 in 112 of 115 calls) */
+/* effects: GU's code post vt+0x39c (p, id, p + 0x2550, 1) = 0x282624 -> the +0x2634 job's slot 0x150, as GU's
+ * classes call it (GS: ids 6 / 7 / 36, list 1), returned 0 for every id under class 5 (tests 3-5, GS's own flash 7
+ * included). Posted straight through the player's wrapper 0x282548(unit, list handle, list, id, req, extra) ->
+ * 0x53b500 -> 0x40978 with the class list handle +0x3304 (0x29adbc: file ID 0x162868c[class], class 5 = 0x89a =
+ * effect\pel\pl\w05_000; extra 0 = none, null-checked in 0x42f08) */
+typedef void *(*ms_post_t)(void *unit, void *pel, uint32_t list, uint32_t id, void *req, void *extra);
+#define MS_POST FN(ms_post_t, 0x282548)
+static inline void *ms_post(uint8_t *p, uint32_t id, void *req)
+{
+    void *pel = FIELD(void *, p, 0x3304);
+    return pel ? MS_POST(p, pel, 1, id, req, 0) : 0;
+}
+#define MS_EFFECT(p, id) ms_post((uint8_t *)(p), id, (uint8_t *)(p) + 0x2550)
 typedef void (*ms_req_t)(void *req);
 #define MS_REQ_CTOR FN(ms_req_t, 0x40b10)             /* a proof-effect request (~0xd8 B, em089_efx.c): +0x1c flags (bit
                                                          0 = at the world position +0xc0), +0xd0 attach model */

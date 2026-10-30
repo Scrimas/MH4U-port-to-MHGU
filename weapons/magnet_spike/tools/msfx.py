@@ -80,13 +80,16 @@ def arc(sw, wdata, holders):
     n = frames_of(w13, mot)
     tr, body, hs = msgrip.tracks_of(mo, weapon.bones), msmot.body_world(w13, bbones, mot), holders.get(mot)
     fa, fb = max(0, f0 - LEAD), min(n - 2, f0 + max(sw['dur'], 1))
-    post = min((f0 + fb) // 2, n - 2)
+    Wp = [body(f)[hs[min(f, len(hs) - 1)] if hs else 14] @ msgrip.pose(weapon.bones, tr, f)[bone] @ pt
+          for f in range(fa, fb + 1)]
+    if len(Wp) < 3: return None
+    # posted at the swing's fastest frame from the arming on (test 5: "even the crescent seems delayed": the
+    # window's middle moved 7-12 frames later when test 3 doubled the live time)
+    steps = range(max(f0 - fa, 1), len(Wp))
+    if not steps: return None                       # armed on the motion's last frames: no swing left
+    post = fa + max(steps, key=lambda i: np.linalg.norm((Wp[i] - Wp[i - 1])[:3]))
     U = np.linalg.inv(body(post)[1])
-    P = []
-    for f in range(fa, fb + 1):
-        hand = hs[min(f, len(hs) - 1)] if hs else 14
-        P.append((U @ body(f)[hand] @ msgrip.pose(weapon.bones, tr, f)[bone] @ pt)[:3])
-    if len(P) < 3: return None
+    P = [(U @ q)[:3] for q in Wp]
     c, axis, r, sweep = fit(np.array(P))
     if not 40.0 <= r <= 500.0 or sweep < 35.0: return None
     h = P[post - fa] - c                                # the head on the blade at the post: the arc trails it

@@ -202,6 +202,7 @@ static int input(struct ms_state *s, uint32_t inp, uint32_t held, uint32_t trig,
 }
 
 static void arm(uint8_t *p, struct ms_state *s, uint32_t hit);
+static void hit_check(uint8_t *p, uint32_t hit, int late);
 
 /* Magnetic Shock 5 x 3 (MHF task kind 0x0f, 0x1004d810): special #12 at task ticks 3 / 5 / 7 / 10 on spots 170 ->
  * 550 cm ahead (msbuild SHOCK; S: the hits follow the hunter, MHF's stay where spawned), each with GS's ground impact
@@ -234,7 +235,7 @@ static void *flash_at(uint8_t *p, const float *t)       /* the marker's flash at
     FIELD(uint32_t, req, 0x1c) |= 1u;
     for (int i = 0; i < 3; i++) FIELD(float, req, 0xc0 + 4 * i) = t[i];
     FIELD(float, req, 0xcc) = 0.0f;
-    void *h = ((ms_efx_t)MS_VT(p, 0x39c))(p, MS_EFX_MARKER, req, 1);
+    void *h = ms_post(p, MS_EFX_MARKER, req);
     MS_REQ_DTOR(req);
     return h;
 }
@@ -282,14 +283,23 @@ void ms_input(uint8_t *p)
     INPUT_PRE(p);
     trace(p);
     struct ms_state *s = ms_of(p);
+    static int s_stats;
+    if (!s_stats++) {                                   /* test 5: no element in the smithy nor on hits: the stats the
+                                                           attack's element setup 0x2acfb8 reads (vt+0x15c 0x11 / 2) */
+        typedef int (*ms_stat_t)(void *u, uint32_t k);
+        ms_stat_t st = (ms_stat_t)MS_VT(p, 0x15c);
+        logf("msport: hunter stats: element type %d value %d, raw %d", st(p, 0x11), st(p, 2), st(p, 0));
+    }
     tick(p, s, tick_len(p));
+    if (s->chk_hit && MS_FRAME(p) >= s->chk_f) { hit_check(p, s->chk_hit, 1); s->chk_hit = 0; }
     uint32_t combo = FIELD(uint32_t, p, 0x1444), r = R_MASK();
     uint32_t held = FIELD(uint16_t, p, 0x13f4), trig = FIELD(uint16_t, p, 0x13f8);
     if ((held & BTN_ZR) && !(held & r) && ms_drawn(p)) s->flags |= 1; else s->flags &= ~1u;
     uint32_t jst = FIELD(uint16_t, p, 0x2506), jno = FIELD(uint16_t, p, 0x250a);
-    if (jst == 1 && (jno == 4 || jno == 5 || jno == 137 || jno == 140) && (trig || combo)) {
-        static int s_n;                                 /* test 4: "no jump attack" (tables 18 / 19, falling 59 / 73) */
-        if (s_n++ < 40) logf("msport: jump %u: pressed %x combo %x table %u frame %d", jno, trig, combo,
+    if (jst == 1 && (jno == 4 || jno == 5 || jno == 137 || jno == 140) && (trig || combo || held != s->held)) {
+        static int s_n;                                 /* test 4: "no jump attack" (tables 18 / 19, falling 59 / 73);
+                                                           test 5: no press logged in three hops */
+        if (s_n++ < 60) logf("msport: jump %u: held %x pressed %x combo %x table %u frame %d", jno, held, trig, combo,
                              FIELD(uint32_t, p, 0x24ac), (int)MS_FRAME(p));
     }
     uint32_t base = s->mode ? MS_ID_IMPACT : 0, set = 0;
@@ -324,26 +334,36 @@ void ms_input(uint8_t *p)
 
 /* ------------------------------------------------------------------------------------------------ hits, guard */
 
-/* the hit view (test build; test 3: "misses visible hits"): an armed attack flashes the marker at both ends of its
- * first hand capsule (msbuild HIT_CAPS), placed with the joint's world matrix: the joint record (joints +0x494, its
- * index from the id table +0x498, 160 bytes) has its rows at +0x10 / +0x20 / +0x30 and the position at +0x40, which
- * GU's lookup 0x53ab30 returns */
-#define MS_HIT_VIEW 1
+/* the hit check (test build; test 5: hits land up to 0.45 s after their swing, at motion frames 33-35 whenever they
+ * arm): an armed attack's first hand capsule end B (msbuild HIT_CAPS) placed as GU places it (the hunter's joint,
+ * world matrix of its joint record: joints +0x494, index from the id table +0x498, 160 bytes, rows +0x10 / +0x20 /
+ * +0x30, position +0x40, as GU's lookup 0x53ab30) against the same point on the drawn weapon (its weapon bone in the
+ * weapon model's own joint records, the part-0 object +0x23a0, same layout assumed), at arming and 8 frames later */
+#define MS_HIT_CHECK 1
 
-static void hit_view(uint8_t *p, uint32_t hit)
+static int joint_point(const uint8_t *u, uint32_t id, const int16_t *v, float t[3])
 {
-    const uint8_t *ids = FIELD(const uint8_t *, p, 0x498), *js = FIELD(const uint8_t *, p, 0x494);
-    if (!MS_HIT_VIEW || hit >= MS_NCAPS || !ms_hit_cap[hit][0] || !ids || !js) return;
-    const int16_t *c = ms_hit_cap[hit];
-    uint32_t i = ids[c[0] & 0xff];
-    if (i == 0xff) return;
-    const float *m = (const float *)(js + 0xa0 * i + 0x10);
-    for (int e = 0; e < 2; e++) {
-        const int16_t *v = c + 1 + 3 * e;
-        float t[3];
-        for (int k = 0; k < 3; k++) t[k] = v[0] * m[k] + v[1] * m[4 + k] + v[2] * m[8 + k] + m[12 + k];
-        flash_at(p, t);
-    }
+    const uint8_t *ids = u ? FIELD(const uint8_t *, u, 0x498) : 0, *js = u ? FIELD(const uint8_t *, u, 0x494) : 0;
+    if (!ids || !js || ids[id & 0xff] == 0xff) return 0;
+    const float *m = (const float *)(js + 0xa0 * ids[id & 0xff] + 0x10);
+    for (int k = 0; k < 3; k++) t[k] = v[0] * m[k] + v[1] * m[4 + k] + v[2] * m[8 + k] + m[12 + k];
+    return 1;
+}
+
+static void hit_check(uint8_t *p, uint32_t hit, int late)
+{
+    if (!MS_HIT_CHECK || hit >= MS_NCAPS || !ms_hit_cap[hit][0]) return;
+    const int16_t *c = ms_hit_cap[hit], z[3] = {0, 0, 0};
+    float a[3], b[3], h[3], r[3];
+    uint8_t *w = FIELD(uint8_t *, p, 0x23a0);
+    if (!joint_point(p, c[0], c + 4, a) || !joint_point(w, c[7], c + 11, b) || !joint_point(p, c[0], z, h) ||
+        !joint_point(w, 0, z, r)) return;
+    static int s_n;
+    if (s_n++ < 200)
+        logf("msport: hit %u check%s f%d: capsule end (%d %d %d), drawn blade (%d %d %d): %d cm apart; hand (%d %d %d), "
+             "weapon root (%d %d %d)", hit, late ? " +8" : "", (int)MS_FRAME(p), (int)a[0], (int)a[1], (int)a[2],
+             (int)b[0], (int)b[1], (int)b[2], (int)root(sq(a[0] - b[0]) + sq(a[1] - b[1]) + sq(a[2] - b[2])),
+             (int)h[0], (int)h[1], (int)h[2], (int)r[0], (int)r[1], (int)r[2]);
 }
 
 static int em_near(uint8_t *p)          /* ground distance (cm) to the nearest large monster's origin, -1 = none */
@@ -363,7 +383,8 @@ static int em_near(uint8_t *p)          /* ground distance (cm) to the nearest l
 static void arm(uint8_t *p, struct ms_state *s, uint32_t hit)
 {
     if (!hit) return;
-    hit_view(p, hit);
+    hit_check(p, hit, 0);
+    s->chk_hit = (uint16_t)hit; s->chk_f = MS_FRAME(p) + 8.0f;
     int d = em_near(p);                                 /* test 4's log ran out in the village: quests only */
     static int s_n;
     if (d >= 0 && s_n++ < 400) logf("msport: armed hit %u in action %u at f%d, monster %d cm", hit, s->action,
@@ -405,9 +426,9 @@ void ms_guarded(uint8_t *p, uint32_t level, uint8_t *info, int32_t *dmg)
     if (s->gc_hits < 255) s->gc_hits++;
     s->flags |= 8;
     MS_GUARD_STAMINA(p);
-    MS_EFFECT(p, MS_EFX_GUARD);                         /* MHF: 0xfc5 0x14 / 0x38 (S: a GS charge flash) */
-    logf("msport: guarded hit %u (level %u, damage %d) in action %u", s->gc_hits, level, dmg ? (int)*dmg : 0,
-         s->action);
+    void *h = MS_EFFECT(p, MS_EFX_GUARD);               /* MHF: 0xfc5 0x14 / 0x38 (S: a GS charge flash) */
+    logf("msport: guarded hit %u (level %u, damage %d) in action %u, effect %x (list handle %x)", s->gc_hits, level,
+         dmg ? (int)*dmg : 0, s->action, (uint32_t)(uintptr_t)h, FIELD(uint32_t, p, 0x3304));
 }
 
 /* slot 44 (+0xb0): "invulnerable now" (GU 0x2a680c: +0x274a bit 0 or the i-frame timer). The hit filter 0x16b15c
