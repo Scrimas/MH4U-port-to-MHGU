@@ -22,6 +22,8 @@
  *   em089_tar_mash @0x2bbb00 (r1 = word + 0x10000, count in bits 16..23): 5 presses make a step.
  *   em089_tar_webpost @0x2826f4: GU's web look (slot 19, shell 159) and its web wrap (slot 4, shell 101, posted at
  *       0x2baef0 and 0x2bbe8c) not posted.
+ *   em089_tar_shellpost @0x44cdd0 (the shell post 0x2826f4 wraps): GU's status look unit 0x44d260 posts the white
+ *       wrap (web status bit 0x100000 -> slot 4 shell 135) every frame from 0x44d4f8; not posted.
  *   em089_tar_hunters_tick (from the em089 effect tick): a hunter in GU's web actions (66, 68, 70..73 = 4U 106..110)
  *       after a tar hit (em089_tar_dmg, this machine's hunter) or a struggle start (em089_tar_struggle, any hunter:
  *       a remote hunter's hit is resolved on its own machine) gets PEL 7000 (qe008_026) on its effect shell's attach
@@ -140,6 +142,24 @@ int em089_tar_webpost_c(uint32_t *regs)
     if (!(web || wrap) || !em089_efx_present()) return 0;
     if (++s_n <= 20) logf("gogport: em089 tar: GU web look (slot %u shell %u) on hunter %x skipped", regs[R1], regs[R2],
                           regs[R0]);
+    regs[R0] = 0;
+    return 1;
+}
+
+/* 0x44cdd0(shell, slot, shell index, req, force) = the player effect shell's post (vt+0x158), which 0x2826f4 wraps.
+ * GU's white wrap = its status look unit 0x44d260 (twin of 4U 0x3284ac, per frame): web status bit 0x100000 ->
+ * slot 4 shell 135, posted every frame from 0x44d4f8 (test 2026-10-30 18:3x, our wrap off: the wrap stayed, with no
+ * web post through 0x2826f4). Skipped here for every hunter (the unit runs for players only; any web while an em089
+ * exists is tar, as em089_tar_dmg). */
+#define STATUS_WEB_SHELL  135u
+#define LR_STATUS_WEB     0x44d4fcu
+int em089_tar_shellpost_c(uint32_t *regs)
+{
+    static uint32_t s_n;
+    uint32_t lr = regs[LR] - MAIN_BASE;
+    if (lr != LR_STATUS_WEB || regs[R1] != WRAP_SLOT || regs[R2] != STATUS_WEB_SHELL || !em089_efx_present())
+        return 0;
+    if (++s_n <= 20) logf("gogport: em089 tar: GU web shell (slot %u shell %u, lr %x) skipped", regs[R1], regs[R2], lr);
     regs[R0] = 0;
     return 1;
 }
