@@ -202,6 +202,42 @@ def attack_instances(acts):
 HIT_CAPS = []        # per hit entry: its first hand capsule (joint, end A, end B; cm) for ms_act.c's hit view
 
 
+GHOST = 0.5                           # the ghost's lag behind the blade, motion frames (GU: one motion frame an update)
+MAX_SHAPES = 4                        # GU's own sets hold up to 4 shapes
+
+
+def ghosts(mot, f0, dur, hs, hm, tr, wsh, shp, tip, w13, bbones, weapon):
+    """test 4: GU tests an attack's shapes at each update's pose only, and MHF's swings move the blade tip up to 270 cm
+    a motion frame: short fast swings stepped over monster parts (actions 4 / 12 / 0 landed 0-1 of 5-8, the long
+    sweeps 6 of 8, all on the same two capsules). Each weapon capsule gets a copy GHOST frames behind it at the live
+    window's fastest frame, in the holding hand's frame (GU's fast weapons add a trail shape of their own, type 5, its
+    fields not decoded). Returns the ghosts (the set stays within MAX_SHAPES) and their largest offset (cm)"""
+    n = len(hs) if hs else 0
+    if n < 3 or len(shp) >= MAX_SHAPES: return [], 0.0
+    body, cache = msmot.body_world(w13, bbones, mot), {}
+    def frame(f):
+        if f not in cache: cache[f] = (body(f), msgrip.pose(weapon.bones, tr, f))
+        return cache[f]
+    def at(f, kb, q):                                # a weapon-bone point in the body root's frame at frame f
+        B, P = frame(f)
+        return B[hs[min(f, n - 1)]] @ P[kb] @ q
+    kb, q = tip[0], np.append(tip[1], 1.0)
+    fr = range(max(f0, 1), min(f0 + dur, n - 1) + 1)
+    if not fr: return [], 0.0
+    fp = max(fr, key=lambda f: np.linalg.norm((at(f, kb, q) - at(f - 1, kb, q))[:3]))
+    U = np.linalg.inv(frame(fp)[0][hm])
+    far = lambda w: -max(np.linalg.norm(shp[w[0]][6:9]), np.linalg.norm(shp[w[0]][10:13]))
+    out, back = [], 0.0
+    for k, bone, pa, pb in sorted(wsh, key=far)[:MAX_SHAPES - len(shp)]:
+        d = [(U @ (at(fp - 1, bone, p) - at(fp, bone, p)))[:3] * GHOST for p in (pa, pb)]
+        s = list(shp[k])
+        s[6:9] = [s[6 + i] + d[0][i] for i in range(3)]
+        s[10:13] = [s[10 + i] + d[1][i] for i in range(3)]
+        out.append(tuple(s))
+        back = max(back, *(float(np.linalg.norm(v)) for v in d))
+    return out, back
+
+
 def build_hits(acts, sdt_d, w00, w02, own, holders, wdata):
     HIT_CAPS[:] = [(0,) * 7]
     es = sdt.entries(sdt_d)
@@ -211,7 +247,7 @@ def build_hits(acts, sdt_d, w00, w02, own, holders, wdata):
         kinds[kind] = sdt.attacks(sdt_d, e), sdt.shape_sets(sdt_d, e)
     tmpl_cut = mshit.hdp_parse(w00)[1]
     tmpl_imp = mshit.hdp_parse(w02)[3]
-    w13w, wbones, weapon = wdata[:3]
+    w13w, wbones, weapon, w13, bbones = wdata
     entries, sets, index, report, swings = [[0] * 28], [], {}, [], []
     todo = [((a, k), acts[a]['steps'][step][1], frame, aid, special,
              'action %3d event %d (step %d f%d)' % (a, k, step, frame))
@@ -236,8 +272,9 @@ def build_hits(acts, sdt_d, w00, w02, own, holders, wdata):
         hs = holders.get(mot)
         hand = hs[min(mid_f, len(hs) - 1)] if hs else 14
         joint = 8 if hand == 14 else 12
-        W = msgrip.pose(weapon.bones, msgrip.tracks_of(mo, weapon.bones), mid_f) if mo else {}
-        shp, tip = [], None
+        tr = msgrip.tracks_of(mo, weapon.bones) if mo else {}
+        W = msgrip.pose(weapon.bones, tr, mid_f) if mo else {}
+        shp, tip, wsh = [], None, []
         si = aid if special else r['shape']          # specials: the shape set of their own id (14 sets, r[8] = 0;
         variant = shapes[si][0] if si < len(shapes) else []    # #5-7 / 10 / 12 = 1 m x 4 m pillars, #8 7 m on the weapon)
         for kind_bone, typ, u0, flag, rad, x0, y0, z0, x1, y1, z1 in variant:
@@ -245,12 +282,15 @@ def build_hits(acts, sdt_d, w00, w02, own, holders, wdata):
             if flag & 8 and kind_bone in W:          # on a weapon bone: into the holding hand's frame
                 M = W[kind_bone]
                 shp.append(mshit.capsule(joint, rad, (M @ pa)[:3], (M @ pb)[:3]))
+                wsh.append((len(shp) - 1, kind_bone, pa, pb))
                 for q in (pa, pb):                   # the blade tip (msfx arcs): the end farthest from the hand
                     d = np.linalg.norm((M @ q)[:3])
                     if not tip or d > tip[2]: tip = (kind_bone, q[:3], d)
             else:                                    # around the hunter: the root (a shock spot: moved there)
                 off = np.array([SHOCK[key[1]][0], 0.0, SHOCK[key[1]][1]]) if key[0] == 'shock' else 0.0
                 shp.append(mshit.capsule(255, rad, pa[:3] + off, pb[:3] + off))
+        gh, back = ghosts(mot, frame, dur, hs, hand, tr, wsh, shp, tip, w13, bbones, weapon) if wsh and tip else ([], 0)
+        shp += gh
         sets.append(shp)
         cap = next((c for c in shp if c[0] != 255), None)
         HIT_CAPS.append((cap[0],) + tuple(int(round(v)) for v in cap[6:9] + cap[10:13]) if cap else (0,) * 7)
@@ -259,9 +299,9 @@ def build_hits(acts, sdt_d, w00, w02, own, holders, wdata):
                             len(sets) - 1, None if cut else r['ko'])
         index[key] = len(entries)
         entries.append(e)
-        report.append('hit %3d: %s MHF %s %2d MV %3d KO %5.1f %-6s live %2d f, joint %3d, %d shapes' % (
+        report.append('hit %3d: %s MHF %s %2d MV %3d KO %5.1f %-6s live %2d f, joint %3d, %d shapes (%d ghosts%s)' % (
             len(entries) - 1, where, 'special' if special else 'attack', aid, r['mv'], r['ko'],
-            'cut' if cut else 'impact', dur, joint, len(shp)))
+            'cut' if cut else 'impact', dur, joint, len(shp), len(gh), ', %.0f cm back' % back if gh else ''))
     # Magnetise (MHF 0x1033c5d0: an attack or special spawned while this mode is magnetised deals MV x (100 + prm61)
     # / 100): entry k's magnetised copy is k + MS_MAG_BASE
     base = len(entries) - 1
@@ -491,6 +531,7 @@ def c_tables(acts, modes, own, tbl_index, hit_index, mvs):
           '#define MS_EFX_SHOCK %d  /* + k: its effect (msfx.SHOCK_TEMPLATE moved to spot k) */' % msfx.SHOCK_EFX,
           '#define MS_EFX_MARKER %d  /* msfx.MARKER_EFX */' % msfx.MARKER_EFX[0],
           '#define MS_EFX_AURA %d  /* msfx.AURA_EFX */' % msfx.AURA_EFX[0]]
+    L += ['#define MS_EFX_%s %d  /* msfx.FLASH_EFX */' % (n, r[0]) for n, r in sorted(msfx.FLASH_EFX.items())]
     L += ['#define MS_NHITS %d' % len(mvs), 'static const uint16_t ms_hit_mv[] = {'] + [
         '    %s,' % ', '.join(str(v) for v in mvs[i:i + 20]) for i in range(0, len(mvs), 20)] + ['};']
     L += ['#define MS_NCAPS %d' % len(HIT_CAPS),
@@ -568,8 +609,8 @@ def main(report_only=False):
     cmds, tbl, tbl_index, creport = build_commands(acts, gs_m0)
     freport = []
     arcs, posts, snd_drop, sounds = msfx.build(swings, wdata, holders, own, GU_COPY, COMMON, freport)
-    arcs += [(msfx.SHOCK_EFX + k, (x, 0.0, z), (0.0, 0.0, 0.0), 1.0, msfx.SHOCK_TEMPLATE)
-             for k, (x, z) in enumerate(SHOCK)] + [msfx.MARKER_EFX, msfx.AURA_EFX]
+    code_fx = [(msfx.SHOCK_EFX + k, (x, 0.0, z), (0.0, 0.0, 0.0), 1.0, msfx.SHOCK_TEMPLATE)
+               for k, (x, z) in enumerate(SHOCK)] + [msfx.MARKER_EFX, msfx.AURA_EFX] + list(msfx.FLASH_EFX.values())
     rep = mreport + hreport + creport + freport
     open(os.path.join(OUT_GEN, 'report.txt'), 'w').write('\n'.join(rep) + '\n')
     if report_only:
@@ -594,7 +635,7 @@ def main(report_only=False):
             for s in own.values(): struct.pack_into('<I', b, 8 + 4 * s, 0)
             fx[i] = (p, t, msfx.psl_add(bytes(b), posts))
         elif p == 'effect\\pel\\pl\\w05_000':
-            fx[i] = (p, t, msfx.pel_add(b, arcs))
+            fx[i] = (p, t, msfx.pel_add(b, arcs, code_fx))
         elif p == 'sound\\call\\pl\\pl_wp05':
             fx[i] = (p, t, msfx.mss_rebuild(b, snd_drop, sounds))
     # GS's weapon sound requests and banks (ms_snd_file answers GS's file IDs for class 5: two001, two_bcom), loaded

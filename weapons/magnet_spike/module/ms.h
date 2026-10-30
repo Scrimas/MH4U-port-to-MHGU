@@ -132,9 +132,8 @@ typedef void (*ms_req_t)(void *req);
 #define MS_REQ_CTOR FN(ms_req_t, 0x40b10)             /* a proof-effect request (~0xd8 B, em089_efx.c): +0x1c flags (bit
                                                          0 = at the world position +0xc0), +0xd0 attach model */
 #define MS_REQ_DTOR FN(ms_req_t, 0x40b50)
-enum { MS_EFX_CHARGED = 7, MS_EFX_GUARD = 9, MS_EFX_MAGNETISE = 11 };   /* GS's charge flashes (list-1 6-11 / 30 /
-                                     31, its PTS ties GS's flash sound 150; 0-5 / 20 / 21 are its slash arcs, 1000+
-                                     ours, msfx.py): S, stand-ins for MHF's effects */
+/* MS_EFX_CHARGED / GUARD / MAGNETISE (ms_data.inc, msfx.FLASH_EFX): copies of GS's charge flashes 7 / 9 / 11 in PEL
+ * list 2, the list code posts read (S: stand-ins for MHF's effects) */
 
 static inline int ms_drawn(uint8_t *p) { return ((int (*)(void *))MS_VT(p, 0x178))(p) == 1; }
 

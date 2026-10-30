@@ -31,8 +31,8 @@
 /* GU's player bits (+0x13f4; the control type swaps 0x40 / 0x800 and 0x200 / 0x400, roles 0x65f93c / 0x65f9b4 /
  * 0x65f8ec): d-pad 0x1-0x8, B 0x10, X 0x20, R 0x40, Y 0x80, A 0x100, ZL 0x200, L 0x400, ZR 0x800 under the user's type
  * (0x400 = GU's camera-reset role 0x27e970; test 3: ZL switched modes, as MHF's SELECT read 0x200) */
-#define BTN_MINUS 0xf000u           /* S: MHF's SELECT = the user's Minus (Back): the bits above ZR, narrowed by the
-                                       "other buttons" log */
+#define BTN_MINUS 0x4000u           /* MHF's SELECT = Minus (the user's Back): test 4 log, Back held = 0x4000 (pressed
+                                       0x5000); 0xf000 also took Plus */
 #define BTN_ZR 0x800                /* MHF's R2 and L2 (user, test 2): ZR held = aim, R + ZR = Guard Counter */
 #define CID_SHEATHE (3u << 13)      /* GU's common ids 0xd / 0xe (+0x1414): sheathe standing / moving (1/2, 1/3) */
 typedef uint32_t (*ms_mask_t)(void);
@@ -175,10 +175,11 @@ static int cond(uint8_t *p, struct ms_state *s, uint32_t c)   /* MHF cancel cond
 static int input(struct ms_state *s, uint32_t inp, uint32_t held, uint32_t trig, uint32_t combo, uint32_t r)
 {
     int rh = (held & r) != 0, aim = (s->flags & 1) != 0;
-    switch (inp) {
-    case 2: return (combo & 2) != 0;                    /* tri (22 = stick + tri: cmd_type 0xc adds the stick) */
-    case 3: return (combo & 4) != 0;                    /* circle (6 = stick + circle) */
-    case 4: return (combo & 0x40) != 0;                 /* tri + circle */
+    switch (inp) {                                      /* R1 is a modifier: tri / circle alone not with R (test 4:
+                                                           R + Y while walking did the walk's Y) */
+    case 2: return !rh && (combo & 2);                  /* tri (22 = stick + tri: cmd_type 0xc adds the stick) */
+    case 3: return !rh && (combo & 4);                  /* circle (6 = stick + circle) */
+    case 4: return !rh && (combo & 0x40);               /* tri + circle */
     case 5: return (trig & BTN_MINUS) != 0;
     case 7: return rh && (combo & 2);
     case 8: return rh && (combo & 4);
@@ -285,6 +286,12 @@ void ms_input(uint8_t *p)
     uint32_t combo = FIELD(uint32_t, p, 0x1444), r = R_MASK();
     uint32_t held = FIELD(uint16_t, p, 0x13f4), trig = FIELD(uint16_t, p, 0x13f8);
     if ((held & BTN_ZR) && !(held & r) && ms_drawn(p)) s->flags |= 1; else s->flags &= ~1u;
+    uint32_t jst = FIELD(uint16_t, p, 0x2506), jno = FIELD(uint16_t, p, 0x250a);
+    if (jst == 1 && (jno == 4 || jno == 5 || jno == 137 || jno == 140) && (trig || combo)) {
+        static int s_n;                                 /* test 4: "no jump attack" (tables 18 / 19, falling 59 / 73) */
+        if (s_n++ < 40) logf("msport: jump %u: pressed %x combo %x table %u frame %d", jno, trig, combo,
+                             FIELD(uint32_t, p, 0x24ac), (int)MS_FRAME(p));
+    }
     uint32_t base = s->mode ? MS_ID_IMPACT : 0, set = 0;
     for (uint32_t k = 0; k < MS_NPAIRS; k++)
         if (input(s, ms_pairs[k].inp, held, trig, combo, r) && cond(p, s, ms_pairs[k].cond)) {
@@ -323,7 +330,7 @@ void ms_input(uint8_t *p)
  * GU's lookup 0x53ab30 returns */
 #define MS_HIT_VIEW 1
 
-static void hit_view(uint8_t *p, struct ms_state *s, uint32_t hit)
+static void hit_view(uint8_t *p, uint32_t hit)
 {
     const uint8_t *ids = FIELD(const uint8_t *, p, 0x498), *js = FIELD(const uint8_t *, p, 0x494);
     if (!MS_HIT_VIEW || hit >= MS_NCAPS || !ms_hit_cap[hit][0] || !ids || !js) return;
@@ -337,18 +344,36 @@ static void hit_view(uint8_t *p, struct ms_state *s, uint32_t hit)
         for (int k = 0; k < 3; k++) t[k] = v[0] * m[k] + v[1] * m[4 + k] + v[2] * m[8 + k] + m[12 + k];
         flash_at(p, t);
     }
-    static int s_n;
-    if (s_n++ < 60) logf("msport: armed hit %u in action %u at f%d", hit, s->action, (int)MS_FRAME(p));
+}
+
+static int em_near(uint8_t *p)          /* ground distance (cm) to the nearest large monster's origin, -1 = none */
+{
+    void *mgr = MS_EM_MGR;
+    float *q = pos_of(p), best = -1;
+    for (int i = 0; mgr && i < 10; i++) {
+        uint8_t *m = MS_EM_GET(mgr, i);
+        if (!em_ok(m)) continue;
+        uint8_t *r = em_rec(m);
+        float d = root(sq(FIELD(float, r, 0x40) - q[0]) + sq(FIELD(float, r, 0x48) - q[2]));
+        if (best < 0 || d < best) best = d;
+    }
+    return (int)best;
 }
 
 static void arm(uint8_t *p, struct ms_state *s, uint32_t hit)
 {
     if (!hit) return;
-    hit_view(p, s, hit);
+    hit_view(p, hit);
+    int d = em_near(p);                                 /* test 4's log ran out in the village: quests only */
+    static int s_n;
+    if (d >= 0 && s_n++ < 400) logf("msport: armed hit %u in action %u at f%d, monster %d cm", hit, s->action,
+                                    (int)MS_FRAME(p), d);
     if (s->mag[s->mode] == 1) hit += MS_MAG_BASE;       /* Magnetise: MV x 1.1 (msbuild's copies) */
     s->slot ^= 1;                                       /* two slots: an attack may still be live when the next arms */
     s->armed[s->slot] = (uint16_t)hit;
-    MS_ARM(p, s->slot, hit, 0);
+    MS_ARM(p, s->slot, hit, 3);                         /* GU's weapon classes pass 3 or 0; 0x2b76cc sets the
+                                                           element (bit 1) only for a non-zero value (test 4: 0, the
+                                                           fire / dragon spikes hit raw) */
 }
 
 /* slot 37 (+0x94): GU calls it after the damage of the owner's attack on a monster (kind 1). MHF on hit: gauge

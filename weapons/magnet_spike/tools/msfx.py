@@ -31,9 +31,14 @@ ARC_BASE = 1000               # PEL ids of the Magnet Spike's arcs (GS's list-1 
 ARC_TEMPLATE = 2              # GS's record copied (unit mask 4: its overhead slash's arc)
 SHOCK_EFX = 1100              # PEL ids of the Magnetic Shock 5 x 3 spots (msbuild SHOCK; MHF effects 0x2e-0x30: S)
 SHOCK_TEMPLATE = 105          # GS's charged slash ground impact (cm001_004, posted with its arc 0 at slot 106 f44)
-# looks with no MHF counterpart converted (S): GS's charge flashes copied under ids its PTS does not tie a sound to
+# looks with no MHF counterpart converted (S): GS's charge flashes copied under ids its PTS does not tie a sound to.
+# Code posts (vt+0x39c) read PEL list 2 (GS's: 500-517, its code-posted charge glows; list 1 = the PSL's): test 4,
+# every code post asked list-1 ids and showed nothing (the marker's returned 0); CODE_EFX go to lists 1 and 2
 MARKER_EFX = (1200, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), 0.5, 9)          # the marker, posted at its point (ms_act.c)
 AURA_EFX = (1201, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), 0.6, 11, 8)        # Magnetise on: on the weapon hand (joint 8)
+FLASH_EFX = {'CHARGED': (1300, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), 1.0, 7, 8),     # Triple Strike charged (GS flash 7)
+             'GUARD': (1301, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), 1.0, 9, 8),       # guarded hit (flash 9)
+             'MAGNETISE': (1302, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), 1.0, 11, 8)}  # Magnetise on (flash 11)
 LEAD = 4                      # frames before the hit the swing path starts
 SND_LEAD = 2
 WHOOSH_B, WHOOSH_FAST, WHOOSH_SLOW = 65, 90, 94
@@ -93,9 +98,9 @@ def arc(sw, wdata, holders):
     return dict(post=post, pos=tuple(c), rot=euler_xyz(R), scl=r / GS_REACH, sweep=sweep, r=r)
 
 
-def pel_add(d, recs):
+def pel_add(d, recs, code=()):
     """the class PEL (v15, lists 0 / 1 / 2) + list-1 records [(id, pos, rot, scale[, template id[, joint]])] copied
-    from GS's list-1 record template (default ARC_TEMPLATE)"""
+    from GS's list-1 record template (default ARC_TEMPLATE); `code` records (code posts) go to lists 1 and 2"""
     assert d[:4] == b'PEL\0' and struct.unpack_from('<I', d, 4)[0] == 15
     lists, i, tmpls = [], 8, {}
     for li in range(3):
@@ -109,7 +114,7 @@ def pel_add(d, recs):
             i += len(rec)
         lists.append([n, d[start:i]])
     assert i == len(d)
-    for rid, pos, rot, scl, *t in recs:
+    for k, (rid, pos, rot, scl, *t) in enumerate(list(recs) + list(code)):
         tmpl = tmpls[t[0] if t else ARC_TEMPLATE]
         r = bytearray(tmpl)
         st = 1 + tmpl[0] + 2
@@ -118,8 +123,9 @@ def pel_add(d, recs):
         struct.pack_into('<3f', r, st + 0x20, scl, scl, scl)
         struct.pack_into('<H', r, st + 0x30, rid)
         if len(t) > 1: struct.pack_into('<H', r, st + 0x32, t[1] & 0xffff)      # joint
-        lists[1][0] += 1
-        lists[1][1] += bytes(r)
+        for li in (1, 2) if k >= len(recs) else (1,):
+            lists[li][0] += 1
+            lists[li][1] += bytes(r)
     return b'PEL\0' + struct.pack('<I', 15) + b''.join(struct.pack('<I', n) + b for n, b in lists)
 
 

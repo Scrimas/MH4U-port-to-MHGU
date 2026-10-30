@@ -95,6 +95,22 @@ B 0x10, X 0x20, R 0x40, Y 0x80, A 0x100, ZL 0x200, L 0x400, ZR 0x800 (roles 0x65
 | 2 | same slots / affinity | MHF's six share them (record +19 slots, +14 affinity) | MHF's 16932 (3 slots, 50 %), 16926 / 17511 (0 slots, sharpness id 0: a full red-to-purple bar) added |
 | 6 | sound only on draw / sheathe | not traced yet | - |
 
+## Test 4 results (user, 2026-10-30) and fixes
+
+| # | report | cause | fix |
+|---|---|---|---|
+| 9 | hits miss across the weapon | every Cutting attack has the same two r50 capsules (the U's prongs, checked in MHF's FK: they stay on the blade, 0 cm drift) and arms 2-6 frames before the swing's fastest frames, yet in the quest short fast swings landed 0-1 of 5-8 (actions 4 / 12 / 0, tip 160-180 cm a motion frame) and long sweeps 6 of 8 (action 11, tip 70 cm a frame): GU tests the shapes at each update's pose, the blade steps over monster parts. GU's fast weapons (LS, SnS, DB, SA, IG, Hammer's spin set) pair every blade shape with a type-5 shape (b.x = the blade's far end on the joint's z), GS / Lance / GL none: a trail, fields not decoded; our capsules lie up to 171 cm off the hand's z | msbuild `ghosts`: each weapon capsule gets a copy half a motion frame behind at the live window's fastest frame (hand frame; 2 -> 4 shapes, GU's max per set), offsets 12-164 cm |
+| - | element never dealt | MS_ARM flags 0: 0x2b76cc sets the element only for non-zero flags; GU's classes pass 3 or 0 | flags 3 |
+| user | no Frontier effect but the crescents | code posts (vt+0x39c) read PEL list 2 (GS's 500-517: its code-posted charge glows; list 1 = the PSL's, as em089's mode 2); ours were list-1 ids (the marker's post returned 0) | msfx CODE records in lists 1 and 2; flashes 1300-1302 on joint 8. MHF's own effects (dat/effect.bin): a later phase (user: wanted) |
+| 1 | Back and Plus both switch modes | BTN_MINUS 0xf000 | log: Back held 0x4000 (pressed 0x5000): 0x4000 |
+| 2 | RB + Back does nothing at a full gauge | Magnetise has its own charge per form (MV x 0.8 per hit, 1000; the user's Cutting reached 772); the 5 bars are the gauge | none (MHF's rule) |
+| 8 | R + Y / B while walking = the walk's Y / B | plain tri / circle matched with R held | inputs 2 / 3 / 4 need R up (R1 is a modifier) |
+| 6 | pin never starts | the leap's grab (MHF attack 17, MV 1, the same capsules) must land: missed like the swings | ghosts |
+| 5 | no jump attack | log: only GU's 12-frame step-down hop (1/137, table 2018); the button log had run out | jump-press log (cap 40) |
+| 10 | smithy viewer still too close | - | header bounding sphere x 1.6 (fmod2gu VIEW_RADIUS, S) |
+| 11 | sheathed weapon carried like a GS | GS's carry record; MHF's: a ∩ on the back (curve behind the shoulders, prongs down past the hips), MHF keys it in code or its draw / sheathe motions (1471-1473 candidates) | later |
+| - | test 4's armed-hit log (cap 60) ran out in the village | - | quest-only, with the nearest monster's distance (cap 400) |
+
 ## Test 1 (Phase 3; save backup dump/save_backups/2026-10-29_before_magnet_spike)
 Test 2 changes the buttons: ZR held = aim, R + ZR = Guard Counter.
 Buttons (MHF -> Switch by position): tri X, circle A, tri + circle X + A, special B, R1 R, R2 ZR, SELECT Minus,

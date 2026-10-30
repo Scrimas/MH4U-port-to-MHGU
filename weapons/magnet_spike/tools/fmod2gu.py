@@ -33,6 +33,8 @@ T_TEX, T_MRL, T_MOD = 0x241f5deb, 0x2749c8a8, 0x58a15856
 # bounding sphere centre (8, 0, 72), ours (-22, 0, 0)): the bind pose moves by VIEW_SHIFT (vertices and the roots'
 # children). Every motion keys those bones (the sheathed weapon = weapon motion 0), so only the viewer sees it
 VIEW_SHIFT = np.array([30.0, 0.0, 72.0])
+VIEW_RADIUS = 1.6             # test 4: still "too close" once centred; the header's bounding sphere x 1.6 (S: the viewer
+                              # assumed to frame by it; culling only grows)
 GU_FMT, STRIDE = 0x14D40022, 28
 
 
@@ -114,7 +116,7 @@ def build_mod(fm, fs, material):
         binv += struct.pack('<16f', *(np.linalg.inv(world[nid]) @ q).T.flatten())
         remap[nid] = i
     bones_blk = brec + bloc + binv + bytes(remap)
-    centre = (lo + hi) / 2; radius = float(np.linalg.norm(allpos - centre, axis=1).max())
+    centre = (lo + hi) / 2; radius = VIEW_RADIUS * float(np.linalg.norm(allpos - centre, axis=1).max())
     groups = struct.pack('<I12x4f', 0, *centre, radius)
     mats = material.encode('ascii').ljust(128, b'\0')
     o_b = 0x84; o_g = o_b + len(bones_blk); o_m = o_g + len(groups); o_me = o_m + len(mats)
