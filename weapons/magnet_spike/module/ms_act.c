@@ -193,9 +193,30 @@ static int input(struct ms_state *s, uint32_t inp, uint32_t held, uint32_t trig,
     return 0;                                           /* 0 / 1: GU's common evade / move commands; 12 / 18 never */
 }
 
-/* every update, drawn or not: gauge regen, Magnetise timers, the marker's life, mode reset when sheathed */
+static void arm(uint8_t *p, struct ms_state *s, uint32_t hit);
+
+/* Magnetic Shock 5 x 3 (MHF task kind 0x0f, 0x1004d810): special #12 at task ticks 3 / 5 / 7 / 10 on spots 170 ->
+ * 550 cm ahead (msbuild SHOCK; S: the hits follow the hunter, MHF's stay where spawned), each with GS's ground impact
+ * moved to the spot (MHF effects 0x2e / 0x2f / 0x30: S) */
+static const float s_shock_at[MS_NSHOCK] = {3, 5, 7, 10};
+
+static void shock_tick(uint8_t *p, struct ms_state *s, float tk)
+{
+    if (!s->shock_on) return;
+    s->shock_t += tk;
+    while (s->shock_k < MS_NSHOCK && s->shock_t >= s_shock_at[s->shock_k]) {
+        arm(p, s, MS_HIT_SHOCK + s->shock_k);
+        MS_EFFECT(p, MS_EFX_SHOCK + s->shock_k);
+        s->shock_k++;
+    }
+    if (s->shock_k >= MS_NSHOCK) s->shock_on = 0;
+}
+
+/* every update, drawn or not: gauge regen, Magnetise timers, the marker's life, mode reset when sheathed, the
+ * Magnetic Shock task */
 static void tick(uint8_t *p, struct ms_state *s, float tk)
 {
+    shock_tick(p, s, tk);
     if (s->gauge < GAUGE_MAX && (s->regen += tk) >= 30) { s->regen -= 30; gauge_add(s, REGEN); }
     for (int m = 0; m < 2; m++) {
         if (!s->mag[m] || (s->mag_v[m] -= tk) > 0) continue;
@@ -473,8 +494,11 @@ static void event(uint8_t *p, struct ms_state *s, const struct ms_event *e, int 
     case 45: MS_STAMINA(p, -60.0f, 0); break;           /* MHF prm80 30 */
     case 12: MS_SHAKE(p, 0xf, 0); break;                /* S: GU preset 0xf for MHF's presets */
     case 13: MS_MOT_SPEED(p) = v * 0.01f; break;
-    case 21:                            /* guard window: 0 open, 1 close, 2 / 3 close without the Guard skills (S) */
-        if (v == 0) MS_BITS_SET(p, 0, MS_GUARDING, 0); else MS_BITS_CLEAR(p, 0, MS_GUARDING, 0);
+    case 21:                            /* guard window: 0 open, 1 close, 2 / 3 close unless MHF's Guard skills 0x28 /
+                                           0x29 (GU's has-skill 14 / 15, S: Guard +1 / +2): f26 -> f28 / f30 */
+        if (v == 0) MS_BITS_SET(p, 0, MS_GUARDING, 0);
+        else if (!(v == 2 && (MS_HAS_SKILL(p, 14) || MS_HAS_SKILL(p, 15))) && !(v == 3 && MS_HAS_SKILL(p, 15)))
+            MS_BITS_CLEAR(p, 0, MS_GUARDING, 0);
         break;
     case 25: s->grav = (float)v; s->grav_t = 0; break;
     case 26: s->flags |= 0x20; break;   /* charge counting */
@@ -583,17 +607,24 @@ static int step_done(uint8_t *p, struct ms_state *s, const struct ms_step *st)
 }
 
 /* hits MHF's code spawns (0x103339d0): the Guard Counter successes 57 / 76 / 77 special #5 / #6 / #7 at f32, the
- * Finishing Slashes 152 / 154 / 155 special #10 after f38 when magnetised */
-static void code_hits(uint8_t *p, struct ms_state *s, uint32_t no)
+ * Finishing Slashes 152 / 154 / 155 special #10 after f38 when magnetised; the Magnetic Shock 5 x 3 task from 159 /
+ * 160 at f8 (step 0: 1031 / 1032) and 161 / 162 at the start of 1082 (step 1) */
+static void code_hits(uint8_t *p, struct ms_state *s, uint32_t no, int k)
 {
     uint32_t hit = 0;
     float f = 32;
-    if (s->code_fired) return;
+    if (!(s->code_fired & 2) && ((k == 0 && (no == 159 || no == 160) && MS_REACHED(p, 8.0f)) ||
+                                 (k == 1 && (no == 161 || no == 162)))) {
+        s->code_fired |= 2;
+        s->shock_on = 1; s->shock_k = 0; s->shock_t = 0;
+        logf("msport: Magnetic Shock 5 x 3 (action %u)", no);
+    }
+    if (s->code_fired & 1) return;
     if (no == 57) hit = MS_HIT_SPECIAL_5;
     else if (no == 76) hit = MS_HIT_SPECIAL_6;
     else if (no == 77) hit = MS_HIT_SPECIAL_7;
     else if ((no == 152 || no == 154 || no == 155) && s->mag[s->mode] == 1) { hit = MS_HIT_SPECIAL_10; f = 38; }
-    if (hit && MS_REACHED(p, f)) { s->code_fired = 1; arm(p, s, hit); }
+    if (hit && MS_REACHED(p, f)) { s->code_fired |= 1; arm(p, s, hit); }
 }
 
 static int charge_tick(uint8_t *p, struct ms_state *s, float tk)   /* 34: 1 = released by overcharging */
@@ -655,7 +686,7 @@ void ms_act(uint8_t *p)
         if ((e->when == 1 && s->loops >= e->loop && MS_REACHED(p, (float)e->frame)) ||
             (e->when == 3 && s->charge_lvl >= e->lvl)) event(p, s, e, i);
     }
-    code_hits(p, s, no);
+    code_hits(p, s, no, k);
     if (s->pin_pending && (no == 94 || no == 97)) { pin_start(p, s); return; }
     if (s->pin_mon && IN(s_pinned, no) && pin_tick(p, s, tk, no)) return;
     if (no == 34 && charge_tick(p, s, tk)) return;

@@ -178,6 +178,10 @@ SPECIAL_EVENTS = (4, 42, 43, 44)     # MHF special attacks (mhfsdt kind 0x79: ma
 # Counter success 57 / 76 / 77 (1 / 2 / 3+ guarded hits): #5 / #6 / #7 at f32 of motion 1034 (0x103339d0);
 # magnetised Finishing Slash (motion 1035, actions 152 / 154 / 155): #10 after f38 (Magnetic Shock's #12: not traced)
 CODE_SPECIALS = {5: (1034, 32), 6: (1034, 32), 7: (1034, 32), 10: (1035, 38)}
+# Magnetic Shock 5 x 3 (MHF task kind 0x0f, 0x1004d810; started by 0x1004d3e0 from the per-motion extras: 159 / 160
+# at f8 of 1031 / 1032, 161 / 162 at the start of 1082): special #12 at task ticks 3 / 5 / 7 / 10 at these spots
+# (x, z cm in the hunter's frame, 0x1004d650): one hit entry per spot, its root shapes moved there (ms_act.c timer)
+SHOCK = [(-120.0, 170.0), (-90.0, 250.0), (-30.0, 400.0), (40.0, 550.0)]
 MAGNETISE_PCT = 10                   # MS block prm61
 
 
@@ -208,10 +212,14 @@ def build_hits(acts, sdt_d, w00, w02, own, holders, wdata):
             for a, k, step, frame, aid, special in attack_instances(acts)]
     todo += [(('code', n), mot, f, n, True, 'code special (motion %d f%d)' % (mot, f))
              for n, (mot, f) in sorted(CODE_SPECIALS.items())]
+    todo += [(('shock', k), 1031, 8, 12, True, 'Magnetic Shock 5 x 3 spot %d' % k) for k in range(len(SHOCK))]
     for key, mot, frame, aid, special, where in todo:
         atk, shapes = kinds[0x79 if special else 0x78]
         if aid >= len(atk): continue
         r = atk[aid]
+        if special and not r['mv']:              # MV-0 specials: MHF's detection volumes (#1 marker shot, #3 pin
+            report.append('hit   -: %s MHF special %2d MV 0: not armed (ms_act.c does its job)' % (where, aid))
+            continue                             # grab 8 m, #11): GU would land 0-damage hits
         cut = bool(r['type'] & 0x200)            # attacks 0x20a cut / 0x10a impact, specials 0x200 / 0x100
         dur = r['raw'][1]
         mid_f = frame + dur // 2
@@ -222,7 +230,8 @@ def build_hits(acts, sdt_d, w00, w02, own, holders, wdata):
         joint = 8 if hand == 14 else 12
         W = msgrip.pose(weapon.bones, msgrip.tracks_of(mo, weapon.bones), mid_f) if mo else {}
         shp, tip = [], None
-        variant = shapes[r['shape']][0] if r['shape'] < len(shapes) else []
+        si = aid if special else r['shape']          # specials: the shape set of their own id (14 sets, r[8] = 0;
+        variant = shapes[si][0] if si < len(shapes) else []    # #5-7 / 10 / 12 = 1 m x 4 m pillars, #8 7 m on the weapon)
         for kind_bone, typ, u0, flag, rad, x0, y0, z0, x1, y1, z1 in variant:
             pa, pb = np.array([x0, y0, z0, 1.0]), np.array([x1, y1, z1, 1.0])
             if flag & 8 and kind_bone in W:          # on a weapon bone: into the holding hand's frame
@@ -231,8 +240,9 @@ def build_hits(acts, sdt_d, w00, w02, own, holders, wdata):
                 for q in (pa, pb):                   # the blade tip (msfx arcs): the end farthest from the hand
                     d = np.linalg.norm((M @ q)[:3])
                     if not tip or d > tip[2]: tip = (kind_bone, q[:3], d)
-            else:                                    # around the hunter: the root
-                shp.append(mshit.capsule(255, rad, pa[:3], pb[:3]))
+            else:                                    # around the hunter: the root (a shock spot: moved there)
+                off = np.array([SHOCK[key[1]][0], 0.0, SHOCK[key[1]][1]]) if key[0] == 'shock' else 0.0
+                shp.append(mshit.capsule(255, rad, pa[:3] + off, pb[:3] + off))
         sets.append(shp)
         swings.append(dict(mot=mot, frame=frame, dur=dur, cut=cut, special=special, tip=tip and tip[:2]))
         e = mshit.hdp_entry(tmpl_cut if cut else tmpl_imp, r['mv'], dur, mshit.CUT if cut else mshit.IMPACT,
@@ -424,6 +434,9 @@ def c_tables(acts, modes, own, tbl_index, hit_index, mvs):
     L.append('#define MS_MAG_BASE %d  /* hit k magnetised = k + MS_MAG_BASE */' % hit_index['mag_base'])
     L += ['#define MS_HIT_SPECIAL_%d %d' % (n, hit_index[('code', n)]) for n in sorted(CODE_SPECIALS)
           if ('code', n) in hit_index]
+    L += ['#define MS_NSHOCK %d' % len(SHOCK),
+          '#define MS_HIT_SHOCK %d  /* + k: Magnetic Shock 5 x 3 spot k (SHOCK) */' % hit_index[('shock', 0)],
+          '#define MS_EFX_SHOCK %d  /* + k: its effect (msfx.SHOCK_TEMPLATE moved to spot k) */' % msfx.SHOCK_EFX]
     L += ['#define MS_NHITS %d' % len(mvs), 'static const uint16_t ms_hit_mv[] = {'] + [
         '    %s,' % ', '.join(str(v) for v in mvs[i:i + 20]) for i in range(0, len(mvs), 20)] + ['};']
     steps, events, rows = [], [], []
@@ -498,6 +511,8 @@ def main(report_only=False):
     cmds, tbl, tbl_index, creport = build_commands(acts, gs_m0)
     freport = []
     arcs, posts, snd_drop, sounds = msfx.build(swings, wdata, holders, own, GU_COPY, COMMON, freport)
+    arcs += [(msfx.SHOCK_EFX + k, (x, 0.0, z), (0.0, 0.0, 0.0), 1.0, msfx.SHOCK_TEMPLATE)
+             for k, (x, z) in enumerate(SHOCK)]
     rep = mreport + hreport + creport + freport
     open(os.path.join(OUT_GEN, 'report.txt'), 'w').write('\n'.join(rep) + '\n')
     if report_only:

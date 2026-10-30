@@ -25,6 +25,8 @@ HEAD = math.radians(-26.0)    # the crescent's head on the ring (theta = atan2(y
 RING_R = 109.0                # outer radius of the ring's visible band (cm; texture u 0.6)
 ARC_BASE = 1000               # PEL ids of the Magnet Spike's arcs (GS's list-1 ids end at 517)
 ARC_TEMPLATE = 2              # GS's record copied (unit mask 4: its overhead slash's arc)
+SHOCK_EFX = 1100              # PEL ids of the Magnetic Shock 5 x 3 spots (msbuild SHOCK; MHF effects 0x2e-0x30: S)
+SHOCK_TEMPLATE = 105          # GS's charged slash ground impact (cm001_004, posted with its arc 0 at slot 106 f44)
 LEAD = 4                      # frames before the hit the swing path starts
 SND_LEAD = 2
 WHOOSH_B, WHOOSH_FAST, WHOOSH_SLOW = 65, 90, 94
@@ -85,9 +87,10 @@ def arc(sw, wdata, holders):
 
 
 def pel_add(d, recs):
-    """the class PEL (v15, lists 0 / 1 / 2) + list-1 records [(id, pos, rot, scale)] copied from GS's ARC_TEMPLATE"""
+    """the class PEL (v15, lists 0 / 1 / 2) + list-1 records [(id, pos, rot, scale[, template id])] copied from GS's
+    list-1 record template (default ARC_TEMPLATE)"""
     assert d[:4] == b'PEL\0' and struct.unpack_from('<I', d, 4)[0] == 15
-    lists, i, tmpl = [], 8, None
+    lists, i, tmpls = [], 8, {}
     for li in range(3):
         n = struct.unpack_from('<I', d, i)[0]
         i += 4
@@ -95,14 +98,14 @@ def pel_add(d, recs):
         for _ in range(n):
             L = d[i]
             rec = d[i:i + 1 + L + 2 + 160]
-            if li == 1 and struct.unpack_from('<H', rec, 1 + L + 2 + 0x30)[0] == ARC_TEMPLATE: tmpl = rec
+            if li == 1: tmpls[struct.unpack_from('<H', rec, 1 + L + 2 + 0x30)[0]] = rec
             i += len(rec)
         lists.append([n, d[start:i]])
-    assert i == len(d) and tmpl
-    L = tmpl[0]
-    for rid, pos, rot, scl in recs:
+    assert i == len(d)
+    for rid, pos, rot, scl, *t in recs:
+        tmpl = tmpls[t[0] if t else ARC_TEMPLATE]
         r = bytearray(tmpl)
-        st = 1 + L + 2
+        st = 1 + tmpl[0] + 2
         struct.pack_into('<3f', r, st + 0x00, *pos)
         struct.pack_into('<3f', r, st + 0x10, *rot)
         struct.pack_into('<3f', r, st + 0x20, scl, scl, scl)

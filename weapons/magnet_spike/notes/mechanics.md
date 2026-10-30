@@ -33,7 +33,7 @@ the marker: 29 87 88 118 168. +0x34 max turn: 95/96/159-162 60 deg, 110/111/114/
 | 12 | camera shake preset p (local) | 0x2a063c(p, 0xf, 0) (S: GS's landing preset for all) |
 | 13 | motion rate p % (P+0xc24) | p+0x50c = p / 100 |
 | 17 | task 0x3c (marker effect) | not run (effects) |
-| 21 | guard window P+0x418 0x8000: 0 set, 1 clear, 2 / 3 clear unless Guard skills 0x28 / 0x29 | +0x2510 bit 0x10 (0x283238 / 0x28321c); 2 / 3 always clear (S) |
+| 21 | guard window P+0x418 0x8000: 0 set, 1 clear, 2 / 3 clear unless Guard skills 0x28 / 0x29 | +0x2510 bit 0x10 (0x283238 / 0x28321c); 2 kept with GU's has-skill (0x2864c4) 14 or 15, 3 kept with 15 (S: GU's guard code checks 14 / 15 = Guard +1 / +2) |
 | 24 | MS+0x6a guard level (5) | class 5 guards with GS's rules (build.py patches) |
 | 25 | per tick y -= p * 0.1 * t; t++ | `grav`, `grav_t` |
 | 26 | MS flag 0x20: charge counting | same |
@@ -71,7 +71,17 @@ plcmd_com_0x0001_013a / 014a) are cleared (S).
 - Magnetise per mode (MS+0x88 state, MS+0x8a value): charge + MV * 80 / 100 per hit in this mode while state 0, cap
   1000; 163 / 164 (condition 13) -> state 1 for 2400 ticks, then lockout 3000 ticks, then state 0 with no charge.
   While on, attacks and specials spawned in that mode deal MV x 1.1 (prm61). Finishing Slash (152 / 154 / 155, motion
-  1035) adds special #10 after f38 when magnetised. Magnetic Shock 5 x 3 (special #12) path: not traced.
+  1035) adds special #10 after f38 when magnetised.
+- Magnetic Shock 5 x 3 (C): the per-motion extras call 0x1004d3e0(0) at f8 of 1031 / 1032 (159 / 160) and at the
+  start of 1082 in 161 / 162; it restarts task kind 0x0f (0x1004d810, one step per tick): special #12 (MV 5, KO 5)
+  spawned (0x101e8120(owner, 0, 12, pos, 0)) at ticks 3 / 5 / 7 / 10 on spots (x, z) = (-120, 170), (-90, 250),
+  (-30, 400), (40, 550) cm in the hunter's frame (0x1004d650), with MHF effects 0x2d / 0x54 (ticks 0 / 1) and
+  0x2e / 0x2f / 0x30. Module: msbuild SHOCK (one hit entry per spot), ms_act.c shock_tick, GS's ground impact (PEL
+  105) moved to each spot (S); the hits follow the hunter (S: MHF's stay where spawned).
+- Specials' hit shapes (C): mhfsdt kind 0x79 has one shape set per special id (14 sets; the attack-record field
+  msbuild read, r[8], is 0 for every special): #5-#7 / #10 / #12 = a 100 cm-radius, 400 cm-tall pillar at the spawn
+  point, #8 = 700 cm on weapon bone 7, #11 = 250 cm, #3 = 800 cm, #1 = 30 cm (the projectile). The MV-0 specials (#1,
+  #3, #11: detection volumes) are not armed (the module does their jobs in code).
 - Module: `gauge`, `mag[]`, `mag_v[]`; the hit callback (slot 37, below) adds gauge and charge with the MV of the
   armed entry (`ms_hit_mv`); msbuild writes every hit twice (k and k + MS_MAG_BASE, MV x 1.1).
 
@@ -139,7 +149,5 @@ scaled), GS's charge flash as the cue.
 | HUD per-class gauge switch 0x665ad8 (class 5 word 0x665b34 = GS's case; CB's phial gauge = 0x264, S) | 0x665ad8 |
 
 ## Not yet ported (Phase 3 open)
-MHF's QTE prompt, effects and sounds (MHF dat/effect.bin unstudied: GU stand-ins), the monster hold during the
-pin, the Guard skills' window extension,
-Magnetic Shock 5 x 3 (special #12: not spawned by the per-motion extras 0x103339d0 for motions 1031 / 1032 / 1082;
-S: a multi-hit property of the attack record), multiplayer (events 43 / 44, authority).
+MHF's QTE prompt, effects and sounds (MHF dat/effect.bin unstudied: GU stand-ins, phase3.md), the monster hold
+during the pin, multiplayer (events 43 / 44, authority).

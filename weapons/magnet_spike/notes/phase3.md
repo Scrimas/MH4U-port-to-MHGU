@@ -9,7 +9,7 @@ switch MS_SLICE (test builds only).
 |---|---|
 | actions | every MHF action that plays Magnet Spike motions (160; msbuild ACTIONS), steps / cancels / events from mhfdat |
 | inputs | one class id per (MHF input, condition) pair (21 pairs, x2 modes); conditions run in the translator |
-| hits | 142 attack / special entries + magnetised copies (MV x 1.1); code specials #5-#7, #10 |
+| hits | 140 attack / special entries + magnetised copies (MV x 1.1); code specials #5-#7, #10, Magnetic Shock 5 x 3 (#12 x 4 spots, MHF's task 0x0f); specials' shapes by special id (were all empty); MV-0 specials not armed |
 | gauge, Magnetise | regen, on-hit gain, bar costs, Magnetise charge / on / lockout (log only: no HUD yet) |
 | guard | Guard Counter 14 -> 207 -> 57 / 76 / 77, Impact guard 112 -> 113 -> 114 / 115 (GU guard patched for class 5) |
 | charge | Triple Strike 34 -> 208 -> 35 / 36, overcharge release |
@@ -45,8 +45,8 @@ CommonMsg 90 (class 5's name, "Med. Bowgun (Removed)") replaced; names / descrip
 ## Deviations (S, to settle in tests)
 Marker = nearest large monster within 0.6 rad / 5000 units of the camera's aim, at the monster's origin + 300; the
 QTE (hold 60 / cap 90, 70 points); every
-MHF camera-shake preset = GU 0xf; the monster is not held during the pin; Guard skills don't extend the windows;
-R1 + evade = R + Y.
+MHF camera-shake preset = GU 0xf; the monster is not held during the pin; Guard skills = GU's has-skill 14 / 15;
+the Magnetic Shock spots follow the hunter; R1 + evade = R + Y.
 
 ## Test 1 (Phase 3; save backup dump/save_backups/2026-10-29_before_magnet_spike)
 Buttons (MHF -> Switch by position): tri X, circle A, tri + circle X + A, special B, R1 R, R2 ZR, SELECT Minus,

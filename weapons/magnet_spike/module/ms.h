@@ -56,6 +56,8 @@ struct ms_state {
     float pin_hold, pin_cd, qte, pin_off[3];
     uint16_t pin_yaw_m, pin_yaw_p;
     uint16_t armed[2];              /* hit-data entry armed in each attack slot */
+    uint8_t shock_on, shock_k;      /* Magnetic Shock 5 x 3 task running, spots spawned */
+    float shock_t;                  /* its ticks */
 };
 struct ms_state *ms_of(uint8_t *p);
 void ms_reset(struct ms_state *s);
@@ -98,6 +100,7 @@ typedef void (*ms_iframes_t)(void *p, float frames, int force);
                                                          if force */
 typedef int (*ms_evlvl_t)(void *p, uint32_t skill);
 #define MS_EVASION FN(ms_evlvl_t, 0x2a69dc)           /* Evasion level 0 / 1 / 2 (GU's roll asks with 0x1f) */
+#define MS_HAS_SKILL FN(ms_evlvl_t, 0x2864c4)         /* the hunter has skill effect id (GU's guard code: 14, 15) */
 typedef void (*ms_stam_t)(void *p, float amount, int flag);
 #define MS_STAMINA FN(ms_stam_t, 0x2a5ebc)            /* action cost (< 0) with Constitution; 150 = a roll */
 #define MS_STAMINA_NOW(p) FIELD(float, (p), 0x13e0)   /* 6 x the displayed value (S) */
