@@ -23,6 +23,7 @@ enum { R0, R1, R2, R3, R4, R5, R12, LR };
 #define ITEM_DATA 20        /* ITEM section record: u16 id, u8 rarity, icon, colour, category, dummy icon, 0,
                                u32 dummy sell, sell, buy */
 void gmd_text_loaded(uint8_t *m, const char *name, uint32_t lang);   /* gear.c: every TXTA append */
+void ms_text_loaded(uint8_t *m, const char *name, uint32_t lang);    /* weapons/magnet_spike (MS_SLICE builds) */
 void gear_tables_loaded(void *res);                                 /* gear.c: every TBLA append */
 static const char *const LANGS[] = { "eng", "fre", "ger", "ita", "spa" };   /* data file text order */
 
@@ -162,6 +163,9 @@ int item_text_loaded_c(uint32_t *regs)
     for (uint32_t k = 0; suffix && k < sizeof(LANGS) / sizeof(LANGS[0]); k++)
         if (str_eq(suffix, LANGS[k])) lang = k;          /* chS / chT / others: English */
     gmd_text_loaded(msg, name, lang);                    /* gear, skill, weapon, Notes texts (gear.c) */
+#ifdef MS_SLICE
+    ms_text_loaded(msg, name, lang);                     /* the forge's Magnet Spike label, its class name */
+#endif
     /* read the string table only now: a TXTA append (appended items' itemData) replaces it with a grown copy, and
      * names written into the old one were lost (test 2026-10-21: every DUMMY material named DUMMY) */
     const char **str = FIELD(const char **, msg, 0x98);

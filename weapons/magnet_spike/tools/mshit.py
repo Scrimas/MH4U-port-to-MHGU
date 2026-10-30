@@ -36,10 +36,12 @@ def hdp_bytes(entries):
     return out
 
 
-def hdp_entry(template, mv, dur, kind, shape):
-    """a GU entry from a template: live now for dur frames, motion value mv, damage type, hit shape set"""
+def hdp_entry(template, mv, dur, kind, shape, ko=None):
+    """a GU entry from a template: live now for dur frames, motion value mv, damage type, hit shape set; ko = MHF's
+    KO value into i16[2] (S: GU's KO, Hammer 22..52; the template's otherwise)"""
     e = list(template)
     e[0], e[1] = 0, dur
+    if ko is not None: e[2] = int(round(ko))
     e[4] = min(mv, 250)
     e[8] = kind
     e[16] = (e[16] & ~0xff) | shape

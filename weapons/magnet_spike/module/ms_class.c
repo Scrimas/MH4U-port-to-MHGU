@@ -15,6 +15,7 @@
 static uint32_t s_vt[2 + VT_SLOTS];  /* 2 words before the address point copied too */
 static uint32_t *ms_vt;
 static struct ms_state s_state[MS_PLAYERS];
+static void forge_tables_init(void);
 
 struct ms_state *ms_of(uint8_t *p)
 {
@@ -24,9 +25,16 @@ struct ms_state *ms_of(uint8_t *p)
         if (!s_state[i].p && !free_) free_ = &s_state[i];
     }
     if (!free_) free_ = &s_state[0];
-    for (uint32_t i = 0; i < sizeof *free_; i++) ((uint8_t *)free_)[i] = 0;
     free_->p = p;
+    ms_reset(free_);
     return free_;
+}
+
+void ms_reset(struct ms_state *s)   /* a new hunter object: MHF's quest-start state (gauge empty, Cutting) */
+{
+    uint8_t *p = s->p;
+    for (uint32_t i = 0; i < sizeof *s; i++) ((uint8_t *)s)[i] = 0;
+    s->p = p;
 }
 
 /* ------------------------------------------------------------------------------------------------ class slots */
@@ -85,7 +93,7 @@ static const uint16_t *indirect(uint8_t *p, uint32_t k)
 }
 
 static int second_mode(uint8_t *p) { return ms_of(p)->mode == 1; }      /* slot 215 (+0x35c): Impact */
-static void reset_state(uint8_t *p, int k) { (void)k; struct ms_state *s = ms_of(p); s->charged = 0; s->fired = 0; }
+static void reset_state(uint8_t *p, int k) { (void)k; ms_of(p)->fired = 0; }
 /* class parameter idx of pl_w05 (Phase 2: GS's values). The result's register (r0 or s0) is not settled: the wrapper
  * returns the call's r0 and leaves s0 as the call left it, as GS's tail call does */
 typedef uint32_t (*param_t)(void *p, uint32_t idx);
@@ -116,6 +124,9 @@ void ms_init(void)
     vt_fn(392, pick392); vt_fn(398, pick398); vt_fn(404, pick404); vt_fn(405, pick405); vt_fn(406, pick406);
     vt_fn(407, pick407); vt_fn(408, pick408); vt_fn(412, pick412); vt_fn(413, pick413); vt_fn(414, pick414);
     vt_fn(415, pick415); vt_fn(416, pick416); vt_fn(453, never); vt_fn(454, nothing);
+    vt_fn(37, ms_on_hit);           /* +0x94: after our attack's damage on a monster (every class: bx lr) */
+    vt_fn(356, ms_guarded);         /* +0x590: the guard reaction (build.py's guard patches let class 5 guard) */
+    forge_tables_init();
     /* still GS's: 82 (resource setup + manager group 35, S), 443 (common actions 0x172-0x174 at GS frames) */
     logf("msport: class 5 vtable at %x (GS %x)", (uint32_t)(uintptr_t)ms_vt, MAIN(VT_GS));
 }
@@ -131,10 +142,32 @@ int ms_factory_cc(uint32_t *regs, uint8_t *info, uint8_t *obj, uint32_t kind)
     (void)regs;
     if (!info || !obj || info[0x4d4] != MS_CLASS || kind != 0) return 0;
     *(uint32_t **)obj = ms_vt;
-    struct ms_state *s = ms_of(obj);
-    s->mode = 0;
+    ms_reset(ms_of(obj));
     logf("msport: class 5 object %x (Great Sword layout), vtable %x", (uint32_t)(uintptr_t)obj,
          (uint32_t)(uintptr_t)ms_vt);
+    return 0;
+}
+
+/* ------------------------------------------------------------------------------------------------ HUD */
+
+/* the HUD (static research gu_hud): class 5's gauge case is the Charge Blade's (build.py word 0x665b34: sharpness
+ * + cUIOWeaponChargeAxe); its update body 0x6463fc reads the local hunter's vtable (phial count / max, colour,
+ * state animations) into widget fields, then clamps and draws them. Hook 0x646560 (r4 = widget, r5 = the hunter or
+ * 0), after those reads: for our class, 5 phial slots = the magnet gauge's bars (full bars lit), the colour = the
+ * mode, element 0's animation (6-entry table) = this mode's Magnetise: ready 2, on 1, lockout 5 (S: CB's
+ * steady / flashing pairs, to check in a test); the shield and second indicators off */
+int ms_hud_c(uint32_t *regs)
+{
+    uint8_t *w = (uint8_t *)regs[R4], *p = (uint8_t *)regs[R5];
+    if (!w || !p || *(uint32_t **)p != ms_vt) return 0;
+    struct ms_state *s = ms_of(p);
+    uint32_t m = s->mode, st = s->mag[m];
+    FIELD(uint32_t, w, 0x70) = 5;
+    FIELD(uint32_t, w, 0x74) = (uint32_t)s->gauge / 2000;
+    FIELD(uint32_t, w, 0x64) = m;
+    FIELD(uint32_t, w, 0x60) = 0;
+    FIELD(uint8_t, w, 0x6c) = 0;
+    FIELD(uint32_t, w, 0x68) = st == 1 ? 1 : st == 2 ? 5 : s->mag_v[m] >= 1000 ? 2 : 0;
     return 0;
 }
 
@@ -201,16 +234,59 @@ int ms_setmotion_c(uint32_t *regs)
 
 /* ------------------------------------------------------------------------------------------------ equipment */
 
-#define VT_BASE_GS 0x173791cu       /* rWeapon00BaseData record vtable, 90 slots; +0x18 = box type */
-#define BASE_SLOTS 90
+/* The Magnet Spikes (GU has no type-12 tables): base / level records built from Great Sword 1's (vtable copy,
+ * retyped, names from s_weapons), the smithy's create / process rows and its 15th forge category (notes/phase3.md
+ * "Smithy"). Weapons 2-7 = MHF-Z rarity-12 Magnet Spikes (dump/mhf/ms_weapons.json; model n = arc/weapon/w05/
+ * 00n.arc, msbuild MODELS), stats scaled into GU's G rank (S: raw x 0.55, element x 0.3, sharpness = GU's
+ * kireaji 106 of its endgame Great Swords, rarity 8); weapon 1 = the Phase 2 test weapon (not forged). Recipes: GU
+ * G-rank materials of the element's monsters (item ID = itemData string / 2). Names / descriptions: English. */
+struct ms_weapon {
+    const char *name, *desc;
+    uint8_t model, rare, element, kire;          /* rare 0-based; element 1 fire, 2 water, 3 thunder, 4 dragon, 5 ice */
+    uint16_t raw, elem;                          /* GU true raw, element / 10 */
+    uint16_t item[4];
+    uint8_t num[4];
+};
+static const struct ms_weapon s_weapons[] = {
+    {"Magnet Spike", "", 1, 0, 0, 106, 100, 0, {0}, {0}},                      /* 0: the equip fallback's dummy */
+    {"Proto Spike", "A test-built Magnet Spike from the Frontier.", 1, 3, 0, 106, 200, 0, {0}, {0}},
+    {"Demon Flamespike \"Flash\"", "A Magnet Spike that burns with a demon's flame. Its magnetism scorches.",
+     2, 7, 1, 106, 352, 24, {1576, 1570, 1585, 335}, {2, 4, 1, 5}},            /* MHF 17516: raw 640, fire 80 */
+    {"Volnoborin IV", "A Magnet Spike that surges like a riptide. Its poles drip with seawater.",
+     3, 7, 2, 106, 310, 45, {890, 888, 818, 332}, {2, 3, 4, 5}},               /* MHF 17563: 564, water 150 */
+    {"Torid Pillar \"Uzi\"", "A Magnet Spike charged with thunder. Its field crackles with every swing.",
+     4, 7, 3, 106, 309, 47, {1246, 1249, 1256, 330}, {2, 4, 1, 5}},            /* MHF 16964: 562, thunder 155 */
+    {"Anoru Pillar \"Wandemu\"", "A Magnet Spike of frozen iron. Its field freezes the air around it.",
+     5, 7, 5, 106, 303, 50, {1145, 332, 331, 330}, {6, 6, 5, 5}},              /* MHF 16968: 551, ice 165 */
+    {"Apophis Pillar \"Flash\"", "A Magnet Spike that draws dragon power into its core.",
+     6, 7, 4, 106, 352, 24, {1695, 1693, 1457, 332}, {3, 4, 1, 5}},            /* MHF 16933: 640, dragon 80 */
+    {"Apophis Pillar \"Clear\"", "A pure Magnet Spike: no element, all force.",
+     7, 7, 0, 106, 374, 0, {1488, 1490, 1523, 330}, {2, 3, 1, 5}},             /* MHF 16936: raw 680 */
+};
+#define MS_NWEAPONS (sizeof s_weapons / sizeof s_weapons[0])
+#define MS_FIRST_FORGED 2
+#define MS_NFORGED (MS_NWEAPONS - MS_FIRST_FORGED)
+#define MS_PRICE 60000              /* S: GU's endgame forge prices */
+
+#define BASE_SLOTS 90               /* rWeapon00BaseData record vtable; +0x18 = box type, +0x3c / +0x40 name /
+                                       description, +0xbc / +0xc0 the same by level (0x126c48..: GMD by type) */
 typedef uint8_t *(*getter_t)(void *equip, uint32_t type, uint32_t id);
 #define GET_BASE FN(getter_t, 0x13c208)
 #define GET_LEVEL FN(getter_t, 0x13ed08)
 static uint32_t s_base_vt[2 + BASE_SLOTS];
-static uint32_t s_base[2][16];      /* 40-B records: IDs 0 (the equip fallback's dummy) and 1 */
-static uint32_t s_level[8];         /* one 20-B level row, shared */
+static uint32_t s_base[MS_NWEAPONS][10];       /* 40-B records */
+static uint32_t s_level[MS_NWEAPONS][5];       /* 20-B level rows, row k = weapon k's only level */
 static int s_records;               /* 0 none, 1 built, -1 failed */
 static uint32_t ms_box_type(void) { return MS_TYPE; }
+static const struct ms_weapon *weapon_of(uint8_t *rec)
+{
+    uint32_t id = FIELD(uint32_t, rec, 4);
+    return &s_weapons[id < MS_NWEAPONS ? id : 0];
+}
+static const char *w_name(uint8_t *rec) { return weapon_of(rec)->name; }
+static const char *w_desc(uint8_t *rec) { return weapon_of(rec)->desc; }
+static const char *w_name_lv(uint8_t *rec, uint32_t lv) { (void)lv; return weapon_of(rec)->name; }
+static const char *w_desc_lv(uint8_t *rec, uint32_t lv) { (void)lv; return weapon_of(rec)->desc; }
 
 static void build_records(void *equip)
 {
@@ -220,29 +296,42 @@ static void build_records(void *equip)
     const uint32_t *vt = *(const uint32_t **)gs;
     for (int i = 0; i < 2 + BASE_SLOTS; i++) s_base_vt[i] = vt[i - 2];
     s_base_vt[2 + 0x18 / 4] = (uint32_t)(uintptr_t)ms_box_type;
-    for (int id = 0; id < 2; id++) {
-        uint8_t *r = (uint8_t *)s_base[id];
+    s_base_vt[2 + 0x3c / 4] = (uint32_t)(uintptr_t)w_name;
+    s_base_vt[2 + 0x40 / 4] = (uint32_t)(uintptr_t)w_desc;
+    s_base_vt[2 + 0xbc / 4] = (uint32_t)(uintptr_t)w_name_lv;
+    s_base_vt[2 + 0xc0 / 4] = (uint32_t)(uintptr_t)w_desc_lv;
+    for (uint32_t id = 0; id < MS_NWEAPONS; id++) {
+        const struct ms_weapon *w = &s_weapons[id];
+        uint8_t *r = (uint8_t *)s_base[id], *l = (uint8_t *)s_level[id];
         for (int i = 0; i < 40; i++) r[i] = gs[i];
         *(uint32_t **)r = s_base_vt + 2;
         FIELD(uint32_t, r, 4) = id;                       /* mIndex */
-        FIELD(uint16_t, r, 8) = 1; FIELD(uint16_t, r, 10) = 1;   /* mModelID / mSrqrNo: weapon\w05\001 */
+        FIELD(uint16_t, r, 8) = w->model;                 /* mModelID: weapon\w05\mbgNNN */
+        FIELD(uint16_t, r, 10) = 1;                       /* mSrqrNo: weapon\w05\snd\001 (GS's, sounds phase) */
         FIELD(uint8_t, r, 13) = 1; FIELD(uint8_t, r, 14) = 0;    /* one level */
+        FIELD(uint8_t, r, 15) = w->rare;
+        FIELD(uint32_t, r, 16) = MS_PRICE;
+        FIELD(uint8_t, r, 21) = w->element;
+        FIELD(uint16_t, r, 24) = (uint16_t)id;            /* mSortID */
         for (int i = 28; i < 38; i++) r[i] = 0;           /* no upgrades */
-        FIELD(uint16_t, r, 0x26) = 0;                     /* first level row */
+        FIELD(uint16_t, r, 0x26) = (uint16_t)id;          /* its level row */
+        for (int i = 0; i < 20; i++) l[i] = row[i];
+        FIELD(uint32_t, l, 4) = id; FIELD(uint8_t, l, 8) = (uint8_t)id; FIELD(uint8_t, l, 9) = 1;
+        FIELD(uint8_t, l, 10) = w->kire; FIELD(uint8_t, l, 11) = 10;      /* kireaji type, bar length step */
+        FIELD(uint16_t, l, 12) = w->raw;
+        FIELD(uint8_t, l, 14) = 0; FIELD(uint8_t, l, 15) = 0;            /* defense, affinity (MHF: 0) */
+        FIELD(uint16_t, l, 16) = w->elem;
+        FIELD(uint8_t, l, 18) = 3;                                       /* slots */
     }
-    uint8_t *l = (uint8_t *)s_level;
-    for (int i = 0; i < 20; i++) l[i] = row[i];
-    FIELD(uint32_t, l, 4) = 0; FIELD(uint8_t, l, 8) = 1; FIELD(uint8_t, l, 9) = 1;
-    FIELD(uint16_t, l, 12) = 200;   /* Phase 2 test raw (MHF Proto Spike : a has 450 on MHF's scale; Phase 5) */
     s_records = 1;
-    logf("msport: type-12 records from Great Sword 1 (row %u, sharpness type %u)", FIELD(uint16_t, gs, 0x26), l[10]);
+    logf("msport: %u type-12 weapons from Great Sword 1's records", (uint32_t)MS_NWEAPONS);
 }
 
 int ms_base_c(uint32_t *regs)                /* 0x13c208 (sEquip, type, id) -> base record */
 {
     if (regs[R1] != MS_TYPE) return 0;
     if (!s_records) build_records((void *)regs[R0]);
-    regs[R0] = s_records > 0 && regs[R2] < 2 ? (uint32_t)(uintptr_t)s_base[regs[R2]] : 0;
+    regs[R0] = s_records > 0 && regs[R2] < MS_NWEAPONS ? (uint32_t)(uintptr_t)s_base[regs[R2]] : 0;
     return 1;
 }
 
@@ -250,8 +339,100 @@ int ms_level_c(uint32_t *regs)               /* 0x13ed08 (sEquip, type, row) -> 
 {
     if (regs[R1] != MS_TYPE) return 0;
     if (!s_records) build_records((void *)regs[R0]);
-    regs[R0] = s_records > 0 ? (uint32_t)(uintptr_t)s_level : 0;
+    regs[R0] = s_records > 0 && regs[R2] < MS_NWEAPONS ? (uint32_t)(uintptr_t)s_level[regs[R2]] : 0;
     return 1;
+}
+
+/* the smithy (static research, phase3.md "Smithy"): its create / process getters 0x6f9658 / 0x70153c (this, type,
+ * row) switch on the box type and answer 0 for 12. Our rows: rWeaponCreateData (44 B, vtable 0x1768234) per forged
+ * weapon: level 1, no unlock condition, no key material (S: always listed; GU's own recipes key on material 1),
+ * no provision, no scraps; rWeaponProcessData (36 B, vtable 0x17682e4): the all-zero level-1 row of a weapon with no
+ * parent (as tools/weapons4u.py's created weapons) */
+struct ms_create { uint32_t vt; uint16_t lv, no, disp, item[4]; uint8_t num[4], key[4]; uint16_t cat, rank,
+                   piece[3], piece_num[3], pad; };
+struct ms_process { uint32_t vt; uint16_t no, lv, item[4]; uint8_t num[4]; uint16_t cat, rank, piece[3],
+                    piece_num[3]; };
+static struct ms_create s_create[MS_NFORGED];
+static struct ms_process s_process[MS_NFORGED];
+static int s_rows;
+
+static void build_rows(void)
+{
+    for (uint32_t k = 0; k < MS_NFORGED; k++) {
+        const struct ms_weapon *w = &s_weapons[MS_FIRST_FORGED + k];
+        struct ms_create *c = &s_create[k];
+        struct ms_process *pr = &s_process[k];
+        c->vt = MAIN(0x1768234); c->lv = 1; c->no = (uint16_t)(MS_FIRST_FORGED + k);
+        for (int j = 0; j < 4; j++) { c->item[j] = w->item[j]; c->num[j] = w->num[j]; }
+        pr->vt = MAIN(0x17682e4); pr->no = c->no; pr->lv = 1;
+    }
+    s_rows = 1;
+}
+
+int ms_forge_create_c(uint32_t *regs)       /* 0x6f9658 (smithy, type, row) -> create row */
+{
+    if (regs[R1] != MS_TYPE) return 0;
+    if (!s_rows) build_rows();
+    regs[R0] = regs[R2] < MS_NFORGED ? (uint32_t)(uintptr_t)&s_create[regs[R2]] : 0;
+    return 1;
+}
+
+int ms_forge_process_c(uint32_t *regs)      /* 0x70153c (smithy, type, row) -> process row */
+{
+    if (regs[R1] != MS_TYPE) return 0;
+    if (!s_rows) build_rows();
+    regs[R0] = regs[R2] < MS_NFORGED ? (uint32_t)(uintptr_t)&s_process[regs[R2]] : 0;
+    return 1;
+}
+
+/* the forge's category menu (build.py MS_LIT_PATCHES repoint its code here; the count byte 14 -> 15 is a word
+ * patch): category index -> box type (GU's u8[14] at 0x1650022 + the Magnet Spike, page 3), labels (LbShop_
+ * EqMakeMsg IDs, 7 read per page: 21 entries; 206 = our appended "Magnet Spike"), and the top panel's icon lists
+ * by kind (GU's pointer table 0x176f3e4, kind 8 = the weapon categories: GU's 14 icons + the Great Sword's 0x37
+ * as the Magnet Spike's stand-in) */
+const uint8_t ms_forge_order[15] = {7, 14, 8, 18, 9, 19, 10, 16, 15, 21, 20, 13, 11, 17, MS_TYPE};
+const uint16_t ms_forge_label[21] = {2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 206, 206, 206, 206, 206, 206,
+                                     206};
+static const uint8_t s_weapon_icons[21] = {0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x43, 0x45, 0x44, 0x3f,
+                                           0x41, 0x42, 0x37, 0x46, 0x47, 0x49, 0x48, 0x4a, 0};
+uint32_t ms_shop_icons[10];
+#define MS_LABEL_COUNT 206          /* LbShop_EqMakeMsg's strings: "Magnet Spike" appended as 206 */
+
+static void forge_tables_init(void)
+{
+    const uint32_t *gu = (const uint32_t *)MAIN(0x176f3e4);
+    for (int k = 0; k < 10; k++) ms_shop_icons[k] = gu[k];
+    ms_shop_icons[8] = (uint32_t)(uintptr_t)s_weapon_icons;
+}
+
+/* texts (items.c, every rGUIMessage load): the forge label appended to LbShop_EqMakeMsg; CommonMsg's class-5 name
+ * (string 90, "Med. Bowgun (Removed)") replaced. English in every language (S) */
+static int name_is(const char *s, const char *base)     /* base, or base + "_<lang>" */
+{
+    while (*base) if (*s++ != *base++) return 0;
+    return *s == 0 || *s == '_';
+}
+typedef void *(*res_alloc_t)(void *res, uint32_t size);
+void ms_text_loaded(uint8_t *m, const char *name, uint32_t lang)
+{
+    (void)lang;
+    uint32_t count = FIELD(uint32_t, m, 0x88);
+    const char **old = FIELD(const char **, m, 0x98);
+    if (!name || !old) return;
+    if (name_is(name, "CommonMsg") && count > 90) {
+        logf("msport: CommonMsg 90 \"%s\" -> Magnet Spike", old[90]);
+        old[90] = "Magnet Spike";
+        return;
+    }
+    if (!name_is(name, "LbShop_EqMakeMsg")) return;
+    if (count != MS_LABEL_COUNT) { logf("msport: %s has %u strings, not %u: no forge label", name, count, MS_LABEL_COUNT); return; }
+    const char **arr = ((res_alloc_t)(*(uint32_t **)m)[0x40 / 4])(m, (count + 1) * 4);   /* the load's allocator */
+    if (!arr) return;
+    for (uint32_t i = 0; i < count; i++) arr[i] = old[i];
+    arr[count] = "Magnet Spike";
+    FIELD(const char **, m, 0x98) = arr;
+    FIELD(uint32_t, m, 0x88) = count + 1;
+    logf("msport: forge label appended to %s (%u)", name, count);
 }
 
 /* pwl getters (sEquip, class, model[, k]): class 5 has no rPlayerWeaponList. mGmkMotNo = 0 (weapon\w05\g00); the

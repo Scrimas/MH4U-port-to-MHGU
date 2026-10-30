@@ -260,7 +260,14 @@ if MS_SLICE:
         ('ms_motion', 0x281998),      # set-motion (p, motion): class-5 motion log (diagnostic)
         ('ms_attach', 0x3078B8),      # weapon attach (weapon, hunter, part type): class 5 in hand on joint 8
         ('ms_setmotion', 0x53A164),   # unit set-motion (unit, motion, mode): class 5's Impact idle / walk slots
+        ('ms_forge_create', 0x6F9658),    # smithy create getter (this, type, row): type 12 = ours
+        ('ms_forge_process', 0x70153C),   # smithy process getter (this, type, row): type 12 = ours
+        ('ms_hud', 0x646560),         # CB phial widget update after its hunter reads (r4 widget, r5 hunter)
     ]
+# the forge's category menu (ms_class.c "the forge's category menu"): order, labels, top-panel icon lists
+MS_TABLES = {'ms_forge_order': 0x1650022, 'ms_forge_label': 0x1650058, 'ms_shop_icons': 0x176F3E4}
+MS_LIT_PATCHES = [(0x6F2DA8, 0x6F2CEC, 'ms_forge_order'), (0x6F2B1C, 0x6F2A94, 'ms_forge_label'),
+                  (0x6F29AC, 0x6F1D2C, 'ms_forge_label'), (0x5933F8, 0x5930B8, 'ms_shop_icons')] if MS_SLICE else []
 MS_GUNNER_SITES = [0x144968, 0x144A0C, 0x144B24, 0x6ECEFC, 0x6ED884, 0x6FCB2C, 0x7037A8, 0x70B738]
 
 
@@ -276,7 +283,8 @@ def ms_patches(img):
         (0x27C860, 0xE3A01047, 0xE3A01045),    # gunner helper kind 1: classes {4,5,6,10} -> {4,6,10}
         (0x28AC94, 0xE3A01047, 0xE3A01045),    # the same mask at 0x28ac80
         (0x180DA8, 0xA0, 0x40),                # switch(class) 0x180d78: class 5 -> class 0's case (was 4 / 6 / 10)
-        (0x665B34, 0x58, 0x3C),                # switch(class) 0x665b04: class 5 -> class 0's case (was 4 / 6)
+        (0x665B34, 0x58, 0x264),               # switch(class) 0x665b04 (HUD gauges): class 5 -> the Charge Blade's
+                                               # case (sharpness + phials; ms_hud drives the phials: magnet gauge)
         (0x1630594, 6, 5), (0x16309C4, 6, 5),  # per-class values for classes 4..10 (0x58a1d4 / 0x58eff4): 6 -> 5
         (0x1628064, 2, 1),                     # gunner table by type - 7 (0x26ee8c strips blademaster armor)
         (0x145B94, 0xE3072FDF, 0xE3072FFF),    # item box blademaster / gunner mask 0x7fdf -> 0x7fff
@@ -298,6 +306,15 @@ def ms_patches(img):
         ra, rb = (sub >> 12) & 15, (sub >> 16) & 15
         assert sub & 0xFFF00FFF == 0xE2400004 and cmp == 0xE3500003 | ra << 16 and blo >> 24 == 0x3A, hex(s)
         out += [(s, sub, 0xE3500004 | rb << 16), (s + 4, cmp, 0x13500006 | rb << 16), (s + 8, blo, blo & 0x0FFFFFFF)]
+    # guard: class 5 joins the Great Sword's class masks (movw #imm, bit 5 added) in the can-guard check 0x2f2ba0, its
+    # angle rule and the guard-level thresholds of 0x2f0670 (the Magnet Spike's Guard Counter / Impact guard windows)
+    for site, old, new in ((0x2F2BC8, 0xC20B, 0xC22B), (0x2F2D8C, 0xC081, 0xC0A1), (0x2F07C0, 0xC001, 0xC021)):
+        w = word(site)
+        assert (w >> 4 & 0xF000 | w & 0xFFF) == old, hex(site)
+        out.append((site, w, movw_imm(w, new)))
+    # the forge: weapon categories 14 -> 15 (cursor config {kind 8, 7 per page, count, 0}, read only by 0x6f29c8);
+    # the per-type list icon (u8 at 0x165000c + type): type 12 = LBG's 0x3f -> the Great Sword's 0x37 (stand-in)
+    out += [(0x1650080, 0x0509000E, 0x0509000F), (0x1650018, 0x43383F3F, 0x43383F37)]
     # per-class value tables whose class-5 entry holds the bowgun values: class 0's (the generic melee values; phase2.md
     # lists them with the Great Sword stand-ins): (table, entry size) as read at 0x29ab40 / 0x2aca3c / 0x2ad1e8 /
     # 0x2cdbd4 / 0x2dfb84 / 0x2e21a4
@@ -627,8 +644,8 @@ def main():
         if delta % HOOKWIN_SPAN or not 0 < x < 256: sys.exit('hook %s: entry delta %#x not encodable' % (name, delta))
         patch = struct.pack('<I', 0xE28FF700 | x)           # add pc, pc, #(x ror 14) = x << 18
         recs += struct.pack('>IH', site + 0x100, len(patch)) + patch
-    tables = dict({t[0]: t[1] for t in REG_TABLES}, **NOTES_TABLES)
-    for lit, use, sym in LIT_PATCHES:
+    tables = dict({t[0]: t[1] for t in REG_TABLES}, **NOTES_TABLES, **MS_TABLES)
+    for lit, use, sym in LIT_PATCHES + MS_LIT_PATCHES:
         old = struct.unpack_from('<I', img, lit)[0]
         delta = (use + 8 + old - tables[sym]) & 0xFFFFFFFF   # the code may address table + delta
         if delta > 0x10: sys.exit('literal %x: expected %s (+small), got target %x' % (lit, sym, use + 8 + old))

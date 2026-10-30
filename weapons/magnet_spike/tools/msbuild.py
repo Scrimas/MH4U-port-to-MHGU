@@ -44,10 +44,10 @@ T_LMT, T_PARAM, T_HDP, T_HTS = 0x76820d81, 0x496f8f22, 0x4e2ef008, 0x5653c1b0
 T_CMD, T_TBL, T_CAM = 0x5139901d, 0x4b4c2bd3, 0x30991f46
 
 # the slice (notes/phase2.md): MHF action numbers
-CUTTING = [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 13, 17, 122, 126, 152, 155, 14, 90, 78]
-IMPACT = [18, 32, 33, 34, 35, 36, 26, 91, 79]
-SLICE = CUTTING + IMPACT
-RELEASE = 208            # MHF shared action "charge released": 35 (charged) or 36 (module code, ms_act.c)
+ACTIONS = []             # every MHF action that plays a Magnet Spike motion (set by main: 19, 47, 134, 137 have no
+                         # steps, 50 plays the shared motion 1 only)
+RELEASE, GC_HIT = 208, 207   # MHF shared actions the module runs: charge released (35 charged / 36), guard hit
+SHARED = (RELEASE, GC_HIT)
 # GU common slot -> MHF motion (S: by duration, loop and root path; the first test's motion log checks them)
 COMMON = {1: 1001, 4: 1004, 5: 1001, 6: 1001, 7: 1001, 9: 1021, 11: 1021, 12: 1006, 13: 1007,
           14: 1462, 15: 1010, 16: 1011, 20: 1020, 24: 1024, 32: 1010, 33: 1011, 80: 1002, 81: 1008}
@@ -61,11 +61,24 @@ COMMON_USED = {1, 2, 3, 4, 6, 7, 9, 11, 12, 13, 18, 20, 24, 27, 28, 30, 32, 33, 
                90, 91, 92, 95, 96, 104, 151, 152, 154, 155, 163, 164, 165, 169, 172, 173, 174, 179, 181, 182, 195,
                196, 198, 201, 211, 212, 213, 252, 255}      # bank-5 slots GU's common code names (scan, S)
 
-# class input ids (player +0x1424 bits, set by the module's translator ms_input.c): MHF input -> id; Impact = +16
-CLASS_ID = {2: 0, 3: 1, 4: 2, 5: 3, 13: 4, 14: 5, 15: 6, 21: 7}
-ID_NAMES = ['TRI', 'CIRCLE', 'TRICIRCLE', 'SELECT', 'R2', 'CIRCLE_HELD', 'CIRCLE_REL', 'TRI_REL']
-STICK_INPUTS = {6: 3, 22: 2}          # stick + circle / tri: cmd_type 0xc (stick tilted + class id)
-NEVER = 998                           # a frame no slice motion reaches: "not in this step"
+# class input ids (player +0x1424.. = 8 words, 0x285e54): one per (MHF input, MHF condition) pair in first-use order,
+# + MS_ID_IMPACT in Impact; the module's translator (ms_act.c ms_input) sets an id when its input is pressed and its
+# condition holds. Stick + circle / tri share the circle / tri ids under cmd_type 0xc (stick tilted + class id).
+PAIRS = {}
+MS_ID_IMPACT = 64
+STICK_INPUTS = {6: 3, 22: 2}
+# drawn idle (msact.IDLE) inputs: the conditions MHF's cancels give the same inputs (R1 moves cost a gauge bar,
+# aiming needs a marker in range); 11 = R1 + SELECT Magnetise: condition 13 (this mode's charge ready, 0x10336810)
+IDLE_COND = {7: 1, 8: 1, 9: 1, 10: 1, 17: 1, 24: 10, 23: 11, 11: 13}
+NEVER = 998                           # a frame no motion reaches: "not in this step"
+
+
+def pair_id(inp, cond):
+    key = (STICK_INPUTS.get(inp, inp), cond)
+    if key not in PAIRS:
+        PAIRS[key] = len(PAIRS)
+        assert len(PAIRS) <= MS_ID_IMPACT, 'class ids: more than %d input / condition pairs' % MS_ID_IMPACT
+    return PAIRS[key]
 
 
 def rom():
@@ -88,19 +101,21 @@ def gu_entries(name):
 # ------------------------------------------------------------------------------------------------ motions
 
 def free_slots():
-    """bank-5 slots no GU class list uses and GU's common code does not name"""
+    """bank-5 slots GU's common code does not name: first those no GU class list uses, then the other classes' own
+    slots (class 5 has its own list; main clears GS's per-slot effect entries for them, the class-5 psl being GS's)"""
     used = set()
     for w in ('w00', 'w14', 'w08', 'w02'):
         d = gu_arc('player/quest/%s.arc' % w)['player\\mot\\%s\\%s' % (w, w)][1]
         used |= {i for i, o in enumerate(lmt.anims(d)) if o}
-    reserved = used | COMMON_USED | set(COMMON) | set(GU_COPY) | {0}
-    return [s for s in range(1, 256) if s not in reserved]
+    reserved = COMMON_USED | set(COMMON) | set(GU_COPY) | {0}
+    return ([s for s in range(1, 256) if s not in reserved | used] +
+            [s for s in range(1, 256) if s in used and s not in reserved])
 
 
 def mhf_motions(acts):
-    """MHF body motions the slice actions play, in first-use order"""
+    """MHF body motions the actions play (bank 1 = w13), in first-use order"""
     out = []
-    for a in SLICE:
+    for a in ACTIONS:
         for kind, mot, start, blend, frame, loops in acts[a]['steps']:
             if kind in (3, 4, 5) and mot not in out: out.append(mot)
     return out
@@ -158,30 +173,47 @@ def empty_list(n=1):
 
 # ------------------------------------------------------------------------------------------------ attacks
 
+SPECIAL_EVENTS = (4, 42, 43, 44)     # MHF special attacks (mhfsdt kind 0x79: marker shot, Pin Finisher, extra hits)
+# specials MHF's code spawns (no event; notes/mechanics.md): special -> (motion posing its shapes, frame). Guard
+# Counter success 57 / 76 / 77 (1 / 2 / 3+ guarded hits): #5 / #6 / #7 at f32 of motion 1034 (0x103339d0);
+# magnetised Finishing Slash (motion 1035, actions 152 / 154 / 155): #10 after f38 (Magnetic Shock's #12: not traced)
+CODE_SPECIALS = {5: (1034, 32), 6: (1034, 32), 7: (1034, 32), 10: (1035, 38)}
+MAGNETISE_PCT = 10                   # MS block prm61
+
+
 def attack_instances(acts):
-    """(action, event index, step, frame, MHF attack id) for every ATTACK event of the slice"""
+    """(action, event index, step, frame, MHF attack id, special) for every attack event (3 = kind 0x78, specials =
+    kind 0x79)"""
     out = []
-    for a in SLICE:
+    for a in ACTIONS:
         for k, (step, kind, cond, frame, loop, eid, prm) in enumerate(acts[a]['events']):
-            if eid == 3: out.append((a, k, step, frame if kind not in (1, 2) else 0, prm))
+            if eid == 3 or eid in SPECIAL_EVENTS:      # 42 spawns special #11, 43 / 44 #8 (param = extra arg)
+                aid = {42: 11, 43: 8, 44: 8}.get(eid, prm)
+                out.append((a, k, step, frame if kind not in (1, 2) else 0, aid, eid != 3))
     return out
 
 
 def build_hits(acts, sdt_d, w00, w02, own, holders, wdata):
     es = sdt.entries(sdt_d)
-    e78 = next(e for e in es if e['kind'] == 0x78)
-    atk = sdt.attacks(sdt_d, e78)
-    shapes = sdt.shape_sets(sdt_d, e78)
+    kinds = {}
+    for kind in (0x78, 0x79):
+        e = next(e for e in es if e['kind'] == kind)
+        kinds[kind] = sdt.attacks(sdt_d, e), sdt.shape_sets(sdt_d, e)
     tmpl_cut = mshit.hdp_parse(w00)[1]
     tmpl_imp = mshit.hdp_parse(w02)[3]
     w13w, wbones, weapon = wdata
     entries, sets, index, report = [[0] * 28], [], {}, []
-    entries[0][10] = 254 if False else 0
-    for a, k, step, frame, aid in attack_instances(acts):
+    todo = [((a, k), acts[a]['steps'][step][1], frame, aid, special,
+             'action %3d event %d (step %d f%d)' % (a, k, step, frame))
+            for a, k, step, frame, aid, special in attack_instances(acts)]
+    todo += [(('code', n), mot, f, n, True, 'code special (motion %d f%d)' % (mot, f))
+             for n, (mot, f) in sorted(CODE_SPECIALS.items())]
+    for key, mot, frame, aid, special, where in todo:
+        atk, shapes = kinds[0x79 if special else 0x78]
+        if aid >= len(atk): continue
         r = atk[aid]
-        cut = r['type'] == 0x20a
+        cut = bool(r['type'] & 0x200)            # attacks 0x20a cut / 0x10a impact, specials 0x200 / 0x100
         dur = r['raw'][1]
-        mot = acts[a]['steps'][step][1]
         mid_f = frame + dur // 2
         part, s = (mot - 1000) // 100, (mot - 1000) % 100
         mo = w13w[part].get(s)
@@ -200,12 +232,21 @@ def build_hits(acts, sdt_d, w00, w02, own, holders, wdata):
                 shp.append(mshit.capsule(255, rad, pa[:3], pb[:3]))
         sets.append(shp)
         e = mshit.hdp_entry(tmpl_cut if cut else tmpl_imp, r['mv'], dur, mshit.CUT if cut else mshit.IMPACT,
-                            len(sets) - 1)
-        index[(a, k)] = len(entries)
+                            len(sets) - 1, None if cut else r['ko'])
+        index[key] = len(entries)
         entries.append(e)
-        report.append('hit %2d: action %3d event %d (step %d f%d) MHF attack %2d MV %3d KO %5.1f %-6s live %2d f, '
-                      'joint %3d, %d shapes' % (len(entries) - 1, a, k, step, frame, aid, r['mv'], r['ko'],
-                                                'cut' if cut else 'impact', dur, joint, len(shp)))
+        report.append('hit %3d: %s MHF %s %2d MV %3d KO %5.1f %-6s live %2d f, joint %3d, %d shapes' % (
+            len(entries) - 1, where, 'special' if special else 'attack', aid, r['mv'], r['ko'],
+            'cut' if cut else 'impact', dur, joint, len(shp)))
+    # Magnetise (MHF 0x1033c5d0: an attack or special spawned while this mode is magnetised deals MV x (100 + prm61)
+    # / 100): entry k's magnetised copy is k + MS_MAG_BASE
+    base = len(entries) - 1
+    for e in entries[1:]:
+        m = list(e)
+        mv = e[26] * (100 + MAGNETISE_PCT) // 100
+        m[4], m[26] = min(mv, 250), mv
+        entries.append(m)
+    index['mag_base'] = base
     return mshit.hdp_bytes(entries), mshit.hts_bytes(sets), index, report
 
 
@@ -292,21 +333,16 @@ def mode_of(a):
 
 
 def cancel_commands(C, a, c, mode):
-    """GU command paths for one MHF cancel of action a (empty = not in the slice)"""
-    nxt, inp = c['next'], c['input']
-    if c['cond'] not in (0,): return []                  # gauge / marker / flag conditions: Phase 3 moves
-    if nxt in (202, 203):                                # roll: GU's common evades out of an attack
+    """GU command paths for one MHF cancel of action a (empty = an action with no Magnet Spike data)"""
+    nxt, inp, cond = c['next'], c['input'], c['cond']
+    if inp == 0 or nxt in (202, 203):                    # roll (shared 202 / 203): GU's common evades
         return [C.com('plcmd_com_0x0001_013a'), C.com('plcmd_com_0x0001_014a')]
     if inp == 1:                                         # stick: GU's common drawn move
         return [C.com('plcmd_com_0x0001_006e')]
-    target = nxt if nxt in SLICE or nxt == RELEASE else None
-    if target is None: return []
-    if inp == 20: return [C.ours_cmd(target, 0, 0)]       # always
-    if inp in STICK_INPUTS:
-        return [C.ours_cmd(target, 0xc, STICK_INPUTS[inp] + 16 * mode)]
-    if inp in CLASS_ID:
-        return [C.ours_cmd(target, 8, CLASS_ID[inp] + 16 * mode)]
-    return []
+    if nxt not in ACTIONS and nxt not in SHARED: return []
+    if inp == 20 and cond == 0: return [C.ours_cmd(nxt, 0, 0)]       # always
+    k = pair_id(inp, cond) + MS_ID_IMPACT * mode
+    return [C.ours_cmd(nxt, 0xc if inp in STICK_INPUTS else 8, k)]
 
 
 def build_commands(acts, gs_m0):
@@ -320,10 +356,10 @@ def build_commands(acts, gs_m0):
         name = c['CmdBase'][1].split('\\')[-1]
         if name.startswith('plcmd_w00'): continue
         idle.append(cmd_obj(C.com(name), 0, 0, 0))
-    for inp, (ca, ia) in sorted(msact.IDLE.items()):
-        for mode, act in ((0, ca), (1, ia)):
-            if act not in SLICE: continue
-            fake = dict(next=act, input=inp, cond=0)
+    for inp, (ca, ia) in sorted(msact.IDLE.items(), key=lambda x: (x[0] not in (19, 23, 24), x[0] < 7, x[0])):
+        for mode, act in ((0, ca), (1, ia)):            # aiming first, then the R1 combos, then the plain inputs
+            if act not in ACTIONS: continue
+            fake = dict(next=act, input=inp, cond=IDLE_COND.get(inp, 0))
             for p in cancel_commands(C, None, fake, mode):
                 idle.append(cmd_obj(p, 0, 0, 0))
     tables.append(idle)
@@ -340,9 +376,9 @@ def build_commands(acts, gs_m0):
             keep.append(cmd_obj(C.com(name), *[struct.unpack('<f', struct.pack('<I', c[f]))[0]
                                               for f in ('PreFrame', 'StartFrame', 'EndFrame')]))
         tables.append(keep)
-    # the slice: one table per (action, step), the cancels in priority order (GU takes the first ready command)
+    # one table per (action, step), the cancels in priority order (GU takes the first ready command)
     index = {}
-    for a in SLICE:
+    for a in ACTIONS:
         cs = sorted(acts[a]['cancels'], key=lambda c: -c['pri'])
         for k in range(len(acts[a]['steps'])):
             t = []
@@ -372,31 +408,32 @@ def build_commands(acts, gs_m0):
 
 # ------------------------------------------------------------------------------------------------ module tables
 
-EVENT_IDS = {3: 'MS_EV_ATTACK', 1: 'MS_EV_GUARD', 21: 'MS_EV_ARMOR', 13: 'MS_EV_SPEED', 14: 'MS_EV_TURN',
-             39: 'MS_EV_TURN_TARGET', 12: 'MS_EV_SHAKE', 26: 'MS_EV_CHARGED'}
-
-
-def c_tables(acts, modes, own, tbl_index, hit_index):
-    """gen/ms_data.inc: the slice's actions, steps and events for ms_act.c"""
+def c_tables(acts, modes, own, tbl_index, hit_index, mvs):
+    """gen/ms_data.inc: every action's steps and events (MHF event ids; attacks / specials = their hit-data index,
+    the MHF param in prm), the class-id pairs and each hit entry's motion value (the gauge gain on hit) for ms_act.c"""
     L = ['/* ms_data.inc: generated by weapons/magnet_spike/tools/msbuild.py from MHF\'s mhfdat / mhfsdt (game data,',
-         ' * gitignored) -- do not edit. MHF action numbers; motion = bank-5 slot of player\\\\mot\\\\w05\\\\w05. */']
-    for i, n in enumerate(ID_NAMES):
-        L.append('#define MS_ID_%s %d' % (n, i))
-    L.append('#define MS_ID_IMPACT 16')
-    L.append('#define MS_RELEASE %d' % RELEASE)
+         ' * gitignored) -- do not edit. MHF action numbers; motion = bank-5 slot of player\\\\mot\\\\w05\\\\w05. */',
+         '#define MS_ID_IMPACT %d' % MS_ID_IMPACT, '#define MS_RELEASE %d' % RELEASE, '#define MS_GC_HIT %d' % GC_HIT,
+         '#define MS_NPAIRS %d' % len(PAIRS), 'static const struct ms_pair ms_pairs[] = {']
+    L += ['    {%d, %d},  /* id %d: %s if %s */' % (i, c, k, msact.INPUTS[i], msact.CONDS[c] if c < 14 else c)
+          for (i, c), k in sorted(PAIRS.items(), key=lambda x: x[1])] + ['};']
+    L.append('#define MS_MAG_BASE %d  /* hit k magnetised = k + MS_MAG_BASE */' % hit_index['mag_base'])
+    L += ['#define MS_HIT_SPECIAL_%d %d' % (n, hit_index[('code', n)]) for n in sorted(CODE_SPECIALS)
+          if ('code', n) in hit_index]
+    L += ['#define MS_NHITS %d' % len(mvs), 'static const uint16_t ms_hit_mv[] = {'] + [
+        '    %s,' % ', '.join(str(v) for v in mvs[i:i + 20]) for i in range(0, len(mvs), 20)] + ['};']
     steps, events, rows = [], [], []
-    for a in SLICE:
+    for a in ACTIONS:
         s0, e0 = len(steps), len(events)
         for k, (kind, mot, start, blend, frame, loops) in enumerate(acts[a]['steps']):
             slot = own.get(mot, 0xffff) if kind in (3, 4, 5) else mot
             steps.append('    {%d, %d, %d, %d, %d, %d, %d},  /* %d: MHF motion %d */' % (
                 kind, slot, start, blend, frame, loops, 2000 + tbl_index[(a, k)], a, mot))
         for k, (step, kind, cond, frame, loop, eid, prm) in enumerate(acts[a]['events']):
-            if eid not in EVENT_IDS: continue
-            when = 0 if kind == 1 else 2 if kind == 2 else 1
-            arg = hit_index.get((a, k), 0) if eid == 3 else prm
-            events.append('    {%d, %d, %d, %s, %d},  /* %d: %s param %d */' % (
-                step, when, frame, EVENT_IDS[eid], arg, a, msact.EVENTS.get(eid, eid), prm))
+            when = 0 if kind == 1 else 2 if kind == 2 else 3 if cond >= 1 else 1
+            hit = hit_index.get((a, k), 0)
+            events.append('    {%d, %d, %d, %d, %d, %d, %d, %d},  /* %d: %s */' % (
+                step, when, frame, loop, max(cond, 0), eid, prm, hit, a, msact.EVENTS.get(eid, eid)))
         rows.append('    {%d, %d, %d, %d, %d, %d},' % (a, mode_of(a), len(steps) - s0, s0, len(events) - e0, e0))
     L += ['static const struct ms_step ms_steps[] = {'] + steps + ['};']
     L += ['static const struct ms_event ms_events[] = {'] + events + ['};']
@@ -407,15 +444,20 @@ def c_tables(acts, modes, own, tbl_index, hit_index):
 
 # ------------------------------------------------------------------------------------------------ arcs
 
-def model_arc():
-    """wk400 as weapon\\w05\\mbg001\\mbg001 in a copy of GS 001's arc (its MRL with the texture paths renamed)"""
-    old, new = 'weapon\\w00\\two001\\two001', 'weapon\\w05\\mbg001\\mbg001'
+# class-5 model number -> MHF weapon model: GU's file table names weapon\w05\mbg001..mbg007 (ids 21815-21821, MH3's
+# class-5 files; C: their path hashes). 1 = the Phase 2 test weapon, 2-7 = the smithy's (msweapons.py)
+MODELS = {1: 'wk400', 2: 'wk595', 3: 'wk606', 4: 'wk414', 5: 'wk415', 6: 'wk404', 7: 'wk407'}
+
+
+def model_arc(n):
+    """MODELS[n] as weapon\\w05\\mbgNNN\\mbgNNN in a copy of GS 001's arc (its MRL with the texture paths renamed)"""
+    old, new = 'weapon\\w00\\two001\\two001', 'weapon\\w05\\mbg%03d\\mbg%03d' % (n, n)
     assert len(old) == len(new)
     ver, ents = arcpack.read(rom().read('/nativeNX/arc/weapon/w00/001.arc'))
     tmp = os.path.join(OUT_GEN, 'w00_001.arc')
     open(tmp, 'wb').write(arcpack.build(ents))
-    fixed = os.path.join(OUT_GEN, 'w05_001_tmp.arc')
-    fmod2gu.build_arc(WK, tmp, fixed)
+    fixed = os.path.join(OUT_GEN, 'w05_%03d_tmp.arc' % n)
+    fmod2gu.build_arc(os.path.join(MHF, 'weapon', MODELS[n]), tmp, fixed)
     ver, ents = arcpack.read(open(fixed, 'rb').read())
     out = []
     for path, th, data in ents:
@@ -438,6 +480,8 @@ def main(report_only=False):
     sdt_d = open(os.path.join(MHF, 'zz', 'mhfsdt.dec.bin'), 'rb').read()
     acts, modes = msact.actions(dat), msact.modes(dat)
     MODES.update(modes)
+    ACTIONS[:] = [a for a, r in enumerate(acts) if r['steps'] and all(
+        k in (0, 1, 2) or m // 1000 == 1 for k, m, *_ in r['steps'])]
     w00 = gu_arc('player/quest/w00.arc')
     w02 = gu_arc('player/quest/w02.arc')
     gs_m0 = gu_arc('player/quest/w00_m0.arc')
@@ -452,7 +496,8 @@ def main(report_only=False):
     open(os.path.join(OUT_GEN, 'report.txt'), 'w').write('\n'.join(rep) + '\n')
     if report_only:
         print('\n'.join(rep)); return
-    open(os.path.join(OUT_GEN, 'ms_data.inc'), 'w').write(c_tables(acts, modes, own, tbl_index, hit_index))
+    mvs = [e[26] for e in mshit.hdp_parse(hdp)]
+    open(os.path.join(OUT_GEN, 'ms_data.inc'), 'w').write(c_tables(acts, modes, own, tbl_index, hit_index, mvs))
     # GS's effect and sound lists (per-motion effects / sounds, the class's effect files and sound banks) under the
     # class-5 names GU's file-ID table holds: placeholders until the sounds / effects phase (they key GS's motion slots,
     # i.e. our common slots; our action slots are empty in GS's list)
@@ -463,6 +508,13 @@ def main(report_only=False):
               'sound\\call\\pl\\pl_wp00': 'sound\\call\\pl\\pl_wp05'}
     fx = [(rename.get(p, p), t, b) for p, t, b in gu_entries('player/quest/w00.arc')
           if t not in (T_LMT, T_PARAM, T_HDP, T_HTS)]
+    # the psl ('PSL', u16 version, u16 count, count x u32 offset per motion slot): no GS effect on the slots our
+    # actions took from GS's own range (free_slots)
+    for i, (p, t, b) in enumerate(fx):
+        if p == 'effect\\psl\\player\\mot\\w05\\w05':
+            b = bytearray(b)
+            for s in own.values(): struct.pack_into('<I', b, 8 + 4 * s, 0)
+            fx[i] = (p, t, bytes(b))
     write('player/quest/w05.arc', arcpack.build([
         ('player\\mot\\w05\\w05', T_LMT, body),
         ('player\\mot\\w05\\w05_sa', T_LMT, empty_list()),
@@ -478,7 +530,8 @@ def main(report_only=False):
         ents = [(p, T_CMD, b) for p, b in sorted(cmds.items())]
         ents.append(('player\\cmd\\w05\\plcmd_w05_%s' % style, T_TBL, tbl))
         write('player/quest/w05_m%d.arc' % k, arcpack.build(ents))
-    write('weapon/w05/001.arc', model_arc())
+    for n in sorted(MODELS):
+        write('weapon/w05/%03d.arc' % n, model_arc(n))
     for name in ('001', 'mat_b', 'mat_i'):                # GS's weapon sound arcs (sounds phase: MHF's)
         write('weapon/w05/snd/%s.arc' % name, rom().read('/nativeNX/arc/weapon/w00/snd/%s.arc' % name))
     write('weapon/w05/g00.arc', arcpack.build([('weapon\\w05\\mot\\wg05_00', T_LMT, wlist),
