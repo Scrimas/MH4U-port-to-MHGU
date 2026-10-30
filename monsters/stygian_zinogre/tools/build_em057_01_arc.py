@@ -482,7 +482,7 @@ def effects(S, gu_pel_u, code, notes):
     spec = dict(arc=SRC_4U, stage_unpacked=[], mef='effect\\mef\\em\\em048_0', em_efl='effect\\efl\\em\\em049\\',
                 groups=groups, extra=[(groups[49] % r['file'], r) for r in own],
                 lmts=[(P48 + 'mot\\em048_%d' % b, PSL % b) for b in BANKS], pel=PEL_U, soil=arena_soil(notes),
-                list2=list2, extra2=extra2)
+                list2=list2, extra2=extra2, hide_grey_models='chunks')   # issue #6 white debris (efl4u2gu.CHUNK_MODELS)
     log = []
     out = efl4u2gu.effect_set(spec, log)
     lists = efl4u2gu.pel_lists(out[(PEL_U, efl4u2gu.T['PEL'])])

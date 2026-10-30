@@ -34,7 +34,7 @@ What is converted (all formats were compared on both games' code and on corpora,
   PSL  rProofEffectMotSequenceList v2 x 4 (one per motion list), from the 4U LMT animation event group 2 (MEF id
        remap[32] + run-length {bits, frames} events): same encoding in GU; slot kind 4 = PEL u list 1.
 """
-import os, struct, sys, zlib, collections
+import os, re, struct, sys, zlib, collections
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -880,13 +880,18 @@ TAR_COAT_MODEL = 'effect\\base\\qe\\qe000\\qe000_004'
 # request mask, 0xafc574 / GU twin), so GU never builds them. Files = the arm slam / step / landing / dash debris.
 HIDE_GREY_MODELS = {'em089_021', 'em089_022', 'em089_023', 'em089_024', 'em089_030', 'em089_031', 'em089_032',
                     'qe006_000', 'qe006_001', 'qe006_003', 'qe006_035', 'qe006_036'}
+# Dalamadur / Stygian Zinogre (2026-10-30, user: "similar issues on S.Zinogre and Dalamadur's attack / movements"):
+# spec hide_grey_models = 'chunks' = every EFL of the set, only for units drawing the shared rock-chunk models.
+CHUNK_MODELS = {'cm000_000', 'cm000_002', 'qe000_001', 'qe001_000'}
 
 
-def hide_grey_models(d, d4, log=None):
+def hide_grey_models(d, d4, log=None, models=None):
     """converted EFL d (4U source d4): element mask 0 on the entries whose unit is a model (type 5) with a grey 4U
-    colour (R = G = B); an element block shared with another entry is copied to the file end for it first."""
+    colour (R = G = B), drawing one of `models` (None = any); an element block shared with another entry is copied to
+    the file end for it first."""
     p, p4 = efl_parse(d), efl_parse(d4)
     users = collections.Counter(e[0] >> 8 for e in p['ents'] if e[0] >> 8)
+    size = {o: s for o, s, k in p['blocks']}
     out = bytearray(d)
     for i, (e, e4) in enumerate(zip(p['ents'], p4['ents'])):
         if not (e[0] >> 8 and e[1] >> 8) or e[1] & 0xFF != UNIT_MODEL:
@@ -894,12 +899,18 @@ def hide_grey_models(d, d4, log=None):
         c = struct.unpack_from('<I', d4, (e4[1] >> 8) + 0x30 + 0x48)[0]
         if not (c & 0xFF == (c >> 8) & 0xFF == (c >> 16) & 0xFF):
             continue
+        if models is not None:
+            offs = [(w >> 8) + 0x30 for w in e if w >> 8]
+            if i < len(p['tail']) and p['tail'][i]: offs.append(p['tail'][i] + 0x30)
+            names = {m.decode().split('\\')[-1] for o in offs
+                     for m in re.findall(rb'effect\\[ -~]+?(?=\0)', d[o:o + size[o]])}
+            if not names & models:
+                continue
         eo = (e[0] >> 8) + 0x30
         if users[e[0] >> 8] > 1:     # shared with a kept entry: a private copy at the file end, mask 0
-            size = {o: s for o, s, k in p['blocks']}[eo]
             while len(out) % 16: out += b'\0'
             new = len(out)
-            out += out[eo:eo + size]
+            out += out[eo:eo + size[eo]]
             struct.pack_into('<I', out, new, 0)
             struct.pack_into('<I', out, 0x30 + 16 * i, ((new - 0x30) << 8) | (e[0] & 0xFF))
             struct.pack_into('<I', out, 8, len(out) - 0x30)
@@ -956,7 +967,10 @@ def effect_set(spec, log):
         d4 = S[(p, T['EFL'])]
         l = []
         conv['EFL'][p] = convert_efl(d4, l, spec['soil'])
-        if p.split('\\')[-1] in spec.get('hide_grey_models', ()):
+        hide = spec.get('hide_grey_models', ())
+        if hide == 'chunks':
+            conv['EFL'][p] = hide_grey_models(conv['EFL'][p], d4, l, CHUNK_MODELS)
+        elif p.split('\\')[-1] in hide:
             conv['EFL'][p] = hide_grey_models(conv['EFL'][p], d4, l)
         _, bad = check_efl(conv['EFL'][p])
         assert not bad, (p, bad)
