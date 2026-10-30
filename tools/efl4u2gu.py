@@ -883,11 +883,14 @@ HIDE_GREY_MODELS = {'em089_021', 'em089_022', 'em089_023', 'em089_024', 'em089_0
 # Dalamadur / Stygian Zinogre (2026-10-30, user: "similar issues on S.Zinogre and Dalamadur's attack / movements"):
 # spec hide_grey_models = 'chunks' = every EFL of the set, only for units drawing the shared rock-chunk models.
 CHUNK_MODELS = {'cm000_000', 'cm000_002', 'qe000_001', 'qe001_000'}
+# "grey" = channel spread <= 8 (Stygian's leap / slam chunks: qe006_005 ffe4e5e6, em048_021 ffa4a4a5; test 16:46)
+GREY_SPREAD = 8
+GREY_MIN = 0x20     # near-black rubble kept (Dalamadur em024_001 ff0a0b0d; darkest confirmed white chunk ff2f2f2f)
 
 
 def hide_grey_models(d, d4, log=None, models=None):
     """converted EFL d (4U source d4): element mask 0 on the entries whose unit is a model (type 5) with a grey 4U
-    colour (R = G = B), drawing one of `models` (None = any); an element block shared with another entry is copied to
+    colour (GREY_SPREAD), drawing one of `models` (None = any); an element block shared with another entry is copied to
     the file end for it first."""
     p, p4 = efl_parse(d), efl_parse(d4)
     users = collections.Counter(e[0] >> 8 for e in p['ents'] if e[0] >> 8)
@@ -897,7 +900,8 @@ def hide_grey_models(d, d4, log=None, models=None):
         if not (e[0] >> 8 and e[1] >> 8) or e[1] & 0xFF != UNIT_MODEL:
             continue
         c = struct.unpack_from('<I', d4, (e4[1] >> 8) + 0x30 + 0x48)[0]
-        if not (c & 0xFF == (c >> 8) & 0xFF == (c >> 16) & 0xFF):
+        rgb = (c & 0xFF, (c >> 8) & 0xFF, (c >> 16) & 0xFF)
+        if max(rgb) - min(rgb) > GREY_SPREAD or max(rgb) < GREY_MIN:
             continue
         if models is not None:
             offs = [(w >> 8) + 0x30 for w in e if w >> 8]
