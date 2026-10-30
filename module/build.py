@@ -264,6 +264,7 @@ if MS_SLICE:
         ('ms_forge_process', 0x70153C),   # smithy process getter (this, type, row): type 12 = ours
         ('ms_hud', 0x646560),         # CB phial widget update after its hunter reads (r4 widget, r5 hunter)
         ('ms_snd_file', 0x4EA0DC),    # weapon sound-request file ID (?, class, equipment, k): class 5 asks as GS
+        ('ms_wsync', 0x308DDC), ('ms_wsync2', 0x308E68),  # weapon sync's class reads: class 5 picks by mode as SA
     ]
 # the forge's category menu (ms_class.c "the forge's category menu"): order, labels, top-panel icon lists
 MS_TABLES = {'ms_forge_order': 0x1650022, 'ms_forge_label': 0x1650058, 'ms_shop_icons': 0x176F3E4}

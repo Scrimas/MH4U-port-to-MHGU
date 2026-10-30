@@ -23,6 +23,9 @@ import msgrip, msmot
 
 HEAD = math.radians(-26.0)    # the crescent's head on the ring (theta = atan2(y, z))
 RING_R = 109.0                # outer radius of the ring's visible band (cm; texture u 0.6)
+GS_REACH = 260.0              # GU's look: GS's crescents (scale 1, band out to RING_R) trail a blade reaching 260 cm
+                              # (its capsules): a swing of tip radius r = scale r / GS_REACH (test 1: r / RING_R
+                              # was "quite big compared to the weapon")
 ARC_BASE = 1000               # PEL ids of the Magnet Spike's arcs (GS's list-1 ids end at 517)
 ARC_TEMPLATE = 2              # GS's record copied (unit mask 4: its overhead slash's arc)
 SHOCK_EFX = 1100              # PEL ids of the Magnetic Shock 5 x 3 spots (msbuild SHOCK; MHF effects 0x2e-0x30: S)
@@ -86,7 +89,7 @@ def arc(sw, wdata, holders):
     hl = np.array([0.0, math.sin(HEAD), math.cos(HEAD)])
     xl = np.array([1.0, 0.0, 0.0])
     R = np.c_[axis, h, np.cross(axis, h)] @ np.c_[xl, hl, np.cross(xl, hl)].T
-    return dict(post=post, pos=tuple(c), rot=euler_xyz(R), scl=r / RING_R, sweep=sweep, r=r)
+    return dict(post=post, pos=tuple(c), rot=euler_xyz(R), scl=r / GS_REACH, sweep=sweep, r=r)
 
 
 def pel_add(d, recs):

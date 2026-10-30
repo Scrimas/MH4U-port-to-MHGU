@@ -45,6 +45,12 @@ def euler(r):
             @ np.array([[1, 0, 0], [0, cx, -sx], [0, sx, cx]]))
 
 
+# the model turn (test 1: "the models lay flat" in the smithy viewer, which stands a weapon on its model z axis, GS's
+# blade z -80..224, where MHF's Magnet Spike lies along x, -140..140): the GU model and the weapon motions' root carry
+# TURN (x -> z), the hand grip undoes it (ms_class.c s_grip); hit shapes and arcs stay in the hand's frame
+TURN = euler((0.0, -math.pi / 2, 0.0))
+
+
 def pose(bones, tracks, f):
     """FSKL bones, {bone: AAN channels} -> {bone: 4x4} in the skeleton root's frame at frame f (unkeyed = rest)"""
     by = {b['node']: b for b in bones}; out = {}

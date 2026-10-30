@@ -188,7 +188,9 @@ typedef uint32_t (*ms_wstate_t)(uint32_t zero, void *hunter, uint32_t type);
 typedef void (*ms_rot_t)(void *obj, const float *euler);
 #define SET_ROTATION FN(ms_rot_t, 0x8a7dc4)          /* radians, vec4 */
 #define IS_PROWLER FN(ms_p_t, 0x27b918)
-static const float s_grip[8];                       /* the hand record: no offset, no rotation */
+/* the hand record: no offset; the rotation undoes the model turn (msgrip.TURN = Ry(-90 deg), x -> z, so the smithy
+ * viewer stands the weapon up): Ry(+90 deg), radians as SET_ROTATION's Rz Ry Rx */
+static const float s_grip[8] = {0, 0, 0, 0, 0, 1.5707964f, 0, 0};
 
 int ms_attach_c(uint32_t *regs)
 {
@@ -223,15 +225,34 @@ int ms_attach_c(uint32_t *regs)
 /* 0x53a164 (unit, motion, mode): every set-motion variant ends here. GU's common actions name their second-mode
  * motions only for SA / CB (the class byte gates slot 215, e.g. the drawn idle 0x2de664), so in Impact the Magnet
  * Spike's drawn idle / walk become the second-mode slots SA uses (5001 -> 5020, 5004 -> 5024), which hold MHF's
- * Impact motions (msbuild COMMON). Only our class object (its vtable) is read. */
+ * Impact motions (msbuild COMMON); the same for the idle variants 5-7 and the rolls 12 / 13 (MHF's Impact rolls
+ * 1010 / 1011 in 32 / 33: test 1 rolled in the Cutting form). Only our class object (its vtable) is read. */
+static const uint16_t s_impact_slot[][2] = {{5001, 5020}, {5004, 5024}, {5005, 5020}, {5006, 5020}, {5007, 5020},
+                                            {5012, 5032}, {5013, 5033}};
+
 int ms_setmotion_c(uint32_t *regs)
 {
     uint8_t *u = (uint8_t *)regs[R0];
     if (!u || *(uint32_t **)u != ms_vt || ms_of(u)->mode != 1) return 0;
-    if (regs[R1] == 5001) regs[R1] = 5020;
-    else if (regs[R1] == 5004) regs[R1] = 5024;
+    for (uint32_t i = 0; i < sizeof s_impact_slot / sizeof s_impact_slot[0]; i++)
+        if (regs[R1] == s_impact_slot[i][0]) { regs[R1] = s_impact_slot[i][1]; break; }
     return 0;
 }
+
+/* the weapon motion sync 0x308b3c, for a body motion outside bank 5 (jumps, GU's shared actions): GU plays the
+ * weapon's motion 1 / 0x101, or for SA (class 8) by its mode, vt+0x35c = 1 -> 0x14 / 0x114. Class 5 takes SA's
+ * branch: at both class reads (`ldrb r0, [r0, #0x4d4]`, 0x308ddc / 0x308e68, r0 = the equipment info) r0 is moved
+ * so that the read gives 8. Our slot 215 answers Impact, so the weapon keeps the Impact form (weapon motion 20 = MHF
+ * 1020's) where test 1 showed the Cutting form */
+static const uint8_t s_sa_class = 8;
+
+int ms_wsync_c(uint32_t *regs)
+{
+    const uint8_t *info = (const uint8_t *)regs[R0];
+    if (info && info[0x4d4] == MS_CLASS) regs[R0] = (uint32_t)(uintptr_t)&s_sa_class - 0x4d4;
+    return 0;
+}
+int ms_wsync2_c(uint32_t *regs) { return ms_wsync_c(regs); }
 
 /* GU's weapon sound-request resolver 0x4ea0dc (?, class, equipment, k) -> file ID (C): class 5's jump-table case is
  * "no file", so every weapon sound of the motion sound sequence (op 0x66) was silent. Asked as class 0: GS's two001
@@ -239,6 +260,9 @@ int ms_setmotion_c(uint32_t *regs)
  * msbuild packs those files into w05.arc (msfx.py) */
 int ms_snd_file_c(uint32_t *regs)
 {
+    static int s_n;
+    if (regs[R1] == MS_CLASS && s_n++ < 12)     /* test 1: "no sound" (diagnostic: is the resolver reached?) */
+        logf("msport: weapon sound request k %u (lr %x)", regs[R3], regs[LR] - MAIN_BASE);
     if (regs[R1] == MS_CLASS) regs[R1] = 0;
     return 0;
 }
@@ -260,18 +284,19 @@ struct ms_weapon {
 };
 static const struct ms_weapon s_weapons[] = {
     {"Magnet Spike", "", 1, 0, 0, 106, 100, 0, {0}, {0}},                      /* 0: the equip fallback's dummy */
-    {"Proto Spike", "A test-built Magnet Spike from the Frontier.", 1, 3, 0, 106, 200, 0, {0}, {0}},
-    {"Demon Flamespike \"Flash\"", "A Magnet Spike that burns with a demon's flame. Its magnetism scorches.",
+    /* descriptions as GU's: up to 3 lines of <= 32 characters (test 1: one long line ran out of the box) */
+    {"Proto Spike", "A test-built Magnet Spike\r\nfrom the Frontier.", 1, 3, 0, 106, 200, 0, {0}, {0}},
+    {"Demon Flamespike \"Flash\"", "A Magnet Spike that burns\r\nwith a demon's flame. Its\r\nmagnetism scorches.",
      2, 7, 1, 106, 352, 24, {1576, 1570, 1585, 335}, {2, 4, 1, 5}},            /* MHF 17516: raw 640, fire 80 */
-    {"Volnoborin IV", "A Magnet Spike that surges like a riptide. Its poles drip with seawater.",
+    {"Volnoborin IV", "A Magnet Spike that surges\r\nlike a riptide. Its poles\r\ndrip with seawater.",
      3, 7, 2, 106, 310, 45, {890, 888, 818, 332}, {2, 3, 4, 5}},               /* MHF 17563: 564, water 150 */
-    {"Torid Pillar \"Uzi\"", "A Magnet Spike charged with thunder. Its field crackles with every swing.",
+    {"Torid Pillar \"Uzi\"", "A Magnet Spike charged with\r\nthunder. Its field crackles\r\nwith every swing.",
      4, 7, 3, 106, 309, 47, {1246, 1249, 1256, 330}, {2, 4, 1, 5}},            /* MHF 16964: 562, thunder 155 */
-    {"Anoru Pillar \"Wandemu\"", "A Magnet Spike of frozen iron. Its field freezes the air around it.",
+    {"Anoru Pillar \"Wandemu\"", "A Magnet Spike of frozen\r\niron. Its field freezes the\r\nair around it.",
      5, 7, 5, 106, 303, 50, {1145, 332, 331, 330}, {6, 6, 5, 5}},              /* MHF 16968: 551, ice 165 */
-    {"Apophis Pillar \"Flash\"", "A Magnet Spike that draws dragon power into its core.",
+    {"Apophis Pillar \"Flash\"", "A Magnet Spike that draws\r\ndragon power into its core.",
      6, 7, 4, 106, 352, 24, {1695, 1693, 1457, 332}, {3, 4, 1, 5}},            /* MHF 16933: 640, dragon 80 */
-    {"Apophis Pillar \"Clear\"", "A pure Magnet Spike: no element, all force.",
+    {"Apophis Pillar \"Clear\"", "A pure Magnet Spike: no\r\nelement, all force.",
      7, 7, 0, 106, 374, 0, {1488, 1490, 1523, 330}, {2, 3, 1, 5}},             /* MHF 16936: raw 680 */
 };
 #define MS_NWEAPONS (sizeof s_weapons / sizeof s_weapons[0])

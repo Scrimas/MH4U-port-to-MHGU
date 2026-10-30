@@ -181,6 +181,7 @@ def weapon(wparts, wbones, mid, holders=None, world=None, frames=None):
                 L = np.eye(4); L[:3, :3] = rot; L[:3, 3] = pos
                 L = M @ L
                 rot, pos = L[:3, :3], L[:3, 3]
+            if node == 0: rot, pos = msgrip.TURN @ rot, msgrip.TURN @ pos     # the model turn (msgrip.TURN)
             R.append(quat(rot)); T.append(tuple(pos)); S.append(tuple(sc))
         tracks.append(rot_track(node, 0, R))
         tracks.append(vec_track(node, 1, T))
@@ -202,6 +203,7 @@ def weapon_pose(wparts, wbones, mid, frame=0):
         ch = {} if node == 0 else chans[node]
         rot = msgrip.euler([channel(ch, 'r' + a, frame, b['rot']['xyz'.index(a)]) for a in 'xyz'])
         pos = tuple(channel(ch, 't' + a, frame, b['pos']['xyz'.index(a)]) for a in 'xyz')
+        if node == 0: rot, pos = msgrip.TURN @ rot, tuple(msgrip.TURN @ np.array(pos))   # the model turn
         sc = tuple(channel(ch, 's' + a, frame, 1.0) for a in 'xyz')
         tracks.append(rot_track(node, 0, [quat(rot)] * 2))
         tracks.append(vec_track(node, 1, [pos] * 2))

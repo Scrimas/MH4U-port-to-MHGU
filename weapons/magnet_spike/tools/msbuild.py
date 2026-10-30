@@ -49,13 +49,15 @@ ACTIONS = []             # every MHF action that plays a Magnet Spike motion (se
 RELEASE, GC_HIT = 208, 207   # MHF shared actions the module runs: charge released (35 charged / 36), guard hit
 SHARED = (RELEASE, GC_HIT)
 # GU common slot -> MHF motion (S: by duration, loop and root path; the first test's motion log checks them)
-COMMON = {1: 1001, 4: 1004, 5: 1001, 6: 1001, 7: 1001, 9: 1021, 11: 1021, 12: 1006, 13: 1007,
+COMMON = {1: 1001, 4: 1004, 5: 1001, 6: 1001, 7: 1001, 12: 1006, 13: 1007,
           14: 1462, 15: 1010, 16: 1011, 20: 1020, 24: 1024, 32: 1010, 33: 1011, 80: 1002, 81: 1008}
 # slots GU's common code plays that every class fills alike: GS's motion (slot -> GS slot). 2 / 3 = the draw /
-# sheathe (GS's events: on the back until frame 14 / from frame 36), GS's until MHF's are found (MHF's are not in
-# w13's part 0: S, a shared motion bank)
-GU_COPY = {s: s for s in (2, 3, 51, 52, 61, 90, 91, 92, 95, 150, 152, 169, 170, 171, 172, 173, 180, 181, 182, 195,
-                          196, 201, 221, 231, 232, 233, 234, 252, 253, 254, 255)}
+# sheathe (GS's events: on the back until frame 14 / from frame 36), 9 / 11 = the sheathes while moving (common
+# 1/3; test 1 played MHF 1021 there, an Impact-form evade: "sheathing while walking rolls"), GS's until MHF's are
+# found (MHF's are not in w13's part 0: S, a shared motion bank). Impact plays 5020 / 5024 / 5032 / 5033 for 1 / 4 /
+# 12 / 13 (ms_class.c ms_setmotion)
+GU_COPY = {s: s for s in (2, 3, 9, 11, 51, 52, 61, 90, 91, 92, 95, 150, 152, 169, 170, 171, 172, 173, 180, 181, 182,
+                          195, 196, 201, 221, 231, 232, 233, 234, 252, 253, 254, 255)}
 GU_COPY.update({53: 51, 54: 52, 96: 95, 174: 169, 175: 170, 176: 171, 177: 172, 178: 173})
 COMMON_USED = {1, 2, 3, 4, 6, 7, 9, 11, 12, 13, 18, 20, 24, 27, 28, 30, 32, 33, 36, 42, 51, 52, 53, 54, 60, 80, 81,
                90, 91, 92, 95, 96, 104, 151, 152, 154, 155, 163, 164, 165, 169, 172, 173, 174, 179, 181, 182, 195,
@@ -359,41 +361,67 @@ def cancel_commands(C, a, c, mode):
     return [C.ours_cmd(nxt, 0xc if inp in STICK_INPUTS else 8, k)]
 
 
+def idle_commands(C, window):
+    """the Magnet Spike's drawn-idle inputs (msact.IDLE), both modes (mode-specific ids), in one window: aiming
+    first, then the R1 combos, then the plain inputs. The stick (input 1, GU's common move) is left to the table's
+    own move command after ours (test 1 had it before the plain inputs: no attack while walking)"""
+    out = []
+    for inp, (ca, ia) in sorted(msact.IDLE.items(), key=lambda x: (x[0] not in (19, 23, 24), x[0] < 7, x[0])):
+        if inp == 1: continue
+        for mode, act in ((0, ca), (1, ia)):
+            if act not in ACTIONS: continue
+            fake = dict(next=act, input=inp, cond=IDLE_COND.get(inp, 0))
+            out += [cmd_obj(p, *window) for p in cancel_commands(C, None, fake, mode)]
+    return out
+
+
+# GU's jumps (common 1/4, 1/5, 1/137, 1/140: tables 18 / 19) take GS's jump attack: tri = MHF's falling attacks,
+# 59 Cutting / 73 Impact (the attraction flight's tri, 58 -> 59 / 68 -> 73), which run airborne until they land
+FALLING = (59, 73)
+JUMP_TABLES = (18, 19)
+
+
+def weapon_commands(C, k, window):
+    """the Magnet Spike's commands for a GU common-action table k that had GS's weapon commands (in their place, with
+    their window): 18 / 19 jumps = the falling attacks, else the drawn-idle inputs (0 drawn idle, 10, 11 drawn move,
+    12 / 13 rolls)"""
+    if k in JUMP_TABLES:
+        return [cmd_obj(p, *window) for mode, act in enumerate(FALLING) if act in ACTIONS
+                for p in cancel_commands(C, None, dict(next=act, input=2, cond=0), mode)]
+    return idle_commands(C, window)
+
+
 def build_commands(acts, gs_m0):
     """-> (command files {path: bytes}, table list bytes, {(action, step): table index}, report)"""
     C = Commands(gs_m0)
     gst = gs_tables(gs_m0)
     tables, report = [], []
-    # 0: drawn idle = GS's idle commons + the Magnet Spike's idle inputs, both modes (mode-specific ids)
-    idle = []
-    for c in gst[0]:
-        name = c['CmdBase'][1].split('\\')[-1]
-        if name.startswith('plcmd_w00'): continue
-        idle.append(cmd_obj(C.com(name), 0, 0, 0))
-    for inp, (ca, ia) in sorted(msact.IDLE.items(), key=lambda x: (x[0] not in (19, 23, 24), x[0] < 7, x[0])):
-        for mode, act in ((0, ca), (1, ia)):            # aiming first, then the R1 combos, then the plain inputs
-            if act not in ACTIONS: continue
-            fake = dict(next=act, input=inp, cond=IDLE_COND.get(inp, 0))
-            for p in cancel_commands(C, None, fake, mode):
-                idle.append(cmd_obj(p, 0, 0, 0))
-    tables.append(idle)
-    report.append('table   0: drawn idle: %s' % ', '.join(o['CmdBase'][1].split('\\')[-1].replace('plcmd_', '')
-                                                         for o in idle))
-    # 1-9: GS's attack tables have no Magnet Spike counterpart (empty); 10-46: GS's common-action tables, without
-    # GS's weapon commands (the table pickers ms_class.c keep GS's indexes)
-    tables += [[] for _ in range(9)]
-    for t in gst[10:]:
-        keep = []
-        for c in t:
+    # 0 = drawn idle, 10-46 = GS's common-action tables (the table pickers ms_class.c keep GS's indexes), GS's weapon
+    # commands replaced by ours at their place: before GU's move / Hunter Arts commands (GU takes the first ready
+    # command: test 1's idle table had them after, so attacks never started while the stick was tilted); 1-9 = GS's
+    # attack tables have no Magnet Spike counterpart (empty)
+    def common_table(k):
+        out, done = [], False
+        for c in gst[k]:
             name = c['CmdBase'][1].split('\\')[-1]
-            if name.startswith('plcmd_w00'): continue
-            keep.append(cmd_obj(C.com(name), *[struct.unpack('<f', struct.pack('<I', c[f]))[0]
-                                              for f in ('PreFrame', 'StartFrame', 'EndFrame')]))
-        tables.append(keep)
-    # one table per (action, step), the cancels in priority order (GU takes the first ready command)
+            window = [struct.unpack('<f', struct.pack('<I', c[f]))[0] for f in ('PreFrame', 'StartFrame', 'EndFrame')]
+            if name.startswith('plcmd_w00'):
+                if not done: out += weapon_commands(C, k, window)
+                done = True
+                continue
+            out.append(cmd_obj(C.com(name), *window))
+        if done:
+            report.append('table %3d: GU common: %s' % (k, ', '.join(
+                o['CmdBase'][1].split('\\')[-1].replace('plcmd_', '') for o in out)))
+        return out
+    tables.append(common_table(0))
+    tables += [[] for _ in range(9)]
+    tables += [common_table(k) for k in range(10, len(gst))]
+    # one table per (action, step), the cancels in priority order (GU takes the first ready command; GU's move last
+    # among equals: test 1's X + A after the Guard Counter lost to a tilted stick)
     index = {}
     for a in ACTIONS:
-        cs = sorted(acts[a]['cancels'], key=lambda c: -c['pri'])
+        cs = sorted(acts[a]['cancels'], key=lambda c: (-c['pri'], c['input'] == 1))
         for k in range(len(acts[a]['steps'])):
             t = []
             for c in cs:

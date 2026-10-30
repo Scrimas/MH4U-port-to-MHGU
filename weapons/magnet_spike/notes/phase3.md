@@ -48,7 +48,27 @@ QTE (hold 60 / cap 90, 70 points); every
 MHF camera-shake preset = GU 0xf; the monster is not held during the pin; Guard skills = GU's has-skill 14 / 15;
 the Magnetic Shock spots follow the hunter; R1 + evade = R + Y.
 
+## Test 1 results (user, 2026-10-30) and fixes
+| # | report | cause (log / data) | fix |
+|---|---|---|---|
+| 5, 12, 13 | no attack while walking, none after a roll, R moves not from idle | the common tables (0 idle / walk, 11 walk start, 12 / 13 rolls) lost GS's weapon commands and ours sat after GU's move / Hunter Arts commands (GU takes the first ready one; our idle block even had the stick's move before X / A) | ours in place of GS's, with GS's windows; no move command inside our block; GU's move last among equal priorities |
+| 11 | no jumping attacks | tables 18 / 19 (jumps 1/4, 1/5, 1/137, 1/140) lost GS's jump attack | tri = MHF's falling attacks 59 / 73 (the attraction flight's tri) |
+| 14 | sheathing while walking rolls | slot 9 (common 1/3, sheathe while moving) played MHF 1021, an Impact-form evade | slots 9 / 11 = GS's motions |
+| 15 | jumps / rolls always in the Cutting form | GU's rolls play 5012 / 5013 in both modes; bank-0 motions (jumps) give the weapon motion 1 | Impact: 5012 / 5013 -> 5032 / 5033 (MHF 1010 / 1011), idle variants 5005-5007 -> 5020; the weapon sync picks by mode as SA's (hooks 0x308ddc / 0x308e68) |
+| 8 | no Triple Strike cue | every MHF timer ran at half speed (tick = dt x 0.5; gauge regen measured ~100 / s), so the cue needed ~2.2 s of holding | tick = dt (cue ~1.5 s after the third hit starts); release logged (frame, A, charge) |
+| 10 | L / ZL = camera reset / lock-on | - | user's choice: ZR held = aim, R + ZR = Guard Counter |
+| R + B | sheathed at idle | GU's sheathe command 1/2 (common id 0xd) precedes ours | common ids 0xd / 0xe cleared when an R input of ours fires |
+| 16 | crescent too big | scale = tip radius / 109 cm (2.4x GS's for a 2.6 m reach) | scale = tip radius / 260 cm (GS's blade reach at scale 1) |
+| 4 | models lie flat in the viewer | the viewer stands a weapon on model z (GS: z -80..224); ours lay along x | model + weapon motions' root turned Ry(-90) (msgrip.TURN), the hand grip undoes it |
+| 1 | descriptions out of the box | one long line | GU's 3 lines of <= 32 characters |
+| 2 | same sharpness / rarity / affinity / slots | MHF's own records of the six: rarity 12, 3 slots, 0 % affinity; sharpness ids differ (2 / 13 / 17 / 21), MHF's sharpness table not located | open |
+| 9 | X + A after the Guard Counter | MHF: only after a guarded hit (57 / 76 / 77, from f68); 57's table had GU's move before it | move last (above) |
+| 17 | hits miss | capsules checked against MHF's mesh in the hand frame (they match bone by bone); the oversized crescent suggested a reach the blade does not have | crescent fix; to re-check in test 2 |
+| 6 | no sound | not diagnosed (no log of the resolver) | resolver calls logged |
+| 3, 7 | GS / bowgun icons, CB's HUD | stand-ins | open |
+
 ## Test 1 (Phase 3; save backup dump/save_backups/2026-10-29_before_magnet_spike)
+Test 2 changes the buttons: ZR held = aim, R + ZR = Guard Counter.
 Buttons (MHF -> Switch by position): tri X, circle A, tri + circle X + A, special B, R1 R, R2 ZR, SELECT Minus,
 aim L (or ZL). The gauge starts empty and fills 1 bar / 10 s and by hits; R moves cost 1 bar.
 1. Chains in both modes (Minus switches), Transform Attacks (Minus after a horizontal).

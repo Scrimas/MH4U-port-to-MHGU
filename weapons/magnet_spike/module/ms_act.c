@@ -29,8 +29,9 @@
 #define BTN_Y 0x80
 #define BTN_A 0x100
 #define BTN_SELECT 0x200            /* Minus, ZR: the user's Back / RT (test 1 runs 5-6) */
-#define BTN_AIM 0x400               /* L / ZL */
-#define BTN_R2 0x800
+#define BTN_ZR 0x800                /* MHF's R2 and L2 (user, test 2): ZR held = aim, R + ZR = Guard Counter (L / ZL =
+                                       GU's camera reset / lock-on, 0x400) */
+#define CID_SHEATHE (3u << 13)      /* GU's common ids 0xd / 0xe (+0x1414): sheathe standing / moving (1/2, 1/3) */
 typedef uint32_t (*ms_mask_t)(void);
 #define R_MASK FN(ms_mask_t, 0x65f93c)   /* GU's R role: 0x40, or 0x800 under the other option (GS's translator) */
 typedef void (*ms_pre_t)(void *p);
@@ -68,7 +69,9 @@ static float root(float x) { float r; __asm__("vsqrt.f32 %0, %1" : "=t"(r) : "t"
 static float *pos_of(uint8_t *p) { return &FIELD(float, p, 0x40); }
 static uint32_t yaw_to(float dx, float dz) { return (uint32_t)(int32_t)(atan2f_gu(dx, dz) * 10430.378f) & 0xffff; }
 static void face(uint8_t *p, uint32_t yaw) { FIELD(uint16_t, p, 0xfec) = (uint16_t)yaw; FIELD(uint16_t, p, 0x14a0) = (uint16_t)yaw; }
-static float tick_len(uint8_t *p) { return FIELD(float, p, 0x1c) * 0.5f; }
+/* MHF ticks (30 per s) this update: GU's dt +0x1c counts 1/30 s (0.5 at 60 fps; test 1's "x 0.5" ran every MHF
+ * timer at half speed: gauge regen ~100 / s, the Triple Strike charge twice as long) */
+static float tick_len(uint8_t *p) { return FIELD(float, p, 0x1c); }
 
 /* diagnostic (tests): every change of the action, its step, the body motion, the weapon's motion (part 0 object
  * +0x23a0, its +0x4b4 = list << 8 | slot) and the command table (+0x24ac id, +0x24a8 table, +0x24f0 the class list) */
@@ -179,7 +182,7 @@ static int input(struct ms_state *s, uint32_t inp, uint32_t held, uint32_t trig,
     case 9: return rh && (combo & 0x40);
     case 10: return rh && (trig & BTN_B);
     case 11: return rh && (trig & BTN_SELECT);
-    case 13: return (trig & BTN_R2) != 0;
+    case 13: return (rh && (trig & BTN_ZR)) || ((held & BTN_ZR) && (trig & r));     /* R + ZR, either order */
     case 14: return (held & BTN_A) != 0;
     case 15: return !(held & BTN_A);                    /* circle not held (a level) */
     case 16: return (trig & r) != 0;
@@ -271,16 +274,21 @@ void ms_input(uint8_t *p)
     tick(p, s, tick_len(p));
     uint32_t combo = FIELD(uint32_t, p, 0x1444), r = R_MASK();
     uint32_t held = FIELD(uint16_t, p, 0x13f4), trig = FIELD(uint16_t, p, 0x13f8);
-    if ((held & BTN_AIM) && ms_drawn(p)) s->flags |= 1; else s->flags &= ~1u;
-    uint32_t base = s->mode ? MS_ID_IMPACT : 0;
+    if ((held & BTN_ZR) && !(held & r) && ms_drawn(p)) s->flags |= 1; else s->flags &= ~1u;
+    uint32_t base = s->mode ? MS_ID_IMPACT : 0, set = 0;
     for (uint32_t k = 0; k < MS_NPAIRS; k++)
-        if (input(s, ms_pairs[k].inp, held, trig, combo, r) && cond(p, s, ms_pairs[k].cond))
+        if (input(s, ms_pairs[k].inp, held, trig, combo, r) && cond(p, s, ms_pairs[k].cond)) {
             MS_SET_CLASS_ID(p, base + k);
-    if (held & r) {                     /* R + B = R1 + special: not GU's roll (common ids 49 / 50, the plcmd_com
-                                           0x0001_013a / 014a ids; S: +0x1414 = the common ids' words) */
+            set = 1;
+        }
+    if (held & r) {                     /* R + B / Y = R1 + special / evade: not GU's roll (common ids 49 / 50, the
+                                           plcmd_com 0x0001_013a / 014a ids) nor its sheathe (test 1: R + B at idle
+                                           sheathed, common 1/2 comes before our commands in the idle table) */
         static int s_n;
-        if ((trig & BTN_B) && s_n++ < 8) logf("msport: R + B: common ids %x", FIELD(uint32_t, p, 0x1418));
+        if ((trig & BTN_B) && s_n++ < 8) logf("msport: R + B: common ids %x %x", FIELD(uint32_t, p, 0x1414),
+                                              FIELD(uint32_t, p, 0x1418));
         FIELD(uint32_t, p, 0x1418) &= ~(3u << 17);
+        if (set && (trig & (BTN_B | BTN_Y))) FIELD(uint32_t, p, 0x1414) &= ~CID_SHEATHE;
     }
     if (held != s->held) {
         static int s_n;
@@ -688,6 +696,8 @@ void ms_act(uint8_t *p)
     uint32_t no = FIELD(uint16_t, p, 0x250a);
     struct ms_state *s = ms_of(p);
     if (no == MS_RELEASE) {                     /* MHF shared 208: the charge released */
+        logf("msport: Triple Strike released at f%d, A %s, charge %d/%d ticks (level %u)", (int)MS_FRAME(p),
+             (FIELD(uint16_t, p, 0x13f4) & BTN_A) ? "held" : "up", (int)s->charge, CHARGE_T, s->charge_lvl);
         MS_SET_ACTION(p, 0x10, s->charge_lvl ? 35 : 36, 0);
         return;
     }

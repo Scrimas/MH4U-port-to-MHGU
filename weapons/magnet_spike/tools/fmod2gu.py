@@ -26,6 +26,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
 sys.path.insert(0, HERE); sys.path.insert(0, os.path.join(REPO, 'tools'))
 import fmod, fskl
 import mod4u2gu, arcpack, tex
+from msgrip import TURN
 
 T_TEX, T_MRL, T_MOD = 0x241f5deb, 0x2749c8a8, 0x58a15856
 GU_FMT, STRIDE = 0x14D40022, 28
@@ -41,13 +42,15 @@ def euler(r):
 
 
 def skeleton(bones):
-    """-> nodes in order, parent index list, local (column-vector) 4x4s, world 4x4s"""
+    """-> nodes in order, parent index list, local (column-vector) 4x4s, world 4x4s; the roots carry msgrip.TURN"""
     by = {b['node']: b for b in bones}
     order = sorted(by)
     assert order == list(range(len(order))), 'FSKL node ids must be 0..n-1'
     local, world = {}, {}
+    turn = np.eye(4); turn[:3, :3] = TURN
     def walk(n):
         b = by[n]; L = np.eye(4); L[:3, :3] = euler(b['rot']); L[:3, 3] = b['pos']
+        if b['parent'] < 0: L = turn @ L
         local[n] = L; world[n] = (world[b['parent']] if b['parent'] >= 0 else np.eye(4)) @ L
         c = b['child']
         while c >= 0: walk(c); c = by[c]['sibling']
@@ -60,12 +63,12 @@ def build_mod(fm, fs, material):
     meshes = fmod.parse(fm); _, bones = fskl.parse(fs)
     order, parents, local, world, by = skeleton(bones)
     nb = len(order)
-    allpos = np.concatenate([np.array(m['pos'], float) for m in meshes])
+    allpos = np.concatenate([np.array(m['pos'], float) for m in meshes]) @ TURN.T
     lo, hi = allpos.min(0), allpos.max(0); cube = float((hi - lo).max())
     vb = bytearray(); ib = bytearray(); recs = []; envs = []; ntri = 0; furthest = np.zeros(nb)
     for mi, m in enumerate(meshes):
-        P = np.array(m['pos'], float); n = len(P)
-        N = np.clip(np.round(np.array(m['normal'], float) * 127), -127, 127).astype(np.int8)
+        P = np.array(m['pos'], float) @ TURN.T; n = len(P)
+        N = np.clip(np.round(np.array(m['normal'], float) @ TURN.T * 127), -127, 127).astype(np.int8)
         N = np.concatenate([N, np.full((n, 1), 127, np.int8)], 1)
         UV = np.array(m['uv'], float) if m['uv'] else np.zeros((n, 2))
         gb = np.zeros((n, 4), np.int64); w = np.zeros((n, 4))
@@ -98,7 +101,7 @@ def build_mod(fm, fs, material):
     for i, nid in enumerate(order):
         b = by[nid]; p = parents[i]
         brec += struct.pack('<4B5f', nid, 255 if p < 0 else order.index(p), i, 0, float(furthest[nid]),
-                            float(np.linalg.norm(b['pos'])), *[float(v) for v in b['pos']])
+                            float(np.linalg.norm(b['pos'])), *[float(v) for v in local[nid][:3, 3]])
         bloc += struct.pack('<16f', *local[nid].T.flatten())             # row-vector storage = transpose
         binv += struct.pack('<16f', *(np.linalg.inv(world[nid]) @ q).T.flatten())
         remap[nid] = i
