@@ -47,7 +47,8 @@ typedef void (*ms_pre_t)(void *p);
 #define MAG_LOCK 3000               /* prm59 */
 #define MARKER_TIME 9000            /* prm14 */
 #define FALL_HEIGHT 200             /* prm36: condition 9 */
-#define CHARGE_T 45                 /* S: MHF's shared charge base (not traced) + prm31 30 */
+#define CHARGE_T 20                 /* Triple Strike charge (0x103332f0 kinds 3 / 5, asm): level 1 at prm33 20 ticks, */
+#define CHARGE_OVER 34              /* overcharged at prm33 + prm34 = 34 (one counter; skills 0x12e-0x130 scale it) */
 #define MARKER_Y 300                /* S: the marker's height over the monster's origin (no shot point in GU) */
 #define MARKER_RANGE 5000           /* S: the shot's reach (a projectile in MHF, its range not traced) */
 #define PIN_HOLD 60                 /* S: the pin's initial hold (MHF's comes from the monster, 0x101bc490) */
@@ -280,8 +281,26 @@ void ms_guarded(uint8_t *p, uint32_t level, uint8_t *info, int32_t *dmg)
     if (s->gc_hits < 255) s->gc_hits++;
     s->flags |= 8;
     MS_GUARD_STAMINA(p);
+    MS_EFFECT(p, MS_EFX_GUARD);                         /* MHF: 0xfc5 0x14 / 0x38 (S: a GS charge flash) */
     logf("msport: guarded hit %u (level %u, damage %d) in action %u", s->gc_hits, level, dmg ? (int)*dmg : 0,
          s->action);
+}
+
+/* slot 44 (+0xb0): "invulnerable now" (GU 0x2a680c: +0x274a bit 0 or the i-frame timer). The hit filter 0x16b15c
+ * asks it for an attack that overlaps the hunter (after its collision test 0x169878): an attack met in the
+ * Magnetic Evasion's i-frames (116 / 117 / 158) = MHF's MS flag 0x20000, condition 12 (C: it gates only
+ * 116 / 117 -> 160 / 159 and 158 -> 162, the stronger Magnetic Shocks; MHF's setter not found, S) */
+typedef int (*ms_inv_t)(void *p);
+int ms_invuln(uint8_t *p)
+{
+    int r = FN(ms_inv_t, 0x2a680c)(p);
+    uint32_t no = FIELD(uint16_t, p, 0x250a);
+    if (r && FIELD(uint16_t, p, 0x2506) == 0x10 && (no == 116 || no == 117 || no == 158)) {
+        struct ms_state *s = ms_of(p);
+        if (!(s->flags & 0x20000)) logf("msport: Magnetic Evasion through an attack (action %u)", no);
+        s->flags |= 0x20000;
+    }
+    return r;
 }
 
 /* ------------------------------------------------------------------------------------------------ motion */
@@ -293,21 +312,23 @@ static void set_air(uint8_t *p, struct ms_state *s)
     MS_MOVE_STATE(p, 2);
 }
 
-/* the attraction (mechanics.md 5): 1 lift v = 90 (0.2t)(2 - 0.2t) for 10 ticks, 2 fly 90 / tick toward the marker
- * until 300 short (re-targeted each tick; S: 90-tick cap), y kept in [target - 550, target + 1000], 3 fall:
- * horizontal 90 * 0.97^t, vertical v0 + g t (g = 2.3 or event 31's). Returns 1 on landing */
+/* the attraction (mechanics.md 5; MHF 0x10332dd0): 1 ease-in along the flight, v = 90 (0.2t)(2 - 0.2t) per tick
+ * while t <= 4, 2 fly 90 / tick toward the marker until 300 short (re-targeted each tick; S: 90-tick cap), y kept
+ * in [target - 550, target + 1000], 3 fall: horizontal 90 * 0.97^t, vertical v0 + g t (g = 2.3 or event 31's).
+ * Returns 1 on landing */
 static int attraction(uint8_t *p, struct ms_state *s, float tk)
 {
     float t[3], *q = pos_of(p);
-    s->att_t += tk;
     if (s->att < 3 && !marker(s, t)) { s->att = 3; s->att_t = 0; s->att_h = 90; }
     if (s->att == 1) {
-        float u = 0.2f * s->att_t;
-        if (u > 2) u = 2;
-        q[1] += 90 * u * (2 - u) * tk;
-        if (s->att_t >= 10) { s->att = 2; s->att_t = 0; }
+        float d[3] = {t[0] - q[0], t[1] - q[1], t[2] - q[2]}, n = root(sq(d[0]) + sq(d[1]) + sq(d[2]));
+        float u = 0.2f * s->att_t, v = 90 * u * (2 - u) * tk;
+        for (int i = 0; i < 3; i++) { s->dir[i] = n > 1 ? d[i] / n : 0; q[i] += s->dir[i] * v; }
+        face(p, yaw_to(d[0], d[2]));
+        if ((s->att_t += tk) > 4) { s->att = 2; s->att_t = 0; }
         return 0;
     }
+    s->att_t += tk;
     if (s->att == 2) {
         float d[3] = {t[0] - q[0], t[1] - q[1], t[2] - q[2]}, n = root(sq(d[0]) + sq(d[1]) + sq(d[2]));
         float go = 90 * tk, left = n - 300;
@@ -330,16 +351,29 @@ static int attraction(uint8_t *p, struct ms_state *s, float tk)
     return s->vy <= 0 && MS_LANDED(p, 0.0f, 0);
 }
 
-/* airborne actions: event 28's drive, event 25's y -= g * 0.1 * t, event 31's gravity (or 2.3 when nothing drives
- * the fall, S). Returns 1 on landing */
+/* MHF's drive (0x1032f700, C from its asm; curve bits from events 29 / 30, 0x10338c90: p 1 -> 1, 2 -> 2, 3 -> 4):
+ * n = ticks since the drive started; this tick's displacement = 0 at n = 0, then speed * 0.97^n (bit 1), n * speed
+ * (bit 2), else speed. Returns this update's displacement */
+static float drive_step(float speed, uint32_t bits, float *n, float *k, float tk)
+{
+    float out = *n < 1 ? 0 : (bits & 2) ? speed * *n : (bits & 1) ? speed * *k : speed;
+    *n += tk;
+    if (bits & 1) *k *= 1 - 0.03f * tk;
+    return out * tk;
+}
+static uint8_t curve_bits(uint32_t p) { return p == 1 ? 1 : p == 2 ? 2 : p == 3 ? 4 : 0; }
+
+/* airborne actions: event 28's drive, event 25's y -= g * 0.1 * t per tick, event 31's gravity (or 2.3 when nothing
+ * drives the fall, S). Returns 1 on landing */
 static int fall(uint8_t *p, struct ms_state *s, float tk)
 {
-    float dy = s->vert - s->grav * 0.1f * s->grav_t;
+    float dy = s->vert ? drive_step(s->vert, s->curve >> 4, &s->vert_n, &s->vert_k, tk) : 0;
+    dy -= s->grav * 0.1f * s->grav_t * tk;
     if ((s->flags & 0x80) || (!s->grav && s->vert <= 0)) {
         s->vy -= ((s->flags & 0x80) ? s->fall_g : 2.3f) * tk;
-        dy += s->vy;
+        dy += s->vy * tk;
     }
-    pos_of(p)[1] += dy * tk;
+    pos_of(p)[1] += dy;
     return dy <= 0 && MS_LANDED(p, 0.0f, 0);
 }
 
@@ -444,13 +478,15 @@ static void event(uint8_t *p, struct ms_state *s, const struct ms_event *e, int 
         break;
     case 25: s->grav = (float)v; s->grav_t = 0; break;
     case 26: s->flags |= 0x20; break;   /* charge counting */
-    case 27: s->fwd = drive(v); break;
-    case 28: s->vert = drive(v); if (s->vert > 0) set_air(p, s); break;
+    case 27: s->fwd = drive(v); s->fwd_n = 0; s->fwd_k = 1; break;
+    case 28: s->vert = drive(v); s->vert_n = 0; s->vert_k = 1; if (s->vert > 0) set_air(p, s); break;
+    case 29: s->curve = (uint8_t)((s->curve & 0xf0) | curve_bits(v)); break;
+    case 30: s->curve = (uint8_t)((s->curve & 0x0f) | curve_bits(v) << 4); break;   /* S: as 29's table */
     case 31: s->flags |= 0x80; s->fall_g = v * 0.01f; break;
     case 33: s->hold_v = (float)v; break;
     case 36: s->att = 0; break;         /* attraction vector reset */
-    case 37: s->fwd = 0; break;
-    case 38: s->vert = 0; break;
+    case 37: s->fwd = 0; s->fwd_n = 0; s->curve &= 0xf0; break;
+    case 38: s->vert = 0; s->vert_n = 0; s->curve &= 0x0f; break;
     case 39:                            /* face the pinned monster */
         if (s->pin_mon) {
             uint8_t *r = em_rec(s->pin_mon);
@@ -461,7 +497,7 @@ static void event(uint8_t *p, struct ms_state *s, const struct ms_event *e, int 
         }
         break;
     case 40: if (s->mode) s->flags |= 0x8000; else s->flags &= ~0x8000u; break;
-    default: {                          /* 6 (P+0x4f0, unknown), 17 (effect task), 29 / 30 (drive curves), 41 */
+    default: {                          /* 6 (P+0x4f0, unknown), 17 (effect task), 41 (run toggle) */
         static uint64_t s_seen;
         if (!(s_seen & 1ull << e->id)) logf("msport: event %u (param %u) not run", e->id, v);
         s_seen |= 1ull << e->id;
@@ -493,7 +529,10 @@ static void action_start(uint8_t *p, struct ms_state *s, const struct ms_action 
     s->action = (uint16_t)no; s->fired = s->code_fired = 0;
     s->flags &= 0x1 | 0x10 | 0x40 | 0x1000 | 0x8000;
     s->end_on_land = 0; s->keep_if = 0;
-    if (!IN(s_pin_keep, no)) { s->gc_hits = 0; s->fwd = s->vert = s->grav = s->grav_t = s->fall_g = s->hold_v = 0; }
+    if (!IN(s_pin_keep, no)) {
+        s->gc_hits = 0; s->curve = 0;
+        s->fwd = s->vert = s->grav = s->grav_t = s->fall_g = s->hold_v = s->fwd_n = s->vert_n = 0;
+    }
     if (no != 94 && no != 97) s->pin_pending = 0;
     if (s->pin_mon && !IN(s_pinned, no)) pin_end(p, s);
     if (!IN(s_attract, no)) { s->att = 0; s->flags &= ~0x1000u; }
@@ -521,7 +560,8 @@ static void action_start(uint8_t *p, struct ms_state *s, const struct ms_action 
     case 163: case 164:
         if (s->mag[s->mode] == 0 && s->mag_v[s->mode] >= MAG_READY) {
             s->mag[s->mode] = 1; s->mag_v[s->mode] = MAG_TIME;
-            logf("msport: %s Magnetise on", s->mode ? "Impact" : "Cutting");
+            void *h = MS_EFFECT(p, MS_EFX_MAGNETISE);   /* MHF: task 0xd3c / 0xe3c (S: a GS charge flash) */
+            logf("msport: %s Magnetise on (effect %x)", s->mode ? "Impact" : "Cutting", (uint32_t)(uintptr_t)h);
         }
         break;
     }
@@ -562,9 +602,10 @@ static int charge_tick(uint8_t *p, struct ms_state *s, float tk)   /* 34: 1 = re
     s->charge += tk;
     if (!s->charge_lvl && s->charge >= CHARGE_T) {
         s->charge_lvl = 1;
-        MS_SHAKE(p, 0xf, 0);                            /* S: cue for MHF's charge effect 0xfc6/0x11 + rumble */
-        logf("msport: Triple Strike charged");
-    } else if (s->charge_lvl && s->charge >= 2 * CHARGE_T) {
+        void *h = MS_EFFECT(p, MS_EFX_CHARGED);         /* MHF: effect 0xfc6/0x11 + rumble (S: a GS charge flash) */
+        if (!h) MS_SHAKE(p, 0xf, 0);                    /* no effect posted: the camera cue */
+        logf("msport: Triple Strike charged (effect %x)", (uint32_t)(uintptr_t)h);
+    } else if (s->charge_lvl && s->charge >= CHARGE_OVER) {
         s->charge_lvl = 0;
         logf("msport: Triple Strike overcharged: released");
         MS_SET_ACTION(p, 0x10, 36, 0);
@@ -623,9 +664,10 @@ void ms_act(uint8_t *p)
         s->hold_v -= tk;
         FIELD(float, p, 0x1010) = FIELD(float, p, 0x1014) = FIELD(float, p, 0x1018) = 0;
     }
-    if (s->fwd != 0 && !s->pin_mon) {
+    if (s->fwd != 0 && !s->pin_mon) {                   /* MHF: pos += R(yaw) (0, 0, drive) */
+        float d = drive_step(s->fwd, s->curve & 0xf, &s->fwd_n, &s->fwd_k, tk);
         float y = FIELD(uint16_t, p, 0xfec) * MS_U16_RAD;
-        q[0] += sinf_gu(y) * s->fwd * tk; q[2] += cosf_gu(y) * s->fwd * tk;
+        q[0] += sinf_gu(y) * d; q[2] += cosf_gu(y) * d;
     }
     s->grav_t += tk;
     int landed = 0;

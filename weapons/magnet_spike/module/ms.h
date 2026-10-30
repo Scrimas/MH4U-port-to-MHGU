@@ -41,6 +41,8 @@ struct ms_state {
     float mag_v[2];                 /* MS+0x8a: charge 0..1000 / timer */
     uint8_t air, end_on_land, keep_if, charge_lvl;   /* P+0x418 bit 0, P+0x410 == 2, ext+0x284, P+0xb28 */
     float fwd, vert;                /* ev27 / ev28 drives (units / tick) */
+    uint8_t curve;                  /* MS+0x6d: drive curves, low nibble forward, high vertical (ev29 / ev30) */
+    float fwd_n, vert_n, fwd_k, vert_k;   /* MS+0x6e / +0x70: ticks since the drive started; 0.97^n */
     float grav, grav_t;             /* ev25: y -= grav * 0.1 * t per tick */
     float fall_g, vy;               /* ev31 custom gravity and the speed it built */
     float hold_v;                   /* ev33: ticks of zero velocity */
@@ -117,6 +119,13 @@ typedef uint8_t *(*ms_em_t)(void *mgr, int i);
 #define MS_EM_MGR (*(void **)MAIN(0x1851fe0))
 #define MS_CAM_MGR (*(uint8_t **)MAIN(0x2126504))     /* +0x54 = the camera: eye +0x40, look-at +0x60 */
 #define MS_U16_RAD 9.58738e-5f                        /* u16 angle -> radians */
+typedef void *(*ms_efx_t)(void *p, uint32_t id, void *req, uint32_t one);
+#define MS_EFFECT(p, id) ((ms_efx_t)MS_VT(p, 0x39c))(p, id, (uint8_t *)(p) + 0x2550, 1)   /* 0x282624: post the
+                                     class PEL's list-1 record id (GS's w00_000 copy as w05_000) on the hunter's
+                                     request (GU's classes: arg 1 in 112 of 115 calls) */
+enum { MS_EFX_CHARGED = 7, MS_EFX_GUARD = 9, MS_EFX_MAGNETISE = 11 };   /* GS's charge flashes (list-1 6-11 / 30 /
+                                     31, its PTS ties GS's flash sound 150; 0-5 / 20 / 21 are its slash arcs, 1000+
+                                     ours, msfx.py): S, stand-ins for MHF's effects */
 
 static inline int ms_drawn(uint8_t *p) { return ((int (*)(void *))MS_VT(p, 0x178))(p) == 1; }
 
@@ -124,5 +133,6 @@ void ms_act(uint8_t *p);            /* ms_act.c: slot 201 */
 void ms_input(uint8_t *p);          /* ms_act.c: slot 139 */
 void ms_on_hit(uint8_t *p, uint8_t *atk, uint8_t *mon, uint32_t kind);      /* ms_act.c: slot 37 */
 void ms_guarded(uint8_t *p, uint32_t level, uint8_t *info, int32_t *dmg);   /* ms_act.c: slot 356 */
+int ms_invuln(uint8_t *p);          /* ms_act.c: slot 44 */
 void ms_init(void);                 /* ms_class.c, from module_init */
 void ms_text_loaded(uint8_t *m, const char *name, uint32_t lang);           /* ms_class.c, from items.c */

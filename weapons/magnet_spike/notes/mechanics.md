@@ -38,7 +38,7 @@ the marker: 29 87 88 118 168. +0x34 max turn: 95/96/159-162 60 deg, 110/111/114/
 | 25 | per tick y -= p * 0.1 * t; t++ | `grav`, `grav_t` |
 | 26 | MS flag 0x20: charge counting | same |
 | 27 / 28 | forward / vertical drive, int8 p per tick | `fwd` along the facing, `vert` (> 0 = airborne) |
-| 29 / 30 | drive curve nibbles {0:1,1:2,2:4} | not run (S: constant drives) |
+| 29 / 30 | drive curve nibble (0x10338c90 jump table: p 0 -> 0, 1 -> 1, 2 -> 2, 3 -> 4; 30 << 4, S: same table). Drive 0x1032f700 (asm): n = ticks since the drive started, this tick's displacement 0 at n = 0, then speed x 0.97^n (bit 1), n x speed (bit 2), else speed; forward = R(yaw) (0, 0, d) | the same (`curve`, `fwd_n` / `vert_n`, 0.97^n kept as a running factor) |
 | 31 | MS flag 0x80, gravity p * 0.01 for the attraction fall | `fall_g`, accumulating `vy` |
 | 33 | p ticks of zero velocity | zero p+0x1010.. |
 | 36 / 37 / 38 | attraction vector reset / forward / vertical drive reset | `att = 0` / `fwd = 0` / `vert = 0` |
@@ -51,7 +51,10 @@ Unused by the data: 5, 10, 14-16, 18-20, 22, 23, 32, 34, 35.
 ## Conditions (0x11926c5c) and inputs (0x11926bf8; C)
 Conditions: 0 always; 1-5 stamina >= 1 and gauge >= N bars; 6 MS flag 0x8; 7 no active pin; 8 guard-counter hits
 >= 1; 9 y >= ground + 200; 10 stamina, 1 bar, marker 1400 < d < 4000; 11 the same, 0 < d < 1400; 12 MS flag
-0x20000 (setter not found); 13 this mode's Magnetise ready (state 0, charge >= 1000).
+0x20000 (setter not found in the MS code; it gates only 116 / 117 -> 160 / 159 and 158 -> 162, the stronger
+Magnetic Shocks = "the evasion went through an attack", behaviour.md; module: set when GU's hit filter asks the
+invulnerability slot 44 about an overlapping attack during 116 / 117 / 158, S); 13 this mode's Magnetise ready
+(state 0, charge >= 1000).
 Inputs: 0 evade + stamina; 1 stick; 2 / 3 / 4 tri / circle / tri+circle pressed; 5 SELECT; 6 stick + circle;
 7-11 R1 held + tri / circle / tri+circle / special(A) / SELECT; 13 R2; 14 / 15 circle held / NOT held (levels);
 16 R1 pressed; 17 R1 + evade; 19 / 23 / 24 aiming (MS flag 0x1) + circle / special(A) / tri; 20 always; 21 tri NOT
@@ -86,10 +89,12 @@ plcmd_com_0x0001_013a / 014a) are cleared (S).
 
 ## Triple Strike charge (C)
 34 (motion 1080, 3 loops): event 26 @f50 starts counting P+0xb24. >= T: level 1 (effect 0xfc6/0x11, rumble 7);
->= T again: level 0 and auto-release. T = shared base (0x10a6a510, not traced) + 30 or 14 (S: kind lost).
-Release = input 15 (circle not held) -> 208: level > 0 -> 35 Charged Strike, else 36 Triple Strike 3; the hold
-expiring (step kind 2) -> 36. Module: T = 45 ticks (S), level 1 at T, auto-release at 2T, a camera shake as the
-charge cue (S: stand-in for MHF's effect).
+>= T again: level 0 and auto-release. Thresholds 0x103332f0(kind) (asm; jump table 0x10333380): kind 0 prm30 20,
+2 prm30 + prm31 50, 3 prm33 20, 5 prm33 + prm34 34, others 0; 0x10a6a510 scales them by skills 0x12e / 0x12f /
+0x130. Motion 1080's code compares kind level + 3 (level 1 at 20 ticks, effect 0xfc6/0x11) and kind 5 (34 ticks,
+effect 0xfc6/0xe, release), one counter. Release = input 15 (circle not held) -> 208: level > 0 -> 35 Charged
+Strike, else 36 Triple Strike 3; the hold expiring (step kind 2) -> 36. Module: 20 / 34 ticks (skills not
+scaled), GS's charge flash as the cue.
 
 ## Marker, attraction, repulsion
 - Shot (82 / 84, event 4 special #1 + event 17): MHF aims with the camera and fires a projectile that sticks (4
@@ -97,8 +102,9 @@ charge cue (S: stand-in for MHF's effect).
   start; the shot marks the nearest large monster within 0.6 rad and 5000 units; marker position = the monster's
   origin + 300 up (GU has no shot point).
 - Ranges (3-D distance to the marker): attract 1400 < d < 4000, repel 0 < d < 1400.
-- Attraction (58 / 61 / 62 / 68 / 71 / 72): face the marker; phases 1 lift v = 90 (0.2t)(2 - 0.2t) (10 ticks;
-  module: vertical, S), 2 fly 90 / tick toward the marker until 300 short (re-targeted, S: 90-tick cap), y in
+- Attraction (58 / 61 / 62 / 68 / 71 / 72): face the marker; phases 1 ease-in along the flight direction,
+  v = 90 (0.2t)(2 - 0.2t) per tick while t <= 4 (0x10332dd0 case 1, C), 2 fly 90 / tick toward the marker until
+  300 short (re-targeted, S: 90-tick cap), y in
   [target - 550, target + 1000], 3 fall: horizontal 90 * 0.97^t, vertical v0 - g t (g 2.3 or event 31's); the
   action ends on landing. During the flight: tri -> 59 / 73 falling attacks (condition 9), cross -> 63 / 69 approach
   cancel (event drives). GU: move state 2 (vt+0x300), landing 0x2a84d8(p, 0, 0); walls and ground run after the
@@ -111,6 +117,9 @@ charge cue (S: stand-in for MHF's effect).
 - MHF QTE (0x101bd650): tri / circle presses, cooldown 4 ticks, + prm40 (4) to the bar and the hold (cap from the
   monster), hold -1 / tick; success at prm41 70 %; i-frames forced 4 ticks. Over -> 100 (Cutting) / 156 (Impact
   origin, flag 0x8000); success -> Pin Finisher 105 / 157 (event 39 face, 43 / 44 special #8 MV 600 at f184).
+- Cap 0x101bc490 (asm): the monster's own pin value (its data + 0x3e) + prm44 60 when the pinner holds weapon
+  type 0xe; ratio 0x101bc5a0 = MS+0x50 / (cap x (1 - prm39 30 x 0.01)), success at prm41 70 %. GU monsters have no
+  MHF pin value.
 - Module (S): hold starts at 60 ticks (cap 90), success at 70 points; the hunter rides the monster (offset in the
   monster's yaw frame) through 98 / 99 / 105 / 157. GU's monster is NOT held yet (MHF's monster side 0x101bc*
   not traced; GU's status pipeline 0x97ddc -> reaction kind rec+0x3ae -> 0x76afc(m, 10, n), kind for trap /
@@ -130,6 +139,7 @@ charge cue (S: stand-in for MHF's effect).
 | HUD per-class gauge switch 0x665ad8 (class 5 word 0x665b34 = GS's case; CB's phial gauge = 0x264, S) | 0x665ad8 |
 
 ## Not yet ported (Phase 3 open)
-HUD (gauge bars, Magnetise icons, QTE prompt), effects and sounds (MHF dat/effect.bin unstudied: GU stand-ins
-planned), the monster hold during the pin, drive curves (events 29 / 30), the Guard skills' window extension,
-Magnetic Shock 5 x 3 (special #12), condition 12's setter, multiplayer (events 43 / 44, authority).
+MHF's QTE prompt, effects and sounds (MHF dat/effect.bin unstudied: GU stand-ins), the monster hold during the
+pin, the Guard skills' window extension,
+Magnetic Shock 5 x 3 (special #12: not spawned by the per-motion extras 0x103339d0 for motions 1031 / 1032 / 1082;
+S: a multi-hit property of the attack record), multiplayer (events 43 / 44, authority).

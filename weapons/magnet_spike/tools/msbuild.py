@@ -27,7 +27,7 @@ ROOT = os.path.dirname(os.path.dirname(WEAPON))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(ROOT, 'tools'))
 import paths, arcpack, xfs, lmt
-import aan, fskl, msact, sdt, msgrip, msmot, mshit, fmod2gu
+import aan, fskl, msact, sdt, msgrip, msmot, mshit, msfx, fmod2gu
 sys.path.append(paths.GU_PY)
 from romfs import RomFS
 from arc import arc_entries, arc_read
@@ -164,7 +164,7 @@ def build_motions(plan, gs_list):
     # sheathed weapon motion): the Cutting form, as the drawn idle's first frame (S), its root at rest on GU's carry
     wpn[0] = msmot.weapon_pose(w13w, wbones, COMMON[1], 0)
     report.append('weapon 0 <- MHF %d frame 0 (sheathed: Cutting form, root at rest)' % COMMON[1])
-    return msmot.lmt_bytes(body), msmot.lmt_bytes(wpn), report, holders, (w13w, wbones, weapon)
+    return msmot.lmt_bytes(body), msmot.lmt_bytes(wpn), report, holders, (w13w, wbones, weapon, w13, bbones)
 
 
 def empty_list(n=1):
@@ -201,8 +201,8 @@ def build_hits(acts, sdt_d, w00, w02, own, holders, wdata):
         kinds[kind] = sdt.attacks(sdt_d, e), sdt.shape_sets(sdt_d, e)
     tmpl_cut = mshit.hdp_parse(w00)[1]
     tmpl_imp = mshit.hdp_parse(w02)[3]
-    w13w, wbones, weapon = wdata
-    entries, sets, index, report = [[0] * 28], [], {}, []
+    w13w, wbones, weapon = wdata[:3]
+    entries, sets, index, report, swings = [[0] * 28], [], {}, [], []
     todo = [((a, k), acts[a]['steps'][step][1], frame, aid, special,
              'action %3d event %d (step %d f%d)' % (a, k, step, frame))
             for a, k, step, frame, aid, special in attack_instances(acts)]
@@ -221,16 +221,20 @@ def build_hits(acts, sdt_d, w00, w02, own, holders, wdata):
         hand = hs[min(mid_f, len(hs) - 1)] if hs else 14
         joint = 8 if hand == 14 else 12
         W = msgrip.pose(weapon.bones, msgrip.tracks_of(mo, weapon.bones), mid_f) if mo else {}
-        shp = []
+        shp, tip = [], None
         variant = shapes[r['shape']][0] if r['shape'] < len(shapes) else []
         for kind_bone, typ, u0, flag, rad, x0, y0, z0, x1, y1, z1 in variant:
             pa, pb = np.array([x0, y0, z0, 1.0]), np.array([x1, y1, z1, 1.0])
             if flag & 8 and kind_bone in W:          # on a weapon bone: into the holding hand's frame
                 M = W[kind_bone]
                 shp.append(mshit.capsule(joint, rad, (M @ pa)[:3], (M @ pb)[:3]))
+                for q in (pa, pb):                   # the blade tip (msfx arcs): the end farthest from the hand
+                    d = np.linalg.norm((M @ q)[:3])
+                    if not tip or d > tip[2]: tip = (kind_bone, q[:3], d)
             else:                                    # around the hunter: the root
                 shp.append(mshit.capsule(255, rad, pa[:3], pb[:3]))
         sets.append(shp)
+        swings.append(dict(mot=mot, frame=frame, dur=dur, cut=cut, special=special, tip=tip and tip[:2]))
         e = mshit.hdp_entry(tmpl_cut if cut else tmpl_imp, r['mv'], dur, mshit.CUT if cut else mshit.IMPACT,
                             len(sets) - 1, None if cut else r['ko'])
         index[key] = len(entries)
@@ -247,7 +251,7 @@ def build_hits(acts, sdt_d, w00, w02, own, holders, wdata):
         m[4], m[26] = min(mv, 250), mv
         entries.append(m)
     index['mag_base'] = base
-    return mshit.hdp_bytes(entries), mshit.hts_bytes(sets), index, report
+    return mshit.hdp_bytes(entries), mshit.hts_bytes(sets), index, report, swings
 
 
 # ------------------------------------------------------------------------------------------------ commands
@@ -489,18 +493,20 @@ def main(report_only=False):
     plan, own = slot_plan(acts)
     body, wlist, mreport, holders, wdata = build_motions(plan, w00['player\\mot\\w00\\w00'][1])
     msmot.check(body); msmot.check(wlist)
-    hdp, hts, hit_index, hreport = build_hits(acts, sdt_d, w00['player\\hit\\pl_we00_hitdata'][1],
-                                              w02['player\\hit\\pl_we02_hitdata'][1], own, holders, wdata)
+    hdp, hts, hit_index, hreport, swings = build_hits(acts, sdt_d, w00['player\\hit\\pl_we00_hitdata'][1],
+                                                      w02['player\\hit\\pl_we02_hitdata'][1], own, holders, wdata)
     cmds, tbl, tbl_index, creport = build_commands(acts, gs_m0)
-    rep = mreport + hreport + creport
+    freport = []
+    arcs, posts, snd_drop, sounds = msfx.build(swings, wdata, holders, own, GU_COPY, COMMON, freport)
+    rep = mreport + hreport + creport + freport
     open(os.path.join(OUT_GEN, 'report.txt'), 'w').write('\n'.join(rep) + '\n')
     if report_only:
         print('\n'.join(rep)); return
     mvs = [e[26] for e in mshit.hdp_parse(hdp)]
     open(os.path.join(OUT_GEN, 'ms_data.inc'), 'w').write(c_tables(acts, modes, own, tbl_index, hit_index, mvs))
     # GS's effect and sound lists (per-motion effects / sounds, the class's effect files and sound banks) under the
-    # class-5 names GU's file-ID table holds: placeholders until the sounds / effects phase (they key GS's motion slots,
-    # i.e. our common slots; our action slots are empty in GS's list)
+    # class-5 names GU's file-ID table holds: GS's entries on GS's motion slots (our common slots), our action slots
+    # get msfx's swing arcs and swing sounds
     rename = {'effect\\psl\\player\\mot\\w00\\w00': 'effect\\psl\\player\\mot\\w05\\w05',
               'effect\\psl\\player\\mot\\w00\\w00_sa': 'effect\\psl\\player\\mot\\w05\\w05_sa',
               'effect\\pel\\pl\\w00_000': 'effect\\pel\\pl\\w05_000', 'effect\\pel\\pl\\w00_800': 'effect\\pel\\pl\\w05_800',
@@ -509,12 +515,20 @@ def main(report_only=False):
     fx = [(rename.get(p, p), t, b) for p, t, b in gu_entries('player/quest/w00.arc')
           if t not in (T_LMT, T_PARAM, T_HDP, T_HTS)]
     # the psl ('PSL', u16 version, u16 count, count x u32 offset per motion slot): no GS effect on the slots our
-    # actions took from GS's own range (free_slots)
+    # actions took from GS's own range (free_slots), our arcs instead
     for i, (p, t, b) in enumerate(fx):
         if p == 'effect\\psl\\player\\mot\\w05\\w05':
             b = bytearray(b)
             for s in own.values(): struct.pack_into('<I', b, 8 + 4 * s, 0)
-            fx[i] = (p, t, bytes(b))
+            fx[i] = (p, t, msfx.psl_add(bytes(b), posts))
+        elif p == 'effect\\pel\\pl\\w05_000':
+            fx[i] = (p, t, msfx.pel_add(b, arcs))
+        elif p == 'sound\\call\\pl\\pl_wp05':
+            fx[i] = (p, t, msfx.mss_rebuild(b, snd_drop, sounds))
+    # GS's weapon sound requests and banks (ms_snd_file answers GS's file IDs for class 5: two001, two_bcom), loaded
+    # with the class; its Hunter Arts bank (two_arts) left out
+    fx += [(p, t, b) for n in ('001', 'mat_b') for p, t, b in gu_entries('weapon/w00/snd/%s.arc' % n)
+           if '_arts' not in p]
     write('player/quest/w05.arc', arcpack.build([
         ('player\\mot\\w05\\w05', T_LMT, body),
         ('player\\mot\\w05\\w05_sa', T_LMT, empty_list()),

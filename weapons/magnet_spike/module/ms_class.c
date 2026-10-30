@@ -126,6 +126,7 @@ void ms_init(void)
     vt_fn(415, pick415); vt_fn(416, pick416); vt_fn(453, never); vt_fn(454, nothing);
     vt_fn(37, ms_on_hit);           /* +0x94: after our attack's damage on a monster (every class: bx lr) */
     vt_fn(356, ms_guarded);         /* +0x590: the guard reaction (build.py's guard patches let class 5 guard) */
+    vt_fn(44, ms_invuln);           /* +0xb0: invulnerable now (GU's), + MHF's "evaded through an attack" */
     forge_tables_init();
     /* still GS's: 82 (resource setup + manager group 35, S), 443 (common actions 0x172-0x174 at GS frames) */
     logf("msport: class 5 vtable at %x (GS %x)", (uint32_t)(uintptr_t)ms_vt, MAIN(VT_GS));
@@ -229,6 +230,16 @@ int ms_setmotion_c(uint32_t *regs)
     if (!u || *(uint32_t **)u != ms_vt || ms_of(u)->mode != 1) return 0;
     if (regs[R1] == 5001) regs[R1] = 5020;
     else if (regs[R1] == 5004) regs[R1] = 5024;
+    return 0;
+}
+
+/* GU's weapon sound-request resolver 0x4ea0dc (?, class, equipment, k) -> file ID (C): class 5's jump-table case is
+ * "no file", so every weapon sound of the motion sound sequence (op 0x66) was silent. Asked as class 0: GS's two001
+ * + mSrqrNo (k 1) and two_bcom by mSndMaterial (k 0), read from our record (0x13f060 finds it through ms_base);
+ * msbuild packs those files into w05.arc (msfx.py) */
+int ms_snd_file_c(uint32_t *regs)
+{
+    if (regs[R1] == MS_CLASS) regs[R1] = 0;
     return 0;
 }
 
