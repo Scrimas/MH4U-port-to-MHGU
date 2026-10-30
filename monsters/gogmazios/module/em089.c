@@ -147,7 +147,7 @@ void em089_register_class(void)
     s_vt[2 + SLOT_NET_SET] = (uint32_t)&em089_net_set;
     s_vt[2 + 168] = (uint32_t)&em089_slot75;   /* 4U slot 75 joint-200 drive (em089_efx.c), while part 1 count == 1 */
     s_vt[2 + 75] = (uint32_t)&em089_psl_post;  /* GU slot 75 PSL post: 4U's ground set of the qe006 dust (em089_efx.c) */
-    s_vt[2 + 78] = (uint32_t)&em089_post78;    /* GU slot 78 generic post: issue #6 diagnostic log (em089_efx.c) */    s_vt[2 + 149] = (uint32_t)&em089_drop_set; /* item-drop table set (4U 0x930bdc em 89: work+0xed), em089_act.c */
+    s_vt[2 + 149] = (uint32_t)&em089_drop_set; /* item-drop table set (4U 0x930bdc em 89: work+0xed), em089_act.c */
     em089_efx_init();                          /* uShell016 effect hook (also installed lazily per frame) */
     em089_bgm_register();                      /* its battle themes (core module/bgm.c, em089_bgm.c) */
 

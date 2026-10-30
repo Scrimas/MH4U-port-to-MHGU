@@ -275,7 +275,12 @@ UNIT_GU_B19 = 1 << 19
 # them (S: 0x327cb8 tests each unit's class, cParticleGenerator first; the colour-tag test showed em089_021's rock
 # chunks u0 / u2 (qe000_001 / ef_em089, ff7f7f7f) and em089_031's u1 (cm000, ff2f2f2f) as the white "snowflakes" of
 # the arm slams / tar-jump landing / steps, where 4U draws them soil-multiplied = dark brown) -> the soil is baked into
-# their words 18 / 19 too (model_area).
+# their words 18 / 19 too.
+# All units of an area-block file (2026-10-30, issue #6, user: "some arm slams fixed, some aren't"): 0x327cb8 recolours
+# only units whose class isKindOf cParticleGenerator (DTI 0x212361c) or cParticleNode (C), and the unit-type -> class
+# map is not traced; em089_021's type-1 units (ffdbdbdb / ffffffff) and qe006_003's type-2 unit stayed bright (S). ->
+# the soil is baked into every unit 4U multiplies (colour mode 0 on the header-block path 0xc476c4, mode 5 on the
+# area path) and pel_colour leaves GU's override off for these files (no double multiply). block_area below.
 UNIT_COLOUR_MODE, UNIT_AREA_MODE = 0xF, 5
 UNIT_MODEL = 5
 
@@ -304,16 +309,16 @@ def area_multiply(word, rgba):
     return struct.unpack('<I', c.astype(np.uint32).astype(np.uint8).tobytes())[0]
 
 
-def unit_4u_to_gu(blk, utype, area=None, model_area=None):
-    """area: the colour baked into mode-5 units (None = left to the PEL multiply, 'code' = code-coloured file);
-    model_area: the colour baked into model units (type 5) of an area-block file (the PEL multiply misses them)."""
+def unit_4u_to_gu(blk, utype, area=None, block_area=None):
+    """area: the colour baked into mode-5 units (None = none, 'code' = code-coloured file); block_area: the colour
+    baked into the mode-0 / mode-5 units of an area-block file (4U multiplies every one of them)."""
     w = struct.unpack_from('<I', blk, 0x18)[0] & ~UNIT_INTENSITY
     if utype in (0, 1, 2):
         w |= UNIT_GU_B19
     out = bytearray(blk)
     struct.pack_into('<I', out, 0x18, w)
-    if utype == UNIT_MODEL and model_area:
-        area = model_area
+    if block_area and w & UNIT_COLOUR_MODE in (0, UNIT_AREA_MODE):
+        area = block_area
     elif w & UNIT_COLOUR_MODE != UNIT_AREA_MODE:
         area = None
     if utype != 9 and area:
@@ -344,11 +349,11 @@ def convert_efl(d, log=None, soil=M19A03_AREA_SOIL):
     pos = p['first']
     b = efl_colour_block(d)
     area = (soil if not b or not b[0] & 0x10 else None if not (b[3] >> 16) & 0xFF else 'code')
-    model_area = soil if b and b[0] & 0x10 and not (b[3] >> 16) & 0xFF else None
+    block_area = soil if b and b[0] & 0x10 and not (b[3] >> 16) & 0xFF else None
     for o, size, k in p['blocks']:
         blk = d[o:o + size]
         if k and k[0] == 1:
-            blk = unit_4u_to_gu(blk, k[1], area, model_area)
+            blk = unit_4u_to_gu(blk, k[1], area, block_area)
         if k == (1, 9):
             assert size == 0xC0, size
             blk = filter_4u_to_gu(blk)
@@ -574,13 +579,14 @@ def efl_colour_block(d):
 
 
 def pel_colour(path, rid, S=None, soil=M19A03_AREA_SOIL, code=None):
-    """RGBA 4U multiplies into the units of record `rid` (EFL `path`), None = 4U keeps the unit colours. code = the
-    record's own 0xc48378 colour (other monsters' code posts), else CODE_COLOUR (em089)."""
+    """RGBA GU's PEL override multiplies into the units of record `rid` (EFL `path`), None = off: 4U keeps the unit
+    colours, or the area colour is baked into the units (convert_efl block_area). code = the record's own 0xc48378
+    colour (other monsters' code posts), else CODE_COLOUR (em089)."""
     b = efl_colour_block((S or sources())[(path, T['EFL'])])
     if not b or not b[0] & 0x10:
         return None
     if not (b[3] >> 16) & 0xFF:
-        return soil
+        return None
     return code or CODE_COLOUR.get(rid)
 
 

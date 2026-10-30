@@ -187,50 +187,7 @@ void *em089_psl_post(void *self, uint32_t list, const uint8_t *data, uint32_t sl
         FIELD(uint32_t, req, REQ_FIELDS) |= 0x80000u;
         FIELD(uint32_t, req, REQ_GROUND) = ground_flags(self);
     }
-    void *eff = pslPostBase(self, list, data, slot, req);
-    static uint32_t s_n;   /* issue #6 diagnostic (test only): what the both-arms slam 7/17 posts */
-    if (data && slot < 32 && FIELD(uint8_t, self, EN_ACT_CAT) == 7 && FIELD(uint8_t, self, EN_ACT_NUM) == 17 &&
-        ++s_n <= 60)
-        logf("gogport: diag psl 7/17 motion %x frame %d slot %u id %u kind %u -> %x", curMotion(self),
-             (int)motionFrame(self), slot, FIELD(uint16_t, data, 4 + 2 * slot), FIELD(uint32_t, data, 0x44 + 4 * slot),
-             (uint32_t)eff);
-    return eff;
-}
-
-/* Issue #6 diagnostic (test only): GU slot 78 (vt+0x138) = 0x6fe48(this, PEL object, list, id, req, tied), the
- * monster's generic post (0x6ff74 goes through it, C): every post on a PEL other than our PEL u (this+0xb624), e.g.
- * the donor's common PEL c (this+0x1358, Kushala's em024_00c), goes to a ring that efx_tick logs (no log call on
- * the post path: the 0x40978 hook crashed on a deep one). Test 13:18: nothing outside PEL u (no 7/17 that fight). */
-typedef void *(*post78_t)(void *self, void *pel, uint32_t list, uint32_t id, void *req, void *tied);
-#define post78Base FN(post78_t, 0x6fe48)
-#define PEL_C_OBJ  0x1358
-#define PEL_U_OBJ  0xb624
-#define P78_N      16
-static struct { void *pel; uint32_t list, id, lr; uint16_t frame; uint8_t cat, num; } s_p78[P78_N];
-static uint32_t s_p78_w, s_p78_r, s_p78_total;
-
-void *em089_post78(void *self, void *pel, uint32_t list, uint32_t id, void *req, void *tied)
-{
-    if (pel != FIELD(void *, self, PEL_U_OBJ) && s_p78_total < 120 && s_p78_w - s_p78_r < P78_N) {
-        uint32_t k = s_p78_w++ % P78_N;
-        s_p78_total++;
-        s_p78[k].pel = pel; s_p78[k].list = list; s_p78[k].id = id;
-        s_p78[k].lr = (uint32_t)__builtin_return_address(0) - MAIN(0);
-        s_p78[k].frame = (uint16_t)motionFrame(self);
-        s_p78[k].cat = FIELD(uint8_t, self, EN_ACT_CAT); s_p78[k].num = FIELD(uint8_t, self, EN_ACT_NUM);
-    }
-    return post78Base(self, pel, list, id, req, tied);
-}
-
-static void p78_flush(void *self)
-{
-    for (; s_p78_r != s_p78_w; s_p78_r++) {
-        uint32_t k = s_p78_r % P78_N;
-        void *pel = s_p78[k].pel;
-        logf("gogport: diag post78 %s pel %x list %u id %u caller main+%x during %u/%u frame %u",
-             pel == FIELD(void *, self, PEL_C_OBJ) ? "PEL c (donor common)" : "other", (uint32_t)pel, s_p78[k].list,
-             s_p78[k].id, s_p78[k].lr, s_p78[k].cat, s_p78[k].num, s_p78[k].frame);
-    }
+    return pslPostBase(self, list, data, slot, req);
 }
 
 void em089_efx_kill(void *eff)
@@ -601,7 +558,6 @@ void em089_efx_init(void)
 static void efx_tick(void *self)
 {
     s_efx_owner = self;
-    p78_flush(self);
     em089_efx_init();
     s016_tick(self);
     aura_tick(self);
