@@ -5,6 +5,11 @@ groups, **New** (something added) and **Fixed** (what works now, not what was br
 written for players; write the section before `release.py package`.
 
 ## v1.7.2
+**New**
+- Building the mod yourself and contributing are now much easier: one setup script prepares everything from your
+  own game dumps, and CONTRIBUTING.md on GitHub walks you through it (what to dump, how to build and test, how to
+  report bugs or port a monster).
+
 **Fixed**
 - Every ported quest now uses the quest format of MHGU 1.4, the game version the mod is made for. With the game set
   to Chinese, these quests show their English text.
