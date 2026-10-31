@@ -21,7 +21,7 @@ All new files: nothing of the game is replaced. The quest only shows up with the
 
 Sources:
   GU template  q0011413 (G4 Hub Kushala "Steel Yourself": plain hunt, no siege) from the base RomFS
-               (MHGU_Editor/scratch/base_romfs.bin), setEmMain position from q0011319 (Fortress, Lao-Shan, area 1).
+               (GU RomFS, tools/paths.py GU_ROMFS), setEmMain position from q0011319 (Fortress, Lao-Shan, area 1).
   4U quests    m11014 (loc/data/quest00.arc, v005): 5-language text, fee 3600z, reward 35400z, sub 11800z, 50 min,
                subquest "Wound Gogmazios's back"; m11035 (quest01.arc): fee 4600z, reward 45900z, sub 15300z, 50 min,
                "Sever Gogmazios's tail", 4U spawn byte 3 = 1 (module/em089_act.c spawn_b3). Same stage, spawn,

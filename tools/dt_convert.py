@@ -1,5 +1,5 @@
 """dt_convert.py : build MHGU dtbase / dttune for a 4U monster from a GU donor file, by editing the donor's loaded
-object inside the emulated game (GU loader -> edit -> GU writer, tools/guemu.py). Run with the scratch venv.
+object inside the emulated game (GU loader -> edit -> GU writer, tools/guemu.py). Run with .venv/bin/python (unicorn, requirements.txt).
 
   dt_convert.py validate                 rebuild GU Teostra and Rathian from 4U data with Kushala as donor, diff
   dt_convert.py build EMNNN DONOR OUTDIR [--sensor]    (--sensor: also the RECORDS tables, the 4U sensor)

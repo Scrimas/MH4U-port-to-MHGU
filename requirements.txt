@@ -1,0 +1,6 @@
+# Python >= 3.11, one venv for every tool:  python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+# then `source .venv/bin/activate` (fish: activate.fish) before running tools/setup.py, build.sh and module/build.py.
+numpy
+Pillow
+cryptography      # tools/extdata4u.py (4U DLC quests)
+unicorn==2.1.4    # tools/dt_convert.py, guemu.py: GU loaders run emulated; pinned so the output bytes never change

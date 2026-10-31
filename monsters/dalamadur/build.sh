@@ -23,7 +23,7 @@ cd "$ROOT" || exit 1
 
 dt() {        # dtbase / dttune of the four halves on GU Kushala em024_00 (tools/dt_convert.py, unicorn: the GU venv)
     local py em
-    py=$(python3 -I -c "import sys; sys.path.insert(0, 'tools'); import paths; print(paths.GU_SCRATCH)")/venv/bin/python
+    py=$ROOT/.venv/bin/python; [ -x "$py" ] || py=python3     # needs unicorn (requirements.txt)
     for em in em024 em083 em110 em111; do
         "$py" tools/dt_convert.py build $em em024_00 "$ROOT/dump/converted/dalamadur/dt_$em" --sensor || return 1
     done

@@ -343,7 +343,7 @@ def check(nn, path, src=None, rom=None):
 def pairs(dir4u, rom):
     """579 (nn, n4, 4U arc path, GU snd arc path): see the docstring."""
     import glob
-    sys.path.insert(0, paths.GU_EDITOR_TOOLS)
+    sys.path.insert(0, paths.GU_PY)
     import mod as modlib
     sys.path.append(os.path.join(paths.monster('gogmazios'), 'tools'))
     import gear_weapons_em089 as G

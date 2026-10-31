@@ -64,7 +64,7 @@ import os, re, struct, sys, pickle
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import paths
-sys.path.insert(0, paths.GU_EDITOR_TOOLS)
+sys.path.insert(0, paths.GU_PY)
 import alloc, gu, portdata                          # noqa: E402
 from gear4u import text4u, gu_item_names, gu_str, exp_4u, LANGS, GU_ROMFS, EXE, EXE_BASE  # noqa: E402
 from build_assets import RomFS, arc as gu_arc, gmd  # noqa: E402

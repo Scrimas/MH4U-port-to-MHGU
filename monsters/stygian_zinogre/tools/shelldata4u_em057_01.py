@@ -2,7 +2,7 @@
 it only prints (module/em057_01_shelldata.h is written by hand from its output).
 
 MH4U v1.1 keeps these vectors at 0 in its image; static initializers fill them. This tool runs those initializers
-under unicorn (the MHGU_Editor scratch venv) and prints what they leave:
+under unicorn (.venv, requirements.txt) and prints what they leave:
   4U 0xd27970 (relative init_array entry): uEm048's statics
     - the 72-B orb records {off, A, B: float[4]; f0..f5} of 0xfebc18 0xfebd38 0xfebe58 0xfebf78 0xfec098 (record
       selector 0x856900): the init writes off / A / B, f0..f5 are .data
@@ -18,7 +18,7 @@ Stubs: 4U 0x5bfabc (MtDTI ctor: links the class DTI into the DTI tree, writes no
 GU SDK imports (dump/gu_plt.json): memclr / memset / memcpy done, the rest return r0. Reads of data / bss by an init
 are listed (a dependence on another initializer would show there).
 
-  /home/scrimas/Projects/MHGU_Editor/scratch/venv/bin/python -I -B monsters/stygian_zinogre/tools/shelldata4u_em057_01.py
+  .venv/bin/python -I -B monsters/stygian_zinogre/tools/shelldata4u_em057_01.py
       [--check]      --check: also compare module/em057_01_shelldata.h (its tables, addresses, axis) with the run
 """
 import json, os, re, struct, sys

@@ -66,10 +66,10 @@ that monster's module code.
 | 4U ROM | `dump/base/*.3ds`; `tools/ctr.py ls/x` extracts RomFS paths; listing in `dump/base_list.txt` |
 | 4U extracted | `dump/romfs/<lang>/data`, monster arcs `/data/emNNN.arc`, data `/data/em_data.arc` (emd + etd) |
 | 4U code | `dump/exefs_v11/mem.bin` (flat from 0x100000), disassembly `dump/mh4u.asm`; `tools/dis4u.py ADDR [N]`, `-f ADDR` (its function-start heuristic is sometimes wrong: walk back to the `push {.., lr}`) |
-| GU code | `/home/scrimas/Projects/MHGU_Editor/scratch/main.asm` (rg `^ +ADDR:`), `mem.bin`, `py/asm.py` (asm.u32, asm.INS); `tools/gu.py` (pc-relative resolver) |
-| GU RomFS | `/home/scrimas/Projects/MHGU_Editor/scratch/base_romfs.bin` (read through the helper scripts) |
+| GU code | `dump/gu_main/main.asm` (rg `^ +ADDR:`), `mem.bin` (`tools/setup.py gu`), `tools/gulib/asm.py` (asm.u32, asm.INS); `tools/gu.py` (pc-relative resolver) |
+| GU RomFS | `dump/gu_romfs/` (Ryujinx Extract Data > RomFS; read through `tools/gulib/romfs.py`) |
 | pairings | `dump/monster_fn_pairs.pkl` (1075 4U -> GU function pairs, 4U 0x6dd000..0x911b38), `dump/apimap.pkl`, `dump/apimap2.pkl` |
-| emulation | `tools/guemu.py` (runs a GU loader under unicorn; use the MHGU_Editor scratch venv) |
+| emulation | `tools/guemu.py` (runs a GU loader under unicorn; `.venv`, requirements.txt) |
 | Ryujinx | title 0100770008dd8000, mods `~/.config/Ryujinx/mods/contents/0100770008dd8000/<mod name>`, logs `~/.config/Ryujinx/Logs` |
 | headless runs | `tools/ryutest.sh run` (isolated `ryuroot/`, GDB stub on :55555; never touches the user's config) |
 

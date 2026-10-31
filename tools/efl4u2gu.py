@@ -43,7 +43,7 @@ import paths
 sys.path.insert(0, paths.GU_PY)
 import arcpack, tex, mod as modlib, mod4u2gu, mrl, mrl_build, ctr
 
-ROM_4U = os.path.join(ROOT, 'dump/base/Monster Hunter 4 Ultimate (EUR) Decrypted.3ds')
+ROM_4U = paths.ROM_4U
 SRC_EM089 = os.path.join(ROOT, 'dump/romfs/data/em089.arc')
 CORE_ARCS = ['/eng/data/core_quest.arc', '/eng/data/core_common.arc']
 STAGE_UNPACKED = ['m19a03', 'm19']   # Battlequarters arena effects (effect\efl\st\m19a03), lowest priority
