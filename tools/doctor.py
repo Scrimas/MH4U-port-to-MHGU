@@ -17,9 +17,8 @@ INPUTS = [
     ('dump/update/*.cia', None, 'MH4U v1.1 update (EUR), decrypted', 'dump it with GodMode9 into dump/update/'),
     (paths.GU_EXEFS + '/main', 'b3935415499549adaf4c0e89822831daa175cfd456a7990791c79be3997645ef', 'MHGU v1.4 ExeFS',
      'Ryujinx: right-click MHGU > Manage Title Updates > 1.4.0, then Extract Data > ExeFS into dump/gu_exefs'),
-    (paths.GU_ROMFS + '/nativeNX/loc/arc/quest/gq.arc', '0c7b2abde3779c7d8fede140e128a47bd614e9ee738c469b5f8efe2f9eacc8da',
-     'MHGU base-game RomFS (no update)',
-     'Ryujinx: Manage Title Updates > No Update, then Extract Data > RomFS into dump/gu_romfs'),
+    (paths.GU_ROMFS + '/nativeNX/loc/arc/quest/gq.arc', '5d28425a975459e62630d32685d5e5bc84d4798180e282d3a5110d1a5bafe95a',
+     'MHGU v1.4 RomFS', 'Ryujinx: Manage Title Updates > 1.4.0, then Extract Data > RomFS into dump/gu_romfs'),
 ]
 MADE = []      # (path, SHA-256 or None, what, fix): the outputs of tools/setup.py, filled from its STEPS below
 

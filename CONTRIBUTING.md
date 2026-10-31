@@ -39,12 +39,11 @@ Everything comes from games you own. The tools check versions by SHA-256 (`tools
 | MH4U **EUR**, decrypted `.3ds` | `dump/base/` | GodMode9 on your 3DS: dump the cartridge (or the installed eShop title) as a decrypted `.3ds`. |
 | MH4U **v1.1 update (EUR)**, decrypted `.cia` | `dump/update/` | GodMode9: build a decrypted CIA of the installed update. |
 | MHGU **v1.4 ExeFS** | `dump/gu_exefs/` | Ryujinx: right-click MHGU > Manage Title Updates > **1.4.0**, then right-click > Extract Data > **ExeFS**. |
-| MHGU **base-game RomFS** | `dump/gu_romfs/` | Ryujinx: Manage Title Updates > **No Update**, then Extract Data > **RomFS** (12 GB). Select 1.4.0 again afterwards. |
+| MHGU **v1.4 RomFS** | `dump/gu_romfs/` | Ryujinx, with 1.4.0 still selected: right-click > Extract Data > **RomFS** (12 GB). |
 | *(optional)* 4U DLC extdata | `dump/extdata_4u/` | Your 3DS extdata. Only the event-quest builders use it. |
 
-Only the EUR 4U is supported: the tools read fixed code addresses of EUR v1.1. The GU RomFS must be the **base
-game**, because the quest builders need its v1.0 quest templates (1.4 changed the quest file format). The ExeFS must
-be **1.4**, the version the mod patches.
+Only the EUR 4U is supported: the tools read fixed code addresses of EUR v1.1. Both MHGU extractions must be
+**v1.4**, the version the mod targets (`doctor.py` tells you if the update was not applied).
 
 Your keys come from your own Switch (Lockpick_RCM) and live in Ryujinx's `system/` folder. Never copy them into the
 repo.

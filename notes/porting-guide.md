@@ -67,7 +67,7 @@ that monster's module code.
 | 4U extracted | `dump/romfs/<lang>/data`, monster arcs `/data/emNNN.arc`, data `/data/em_data.arc` (emd + etd) |
 | 4U code | `dump/exefs_v11/mem.bin` (flat from 0x100000), disassembly `dump/mh4u.asm`; `tools/dis4u.py ADDR [N]`, `-f ADDR` (its function-start heuristic is sometimes wrong: walk back to the `push {.., lr}`) |
 | GU code | `dump/gu_main/main.asm` (rg `^ +ADDR:`), `mem.bin` (`tools/setup.py gu_code`), `tools/gulib/asm.py` (asm.u32, asm.INS); `tools/gu.py` (pc-relative resolver) |
-| GU RomFS | `dump/gu_romfs/` (base game, no update: Ryujinx Extract Data > RomFS; read through `tools/gulib/romfs.py`) |
+| GU RomFS | `dump/gu_romfs/` (v1.4: Ryujinx Extract Data > RomFS; read through `tools/gulib/romfs.py`) |
 | pairings | `dump/monster_fn_pairs.pkl` (1075 4U -> GU function pairs, 4U 0x6dd000..0x911b38), `dump/apimap.pkl`, `dump/apimap2.pkl` |
 | emulation | `tools/guemu.py` (runs a GU loader under unicorn; `.venv`, requirements.txt) |
 | Ryujinx | title 0100770008dd8000, mods `~/.config/Ryujinx/mods/contents/0100770008dd8000/<mod name>`, logs `~/.config/Ryujinx/Logs` |

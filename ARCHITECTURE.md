@@ -114,8 +114,7 @@ Raw inputs (from your own consoles / games)
   update/               MH4U v1.1 update, decrypted .cia
   extdata_4u/           optional: 4U DLC / event quest extdata (decrypted by tools/extdata4u.py)
   gu_exefs/             MHGU v1.4 ExeFS (Ryujinx Extract Data, update 1.4 selected): main, main.npdm, rtld, sdk
-  gu_romfs/             MHGU base-game RomFS (Ryujinx Extract Data, No Update): nativeNX/... (12 GB). Base, not 1.4:
-                        the quest builders need its v1.0 quest templates (1.4 grew questData 329 -> 369 bytes)
+  gu_romfs/             MHGU v1.4 RomFS (Ryujinx Extract Data, update 1.4 selected): nativeNX/... (12 GB)
 
 Made by tools/setup.py (also needed by a build)
   exefs_v11/            4U v1.1 code.bin, exheader.bin, mem.bin (flat from 0x100000)   [setup 4u_exefs]

@@ -8,8 +8,7 @@ Your inputs (never commit them):
   dump/update/*.cia    MH4U v1.1 update (EUR), decrypted (GodMode9)
   dump/gu_exefs/       MHGU v1.4 ExeFS: in Ryujinx, right-click MHGU > Manage Title Updates > 1.4.0, then
                        right-click > Extract Data > ExeFS into this folder
-  dump/gu_romfs/       MHGU base-game RomFS (no update: the quest builders need its v1.0 quest templates): Manage
-                       Title Updates > No Update, then Extract Data > RomFS (12 GB); select 1.4.0 again afterwards
+  dump/gu_romfs/       MHGU v1.4 RomFS: right-click > Extract Data > RomFS (12 GB), update 1.4.0 still selected
   dump/extdata_4u/     optional, 4U DLC quests: your 3DS extdata (tools/extdata4u.py)
 Every other dump/ file a build needs is either made here or extracted by the tool that needs it.
 """

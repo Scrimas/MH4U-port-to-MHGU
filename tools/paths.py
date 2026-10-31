@@ -3,8 +3,7 @@
 GU inputs, made from your own MHGU v1.4 by tools/setup.py (each one overridable with the environment variable of the
 same name):
   GU_EXEFS     dump/gu_exefs: Ryujinx, right-click MHGU > Extract Data > ExeFS (main, main.npdm, rtld, sdk, subsdk0)
-  GU_ROMFS     dump/gu_romfs: Ryujinx, Extract Data > RomFS of the base game (No Update: v1.0 quest templates), or a
-               RomFS image file
+  GU_ROMFS     dump/gu_romfs: Ryujinx, Extract Data > RomFS (update 1.4 selected), or a RomFS image file
   GU_CODE      dump/gu_main: made by `tools/setup.py gu_code` from GU_EXEFS: mem.bin (main, flat), main32.elf, main.asm
 GU_PY = tools/gulib: the GU readers (romfs, arc, gmd, asm ...), vendored from MHGU_Editor.
 Repo layout: tools/ + module/ + notes/ = shared core; monsters/<package>/{module,tools,notes} = one package,

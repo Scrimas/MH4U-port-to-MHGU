@@ -75,7 +75,7 @@ def main():
 
     # --- questData: the template's (G3 = stars 13, Hub, Dunes, start area, +0x1A, flags, money), then 4U's values
     qd = bytearray(tpl['loc\\quest\\questData\\questData_%07d' % TPL][1])
-    assert len(qd) == 329 and qd[0x12] == 13 and qd[0x14] == STAGE and qd[0x11] == 10
+    assert len(qd) == quest4u.QD_SIZE and qd[0x12] == 13 and qd[0x14] == STAGE and qd[0x11] == 10
     struct.pack_into('<I', qd, 0x0C, QID)
     # clear rule +0x1d (C): quest+0xe8 = [1, 2, 3][+0x1d] (table 0x162a75a, init 0x3abe54); the clear check 0x3a027c
     # (per frame while state 2) clears on rule 1 when objective 0 is done (flags & 0x60 == 0x20), rule 2 needs
@@ -97,7 +97,7 @@ def main():
     boss = struct.pack('<HBBBBBBBHBB', BOSS_ID, 0, 0, 1, hp, atk, other, 2, 100, 5, 3)
     qd[0x64:0x64 + 65] = boss + bytes(52)
     qd[0xD6:0xDB] = bytes([ICON, 0, 0, 0, 0])
-    for i, lang in enumerate(LANGS):
+    for i, lang in enumerate(quest4u.QLANGS):
         qd[0xDF + 20 * i:0xDF + 20 * (i + 1)] = ref(quest4u.T_GMD, '%s_%s' % (sid, lang))
     qd = bytes(qd)
 
