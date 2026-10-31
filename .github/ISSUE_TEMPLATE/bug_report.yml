@@ -1,0 +1,47 @@
+name: Bug report
+description: Something in the mod does not work, crashes, or differs from MH4U
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "Thanks! Never attach game files (arcs, saves, dumps). Logs and screenshots are fine."
+  - type: input
+    id: versions
+    attributes:
+      label: Release and zips installed
+      description: Every zip in your MH4U Port folder, all from the same release.
+      placeholder: "core-1.7.1, gogmazios-1.1.4, dalamadur-1.0.3"
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Where you play
+      options: [Ryujinx, Yuzu / Eden, MHGU PC Recomp, Other emulator / platform]
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Solo or online
+      options: [Solo, Online (everyone has the same zips), Online (not sure about the others' zips)]
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: What happened
+      description: The quest and monster, what you did, what happened, and what you expected (what MH4U does, if you know).
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: >-
+        Attach the log of the session (drag the file here).
+        Ryujinx: File > Open Logs Folder, the newest file.
+        Yuzu / Eden: File > Open the emulator's folder (yuzu / Eden Folder), then log/, the newest .txt.
+        Other: any log it writes. Screenshots or a clip help for anything visual.
+    validations:
+      required: true
