@@ -43,7 +43,7 @@ import os, struct, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import paths
-sys.path.insert(0, paths.GU_EDITOR_TOOLS)
+sys.path.insert(0, paths.GU_PY)
 import alloc                                        # noqa: E402
 from items4u import EXE, EXE_BASE, LANGS, msg4u as text4u, gu_text as gu_str   # noqa: E402,F401 (users import them)
 from build_assets import RomFS, arc as gu_arc, gmd  # noqa: E402

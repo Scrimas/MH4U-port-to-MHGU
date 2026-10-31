@@ -1,7 +1,7 @@
 """quest4u.py : MH4U quest data -> MHGU quest files, shared by the monsters' quest builders
 (monsters/<name>/tools/build_*_quest.py). Formats (layouts checked on GU's own quests; Gogmazios' notes/stage.md):
 
-questData (329 B, little endian; MHXX rQuestData layout, mhff wiki):
+questData (v1.4: 369 B, little endian; MHXX rQuestData layout, mhff wiki; v1.0 had 329 B, without the chT / chS refs):
   +0x00 'KC' header (u32 0x434b0000, u32 1, u32 0)  +0x0C u32 quest id
   +0x10 type  +0x11 board (10 = every board)  +0x12 stars (14 = G4)  +0x13 rank tier  +0x14 stage  +0x15 start area
   +0x16 minutes  +0x17 carts  +0x1A BGM/flags  +0x1F objective type (1 hunt)
@@ -9,7 +9,8 @@ questData (329 B, little endian; MHXX rQuestData layout, mhff wiki):
   +0x31 fee  +0x39 reward  +0x3D sub reward  +0x41 academy pts (reward x 0.08 in G)  +0x49 sub academy  +0x4D HRP
   +0x51 sub HRP  +0x58 supply deliveries  +0x64 5 x 13 B boss {u16 em id, u8 subtype, u8 aura, u8 restore count,
   u8 vital/attack/other table, u8 difficulty, u16 size %, u8 size table, u8 stamina}  +0xA5 small monster tables
-  +0xD6 5 icons  +0xDF 5 x {u32 GMD type 0x242bb29a, char[16] "<ID>_<lang>"}  +0x147 u16 flags (bit 7 = no rotation)
+  +0xD6 5 icons  +0xDF 7 x {u32 GMD type 0x242bb29a, char[16] "<ID>_<lang>"} (QLANGS order)
+  +0x16F u16 flags (bit 7 = no rotation; +0x147 in v1.0)
 questLink (308 B): 'KC' header, 13 x {u32 type, char[16] name}: 5 setEmMain, 3 emSetList, 5 rem, supp, questPlus.
 GMD (v0x10302): 'GMD\\0', u32 version, u32 lang 0, u32 unk (copied from the template), u64 0, u32 strings,
   u32 labels 0, u32 string bytes, u32 name length, name\\0, UTF-8 strings. 7 strings: title, client, description,
@@ -31,7 +32,8 @@ sys.path.insert(0, paths.GU_PY)
 import arcpack
 
 LANGS = ['eng', 'fre', 'ger', 'ita', 'spa']
-FILLER_LANGS = ['jpn', 'kor']      # arc padding only (v1.4 positional questLink lookup, see assemble())
+QLANGS = LANGS + ['chT', 'chS']     # quest text languages of v1.4 (questData refs + arc GMDs); 4U has no Chinese: English
+QD_SIZE = 369                      # v1.4 questData (the templates come from the v1.4 RomFS)
 LANG4U = {'eng': 0, 'fre': 1, 'spa': 2, 'ger': 3, 'ita': 4}    # order of a 4U quest's language tables (+0xBC)
 T_SET, T_ESL, T_REM, T_SUPP, T_PLUS, T_LINK, T_GMD, T_QD = (
     0x2553701d, 0x32ca92f8, 0x5b3c302d, 0x54539aee, 0x26bec21c, 0x00e0bb1c, 0x242bb29a, 0x1bbfd18e)
@@ -139,13 +141,13 @@ def ref(t, name):
 def quest_gmds(tpl, tpl_id, sid, t4):
     """questData_<sid>_<lang> GMDs from the 4U text (text4u), the template's unk word; checks first that the GMD writer
     reproduces the template's files byte for byte"""
-    for lang in LANGS:
+    for lang in QLANGS:
         d = tpl['%s\\quest\\questData\\questData_%07d_%s' % (lang, tpl_id, lang)][1]
         name, strs, unk = gmd_unpack(d)
         assert gmd(name, [s.decode('utf-8') for s in strs], unk) == d, lang
     gmds = {}
-    for lang in LANGS:
-        title, obj, fail, desc, other, client, sub = t4[lang]
+    for lang in QLANGS:
+        title, obj, fail, desc, other, client, sub = t4[lang if lang in LANGS else 'eng']
         unk = gmd_unpack(tpl['%s\\quest\\questData\\questData_%07d_%s' % (lang, tpl_id, lang)][1])[2]
         gmds[lang] = gmd('questData_' + sid, [title, client, desc, other, obj, fail, sub], unk)
     return gmds
@@ -154,12 +156,12 @@ def quest_gmds(tpl, tpl_id, sid, t4):
 def assemble(res, link, gmds, qd, sid):
     """quest arc + loose files -> {RomFS path under nativeNX: bytes}. res = [(path, type, data)] of the resources
     questLink names. v1.4 positional layout: questData = arc entry [count-1] (0x3ba6dc), questLink = [count-9]
-    (0x3ba840, path must contain "Link"; v1.0 used [count-7]); a v1.0 template has 7 entries from questLink to
-    questData, so 2 inert GMDs (English text, language folders the game never asks for) fill the gap: without them
-    questLink is null and 0x3ade34 skips the whole quest setup."""
+    (0x3ba840, path must contain "Link"; v1.0 used [count-7]): questLink, the 7 QLANGS GMDs, questData, as GU's own
+    v1.4 quests (without the 9 entries questLink is null and 0x3ade34 skips the whole quest setup). Loose GMDs: the 5
+    LANGS only (v1.4 has no loose chT / chS quest text)."""
     ents = res + [('loc\\quest\\questLink\\questLink_' + sid, T_LINK, link)]
-    ents += [('%s\\quest\\questData\\questData_%s_%s' % (l, sid, l), T_GMD, gmds[l]) for l in LANGS]
-    ents += [('%s\\quest\\questData\\questData_%s_%s' % (l, sid, l), T_GMD, gmds['eng']) for l in FILLER_LANGS]
+    ents += [('%s\\quest\\questData\\questData_%s_%s' % (l, sid, l), T_GMD, gmds[l]) for l in QLANGS]
+    assert len(qd) == QD_SIZE
     ents += [('loc\\quest\\questData\\questData_' + sid, T_QD, qd)]
     assert len(ents) >= 9 and ents[-9][1] == T_LINK and 'Link' in ents[-9][0] and ents[-1][1] == T_QD
     arc = arcpack.build(ents)

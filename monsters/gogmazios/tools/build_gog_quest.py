@@ -13,7 +13,7 @@ Writes (default DIR = monsters/gogmazios/romfs, mirror of the game RomFS):
   nativeNX/loc/arc/quest/q<ID>.arc                      quest arc (setEmMain, emSetList, rem, supp, questPlus,
                                                           questLink, 5+2 GMDs, questData), loaded at quest start;
                                                           v1.4 finds questLink at entry [count-9], questData [count-1]
-  nativeNX/loc/quest/questData/questData_<ID>.ext        loose questData (329 B), loaded for the board lists
+  nativeNX/loc/quest/questData/questData_<ID>.ext        loose questData (369 B), loaded for the board lists
   nativeNX/loc/quest/questLink/questLink_<ID>.qdl        loose questLink (308 B)
   nativeNX/<lang>/quest/questData/questData_<ID>_<lang>.gmd   text, lang = eng fre ger ita spa
 All new files: nothing of the game is replaced. The quest only shows up with the module's two hooks
@@ -21,7 +21,7 @@ All new files: nothing of the game is replaced. The quest only shows up with the
 
 Sources:
   GU template  q0011413 (G4 Hub Kushala "Steel Yourself": plain hunt, no siege) from the base RomFS
-               (MHGU_Editor/scratch/base_romfs.bin), setEmMain position from q0011319 (Fortress, Lao-Shan, area 1).
+               (GU RomFS, tools/paths.py GU_ROMFS), setEmMain position from q0011319 (Fortress, Lao-Shan, area 1).
   4U quests    m11014 (loc/data/quest00.arc, v005): 5-language text, fee 3600z, reward 35400z, sub 11800z, 50 min,
                subquest "Wound Gogmazios's back"; m11035 (quest01.arc): fee 4600z, reward 45900z, sub 15300z, 50 min,
                "Sever Gogmazios's tail", 4U spawn byte 3 = 1 (module/em089_act.c spawn_b3). Same stage, spawn,
@@ -141,7 +141,7 @@ def main():
 
     # --- questData
     qd = bytearray(tpl['loc\\quest\\questData\\questData_%07d' % TPL][1])
-    assert len(qd) == 329
+    assert len(qd) == quest4u.QD_SIZE
     struct.pack_into('<I', qd, 0x0C, qid)
     qd[0x11] = 10                          # every board
     qd[0x12] = 14                          # G4
@@ -184,7 +184,7 @@ def main():
     boss = struct.pack('<HBBBBBBBHBB', BOSS_ID, 0, 0, 1, hp, atk, other, 1, 100, 0, 3)
     qd[0x64:0x64 + 65] = boss + bytes(52)
     qd[0xD6:0xDB] = bytes([a.icon, 0, 0, 0, 0])    # board icon, default 4U's '?' (module/icons.c)
-    for i, lang in enumerate(LANGS):
+    for i, lang in enumerate(quest4u.QLANGS):
         qd[0xDF + 20 * i:0xDF + 20 * (i + 1)] = ref(T_GMD, '%s_%s' % (sid, lang))
     qd = bytes(qd)
 

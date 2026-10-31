@@ -1,4 +1,4 @@
-# Porting an MH4U monster into MHGU: guide for a new session
+# Porting an MH4U monster into MHGU: guide for a new session (human or AI)
 
 Written 2026-10-19 from the Gogmazios (4U em089) port; content side (Phase 5b) added 2026-10-20. Example target:
 Dalamadur, but everything here applies to any 4U-only monster. GU = MHGU 1.4 main offsets (runtime = 0x704000 + offset); 4U = MH4U v1.1 (EUR) code.bin addresses.
@@ -42,23 +42,23 @@ that monster's module code.
      side, Phase 5b).
    - `notes/gear-weapons.md`: the weapon table formats and the choices behind gear_weapons_em089.py.
    - `notes/installer.md`: package layout and the warnings the installer must show.
-4. The user's rules (section 1) and the memory files listed in MEMORY.md.
+4. The maintainer's rules (section 1) and the memory files listed in MEMORY.md.
 
-## 1. Ground rules (the user's, keep them)
+## 1. Ground rules (the maintainer's, keep them)
 - Edit files only with the Edit tool (Write for new files). Never use sed -i, Python or heredoc edits: every change
   must be visible as a diff. Read and search with shell tools (cat, sed -n, rg, rg --files).
 - Use `sudo -A`. Never `cargo build --release` locally. Run long jobs in the background; announce anything over
   about 1 minute.
 - No AI attribution in commits or docs. Never expose secrets.
 - Ported game assets stay local (Ryujinx mods folder). They never go into a public repo.
-- Install only when the user says so. Uninstall after each test. Keep test windows off the user's workspaces.
-  Low test burden: the user plays and closes, you read the log, and you ask only about visuals.
+- Install only when the maintainer says so. Uninstall after each test. Keep test windows off the maintainer's workspaces.
+  Low test burden: the maintainer plays and closes, you read the log, and you ask only about visuals.
 - "Finished" = faithful to 4U in looks, arena, behaviour, music and SFX. The port is an ADDITION to GU, never a
   replacement.
 - At most ONE helper agent at a time, freshly and narrowly briefed (a big-context spawn burns usage). Give it the
   files it owns and the files it must not touch, and forbid sub-agents and installs.
 - Never call something "4U behaviour" before tracing every end condition in 4U code (memory
-  feedback-faithful-claims). Never justify a choice with an unverified rationale: the user checks.
+  feedback-faithful-claims). Never justify a choice with an unverified rationale: the maintainer checks.
 
 ## 2. Inputs and environment
 | what | where |
@@ -66,12 +66,12 @@ that monster's module code.
 | 4U ROM | `dump/base/*.3ds`; `tools/ctr.py ls/x` extracts RomFS paths; listing in `dump/base_list.txt` |
 | 4U extracted | `dump/romfs/<lang>/data`, monster arcs `/data/emNNN.arc`, data `/data/em_data.arc` (emd + etd) |
 | 4U code | `dump/exefs_v11/mem.bin` (flat from 0x100000), disassembly `dump/mh4u.asm`; `tools/dis4u.py ADDR [N]`, `-f ADDR` (its function-start heuristic is sometimes wrong: walk back to the `push {.., lr}`) |
-| GU code | `/home/scrimas/Projects/MHGU_Editor/scratch/main.asm` (rg `^ +ADDR:`), `mem.bin`, `py/asm.py` (asm.u32, asm.INS); `tools/gu.py` (pc-relative resolver) |
-| GU RomFS | `/home/scrimas/Projects/MHGU_Editor/scratch/base_romfs.bin` (read through the helper scripts) |
+| GU code | `dump/gu_main/main.asm` (rg `^ +ADDR:`), `mem.bin` (`tools/setup.py gu_code`), `tools/gulib/asm.py` (asm.u32, asm.INS); `tools/gu.py` (pc-relative resolver) |
+| GU RomFS | `dump/gu_romfs/` (v1.4: Ryujinx Extract Data > RomFS; read through `tools/gulib/romfs.py`) |
 | pairings | `dump/monster_fn_pairs.pkl` (1075 4U -> GU function pairs, 4U 0x6dd000..0x911b38), `dump/apimap.pkl`, `dump/apimap2.pkl` |
-| emulation | `tools/guemu.py` (runs a GU loader under unicorn; use the MHGU_Editor scratch venv) |
+| emulation | `tools/guemu.py` (runs a GU loader under unicorn; `.venv`, requirements.txt) |
 | Ryujinx | title 0100770008dd8000, mods `~/.config/Ryujinx/mods/contents/0100770008dd8000/<mod name>`, logs `~/.config/Ryujinx/Logs` |
-| headless runs | `tools/ryutest.sh run` (isolated `ryuroot/`, GDB stub on :55555; never touches the user's config) |
+| headless runs | `tools/ryutest.sh run` (isolated `ryuroot/`, GDB stub on :55555; never touches the maintainer's config) |
 
 Ground truth for every format and every mapping: the monsters that exist in BOTH games (Capcom converted them, e.g.
 4U em031 Kushala -> GU em024_00, em001 Rathian -> em001_00). Learn each rule from those pairs, by vote over all
@@ -99,7 +99,7 @@ pairs where possible (tools/dt_vote.py, dt_map.py, snd4u2gu.py selftest), then a
    (`nativeNX/mh4uport/<name>.bin`, tools/portdata.py: sections ITEM, BUI, TBLA, TXTA, NOTE, NAME, SKIL, PWLF, FILE);
    the core patches the loaded tables (module/items.c, gear.c, notes.c), never ships resident arcs: UI mods
    replace resident.arc / resident_<lang>.arc (the
-   user's HD UI v4 does), and shipping blacksmith.arc from the v1.0 RomFS could undo update changes.
+   maintainer's HD UI v4 does), and shipping blacksmith.arc from the v1.0 RomFS could undo update changes.
 
 ## 4. Pipeline, in order
 ### Phase 0: identify (do not guess)
@@ -213,7 +213,7 @@ pairs where possible (tools/dt_vote.py, dt_map.py, snd4u2gu.py selftest), then a
 ### Phase 5b: content (save, items, gear, Notes, quests)
 Order that worked: save slot -> materials -> carves / rewards -> second quest + subquests -> armor data on a GU
 stand-in model -> weapon data -> descriptions / decorations / Notes -> gear models. Each step builds clean and is
-testable alone (the user checks the smithy or one quest).
+testable alone (the maintainer checks the smithy or one quest).
 - **Save slot.** The save arrays (hunts, captures, sizes) hold registry indexes 0..136 only and every accessor
   bounds-checks, so a new index is silently not counted. Use an unused registry slot (dummy1..7 = indexes 105..111,
   ids 0x1064..0x106a; Gogmazios = 105). Remap at the right place: the quest-end tally 0x3a75c8 compares the
@@ -288,17 +288,17 @@ testable alone (the user checks the smithy or one quest).
    `tools/portdata.py pack`; one line per step).
 1. Build both variants and check for 0 warnings:
    `python3 module/build.py`, and with defines, e.g. `GOG_DEFINES="GOG_STAGE_ALIAS TEST_HP_PCT=55 TEST_RAGE=60"`.
-2. Install only on the user's go:
+2. Install only on the maintainer's go:
    `GOG_DEFINES=... GOG_MOD_ROOT=$HOME/.config/Ryujinx/mods python3 module/build.py install` (exefs + every data
    file + the assets of PORT_ASSETS = comma-separated names, default all, `none` = none) into the mod folder
    "MH4U Port".
-3. The user plays and closes. Read the log with `python3 monsters/gogmazios/tools/gogreport.py` (extend it for the
+3. The maintainer plays and closes. Read the log with `python3 monsters/gogmazios/tools/gogreport.py` (extend it for the
    new monster's lines; core lines start with `mh4uport:`) and ask only about visuals.
 4. Uninstall: `rm -rf ~/.config/Ryujinx/mods/contents/0100770008dd8000/"MH4U Port"`.
-Automated smoke runs without the user: tools/ryutest.sh. `build.py install` without GOG_MOD_ROOT installs into the
+Automated smoke runs without the maintainer: tools/ryutest.sh. `build.py install` without GOG_MOD_ROOT installs into the
 isolated ryuroot/; `ryutest.sh gui` boots it windowed on hidden workspace 10 (headless `run` aborts ~1.5 s in) and
 its log (written to ~/.config/Ryujinx/Logs) shows the boot-time table patches (items, armor / skill / weapon /
-decoration tables, Notes redirect) without a user test; the blacksmith and Notes-text loads come later (village).
+decoration tables, Notes redirect) without a maintainer test; the blacksmith and Notes-text loads come later (village).
 Stop it with `ryutest.sh stop` (matches the cmdline: the gui process's /proc exe link is unreadable).
 
 ## 5. Lessons that cost time on Gogmazios
@@ -308,7 +308,7 @@ Stop it with `ryutest.sh stop` (matches the cmdline: the gui process's /proc exe
   "stays in one place far too long after flinches"). Read the callee's first instructions for vldr / vmul of s0..s3
   before writing the typedef.
 - **Trace every end condition before calling a report "4U behaviour".** The "permanent puddle" was a missing
-  attack-window kill (shell +0x16d), not 4U data. The user checked a 4U video.
+  attack-window kill (shell +0x16d), not 4U data. The maintainer checked a 4U video.
 - **Heights:** the rest pair raises y before the hover motion (root track y 720 x scale 2.5 = 1800). A monster
   "stuck at 1800" was a correct takeoff.
 - **Scale:** GU joint matrices include the model scale. A 10000-long 4U capsule is 25000 at scale 2.5 in both
@@ -324,7 +324,7 @@ Stop it with `ryutest.sh stop` (matches the cmdline: the gui process's /proc exe
   Check what each default byte does (checklist "White effects after the PEL_TAIL change").
 - **Motion effects on joints follow them (2026-10-28):** 4U re-reads a MEF record's joint every frame (effect slot 6
   0xc481f8 -> 0xc4838c) and only its ground flag (MEF bit 1) pins y to the ground. With PEL_TAIL everywhere, roars
-  and other head effects stayed where they started (user: "spawned on the ground for all ported monsters").
+  and other head effects stayed where they started (maintainer: "spawned on the ground for all ported monsters").
   efl4u2gu.py mef_follows: in PEL list 1, joint records without the ground flag take PEL_TAIL_LOCAL (MEF bit 0, the
   units' local space; Capcom's tail for Zinogre's 0x225 joint records) or PEL_TAIL_PREV; list 2 is unchanged.
 - **Effect reference model:** a pos-only post through the monster uses the monster's attach model as reference: its
@@ -356,7 +356,7 @@ Stop it with `ryutest.sh stop` (matches the cmdline: the gui process's /proc exe
   Gogmazios' fallen Dragonator spear into a pile bunker (kind-36 record, stage timeline, player-owned hit); GU's
   port of the class dropped them, and an earlier stage survey called the pile "unreachable" because it never
   looked there. Grep generic 4U classes (cut objects, uStageGimmick, shells) for the monster's em ID before
-  calling a feature unreachable, and ask the user what the thing does in 4U.
+  calling a feature unreachable, and ask the maintainer what the thing does in 4U.
 - **Online damage:** GU sends no damage packets. Every machine runs every attack against its own monster copy, but
   only the controlling machine (enemy+0x7420) applies HP / break / sever (0x97ddc) and ships them in the action
   message. So a gimmick hit must exist on the controller: spawn it on every machine from the replayed press (one
@@ -368,7 +368,7 @@ Stop it with `ryutest.sh stop` (matches the cmdline: the gui process's /proc exe
 
 ## 5b. Lessons from Tigerstripe Zamtrios (a 4U subspecies run by GU's own class, 2026-10-21)
 Notes: monsters/tigerstripe_zamtrios/notes/ (plan, phase1-variant-map, missing-actions, shells, blast, area-move).
-- **Install target:** user tests run `~/.config/Ryujinx`; `module/build.py install` defaults to the ryuroot test dir.
+- **Install target:** maintainer tests run `~/.config/Ryujinx`; `module/build.py install` defaults to the ryuroot test dir.
   Use `GOG_MOD_ROOT=~/.config/Ryujinx/mods python3 module/build.py install` and `cmp` the installed files. One
   test round was lost to the wrong folder.
 - **Missing actions:** GU's dispatcher ends unknown actions through the base thunks 0xca118 / 0xca10c (slot 247).

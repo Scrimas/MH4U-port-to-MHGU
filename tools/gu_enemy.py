@@ -1,4 +1,4 @@
-"""gu_enemy.py : MHGU 1.4 enemy class survey (static; uses MHGU_Editor/scratch/py helpers).
+"""gu_enemy.py : MHGU 1.4 enemy class survey (static; uses the tools/gulib helpers).
 
   gu_enemy.py classes      DTI, size, newInstance, ctor, object vtable of every uEmXXX_YY / uEnemy
   gu_enemy.py slots [N]    uEnemy vtable slots vs overrides in the monster classes (first N slots)

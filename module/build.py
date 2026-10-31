@@ -33,12 +33,14 @@ def gu_class_dti(m, raw):
     """the donor's class DTI (main address) for a gu_class monster, checked against the name in package.toml"""
     want = package(m)['gu_class']
     dti = raw[m['donor_index']]
-    pkl = os.path.join(paths.GU_SCRATCH, 'dti.pkl')            # MHGU_Editor: DTI address -> {(name, ...)}
+    pkl = os.path.join(paths.GU_CODE, 'dti.pkl')   # optional (MHGU_Editor study file): DTI address -> {(name, ...)}
     if os.path.exists(pkl):
         import pickle
         names = {n for n, _ in pickle.load(open(pkl, 'rb')).get(dti, ())}
         if want not in names: sys.exit('%s: donor %d runs %s, not gu_class %s' % (m['name'], m['donor_index'],
                                                                                names or '?', want))
+    else:
+        print('WARNING %s: donor class not checked against gu_class %s (no %s)' % (m['name'], want, pkl))
     return dti
 
 

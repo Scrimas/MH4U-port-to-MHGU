@@ -1,5 +1,5 @@
 """dt_map.py : learn where every field of a GU enemy-data object (dtbase / dtbparts / dttune) comes from in the
-MH4U em_data files (emd / etd), from monsters present in both games. Run with the MHGU_Editor scratch venv.
+MH4U em_data files (emd / etd), from monsters present in both games. Run with .venv/bin/python (unicorn).
 
   dt_map.py KIND        prints, per GU object field / heap block, its 4U source for each training monster and
                         whether they agree
@@ -35,7 +35,7 @@ def shared_pairs():
     pairs = {struct.unpack_from('<II', img, 0x1597EA4 + 8 * i)[1]: struct.unpack_from('<II', img, 0x1597EA4 + 8 * i)[0]
              for i in range(137)}
     out = []
-    for row in csv.DictReader(open(os.path.join(paths.GU_EDITOR, 'data/monster-index.csv'))):
+    for row in csv.DictReader(open(os.path.join(paths.GU_PY, 'monster-index.csv'))):
         nm, idx = row['monster'], int(row['index']) - 1
         if nm not in em4 or idx not in pairs or pairs[idx] & 0x1000: continue
         if nm.startswith(('Raging', 'Furious', 'Savage', 'Apex')): continue   # variants share the base's GU file

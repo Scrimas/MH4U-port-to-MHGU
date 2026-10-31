@@ -263,7 +263,7 @@ def build(R, exe, gu_item, out, spec, hp_table=None):
 
     # --- questData: the template's (rank, board, start area, flags, money), then 4U's values
     qd = bytearray(tpl['loc\\quest\\questData\\questData_%07d' % tpl_id][1])
-    assert len(qd) == 329 and qd[0x14] == spec.get('tpl_stage', stage) and qd[0x1F] in (1, 2, 3), \
+    assert len(qd) == quest4u.QD_SIZE and qd[0x14] == spec.get('tpl_stage', stage) and qd[0x1F] in (1, 2, 3), \
         (tpl_id, 'not a hunt / capture on the stage')
     qd[0x14] = stage
     assert (qd[0x12], qd[0x13]) == (base_qd[0x12], base_qd[0x13]), ('template and stat base differ in rank', tpl_id)
@@ -328,7 +328,7 @@ def build(R, exe, gu_item, out, spec, hp_table=None):
     # the first icon of a GU quest whose first boss it is (ICON_QUEST)
     icons = [ICON if e == EM_4U else partner_icon(R, PARTNER_GU[e]) for e in ems]
     qd[0xD6:0xDB] = bytes(icons + [0] * (5 - len(icons)))
-    for i, lang in enumerate(LANGS):
+    for i, lang in enumerate(quest4u.QLANGS):
         qd[0xDF + 20 * i:0xDF + 20 * (i + 1)] = ref(quest4u.T_GMD, '%s_%s' % (sid, lang))
 
     # --- questLink + resources: one setEmMain per boss (the template's first record with 4U's area and floats);

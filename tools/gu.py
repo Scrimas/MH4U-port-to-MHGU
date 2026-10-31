@@ -1,4 +1,4 @@
-"""gu.py : MHGU 1.4 main static helpers on top of MHGU_Editor/scratch/py (asm.py index of main.asm).
+"""gu.py : MHGU 1.4 main static helpers on top of tools/gulib (asm.py index of main.asm).
 
 pcref(b): address computed by the pc-relative instruction at b, with the literal it uses:
   `add rD, pc, rY`  -> (b+8+lit, 'addr', lit_addr)
