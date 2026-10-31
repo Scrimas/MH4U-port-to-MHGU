@@ -21,4 +21,5 @@ jobs:
       - name: C compiles
         run: |
           sudo apt-get install -y -q clang
+          pip install -q numpy Pillow       # module/build.py imports tools/ui_icons.py
           python3 tools/ci_compile.py
