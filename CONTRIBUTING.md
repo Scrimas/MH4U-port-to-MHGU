@@ -41,6 +41,7 @@ Everything comes from games you own. The tools check versions by SHA-256 (`tools
 | MHGU **v1.4 ExeFS** | `dump/gu_exefs/` | Ryujinx: right-click MHGU > Manage Title Updates > **1.4.0**, then right-click > Extract Data > **ExeFS**. |
 | MHGU **v1.4 RomFS** | `dump/gu_romfs/` | Ryujinx, with 1.4.0 still selected: right-click > Extract Data > **RomFS** (12 GB). |
 | *(optional)* 4U DLC extdata | `dump/extdata_4u/` | Your 3DS extdata. Only the event-quest builders use it. |
+| *(optional)* Magnet Spike: MHF-ZZ files | `dump/mhf/` | Only for the work-in-progress Magnet Spike (branch `magnet-spike`, switch `MS_SLICE`). Extracted by hand from an MHF-ZZ PC client; no setup step. The list and the method are in `weapons/magnet_spike/notes/assets.md` "Inputs"; `doctor.py` warns about missing ones. |
 
 Only the EUR 4U is supported: the tools read fixed code addresses of EUR v1.1. Both MHGU extractions must be
 **v1.4**, the version the mod targets (`doctor.py` tells you if the update was not applied).

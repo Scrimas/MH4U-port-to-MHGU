@@ -21,6 +21,15 @@ INPUTS = [
      'MHGU v1.4 RomFS', 'Ryujinx: Manage Title Updates > 1.4.0, then Extract Data > RomFS into dump/gu_romfs'),
 ]
 MADE = []      # (path, SHA-256 or None, what, fix): the outputs of tools/setup.py, filled from its STEPS below
+# Optional (warn only): what weapons/magnet_spike/tools/msbuild.py reads, MHF-Z files the maintainer extracted by hand
+# (dump/mhf/SOURCES.txt). No setup step: the extraction needs MHF clients and local tools that are not in the repo.
+MS_FIX = 'only for the Magnet Spike (MS_SLICE): see weapons/magnet_spike/notes/assets.md "Inputs"'
+MS_INPUTS = [('dump/mhf/' + p, 'Magnet Spike: ' + w) for p, w in (
+    ('motion/w13.aan', 'MHF w13 body motions'), ('motion/w13w.aan', 'MHF w13 weapon motions'),
+    ('player/m_editpl.fskl', 'MHF player skeleton'), ('player/m_editpl.0.bin', 'MHF player model'),
+    ('zz/mhfdat.dec.bin', 'MHF-Z mhfdat, decoded'), ('zz/mhfsdt.dec.bin', 'MHF-Z mhfsdt, decoded'),
+    ('ui/mhf_90c_04.png', 'MHF-Z HUD art'),
+    ('weapon/wk[0-9]*/0.fmod', 'MHF weapon models'))]
 
 failed = 0
 
@@ -67,6 +76,8 @@ def main():
             good = sha(hits[0]) == h
             what += '' if good else ' (SHA-256 differs: another version or region?)'
         check('%s: %s' % (what, os.path.relpath(p, paths.ROOT)), good, fix)
+    for p, what in MS_INPUTS:
+        check('%s: %s' % (what, p), bool(glob.glob(os.path.join(paths.ROOT, p))), MS_FIX, required=False)
     print('\n%s' % ('all good' if not failed else '%d problem(s)' % failed))
     sys.exit(1 if failed else 0)
 

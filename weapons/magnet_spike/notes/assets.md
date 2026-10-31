@@ -4,6 +4,23 @@ C = confirmed on the files, S = inferred. Local inputs (gitignored): dump/mhf/mo
 dump/mhf/player/{m,f}_editpl.* (character-edit body: parts 0 FMOD, 1 FSKL, 2 textures), dump/mhf/weapon/wkNNN/
 {0.fmod, 1.fskl, 2.tex} (the 40 Magnet Spike models).
 
+## Inputs
+
+What `tools/msbuild.py` reads from `dump/mhf/` (`tools/doctor.py` checks these, warn-only). They were extracted by hand,
+with session scripts kept locally in `dump/scratch/magnet-spike-session/` (`ms_extract.py`, `mhfc.c`/`mhfc.py` = MHF's
+ECD decryption and JPK decompression, `mhfarc.py`), so `tools/setup.py` has no step for them. `dump/mhf/SOURCES.txt`
+records each file's source and SHA-1.
+
+| File | Source |
+|---|---|
+| `motion/w13.aan`, `w13w.aan` | an MHF-ZZ PC client, `dat/motion/w13.mot` / `w13w.mot`, JPK-decompressed |
+| `weapon/wkNNN/{0.fmod, 1.fskl, 2.tex}` | `dat/extend/wk000.abn` / `wk500.abn` entries: ECD, then a simple archive of JPK parts. The build uses wk400, 404, 407, 414, 415, 595, 606 |
+| `player/m_editpl.{0.bin, fskl}` | the character-edit male body (parts 0 FMOD, 1 FSKL) |
+| `zz/mhfdat.dec.bin`, `zz/mhfsdt.dec.bin` | `dat/mhfdat.bin` / `mhfsdt.bin` of the ZZ client "Monster Hunter Frontier Z PC [EN-CT4.1]", ECD-decrypted (CRC checked) |
+| `ui/mhf_90c_04.png` | `dat/mhf_90c.bin.xbox`, PNG 4 (the HUD's gauge cell and horseshoe) |
+
+Bringing these scripts into the repo would allow a `setup.py mhf` step from a client folder; not done yet.
+
 ## Motions (C)
 - `w13.mot` (AAN, `tools/aan.py`): 3 groups = part pairs; even part = bones 0-8 (root + legs), odd = 9-20 (spine,
   arms, head). Motion ID 1000 + part * 100 + slot. `w13w.mot`: the weapon's own motions, part P slot S = the body

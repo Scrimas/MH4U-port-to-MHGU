@@ -75,7 +75,9 @@ monsters/<name>/      One port each: gogmazios, dalamadur, stygian_zinogre, tige
   module/               the monster's C code (class, actions, shells, effects, stage gimmicks),
                         compiled into subsdk1 with the core
   notes/                study notes, behaviour notes, port checklist, release notes
-weapons/magnet_spike/ WIP: MHF-ZZ weapon class on GU's weapon class slot 5 (tools/, gen/, romfs/)
+weapons/magnet_spike/ WIP, branch magnet-spike: MHF-ZZ's Magnet Spike as GU weapon class 5, built only with the
+                      MS_SLICE switch. tools/msbuild.py (MHF data from dump/mhf + GU templates) -> romfs/ and gen/
+                      (gitignored); module/ = its C code (in subsdk1); notes/ = study, phases, test results
 requirements.txt      Python packages (one .venv for every tool)
 installer/            Rust + Slint GUI installer (AppImage / exe via .github/workflows). Dormant:
                       releases ship zips only.
@@ -132,7 +134,9 @@ Made by tools/setup.py (also needed by a build)
 Maintainer's extra GU study files (not needed to build)
   gu/                   other MHGU pieces: player/ and resident/ arcs, rtld, sample EMC
   gu_quest/ gu_quest14/ GU quest files used as templates / references
-  mhf/                  MHF-ZZ data for Magnet Spike: motions, player models, weapon/action tables (json/txt)
+  mhf/                  optional, Magnet Spike only: MHF-ZZ files extracted by hand (SOURCES.txt), no setup step:
+                        motion/ (w13, w13w .aan), player/ (m_editpl), weapon/wkNNN/ (models), zz/ (mhfdat, mhfsdt
+                        decoded; mhfo-hd.dll + its disassembly), ui/ (HUD art); doctor.py warns when missing
   gear_src/ (rest)      armor / weapon conversion work (4uall, gu, png, scripts...)
 
 Code study (reverse engineering)
