@@ -3,7 +3,7 @@ import re, pickle, os, collections, struct
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # tools/ (append: never shadow the caller's imports)
 import paths  # noqa: E402
-ROOT = paths.GU_CODE + '/'   # tools/setup.py gu: mem.bin, main.asm, caches
+ROOT = paths.GU_CODE + '/'   # tools/setup.py gu_code: mem.bin, main.asm, caches
 CACHE = ROOT + 'asmidx.pkl'
 LINE = re.compile(r'^ +([0-9a-f]+):\s+\t?(\S+)\s*(.*)$')
 MEM = open(ROOT + 'mem.bin', 'rb').read()

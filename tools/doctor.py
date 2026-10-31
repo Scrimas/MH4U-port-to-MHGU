@@ -49,7 +49,7 @@ def main():
         except ImportError:
             good = False
         check('python module ' + m, good, VENV)
-    for b, why in (('clang', 'module/build.py'), ('ld.lld', 'module/build.py'), ('llvm-objdump', 'tools/setup.py gu'),
+    for b, why in (('clang', 'module/build.py'), ('ld.lld', 'module/build.py'), ('llvm-objdump', 'tools/setup.py gu_code'),
                    ('ffmpeg', 'music, tools/snd_bgm.py')):
         check('%s (%s)' % (b, why), shutil.which(b) is not None, 'install it (Arch: clang lld llvm ffmpeg)')
     if shutil.which('ffmpeg'):
