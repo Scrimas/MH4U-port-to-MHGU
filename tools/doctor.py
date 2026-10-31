@@ -15,9 +15,11 @@ SETUP = 'python3 tools/setup.py'
 INPUTS = [
     ('dump/base/*.3ds', None, 'MH4U (EUR) ROM, decrypted', 'dump your cartridge / eShop copy with GodMode9 into dump/base/'),
     ('dump/update/*.cia', None, 'MH4U v1.1 update (EUR), decrypted', 'dump it with GodMode9 into dump/update/'),
-    (paths.GU_EXEFS + '/main', None, 'MHGU v1.4 ExeFS',
-     'Ryujinx: right-click MHGU > Extract Data > ExeFS, into dump/gu_exefs (update 1.4 installed)'),
-    (paths.GU_ROMFS, None, 'MHGU v1.4 RomFS', 'Ryujinx: right-click MHGU > Extract Data > RomFS, into dump/gu_romfs'),
+    (paths.GU_EXEFS + '/main', 'b3935415499549adaf4c0e89822831daa175cfd456a7990791c79be3997645ef', 'MHGU v1.4 ExeFS',
+     'Ryujinx: right-click MHGU > Manage Title Updates > 1.4.0, then Extract Data > ExeFS into dump/gu_exefs'),
+    (paths.GU_ROMFS + '/nativeNX/loc/arc/quest/gq.arc', '0c7b2abde3779c7d8fede140e128a47bd614e9ee738c469b5f8efe2f9eacc8da',
+     'MHGU base-game RomFS (no update)',
+     'Ryujinx: Manage Title Updates > No Update, then Extract Data > RomFS into dump/gu_romfs'),
 ]
 MADE = []      # (path, SHA-256 or None, what, fix): the outputs of tools/setup.py, filled from its STEPS below
 
