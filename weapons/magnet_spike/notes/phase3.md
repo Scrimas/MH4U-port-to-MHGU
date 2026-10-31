@@ -122,7 +122,18 @@ B 0x10, X 0x20, R 0x40, Y 0x80, A 0x100, ZL 0x200, L 0x400, ZR 0x800 (roles 0x65
 | 6 | jump attack | three hops (1/137, 0.7 s): no press logged in any | the jump log adds held buttons |
 | 8 | no element (smithy, hits) | the attack's element comes from the hunter's stats vt+0x15c (0x11 type, 2 value), filled at equip time; the smithy reads the weapon data through per-class code (13 class readers of mElement, 0x1014d8..0x125350) | log of the hunter's stats at the first quest frame |
 | 9 | viewer unchanged | the bounding sphere does not set its framing | reverted |
-| user | ghost size | tuned to ~60 updates / s (the 120 FPS cheat, dt 0.5): native 30 fps moves 2 frames per check | before release: a hunt without the cheat, resize (a dt-based second set would pass GU's 255-set limit) |
+| user | ghost size (test 5 note, kept below) | see below | see below |
+
+## Test 6 results (user, 2026-10-30; not analysed yet)
+Log: dump/mhf/test_logs/ms_test6_Ryujinx_..._2026-10-30_16-13-37.log (956 msport lines; hit check, element stats,
+jump held-button and effect-handle logs inside). User's answers (Demon Flamespike equipped):
+- crescent with the swing now: yes
+- Triple Strike full-charge flash (Impact B, B, hold B): no
+- flash on a guarded hit (RB + RT): yes
+- marker blink on the large monster (RT + B): no
+- jumping attack (Y in the air off a ledge): still none
+
+| (test 5) | ghost size | tuned to ~60 updates / s (the 120 FPS cheat, dt 0.5): native 30 fps moves 2 frames per check | before release: a hunt without the cheat, resize (a dt-based second set would pass GU's 255-set limit) |
 
 ## Test 1 (Phase 3; save backup dump/save_backups/2026-10-29_before_magnet_spike)
 Test 2 changes the buttons: ZR held = aim, R + ZR = Guard Counter.
