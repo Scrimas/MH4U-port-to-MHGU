@@ -136,6 +136,7 @@ HOOKS = [
     ('em057_01_atk', 0x7DC2C),     # GU attackEx: Stygian's attack indices in the GU handlers it keeps (em057_01_fix.c)
     ('em057_01_start', 0xEEFED0),  # uEm057_00 slot 129 action start: 4U's start work for variant 1 (em057_01_start.c)
     ('em057_01_glow', 0xEF3214),   # uEm057_00 slot 132 material charge glow (GU only): skipped for variant 1 (_fix.c)
+    ('em057_01_sndvar', 0xB1D1C),  # uFestaEnemy slot 282 sound-call condition getter: 4U's vars 30 / 100 (_fix.c)
     ('em057_01_efx', 0xF060C4),    # uEm057_00 slot 116 effect gateway: 4U Stygian's records for variant 1 (_efx.c)
     ('em057_01_pstance', 0xEF4484),  # mid hooks (return 0) at GU's pillar frame loops, whose posts GU removed: the 4U
     ('em057_01_pwalk1', 0xEF6450),   # posts for variant 1: charge stance 1/6.. (ef4280 step 1), charge walk 2/40 steps

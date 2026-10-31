@@ -50,6 +50,54 @@ def convert(d):
     return bytes(out)
 
 
+GU_ONLY_IDS = range(40, 256)    # ids no 4U LCM has (87 files) and 62 of GU's 67 monster LCMs carry (40 / 41, often
+                                # 42..44, 50..53, 60..62): GU's own cameras, not 4U camera events (S: the kill cam)
+
+
+def add_records(d, donor, ids=GU_ONLY_IDS):
+    """v5 LCM d + the records of the v5 LCM `donor` whose id is in `ids` and absent from d (with the donor's whole
+    data area appended after d's). Records stay contiguous after the table (the layout convert() asserts): d's
+    offset fields move by the inserted record bytes, the donor's by where its data area lands."""
+    def parse(x):
+        assert x[:4] == b'LCM\0' and struct.unpack_from('<H', x, 4)[0] == 5, 'not a v5 LCM'
+        offs = list(struct.unpack_from('<256I', x, 8))
+        ids_ = sorted((i for i in range(256) if offs[i]), key=lambda i: offs[i])
+        end = 8 + 1024 + REC5 * len(ids_)
+        assert [offs[i] for i in ids_] == list(range(8 + 1024, end, REC5)), 'records not contiguous after the table'
+        return offs, ids_, end
+    offs, own, end = parse(d)
+    doffs, dids, dend = parse(donor)
+    add = [i for i in dids if i in ids and not offs[i]]
+    if not add:
+        return bytes(d)
+    # both data areas keep their offsets modulo 16 (the record size 0xac is not a multiple of 16): padding after the
+    # records and between the two data areas
+    rec_end = 8 + 1024 + REC5 * (len(own) + len(add))
+    pad1 = (end - rec_end) % 16
+    grow = rec_end + pad1 - end
+    out = bytearray(d[:8] + bytes(1024))
+    data = bytes(pad1) + d[end:]
+    pad = (dend - (rec_end + len(data))) % 16
+    dbase = rec_end + len(data) + pad                                  # where the donor's data area lands
+
+    def rec(x, o, shift):
+        r = bytearray(x[o:o + REC5])
+        for f in OFFSET_FIELDS:
+            v = struct.unpack_from('<I', r, PREFIX + f)[0]
+            if v:
+                struct.pack_into('<I', r, PREFIX + f, v + shift)
+        return r
+    for i in own:
+        struct.pack_into('<I', out, 8 + 4 * i, len(out))
+        out += rec(d, offs[i], grow)
+    for i in add:
+        struct.pack_into('<I', out, 8 + 4 * i, len(out))
+        out += rec(donor, doffs[i], dbase - dend)
+    out += data + bytes(pad) + donor[dend:]
+    assert len(out) == dbase + len(donor) - dend
+    return bytes(out)
+
+
 if __name__ == '__main__':
     src = open(sys.argv[1], 'rb').read()
     open(sys.argv[2], 'wb').write(convert(src))

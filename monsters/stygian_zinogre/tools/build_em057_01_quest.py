@@ -47,7 +47,7 @@ sys.path.insert(0, HERE)
 import paths                        # noqa: E402
 sys.path.insert(0, paths.GU_PY)
 import alloc, arcpack, extdata4u, items_em057_01, quest4u   # noqa: E402
-from items4u import EXE, EXE_BASE   # noqa: E402
+from items4u import EXE, EXE_BASE, msg4u   # noqa: E402
 from quest4u import (arc_files, text4u, ref, LANGS, T_SET, T_ESL, T_REM, T_SUPP, T_PLUS,  # noqa: E402
                      REWARD_ROWS_4U, SUB_ROW_4U, STATS_4U, NANDO_4U)
 from romfs import RomFS             # noqa: E402
@@ -74,6 +74,10 @@ PARTNER_GU = {48: 0x39,     # Zinogre
 # 4U small monsters -> GU ID (C: GU quests naming them as objectives, q10230 "Ioprey Hunting" 0x100b); the others of
 # the 4U lists (Kelbi, Conga, Remobra, Felyne, Melynx, Bnahabra) are left out (no GU ID read: a DEVIATION)
 ZAKO_GU = {60: 0x100b}      # Ioprey
+REM_EMPTY = struct.pack('<fI', 1.0, 1) + bytes(176)     # GU's rem_000000 (184 B, no group; C: q10706)
+# 4U species GU lacks, spawned as their base species (PARTNER_GU): their 4U names in the quest texts become the base
+# species' 4U names (emName, 5 languages): Brute Tigrex 12 -> Tigrex 11, Azure Rathalos 4 -> Rathalos 2
+NAME_SUB = {12: 11, 4: 2}
 # GU break groups (subquest code digits, C from GU's subquest texts): Zinogre 1 head, 2 back, 3 front legs, 7 tail;
 # Tigrex 7 tail (q914 / q10602). 4U's own codes differ (m10603 2 head, m10616 3 front leg, m00907 4 back, 7 tail).
 # Quests (k = index in allocations.toml quests; notes/quests.md 3b / 3c):
@@ -360,7 +364,10 @@ def build(R, exe, gu_item, out, spec, hp_table=None):
         info_zako = ''
         for n in sorted(set(tnames[5:8])):
             res.append(('quest\\zako\\emSetList\\' + n, T_ESL, tpl['quest\\zako\\emSetList\\' + n][1]))
-    # rewards: rows A / B from 4U, slots 3 / 4 the template's, the subquest row from 4U (row A's file when equal)
+    # rewards: rows A / B from 4U, the subquest row from 4U (row A's file when equal), slots 3 / 4 GU's empty row
+    # rem_000000 (C: q10706's; issue #8): the templates' condition-3 rows are their own quest's extras (q10724 EX Tigrex
+    # Ticket + Hyper Hunter II, q10774 Accolade G + Hyper Hunter III, q10742 Hyper Hunter III), none in 4U, and
+    # Stygian has no Hyper state
     ptr = lambda o: struct.unpack_from('<I', q4, o)[0]
     rows = {'rem_%sa' % m4: REWARD_ROWS_4U[0], 'rem_%sb' % m4: REWARD_ROWS_4U[1]}
     sub_name = 'rem_%sa' % m4
@@ -369,9 +376,11 @@ def build(R, exe, gu_item, out, spec, hp_table=None):
         rows[sub_name] = SUB_ROW_4U
     rems = {name: quest4u.rem_4u(q4, row, gu_item) for name, row in rows.items()}
     assert not set(rems) & set(tnames), 'reward row names taken by the template'
-    rem = ['rem_%sa' % m4, 'rem_%sb' % m4, tnames[10], tnames[11], sub_name]
+    rems['rem_000000'] = REM_EMPTY
+    assert tpl.get('quest\\rem\\rem_000000', (0, REM_EMPTY))[1] == REM_EMPTY, "GU's rem_000000 is not the empty row"
+    rem = ['rem_%sa' % m4, 'rem_%sb' % m4, 'rem_000000', 'rem_000000', sub_name]
     for r in sorted(set(rem)):
-        res.append(('quest\\rem\\' + r, T_REM, rems[r] if r in rems else tpl['quest\\rem\\' + r][1]))
+        res.append(('quest\\rem\\' + r, T_REM, rems[r]))
     res.append(('quest\\supp\\supp_' + sid, T_SUPP, tpl['quest\\supp\\supp_%07d' % tpl_id][1]))
     plus = tnames[14]
     res.append(('quest\\plus\\questPlus_' + plus, T_PLUS, tpl['quest\\plus\\questPlus_' + plus][1]))
@@ -382,6 +391,10 @@ def build(R, exe, gu_item, out, spec, hp_table=None):
 
     # --- text (4U, 5 languages) + arc layout + files (tools/quest4u.py)
     t4 = text4u(q4)
+    for lang, strs in t4.items():           # the stand-in species' names (NAME_SUB; issue #8: m10608's texts named
+        names = msg4u(lang)['emName']       # Brute Tigrex, who spawns as Tigrex)
+        for src, dst in NAME_SUB.items():
+            strs[:] = [s.replace(names[src], names[dst]) for s in strs]
     gmds = quest4u.quest_gmds(tpl, tpl_id, sid, t4)
     qd = bytes(qd)
     quest4u.write(out, quest4u.assemble(res, link, gmds, qd, sid))

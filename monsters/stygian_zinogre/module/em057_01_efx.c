@@ -207,14 +207,21 @@ static void aura_sounds(void *self, uint32_t st)
 
 /* every frame (em057_01_diag.c, slot 125): one aura for the state; a new state removes the old one (4U 0xc470dc,
  * here GU's kill) and posts its own (4U 0xc08698 on the monster, joint 2: the records' joint) and restarts both
- * sound timers at 0 (0x322fe8; not for state 0); then the loop sounds (aura_sounds). An aura GU removed with the
- * monster's area change is forgotten untouched and posted again in the new area. */
+ * sound timers at 0 (0x322fe8; not for state 0); then the loop sounds (aura_sounds). Area change (C): 4U's controller
+ * skips its frame while the area move runs (W+0x1dd == 1, set by the move 0x68aa58) and posts again once its handle
+ * test 0x37ecd4 finds the effect gone, which the area change does in 4U; GU leaves the effect alive in the old area,
+ * where it went on drawn on its own (issue #8: "a dragonblight orb stays on the map and moves on its own"), so the
+ * area change stops it here, then posts the state's aura in the new area. */
 void em057_01_efx_frame(void *self)
 {
     static uint32_t s_lines;
     uint32_t st = aura_state(self), area = FIELD(uint8_t, self, EN_AREA), old = FIELD(uint32_t, self, AURA_STATE);
     void *h = FIELD(void *, self, AURA_EFX);
-    if (h && ((old >> 8) != area || !sz_efx_alive(h))) h = 0, old = 0;
+    if (h && !sz_efx_alive(h)) h = 0, old = 0;          /* 4U 0x37ecd4: a dead handle -> state 0, posted again */
+    else if (h && (old >> 8) != area) {
+        efx_stop(h, 1);                                 /* GU keeps it alive across the area change (issue #8) */
+        h = 0, old = 0;
+    }
     if (h != FIELD(void *, self, AURA_EFX) || (old & 0xff) != st) {
         if (h) efx_stop(h, 1);
         h = 0;
