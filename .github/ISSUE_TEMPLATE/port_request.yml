@@ -1,6 +1,6 @@
 name: Port request / I want to port
 description: Suggest an MH4U monster (or feature) to port, or say you are starting one
-labels: [port]
+labels: [port-request]
 body:
   - type: input
     id: what

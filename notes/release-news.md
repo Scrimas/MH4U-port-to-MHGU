@@ -4,6 +4,13 @@ tools/release.py puts the section of the core version being packaged into the re
 groups, **New** (something added) and **Fixed** (what works now, not what was broken), one short plain line each,
 written for players; write the section before `release.py package`.
 
+## v1.7.2
+**Fixed**
+- Every ported quest now uses the quest format of MHGU 1.4, the game version the mod is made for. With the game set
+  to Chinese, these quests show their English text.
+- Gogmazios no longer carries behaviour settings inherited from Kushala Daora (the MHGU monster his data is built
+  on) where MH4U has none of its own.
+
 ## v1.7.1
 **Fixed**
 - Gogmazios' tar now covers you in black tar, as in MH4U, instead of white spider web.
