@@ -199,7 +199,7 @@ def notes(c, pk, out):
     update / online play, the files with their sha256, the warnings"""
     v = c['version']
     lines = ['MH4U monsters in MHGU (Switch 1.4): the monsters, their arenas, music, quests and gear. '
-             'Take every zip from this one release.', '',
+             'Take zips from only one release (do not mix zips taken from different releases).', '',
              "## What's new"] + '\n'.join(news(v)).strip().split('\n') + ['', '## Monsters and quests',
              'On the Hub quest board (Village: on the village board):']
     for p in pk:
