@@ -1,0 +1,24 @@
+# ci.yml : checks every PR and push to main can run without game files (CONTRIBUTING.md, Checks)
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: No game data or keys
+        run: python3 tools/check_repo.py --all
+      - name: IDs (allocations.toml)
+        run: python3 tools/alloc.py
+      - name: Python compiles
+        run: git ls-files -z '*.py' | xargs -0 python3 -m py_compile
+      - name: C compiles
+        run: |
+          sudo apt-get install -y -q clang
+          python3 tools/ci_compile.py

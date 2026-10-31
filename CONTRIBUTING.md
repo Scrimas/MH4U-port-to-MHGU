@@ -94,6 +94,15 @@ none. `python3 tools/release.py all` builds and packages a full release into `du
 - Everything is **added** to GU: never replace a GU monster, quest or item.
 - Releases are matched sets: core and monster zips from different releases are never mixed.
 
+## Checks
+
+- **Pre-commit hook** (`tools/hooks/pre-commit`, switched on by `tools/setup.py`): runs `tools/check_repo.py`, which
+  refuses files in game-data folders, game file types (`.arc`, `.3ds`, `.nsp`, ...), binaries over 256 KB and key
+  material. If it refuses a file, unstage it (`git restore --staged <file>`); never bypass it with `--no-verify`.
+- **CI** (`.github/workflows/ci.yml`, every PR and push to `main`, no game files needed): the same check on every
+  tracked file, `tools/alloc.py` (IDs), every Python file compiles, and every C file of the module compiles
+  (`tools/ci_compile.py`; it cannot link, which needs GU's `main`). Run them locally before a PR.
+
 ## Using an AI coding assistant
 
 `AGENTS.md` gives AI tools the hard rules and where to start. You are responsible for what you submit: check its

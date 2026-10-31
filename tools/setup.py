@@ -198,7 +198,15 @@ STEPS = [
 ]
 
 
+def hooks():
+    """switch on tools/hooks/pre-commit (refuses game data and keys: tools/check_repo.py), once per clone"""
+    git = lambda *a: subprocess.run(['git', '-C', ROOT, *a], capture_output=True, text=True)
+    if git('rev-parse', '--git-dir').returncode == 0 and git('config', 'core.hooksPath').stdout.strip() != 'tools/hooks':
+        git('config', 'core.hooksPath', 'tools/hooks'); print('pre-commit hook on (tools/hooks/pre-commit)')
+
+
 def main():
+    hooks()
     force = '--force' in sys.argv
     want = [a for a in sys.argv[1:] if not a.startswith('--')]
     bad = [w for w in want if w not in [s[0] for s in STEPS]]

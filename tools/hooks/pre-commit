@@ -1,0 +1,4 @@
+#!/bin/sh
+# pre-commit: refuse game data and keys (tools/check_repo.py). Switched on by tools/setup.py
+# (git config core.hooksPath tools/hooks).
+exec python3 "$(git rev-parse --show-toplevel)/tools/check_repo.py" --staged
