@@ -85,7 +85,7 @@ HOOKS = [
     ('stage_name_list', 0x614840), ('stage_name_quest', 0x6149C8),  # stage-name index stores: the alias's name
     ('stage_name_board', 0x613410),                                 # for its quests (stage_alias.c)
     ('quest_group_fix', 0x3B7DE8),  # quest list loader step: placeholder 1011009 -> quest 11491 in memory
-    ('quest_unlocked', 0x3B2174),   # (_, id) -> 1 for quest 11491
+    ('quest_unlocked', 0x3B2194),   # in 0x3b2174(_, id), before its check call: 1 for our quests (MID_EXIT)
     ('quest_clear_fix', 0x388D40),  # results-scene clear write: rename the freshly loaded quest list first
     ('quest_group_append', 0x39BB6C),  # quest_group parser exit (r4 = the list): append the quest_append quests
     ('notes_unlock_check', 0x554DA4),  # Hunter's Notes unlock condition (talk action 6 / condition 44): log entry 123
@@ -162,7 +162,8 @@ HOOKS = [
     ('icon_set', 0x56EF58),    # icon setter 0x56ef50 after its push: UI indexes 196.. = our atlas (icons.c)
     ('board_icon', 0x3A3178),  # (_, quest board byte) -> UI index + 1: bytes 200.. = our atlas (icons.c)
     ('board_byte', 0x6132E0),  # board loop before that call: no hyper badge for our bytes (icons.c)
-    ('tex_bind', 0xA4FAF0),    # sprite texture bind (sprite, ID): our icon sprites keep our atlas (icons.c)
+    ('tex_bind', 0xA4FB10),    # in sprite texture bind 0xa4faf0 (sprite, ID): our icon sprites keep our atlas
+                               # (icons.c, MID_EXIT)
     ('tex_entry', 0xB80FD0),   # .gui texture entry by ID: our IDs -> their entry copies (icons.c)
 ]
 # weapon / sharpness table load exits (gear.c GEAR_HOOK wrappers, out/gear_hooks.inc), "name 0xSITE", written by
@@ -173,6 +174,23 @@ if os.path.exists(_GEAR_HOOKS):
 # hooks whose C function always returns nonzero: the hooked function is replaced, its first two instructions
 # are never replayed (0x55bda4 is `mov r0, r1; b 0x50b64`: the branch cannot be displaced)
 REPLACE_HOOKS = {'name_index'}
+# mid-function hooks whose C function may return nonzero: the trampoline then jumps to this main offset (a point of
+# the same function, same stack frame) instead of returning to the caller. Third-party Forge plugins check the first
+# 0x20 bytes of the GU functions they hook against v1.4 (Key Quest Markers: 0x3b2174, 0xa4faf0; issue #10), so a hook
+# of ours on a function a plugin also hooks sits past those bytes.
+MID_EXIT = {
+    'quest_unlocked': 0x3B219C,  # ldrb r0, [sp, #7]: returns the result byte quest_unlocked_c wrote
+    'tex_bind': 0xA4FB34,        # pop {r4, pc}: the bind is skipped, the sprite keeps its texture
+}
+# functions whose first 0x20 bytes a Forge plugin checks (Key Quest Markers r18: its table of address + v1.4 bytes);
+# main() refuses a hook site inside them
+PLUGIN_CHECKED = [
+    0x3B1A18, 0x3B1D70, 0x3B2174, 0x3B57D0, 0x50CBD0, 0x523DA4, 0x540C08, 0x540C38, 0x5456E4, 0x546F28,
+    0x54AF8C, 0x54D030, 0x616CB0, 0x7AA47C, 0x7AEF68, 0xA38B58, 0xA38FFC, 0xA47950, 0xA47A04, 0xA47A94, 0xA47D2C,
+    0xA4844C, 0xA48668, 0xA494A0, 0xA4964C, 0xA4A9F4, 0xA4AA24, 0xA4AA5C, 0xA4AA94, 0xA4AAC8, 0xA4AAFC, 0xA4D0D8,
+    0xA4DC24, 0xA4DC54, 0xA4DCA0, 0xA4E0B8, 0xA4F60C, 0xA4F6A4, 0xA4F77C, 0xA4FA5C, 0xA4FAF0, 0xA4FB58, 0xA53324,
+    0xA53348, 0xA5350C, 0xA53528, 0xA53AA8, 0xA56AB8,
+]
 
 # Registry relocation (notes/registry.md): module copies of the per-index tables with one entry per ported monster
 # (indexes 137.., allocations.toml), and the code that addresses them repointed.
@@ -437,8 +455,19 @@ def branch_into(img, site):
     return None
 
 
+def jump_main(name, tag, off):
+    """asm jumping to main + off through an rtld-relocated data word (no absolute address in text, which rtld cannot
+    relocate); every register, the flags and lr are preserved. -> (text lines, .data.hookret lines)"""
+    lab = '%s_%s' % (name, tag)
+    return (['    sub     sp, sp, #4', '    push    {r0}', '    ldr     r0, .L%soff' % lab, '.L%spc:' % lab,
+             '    add     r0, pc, r0', '    ldr     r0, [r0]', '    str     r0, [sp, #4]', '    pop     {r0, pc}',
+             '.L%soff: .word %s - (.L%spc + 8)' % (lab, lab, lab)],
+            ['%s: .word %s' % (lab, main_ref(off))])
+
+
 def trampoline(img, name, site):
-    """asm for one entry hook: call name_c(regs); nonzero -> return to the caller with the saved r0/r1."""
+    """asm for one hook: call name_c(regs); nonzero -> return to the caller with the saved r0/r1 (entry hook) or
+    jump to MID_EXIT[name] (mid-function hook)."""
     out = ['    .global %s_tramp' % name, '    .hidden %s_tramp' % name, '    .hidden %s_c' % name,
            '    .align 2', '%s_tramp:' % name,
            '    push    {r0-r5, r12, lr}', '    vpush   {d0-d7}', '    add     r0, sp, #64',
@@ -446,11 +475,24 @@ def trampoline(img, name, site):
            '    pop     {r0-r5, r12, lr}', '    bxne    lr']
     if name in REPLACE_HOOKS:
         return '\n'.join(out[:-1] + ['    bx      lr'])
-    lits = []
+    lits, data = [], []
+    if name in MID_EXIT:
+        out[-1] = '    bne     .L%s_exit' % name
+        t, d = jump_main(name, 'exit', MID_EXIT[name])
+        lits += ['.L%s_exit:' % name] + t
+        data += d
     for k in range(2):
         a = site + 4 * k
         w = struct.unpack_from('<I', img, a)[0]
-        if is_ldr_pc_lit(w):
+        if (w & 0xFF000000) == 0xEB000000:          # bl (AL): called through ip, free at a call (AAPCS)
+            off = w & 0xFFFFFF
+            if off & 0x800000: off -= 0x1000000
+            lab = '%s_call%d' % (name, k)
+            out += ['    ldr     ip, .L%soff' % lab, '.L%spc:' % lab, '    add     ip, pc, ip', '    ldr     ip, [ip]',
+                    '    blx     ip']
+            lits.append('.L%soff: .word %s - (.L%spc + 8)' % (lab, lab, lab))
+            data.append('%s: .word %s' % (lab, main_ref(a + 8 + 4 * off)))
+        elif is_ldr_pc_lit(w):
             imm = w & 0xFFF
             val = struct.unpack_from('<I', img, a + 8 + (imm if w & (1 << 23) else -imm))[0]
             lab = '.L%s_lit%d' % (name, k)
@@ -460,14 +502,9 @@ def trampoline(img, name, site):
             out.append('    .word   0x%08x' % w)
         else:
             sys.exit('hook %s: instruction %08x at %x cannot be displaced' % (name, w, a))
-    # back to main at site + 8 through an rtld-relocated data word (no absolute address in text, which rtld
-    # cannot relocate); every register, the flags and lr are preserved
-    out += ['    sub     sp, sp, #4', '    push    {r0}', '    ldr     r0, .L%s_retoff' % name,
-            '.L%s_retpc:' % name, '    add     r0, pc, r0', '    ldr     r0, [r0]', '    str     r0, [sp, #4]',
-            '    pop     {r0, pc}',
-            '.L%s_retoff: .word %s_ret - (.L%s_retpc + 8)' % (name, name, name)] + lits
-    out += ['    .pushsection .data.hookret, "aw"', '    .align 2', '%s_ret: .word %s' % (name, main_ref(site + 8)),
-            '    .popsection']
+    t, d = jump_main(name, 'ret', site + 8)          # back to main at site + 8
+    out += t + lits
+    out += ['    .pushsection .data.hookret, "aw"', '    .align 2'] + d + data + ['    .popsection']
     return '\n'.join(out)
 
 
@@ -488,6 +525,10 @@ def main():
     for name, site in HOOKS:
         hit = branch_into(img, site)
         if hit is not None: sys.exit('hook %s: branch at %x targets %x (inside the patch)' % (name, hit, site + 4))
+        for f in PLUGIN_CHECKED:
+            if f <= site < f + 0x20:
+                sys.exit('hook %s at %x: inside the first 0x20 bytes of %x, checked by a Forge plugin (PLUGIN_CHECKED)'
+                         % (name, site, f))
         inc.append(trampoline(img, name, site))
     open(os.path.join(OUT, 'hooks.inc'), 'w').write('\n'.join(inc) + '\n')
     open(os.path.join(OUT, 'layout.inc'), 'w').write('    .equ MAIN_GAP, 0x%x\n' % MAIN_GAP)

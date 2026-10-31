@@ -139,12 +139,14 @@ int quest_group_append_c(uint32_t *regs)
     return 0;
 }
 
-/* 0x3b2174(_, id) -> bool: "quest unlocked?" (script check_quest_unlocked has no rule for our IDs) */
+/* 0x3b2174(_, id) -> bool: "quest unlocked?" (script check_quest_unlocked has no rule for our IDs). Mid hook 0x3b2194,
+ * before its check call 0x3d7e90: r1 = &result byte, r2 = id; nonzero -> 0x3b219c returns the byte (build.py
+ * MID_EXIT). Not at the entry: the Forge plugin Key Quest Markers checks its first 0x20 bytes (issue #10). */
 int quest_unlocked_c(uint32_t *regs)
 {
-    int m = port_quest_owner(regs[R1], 0);
+    int m = port_quest_owner(regs[R2], 0);
     if (m < 0 || !port_installed(m)) return 0;
-    regs[R0] = 1;
+    *(uint8_t *)(uintptr_t)regs[R1] = 1;
     return 1;
 }
 

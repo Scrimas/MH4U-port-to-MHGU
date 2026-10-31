@@ -86,9 +86,12 @@ pairs where possible (tools/dt_vote.py, dt_map.py, snd4u2gu.py selftest), then a
 2. **Module** (subsdk1, `module/` + every `monsters/<name>/module/`, `python3 module/build.py [install]`): the class
    (DTI + a copy of uFestaEnemy's 286-slot vtable with overrides), the registry relocation (one entry per
    allocations.toml monster), hooks, and every behaviour / shell / effect / sound port. AArch32. Hooks displace two
-   instructions into a trampoline; these must not be pc-relative or branches (build.py checks). The trampoline saves
-   r0-r5, r12, lr at regs[0..7] and the caller's stack args start at regs[8]; a handler can rewrite them. A handler
-   returning nonzero replaces the function (REPLACE_HOOKS).
+   instructions into a trampoline; these must not be pc-relative or branches, except a `bl` (re-issued through ip)
+   (build.py checks). The trampoline saves r0-r5, r12, lr at regs[0..7] and the caller's stack args start at
+   regs[8]; a handler can rewrite them. A handler returning nonzero replaces the function (REPLACE_HOOKS), returns to
+   the caller (entry hook) or jumps to a point of the same function (MID_EXIT). Forge plugins (Key Quest Markers,
+   issue #10) refuse to load when the first 0x20 bytes of a function they hook differ from v1.4: keep our hooks off
+   those bytes (build.py PLUGIN_CHECKED, checked at build).
 3. **RomFS additions** = the monster's assets (`monsters/<name>/romfs/...`): BGM (tools/snd_bgm.py), quest arc
    (build_gog_quest.py), the stage alias arcs if the 4U arena is ported (tools/stage4u2gu.py), the map UI
    (tools/mapui4u2gu.py), and the gear models (tools/armor4u2gu.py, tools/weapon4u2gu.py). Never a copy of a GU

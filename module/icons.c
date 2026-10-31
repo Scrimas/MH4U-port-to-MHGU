@@ -16,7 +16,7 @@
 #include "game.h"
 #include "util.h"
 
-enum { R0, R1, R2, R3 };
+enum { R0, R1, R2, R3, R4 };
 
 #define ICON_PAGE2    196u          /* tools/alloc.py ICON_PAGE2 */
 #define ICON_CELLS    49u           /* tools/ui_icons.py CELLS */
@@ -140,10 +140,12 @@ int icon_set_c(uint32_t *regs)
 
 /* hook 0xa4faf0 (sprite, texture ID): GU's bind. The quest board rebinds the micon01 ID after the setter (user
  * 2026-10-27: Tigerstripe's board icon = micon01 cell 2, Tidal Najarala), so a sprite of ours keeps our atlas
- * against its .gui's micon IDs; any other ID (or another .gui) goes through */
+ * against its .gui's micon IDs; any other ID (or another .gui) goes through. Mid hook 0xa4fb10, past the bind's
+ * early outs (no .gui table, same ID) and before its store: r4 = sprite, r1 = ID; nonzero -> 0xa4fb34 returns (build.py
+ * MID_EXIT). Not at the entry: the Forge plugin Key Quest Markers checks its first 0x20 bytes (issue #10). */
 int tex_bind_c(uint32_t *regs)
 {
-    uint8_t *spr = (uint8_t *)(uintptr_t)regs[R0];
+    uint8_t *spr = (uint8_t *)(uintptr_t)regs[R4];
     uint32_t id = regs[R1];
     if (!ours(FIELD(uint32_t, spr, 0x100)) || ours(id)) return 0;
     int o = own_find(spr);
