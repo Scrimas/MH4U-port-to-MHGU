@@ -6,7 +6,7 @@ In the meantime, I will still be working on porting monsters and make releases. 
 If you are a contributor, I would accept PR, but understand that as it's going to be merged, there are some monsters that are already done and therefore working on them isn't useful.
 If you're interested into porting monsters, here is a (non-exhaustive) list of what monsters are actually useful to be ported:
 - Dah'ren Mohran (from MH4U) and Jhen Mohran (from MH3U)
-- Dire Miralis (from MH3U
+- Dire Miralis (from MH3U)
 
 
 --- 
@@ -15,7 +15,7 @@ Brings Monster Hunter 4 Ultimate monsters into Monster Hunter Generations Ultima
 
 **Monsters:** Gogmazios, Dalamadur, Shah Dalamadur, Tigerstripe Zamtrios, and Stygian Zinogre.
 
-Next up is... hum... I have no idea. Maybe Tidal Najarala.
+Next up is the Magnet Spike from MHFZZ (yeah it's not a monster)
 
 ## Install
 
@@ -25,11 +25,15 @@ Next up is... hum... I have no idea. Maybe Tidal Najarala.
 
 Unequip a monster's gear before removing that monster. Online, everyone should have the same monsters installed.
 
-## Build
+## Build / contribute
 
-You need your own MH4U and MHGU dumps; no game data is in this repo. Each monster builds with `monsters/<name>/build.sh`, and `python3 tools/release.py all` makes the release zips.
+No game data is in this repo: you build from your own MH4U (EUR) and MHGU dumps.
 
-`notes/porting-guide.md` explains how a port works and is the place to start for a new monster.
+1. Put your dumps in `dump/` and run `python3 tools/setup.py`, then `python3 tools/doctor.py`.
+2. Build with `monsters/<name>/build.sh` and `python3 module/build.py`.
+3. Install with `GOG_MOD_ROOT=~/.config/Ryujinx/mods python3 module/build.py install`.
+
+Details, requirements and the workflow are in [CONTRIBUTING.md](CONTRIBUTING.md). [ARCHITECTURE.md](ARCHITECTURE.md) maps the repo.
 
 ## License
 

@@ -280,10 +280,20 @@ int dala_shah_zone_hit(void *head, const float *pos, uint32_t area, uint32_t flo
     static const uint8_t k_floor[3] = {2, 6, 5};
     if (!head || !shah(head) || FIELD(uint8_t, head, UNIT_AREA) != area) return 0;
     for (uint32_t k = 0; k < 3; k++) {
-        if (zone(head, k)[Z_STATE] != 110 + k || floor != k_floor[k]) continue;
+        if (zone(head, k)[Z_STATE] != 110 + k) continue;
         float dx = pos[0] - k_pt[k][0], dy = pos[1] - k_pt[k][1], dz = pos[2] - k_pt[k][2];
         if (dy > k_box[k][2] || dy < -k_box[k][2] || dx * dx > k_box[k][0] * k_box[k][0] ||
             dz * dz > k_box[k][1] * k_box[k][1]) continue;
+        if (floor != k_floor[k]) {     /* issue #6 (Shah's burn not on every surface): in the box, another floor */
+            static uint32_t s_m, s_key;
+            uint32_t key = k << 8 | floor;
+            if (key != s_key && ++s_m <= 30) {
+                s_key = key;
+                logf("dalaport: shah zone %u box at %d %d %d but floor %u (burns on floor %u only)", k, (int)pos[0],
+                     (int)pos[1], (int)pos[2], floor, k_floor[k]);
+            }
+            continue;
+        }
         static uint32_t s_n;
         if (++s_n <= 20)
             logf("dalaport: shah zone %u hit at %d %d %d floor %u", k, (int)pos[0], (int)pos[1], (int)pos[2], floor);

@@ -22,7 +22,7 @@ cd "$ROOT" || exit 1
 
 dt() {        # dtbase / dttune of 4U em048 and em049 on GU em057_00 (tools/dt_convert.py, unicorn: the GU venv)
     local py em
-    py=$(python3 -I -c "import sys; sys.path.insert(0, 'tools'); import paths; print(paths.GU_SCRATCH)")/venv/bin/python
+    py=$ROOT/.venv/bin/python; [ -x "$py" ] || py=python3     # needs unicorn (requirements.txt)
     for em in em048 em049; do
         "$py" tools/dt_convert.py build $em em057_00 "$ROOT/dump/converted/em049/dt_$em" || return 1
     done

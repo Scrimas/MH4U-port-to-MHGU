@@ -561,7 +561,7 @@ def effects(em4, gu, soil, notes):
     spec = dict(arc=os.path.join(ROOT, 'dump/romfs/data/%s.arc' % em4), stage_unpacked=[],
                 mef='effect\\mef\\em\\%s_0' % em4, em_efl='effect\\efl\\em\\%s\\' % em4, groups=groups, extra=extra,
                 lmts=[(P4M.replace('em024', em4) + 'mot\\%s_%d' % (em4, b), psl % b) for b in BANKS], pel=pel,
-                soil=soil, list2=None)
+                soil=soil, list2=None, hide_grey_models='chunks')   # issue #6 white debris (efl4u2gu.CHUNK_MODELS)
     log = []
     out = efl4u2gu.effect_set(spec, log)
     notes.append('%s effects: %d entries (tools/efl4u2gu.py effect_set), %d code-post records from MEF _1 + %d of '

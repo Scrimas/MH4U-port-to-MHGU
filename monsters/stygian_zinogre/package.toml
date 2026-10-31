@@ -1,7 +1,7 @@
 # Stygian Zinogre package: what the installer shows and installs, and the version written into its data file.
 name = "stygian_zinogre"
 title = "Stygian Zinogre"
-version = "1.0.0"          # bump on every published change of this monster's files (data, assets or code)
+version = "1.0.1"       # bump on every published change of this monster's files (data, assets or code)
 requires_core = "1.7.0"    # oldest core module (exefs) that runs this version: the release that registers it
 code = "em057_01"          # C prefix of its module code (hooks gated on GU variant 1)
 gu_class = "uEm057_00"     # GU's Zinogre class runs it as variant 1 (module/build.py: registry DTI = donor's)

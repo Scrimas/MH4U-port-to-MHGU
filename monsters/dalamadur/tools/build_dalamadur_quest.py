@@ -92,7 +92,7 @@ def build(R, out, entry, src, num, tpl_id, ems, subq, qid, hp_table=None):
 
     # --- questData: the template's (rank bytes, board, start area 0, flags), then 4U's values
     qd = bytearray(tpl['loc\\quest\\questData\\questData_%07d' % tpl_id][1])
-    assert len(qd) == 329 and qd[0x14] == STAGE and qd[0x11] == 10 and qd[0x1D] == 0   # clear rule: objective 0
+    assert len(qd) == quest4u.QD_SIZE and qd[0x14] == STAGE and qd[0x11] == 10 and qd[0x1D] == 0   # clear rule: objective 0
     t_fee, _, t_reward, t_sub, t_acad, _, t_subacad, t_hrp, t_subhrp = struct.unpack_from('<9I', qd, 0x31)
     struct.pack_into('<I', qd, 0x0C, qid)
     qd[0x16] = struct.unpack_from('<I', q4, 0xB4)[0]       # 50 min (4U)
@@ -115,7 +115,7 @@ def build(R, out, entry, src, num, tpl_id, ems, subq, qid, hp_table=None):
     qd[0x64:0x64 + 65] = boss(head['standin_id']) + boss(tail['standin_id']) + bytes(39)
     assert struct.unpack_from('<H', q4, 0xE8)[0] == 0                # 4U board icon '?' (both monsters, all quests)
     qd[0xD6:0xDB] = bytes([alloc.board_byte(alloc.ICON_PAGE2), 0, 0, 0, 0])   # '?' (module/icons.c)
-    for i, lang in enumerate(LANGS):
+    for i, lang in enumerate(quest4u.QLANGS):
         qd[0xDF + 20 * i:0xDF + 20 * (i + 1)] = ref(quest4u.T_GMD, '%s_%s' % (sid, lang))
     qd = bytes(qd)
 

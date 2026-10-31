@@ -33,12 +33,14 @@ def gu_class_dti(m, raw):
     """the donor's class DTI (main address) for a gu_class monster, checked against the name in package.toml"""
     want = package(m)['gu_class']
     dti = raw[m['donor_index']]
-    pkl = os.path.join(paths.GU_SCRATCH, 'dti.pkl')            # MHGU_Editor: DTI address -> {(name, ...)}
+    pkl = os.path.join(paths.GU_CODE, 'dti.pkl')   # optional (MHGU_Editor study file): DTI address -> {(name, ...)}
     if os.path.exists(pkl):
         import pickle
         names = {n for n, _ in pickle.load(open(pkl, 'rb')).get(dti, ())}
         if want not in names: sys.exit('%s: donor %d runs %s, not gu_class %s' % (m['name'], m['donor_index'],
                                                                                names or '?', want))
+    else:
+        print('WARNING %s: donor class not checked against gu_class %s (no %s)' % (m['name'], want, pkl))
     return dti
 
 
@@ -109,6 +111,7 @@ HOOKS = [
     ('stage_demolisher_pose', 0x466618), ('stage_demolisher_efx', 0x466B9C),  # stage_demolisher.c (uShellPlcom_011)
     ('em089_tar_dmg', 0x2F1C60), ('em089_tar_struggle', 0x2BBA74), ('em089_tar_mash', 0x2BBB00),
     ('em089_tar_webpost', 0x2826F4),  # em089_tarhunter.c: Gogmazios' tar on hunters on GU's web status
+    ('em089_tar_shellpost', 0x44CDD0),  # em089_tarhunter.c: the player shell's post itself (vt+0x158)
     ('item_data_loaded', 0x19237C),  # rItemData load exit (r4 = this): Gogmazios materials in DUMMY items (items.c)
     ('item_text_loaded', 0xB83C48),  # rGUIMessage load exit (r4 = this): their names in itemData_<lang> (items.c)
     ('bui_record', 0x3A3874),  # (quest, em id) -> break reward record: em089's own for 0x59 (items.c)
@@ -140,6 +143,7 @@ HOOKS = [
     ('em057_01_vparams', 0xEFA930),  # orb family efa930 (= 4U 0x84c280) entry: keeps its 4U parameters, then mid hooks
     ('em057_01_volley1', 0xEFAA6C),  # at its frame-88 / frame-58 posts (GU posts no orb for variant 1): Stygian's orbs
     ('em057_01_volley2', 0xEFAAB4),  # (em057_01_posts.c, em057_01_shell046.c)
+    ('em057_01_psl', 0x70028),     # uFestaEnemy slot 75 PSL post (uEm057_00's too): 4U's ground set for variant 1 (_efx.c)
     ('dala_dmg_end', 0x98E44),     # enemy damage update 0x97ddc, after the rage add, before the reaction dispatcher
                                    # (r0 = this): Dalamadur tail rage -> head, shared reactions (dala_react.c)
     ('dala_heat_zone', 0x6A160),   # (mgr, area, pos) heat-aura zone test (Teostra only): 1 inside the Dalamadur

@@ -1,25 +1,29 @@
 """paths.py : where the inputs live and where a monster's outputs go (one place for every tool).
 
-Inputs outside this repo (override with the environment for another machine / CI):
-  GU_SCRATCH   MHGU_Editor scratch dir: main.asm, mem.bin (GU 1.4 main, flat), base_romfs.bin, py/ helpers
-  GU_EDITOR    MHGU_Editor checkout (tools/ helpers, data/monster-index.csv)
+GU inputs, made from your own MHGU v1.4 by tools/setup.py (each one overridable with the environment variable of the
+same name):
+  GU_EXEFS     dump/gu_exefs: Ryujinx, right-click MHGU > Extract Data > ExeFS (main, main.npdm, rtld, sdk, subsdk0)
+  GU_ROMFS     dump/gu_romfs: Ryujinx, Extract Data > RomFS (update 1.4 selected), or a RomFS image file
+  GU_CODE      dump/gu_main: made by `tools/setup.py gu_code` from GU_EXEFS: mem.bin (main, flat), main32.elf, main.asm
+GU_PY = tools/gulib: the GU readers (romfs, arc, gmd, asm ...), vendored from MHGU_Editor.
 Repo layout: tools/ + module/ + notes/ = shared core; monsters/<package>/{module,tools,notes} = one package,
 monsters/<package>/{gen,romfs} = its generated tables and converted RomFS (gitignored: game data). A package holds one
 allocations.toml entry, or several (their `package` key, e.g. Dalamadur, Shah Dalamadur and their tail halves): the
 functions below take an entry name and resolve its package; gen/ keeps one data file per entry.
 """
-import os, tomllib
+import glob, os, tomllib
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TOOLS = os.path.join(ROOT, 'tools')
 DUMP = os.path.join(ROOT, 'dump')
+ROM_4U = (sorted(glob.glob(os.path.join(DUMP, 'base', '*.3ds'))) or [os.path.join(DUMP, 'base', 'MH4U.3ds')])[0]
+UPDATE_4U = (sorted(glob.glob(os.path.join(DUMP, 'update', '*.cia'))) or [os.path.join(DUMP, 'update', 'v1.1.cia')])[0]
 
-GU_EDITOR = os.environ.get('GU_EDITOR', '/home/scrimas/Projects/MHGU_Editor')
-GU_SCRATCH = os.environ.get('GU_SCRATCH', os.path.join(GU_EDITOR, 'scratch'))
-GU_PY = os.path.join(GU_SCRATCH, 'py')               # romfs.py, asm.py, arc.py ... (MHGU_Editor)
-GU_EDITOR_TOOLS = os.path.join(GU_EDITOR, 'tools')
-GU_ROMFS = os.path.join(GU_SCRATCH, 'base_romfs.bin')
-GU_MAIN = os.path.join(GU_SCRATCH, 'mem.bin')        # MHGU 1.4 main, flat
+GU_EXEFS = os.environ.get('GU_EXEFS', os.path.join(DUMP, 'gu_exefs'))
+GU_ROMFS = os.environ.get('GU_ROMFS', os.path.join(DUMP, 'gu_romfs'))
+GU_CODE = os.environ.get('GU_CODE', os.path.join(DUMP, 'gu_main'))
+GU_PY = os.path.join(TOOLS, 'gulib')                 # romfs.py, asm.py, arc.py ... (put first on sys.path)
+GU_MAIN = os.path.join(GU_CODE, 'mem.bin')           # MHGU 1.4 main, flat
 
 
 _PACKAGES = None

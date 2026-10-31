@@ -1,0 +1,138 @@
+index,monster,category,confidence,has_size_record,notes
+1,Rathian,large,DERIVED_EDITOR,yes,name from the game's monsterName table (entry i-1) and MHXXSwitchSaveEditor MonsterHuntNames (editor index = i-1); they agree
+2,Gold Rathian,large,DERIVED,yes,
+3,Dreadqueen Rathian,large,DERIVED_COUNT_VALIDATED,yes,
+4,Rathalos,large,DERIVED,yes,
+5,Silver Rathalos,large,DERIVED,yes,
+6,Dreadking Rathalos,large,DERIVED,yes,
+7,Khezu,large,DERIVED,yes,
+8,Yian Kut-Ku,large,DERIVED_COUNT_VALIDATED,yes,
+9,Gypceros,large,DERIVED_COUNT_VALIDATED,yes,
+10,Plesioth,large,DERIVED,yes,
+11,Kirin,large,DERIVED,yes,
+12,Velocidrome,large,DERIVED_COUNT_VALIDATED,yes,
+13,Gendrome,large,DERIVED_COUNT_VALIDATED,yes,
+14,Iodrome,large,DERIVED_COUNT_VALIDATED,yes,
+15,Cephadrome,large,DERIVED_COUNT_VALIDATED,yes,
+16,Yian Garuga,large,DERIVED,yes,
+17,Deadeye Yian Garuga,large,DERIVED,yes,
+18,Daimyo Hermitaur,large,DERIVED_COUNT_VALIDATED,yes,
+19,Stonefist Hermitaur,large,DERIVED,yes,
+20,Shogun Ceanataur,large,DERIVED,yes,
+21,Blangonga,large,DERIVED,yes,
+22,Rajang,large,DERIVED_EDITOR,yes,name from the game's monsterName table (entry i-1) and MHXXSwitchSaveEditor MonsterHuntNames (editor index = i-1); they agree
+23,Furious Rajang,large,DERIVED_EDITOR,yes,name from the game's monsterName table (entry i-1) and MHXXSwitchSaveEditor MonsterHuntNames (editor index = i-1); they agree; editor IgnoreList: no crown sizes shown
+24,Kushala Daora,large,DERIVED,yes,
+25,Chameleos,large,DERIVED,yes,
+26,Teostra,large,DERIVED,yes,
+27,Bulldrome,large,DERIVED_COUNT_VALIDATED,yes,
+28,Tigrex,large,DERIVED,yes,
+29,Grimclaw Tigrex,large,DERIVED,yes,
+30,Akantor,large,DERIVED,yes,editor IgnoreList: no crown sizes shown
+31,Lavasioth,large,DERIVED,yes,
+32,Nargacuga,large,DERIVED_EDITOR,yes,name from the game's monsterName table (entry i-1) and MHXXSwitchSaveEditor MonsterHuntNames (editor index = i-1); they agree
+33,Silverwind Nargacuga,large,DERIVED_COUNT_VALIDATED,yes,
+34,Ukanlos,large,DERIVED,yes,editor IgnoreList: no crown sizes shown
+35,Deviljho,large,DERIVED_EDITOR,yes,name from the game's monsterName table (entry i-1) and MHXXSwitchSaveEditor MonsterHuntNames (editor index = i-1); they agree
+36,Savage Deviljho,large,DERIVED_EDITOR,yes,name from the game's monsterName table (entry i-1) and MHXXSwitchSaveEditor MonsterHuntNames (editor index = i-1); they agree; editor IgnoreList: no crown sizes shown
+37,Uragaan,large,DERIVED,yes,
+38,Crystalbeard Uragaan,large,DERIVED,yes,
+39,Lagiacrus,large,DERIVED,yes,
+40,Royal Ludroth,large,DERIVED_COUNT_VALIDATED,yes,
+41,Agnaktor,large,DERIVED,yes,
+42,Alatreon,large,DERIVED,yes,editor IgnoreList: no crown sizes shown
+43,Duramboros,large,DERIVED,yes,
+44,Nibelsnarf,large,DERIVED,yes,
+45,Zinogre,large,DERIVED,yes,
+46,Thunderlord Zinogre,large,DERIVED,yes,
+47,Amatsu,large,DERIVED,yes,editor IgnoreList: no crown sizes shown
+48,Arzuros,large,CONFIRMED,yes,verified by controlled hunt diff (tally and size record agree)
+49,Redhelm Arzuros,large,DERIVED,yes,
+50,Lagombi,large,DERIVED_EDITOR,yes,name from the game's monsterName table (entry i-1) and MHXXSwitchSaveEditor MonsterHuntNames (editor index = i-1); they agree
+51,Snowbaron Lagombi,large,DERIVED_COUNT_VALIDATED,yes,
+52,Volvidon,large,DERIVED_COUNT_VALIDATED,yes,
+53,Brachydios,large,DERIVED,yes,
+54,Kecha Wacha,large,DERIVED_COUNT_VALIDATED,yes,
+55,Tetsucabra,large,DERIVED_COUNT_VALIDATED,yes,
+56,Drilltusk Tetsucabra,large,DERIVED,yes,
+57,Zamtrios,large,DERIVED,yes,
+58,Najarala,large,DERIVED,yes,
+59,Seltas Queen,large,DERIVED,yes,
+60,Gore Magala,large,DERIVED,yes,
+61,Shagaru Magala,large,DERIVED,yes,
+62,Seltas,large,DERIVED_COUNT_VALIDATED,yes,
+63,Seregios,large,DERIVED_EDITOR,yes,name from the game's monsterName table (entry i-1) and MHXXSwitchSaveEditor MonsterHuntNames (editor index = i-1); they agree
+64,Malfestio,large,DERIVED_EDITOR,yes,name from the game's monsterName table (entry i-1) and MHXXSwitchSaveEditor MonsterHuntNames (editor index = i-1); they agree
+65,Glavenus,large,DERIVED_EDITOR,yes,name from the game's monsterName table (entry i-1) and MHXXSwitchSaveEditor MonsterHuntNames (editor index = i-1); they agree
+66,Hellblade Glavenus,large,DERIVED_COUNT_VALIDATED,yes,
+67,Astalos,large,DERIVED,yes,
+68,Mizutsune,large,DERIVED_COUNT_VALIDATED,yes,
+69,Gammoth,large,DERIVED,yes,
+70,Nakarkos,large,DERIVED,yes,editor IgnoreList: no crown sizes shown
+71,Great Maccao,large,DERIVED_EDITOR,yes,name from the game's monsterName table (entry i-1) and MHXXSwitchSaveEditor MonsterHuntNames (editor index = i-1); they agree
+72,Aptonoth,small,DERIVED,no,
+73,Apceros,small,DERIVED,no,
+74,Kelbi,small,DERIVED,no,
+75,Mosswine,small,DERIVED,no,
+76,Hornetaur,small,DERIVED,no,
+77,Vespoid,small,DERIVED,no,
+78,Felyne,small,DERIVED,no,
+79,Melynx,small,DERIVED,no,
+80,Velociprey,small,DERIVED,no,
+81,Genprey,small,DERIVED,no,
+82,Ioprey,small,DERIVED,no,
+83,Cephalos,small,DERIVED,no,
+84,Bullfango,small,DERIVED,no,
+85,Popo,small,DERIVED,no,
+86,Giaprey,small,DERIVED,no,
+87,Anteka,small,DERIVED,no,
+88,Remobra,small,DERIVED,no,
+89,Hermitaur,small,DERIVED,no,
+90,Ceanataur,small,DERIVED,no,
+91,Blango,small,DERIVED,no,
+92,Rhenoplos,small,DERIVED,no,
+93,Bnahabra,small,DERIVED,no,
+94,Altaroth,small,DERIVED,no,
+95,Jaggi,small,DERIVED,no,
+96,Jaggia,small,DERIVED,no,
+97,Ludroth,small,DERIVED,no,
+98,Uroktor,small,DERIVED,no,
+99,Slagtoth,small,DERIVED,no,
+100,Gargwa,small,DERIVED,no,
+101,Zamite,small,DERIVED,no,
+102,Konchu,small,DERIVED,no,
+103,Maccao,small,DERIVED,no,
+104,Larinoth,small,DERIVED,no,
+105,Moofah,small,DERIVED_EDITOR,no,name from the game's monsterName table (entry i-1) and MHXXSwitchSaveEditor MonsterHuntNames (editor index = i-1); they agree
+106,,unused,DERIVED,no,dummy slot: the game's monsterName entry i-1 is dummy1-dummy7; editor labels Unknown
+107,,unused,DERIVED,no,dummy slot: the game's monsterName entry i-1 is dummy1-dummy7; editor labels Unknown
+108,,unused,DERIVED,no,dummy slot: the game's monsterName entry i-1 is dummy1-dummy7; editor labels Unknown
+109,,unused,DERIVED,no,dummy slot: the game's monsterName entry i-1 is dummy1-dummy7; editor labels Unknown
+110,,unused,DERIVED,no,dummy slot: the game's monsterName entry i-1 is dummy1-dummy7; editor labels Unknown
+111,,unused,DERIVED,no,dummy slot: the game's monsterName entry i-1 is dummy1-dummy7; editor labels Unknown
+112,,unused,DERIVED,no,dummy slot: the game's monsterName entry i-1 is dummy1-dummy7; editor labels Unknown
+113,Basarios,large,DERIVED_EDITOR,yes,name from the game's monsterName table (entry i-1) and MHXXSwitchSaveEditor MonsterHuntNames (editor index = i-1); they agree
+114,Gravios,large,DERIVED_EDITOR,yes,name from the game's monsterName table (entry i-1) and MHXXSwitchSaveEditor MonsterHuntNames (editor index = i-1); they agree
+115,Diablos,large,DERIVED_EDITOR,yes,name from the game's monsterName table (entry i-1) and MHXXSwitchSaveEditor MonsterHuntNames (editor index = i-1); they agree
+116,Bloodbath Diablos,large,DERIVED_EDITOR,yes,name from the game's monsterName table (entry i-1) and MHXXSwitchSaveEditor MonsterHuntNames (editor index = i-1); they agree
+117,Lao-Shan Lung,large,DERIVED_EDITOR,yes,name from the game's monsterName table (entry i-1) and MHXXSwitchSaveEditor MonsterHuntNames (editor index = i-1); they agree; editor IgnoreList: no crown sizes shown
+118,Fatalis,large,DERIVED_EDITOR,yes,name from the game's monsterName table (entry i-1) and MHXXSwitchSaveEditor MonsterHuntNames (editor index = i-1); they agree
+119,Crimson Fatalis,large,DERIVED_EDITOR,yes,name from the game's monsterName table (entry i-1) and MHXXSwitchSaveEditor MonsterHuntNames (editor index = i-1); they agree
+120,White Fatalis,large,DERIVED_EDITOR,yes,name from the game's monsterName table (entry i-1) and MHXXSwitchSaveEditor MonsterHuntNames (editor index = i-1); they agree
+121,Rustrazor Ceanataur,large,CONFIRMED,yes,verified by controlled hunt diff (tally and size record agree)
+122,Congalala,large,CONFIRMED,yes,editor name + Monster List 3(0) = tally 3 capture 0; marker readout (Soulseer) was a transcription slip
+123,Giadrome,large,DERIVED_EDITOR,yes,name from the game's monsterName table (entry i-1) and MHXXSwitchSaveEditor MonsterHuntNames (editor index = i-1); they agree
+124,Barioth,large,DERIVED_EDITOR,yes,name from the game's monsterName table (entry i-1) and MHXXSwitchSaveEditor MonsterHuntNames (editor index = i-1); they agree
+125,Barroth,large,DERIVED_EDITOR,yes,name from the game's monsterName table (entry i-1) and MHXXSwitchSaveEditor MonsterHuntNames (editor index = i-1); they agree
+126,Raging Brachydios,large,DERIVED_EDITOR,yes,name from the game's monsterName table (entry i-1) and MHXXSwitchSaveEditor MonsterHuntNames (editor index = i-1); they agree; editor IgnoreList: no crown sizes shown
+127,Nerscylla,large,DERIVED_EDITOR,yes,name from the game's monsterName table (entry i-1) and MHXXSwitchSaveEditor MonsterHuntNames (editor index = i-1); they agree
+128,Chaotic Gore Magala,large,DERIVED_EDITOR,yes,name from the game's monsterName table (entry i-1) and MHXXSwitchSaveEditor MonsterHuntNames (editor index = i-1); they agree; editor IgnoreList: no crown sizes shown
+129,Nightcloak Malfestio,large,DERIVED_EDITOR,yes,name from the game's monsterName table (entry i-1) and MHXXSwitchSaveEditor MonsterHuntNames (editor index = i-1); they agree
+130,Boltreaver Astalos,large,DERIVED_EDITOR,yes,name from the game's monsterName table (entry i-1) and MHXXSwitchSaveEditor MonsterHuntNames (editor index = i-1); they agree
+131,Soulseer Mizutsune,large,CONFIRMED,yes,editor name + Monster List 3(1) = tally 2 capture 1
+132,Elderfrost Gammoth,large,DERIVED_EDITOR,yes,name from the game's monsterName table (entry i-1) and MHXXSwitchSaveEditor MonsterHuntNames (editor index = i-1); they agree
+133,Valstrax,large,DERIVED_EDITOR,yes,name from the game's monsterName table (entry i-1) and MHXXSwitchSaveEditor MonsterHuntNames (editor index = i-1); they agree
+134,,unused,DERIVED,yes,"empty slot: empty name in the game's monsterName table, code 0x57 in the code table 0x1597ea4; editor labels Unknown[133]; editor IgnoreList: no crown sizes shown"
+135,Ahtal-Ka,large,DERIVED_EDITOR,yes,name from the game's monsterName table (entry i-1) and MHXXSwitchSaveEditor MonsterHuntNames (editor index = i-1); they agree; editor IgnoreList: no crown sizes shown
+136,Great Thunderbug,small,DERIVED_EDITOR,no,name from the game's monsterName table (entry i-1) and MHXXSwitchSaveEditor MonsterHuntNames (editor index = i-1); they agree
+137,Conga,small,DERIVED_EDITOR,no,name from the game's monsterName table (entry i-1) and MHXXSwitchSaveEditor MonsterHuntNames (editor index = i-1); they agree

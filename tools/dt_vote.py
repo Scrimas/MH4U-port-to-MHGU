@@ -1,6 +1,6 @@
 """dt_vote.py : majority vote, over every monster present in both games, of which 4U header pointer each GU
 dtbase / dtbparts / dttune heap block is copied from (exact byte matches only), and which 4U header offset each
-GU object scalar equals. Run with the MHGU_Editor scratch venv.
+GU object scalar equals. Run with .venv/bin/python (unicorn).
 
   dt_vote.py KIND [--json OUT]
 """

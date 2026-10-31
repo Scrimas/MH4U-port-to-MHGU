@@ -34,7 +34,7 @@ sys.path.insert(0, HERE)
 import paths
 sys.path.insert(0, paths.GU_PY)
 
-ROM_4U = os.path.join(ROOT, 'dump/base/Monster Hunter 4 Ultimate (EUR) Decrypted.3ds')
+ROM_4U = paths.ROM_4U
 GU_ROMFS = paths.GU_ROMFS
 WORK = os.path.join(ROOT, 'dump/converted/bgm')
 GOG_ROMFS = paths.romfs('gogmazios')
