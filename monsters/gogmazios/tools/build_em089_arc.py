@@ -471,8 +471,9 @@ def main():
              'hitsize from 4U etd word 27 (4U bone IDs = model IDs; 13 -> 201)'),
         30: (emdata4u.bodydata(d4['emd'], 8), 'bodydata from 4U emd word 8 (own skeleton bone IDs)'),
         31: (emdata4u.bodydata(d4['emd'], 9), 'cambodydata from 4U emd word 9'),
-        3: (emdata4u.partsvis(d4['emd'], donor_xfs, [x['group'] for x in gog_mod['mesh_list']])[0],
-            'parts visibility: 4U rows in the donor\'s 12-state layout'),
+        # eyelid = group 12 (mesh 58: 9 vertices capping each eye, 4U cond 11 mode 1; issue #11)
+        3: (emdata4u.partsvis(d4['emd'], donor_xfs, [x['group'] for x in gog_mod['mesh_list']], eyelid=(12,))[0],
+            'parts visibility: 4U rows in the donor\'s 12-state layout, eyelid group 12 in states 1 / 6'),
         11: (lcm4u2gu.convert(S[('enemy\\em089\\mot\\e089_cam', 0x39C52040)]),
              'camera list from 4U e089_cam (LCM v4 -> v5, tools/lcm4u2gu.py; ids = 4U ids of the camera events)'),
     }

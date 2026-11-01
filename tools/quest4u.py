@@ -121,6 +121,48 @@ def rem_4u(q, row, gu_item):
     return d + bytes(184 - len(d))
 
 
+# Supply box (issue #11). 4U quest header +0x08 -> list of 8-byte {u8 kind, u8, u16, u32 table} closed by kind 0xff;
+# a table = {u16 item, u16 count} slots (0 = empty): 32 for the box, 8 for the delivery. Gogmazios m11014 / m11035 (C, data): kind 0 -> the box (Map,
+# First-aid Med+, Ration, Cleanser, ...: the reporter's 4U box), kinds 1..3 -> one second table (7 / 8 items, the
+# later delivery; its trigger is not traced, G). GU supp (168 B): f32 1.0, u32 1, 40 x {u16 item, u8 count, u8 group};
+# a nonzero group byte starts a delivery group, the slots before it are the box at start; questData +0x58..+0x5f
+# hold the groups' conditions (S, survey of the 1854 v1.4 quests: 869 have no group, 468 `01 01 00 00 00 00 04 04` with
+# group 1 at slot 4 (4 Maps at start = q0011413, the old template: "only Maps") and group 4 at slot 32, 219
+# `00 00 00 00 00 00 04 04` with only group 4 at slot 32). Here: slots 0..31 = the 4U box, slots 32.. = the 4U delivery
+# as group 4, questData SUPP_QD.
+SUPP_QD = bytes([0, 0, 0, 0, 0, 0, 4, 4])
+SUPP_GU_NAME = {'Power Coating': 'Power Coating Lv1'}      # GU splits coatings into Lv1 / Lv2; GU's own boxes use Lv1
+
+
+def supp_4u(q, names4u, gu_ids, log=print):
+    """4U quest -> GU supp bytes. names4u = 4U item names (items4u.text_4u), gu_ids = {GU name: [ids]} (the first id
+    wins: e.g. Normal S Lv2 0x65 as GU's boxes, not 0x85). A 4U item GU lacks (4U Torch) is left out."""
+    lst, tabs = struct.unpack_from('<I', q, 8)[0], []
+    while q[lst] != 0xFF:
+        kind, t = q[lst], struct.unpack_from('<I', q, lst + 4)[0]
+        if t not in [x for _, x in tabs]: tabs.append((kind, t))
+        lst += 8
+    assert [k for k, _ in tabs][:1] == [0] and len(tabs) <= 2, 'unexpected 4U supply list %s' % tabs
+
+    def table(t, slots):
+        out = []
+        for i in range(slots):
+            item, n = struct.unpack_from('<HH', q, t + 4 * i)
+            if not item: continue
+            name = names4u[item]
+            ids = gu_ids.get(SUPP_GU_NAME.get(name, name))
+            if not ids:
+                log('supply: 4U item %d %s has no GU item, left out' % (item, name)); continue
+            out.append((ids[0], n))
+        return out
+    box = table(tabs[0][1], 32)
+    later = table(tabs[1][1], 8) if len(tabs) > 1 else []     # 8 slots: m11035's runs into the list at +0x80
+    assert len(box) <= 32 and len(later) <= 8 and all(n < 256 for _, n in box + later)
+    slots = [(i, n, 0) for i, n in box] + [(0, 0, 0)] * (32 - len(box))
+    slots += [(i, n, 4 if k == 0 else 0) for k, (i, n) in enumerate(later)] + [(0, 0, 0)] * (8 - len(later))
+    return struct.pack('<fI', 1.0, 1) + b''.join(struct.pack('<HBB', *s) for s in slots), bool(later)
+
+
 def gmd(name, strings, unk):
     body = b''.join(s.encode('utf-8') + b'\0' for s in strings)
     n = name.encode('ascii')

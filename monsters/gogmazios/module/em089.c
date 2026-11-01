@@ -101,6 +101,7 @@ static void em089_action(void *self)
  * tar state word W+0x7814 that 4U slot 39 sets at spawn [0x8b9dc0..0x8b9e0c: 0x8c69b8(this, mode, part) =
  * part 0, 7 mode 1; parts 2, 3, 6 mode 0 -> 0x7c]. */
 #define XFS_BASE         0
+#define XFS_EYES_OPEN    1     /* eyelid group 12 hidden; state 6 (shown) at death, em089_react.c (issue #11) */
 #define XFS_INTACT_FIRST 2
 #define XFS_TAIL_INTACT  5
 static void em089_spawn_setup(void *self, uint32_t flag)
@@ -108,6 +109,7 @@ static void em089_spawn_setup(void *self, uint32_t flag)
     void *pm = FIELD(void *, self, EN_PARTS_MGR);
     int32_t n = pm ? FIELD(int32_t, pm, 0x68) : 0;
     applyPartsState(self, XFS_BASE);
+    applyPartsState(self, XFS_EYES_OPEN);
     for (int32_t s = XFS_INTACT_FIRST; s <= XFS_TAIL_INTACT; s++) applyPartsState(self, s);
     em089_tar_machine_spawn(self);   /* 4U slot 39 tar part: amounts, modes, hitzones, W+0x7814 -> group bits */
     logf("gogport: em089 spawn setup flag %u parts %x states %d groups %x %x %x %x", flag, (uint32_t)pm, n,

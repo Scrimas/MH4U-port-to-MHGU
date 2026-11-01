@@ -179,26 +179,31 @@ def row_visible(rows, g, word=SPAWN_STATE_WORD, broken=(), severed=()):
     return True
 
 
-def partsvis(emd, donor_xfs, model_groups, word=SPAWN_STATE_WORD):
+def partsvis(emd, donor_xfs, model_groups, word=SPAWN_STATE_WORD, eyelid=()):
     """Gogmazios-style visibility states in the donor's state layout (Kushala: 0 base, 1/6 eyelid, 2-4 / 7-9
     break pairs intact / broken, 5 / 10 tail intact / severed, 11 empty), filled from the 4U rows by role.
     Every value is the group's full 4U evaluation (all its rows) at the spawn state word, intact and unsevered,
-    except the one break / sever the state stands for."""
+    except the one break / sever the state stands for.
+    eyelid: the monster's eyelid groups -> state 1 hidden (open) / state 6 shown (closed), as GU em024_00's group 1
+    (4U em031 / em001 eyelid group 1 = cond 0 mode 1; em089's eyelid group 12 = cond 11 mode 1, issue #11). Without
+    them states 1 / 6 stay empty and the eyes never close (dead Gogmazios)."""
     rows = part_rows(emd)
     groups = sorted(set(model_groups) | {g for g, *_ in rows})
+    eyelid = sorted(eyelid)
+    assert set(eyelid) <= set(groups), 'eyelid group not in the model'
     breaks = {}                                       # break record -> groups
     for g, c, m, p, t in rows:
         if c == 6 and g not in breaks.get(p, []): breaks.setdefault(p, []).append(g)
     sever = sorted({g for g, c, m, p, t in rows if c == 1 and p == 1})      # tail
     slots = sorted(breaks)[:3]
-    in_slot = {g for p in slots for g in breaks[p]} | set(sever)
+    in_slot = {g for p in slots for g in breaks[p]} | set(sever) | set(eyelid)
     vis = lambda g, **kw: row_visible(rows, g, word, **kw)
     base = [(g, vis(g)) for g in groups if g not in in_slot]
     intact = [[(g, vis(g)) for g in breaks[p]] for p in slots]
     broken = [[(g, vis(g, broken={p})) for g in breaks[p]] for p in slots]
     while len(intact) < 3: intact.append([]); broken.append([])
-    states = [base, []] + intact + [[(g, vis(g)) for g in sever], []] + broken + \
-             [[(g, vis(g, severed={1})) for g in sever], []]
+    states = [base, [(g, False) for g in eyelid]] + intact + [[(g, vis(g)) for g in sever]] + \
+             [[(g, True) for g in eyelid]] + broken + [[(g, vis(g, severed={1})) for g in sever], []]
     r, _ = parse_xfs_states(donor_xfs)
     data, nobj = xfs_states(states)
     head = bytearray(donor_xfs[:r])

@@ -1167,12 +1167,20 @@ def collision_floors(d):
     return {f: (np.concatenate(L), float(np.median(np.concatenate(L)[:, 1]))) for f, L in acc.items()}
 
 
-def relation_pairs(fl):
-    """direct pairs {(a, b): (attr, dir)} per the Fortress convention above."""
+def relation_pairs(fl, strict=True):
+    """direct pairs {(a, b): (attr, dir)} per the Fortress convention above. strict (issue #11): a shared vertex
+    links two floors on foot only when it lies within 200 of the lower floor's height (a ramp foot or a common
+    edge). m19a03d's ground floor 1 carries wall-top vertices at y 950 shared with the flat ballista platforms 3 / 4
+    (all 17 / 33 shared vertices at 949..950, the platforms themselves 945..950): not a ramp, so 1-3 / 1-4 are
+    950 climbs (4), as 1-2 / 1-6. With walk (1) GU's target class (0xb73c8) gave 0x1000 for a hunter on 3 / 4 and
+    em089's think took its ground sets (g0 s4) instead of the ledge sets (s5 / s7)."""
     def shared(a, b):
         A, B = fl[a][0], fl[b][0]
         d = np.abs(A[None, :, :] - B[:, None, :]).max(2)
-        return int((d < 2).sum())
+        if not strict:
+            return int((d < 2).sum())
+        low = min(fl[a][1], fl[b][1])
+        return int(((d < 2).any(0) & (np.abs(A[:, 1] - low) < 200)).sum())
     def cls(dy):
         h = abs(dy)
         return 1 if h < 200 else 2 if h < 700 else 4 if h < 1250 else 8

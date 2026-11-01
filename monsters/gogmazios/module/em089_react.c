@@ -446,9 +446,14 @@ int em089_react_run(void *self, uint32_t cat, uint32_t num)
     if (cat == 10) return react10(self, num);
     if (cat == 11 && num <= 1) {
         const rx_op *t = num ? T_death_fly : T_death;
-        if (FIELD(uint8_t, REC(self), 0x1a1) == 0)
-            logf("gogport: em089 death 11/%u: %s death (4U %s), op 7 then 12/255 by the reaction player", num,
-                 num ? "flying" : "ground", num ? "0x8b6b80" : flying(self) ? "0x8b6da4" : "0x8b6ac8");
+        if (FIELD(uint8_t, REC(self), 0x1a1) == 0) {
+            logf("gogport: em089 death 11/%u: %s death (4U %s), op 7 then 12/255 by the reaction player; eyes closed",
+                 num, num ? "flying" : "ground", num ? "0x8b6b80" : flying(self) ? "0x8b6da4" : "0x8b6ac8");
+            /* field-3 state 6 = eyelid group 12 shown (tools/emdata4u.partsvis eyelid; 4U cond 11 mode 1 row, the
+             * reporter: 4U closes the eyes on death; issue #11). GU's eyelid states are per-monster code (every
+             * applyPartsState caller is in a monster class), so ours sets it. */
+            applyPartsState(self, 6);
+        }
         reactPlay(self, t, num);
         if (!num && flying(self)) death_layer(self);
         return 1;

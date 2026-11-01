@@ -39,6 +39,7 @@ sys.path.insert(0, HERE)
 import paths                        # noqa: E402
 sys.path.insert(0, paths.GU_PY)
 import items_em089                  # noqa: E402
+import gear4u, items4u              # noqa: E402
 import quest4u                      # noqa: E402
 from quest4u import (arc_files, text4u, ref, LANGS, T_SET, T_ESL, T_REM, T_SUPP, T_PLUS, T_GMD,  # noqa: E402
                      REWARD_ROWS_4U, SUB_ROW_4U)
@@ -71,6 +72,15 @@ BQ_AREA, BQ_POS = 2, (0.0, 633.5, 0.0, 1510.8)    # --bq spawn (alias area 2 = 4
 
 def rem_4u(q, row):
     return quest4u.rem_4u(q, row, items_em089.gu_item)
+
+
+def gu_names(R):
+    """{GU English item name: [ids]} (supply box lookup by name)"""
+    it = gear4u.gmd(gear4u.gu_arc(R.read('/nativeNX/eng/arc/resident_eng.arc'))['eng\\table\\itemData_eng'])
+    out = {}
+    for i in range(len(it) // 2):
+        out.setdefault(it[2 * i], []).append(i)
+    return out
 
 
 def bq_plus(d):
@@ -162,6 +172,10 @@ def main():
         lao = pos['loc\\quest\\questData\\questData_%07d' % TPL_POS][1]
         qd[0x1A] = lao[0x1A]
         qd[0x58:0x60] = lao[0x58:0x60]
+    # supply box from the 4U quest (quest4u.supp_4u, issue #11): the template's box held only Maps at start
+    supp, supp_later = quest4u.supp_4u(q4, items4u.text_4u('eng')[0], gu_names(R))
+    if supp_later and not a.siege:
+        qd[0x58:0x60] = quest4u.SUPP_QD
     qd[0x1F] = 1; struct.pack_into('<HH', qd, 0x20, EM_ID, 1)
     qd[0x24:0x29] = bytes(5)               # no second objective
     # subquest +0x29 {u8 type, u16 target, u16 code}: type 8 = wound / sever (template: 08 18 00 11 00 = Kushala head
@@ -216,7 +230,7 @@ def main():
     for r in sorted(set(REM)):
         src = pos if ('quest\\rem\\' + r) in pos else tpl
         res.append(('quest\\rem\\' + r, T_REM, rems[r] if r in rems else src['quest\\rem\\' + r][1]))
-    res.append(('quest\\supp\\supp_' + sid, T_SUPP, tpl['quest\\supp\\supp_%07d' % TPL][1]))
+    res.append(('quest\\supp\\supp_' + sid, T_SUPP, supp))
     res.append(('quest\\plus\\' + plus, T_PLUS, plus_data))
     link = tpl['loc\\quest\\questLink\\questLink_%07d' % TPL][1][:8]
     link += ref(T_SET, setname) + ref(T_SET, 'b_m00em000_00') * 4 + ref(T_ESL, 'z_m00d_000') * 3
