@@ -112,6 +112,7 @@ HOOKS = [
     ('em089_tar_dmg', 0x2F1C60), ('em089_tar_struggle', 0x2BBA74), ('em089_tar_mash', 0x2BBB00),
     ('em089_tar_webpost', 0x2826F4),  # em089_tarhunter.c: Gogmazios' tar on hunters on GU's web status
     ('em089_tar_shellpost', 0x44CDD0),  # em089_tarhunter.c: the player shell's post itself (vt+0x158)
+    ('em089_tar_hudicon', 0x634C60),  # em089_tarhunter.c: HUD status slot 2 before its cell store: web = 4U tar icon
     ('item_data_loaded', 0x19237C),  # rItemData load exit (r4 = this): Gogmazios materials in DUMMY items (items.c)
     ('item_text_loaded', 0xB83C48),  # rGUIMessage load exit (r4 = this): their names in itemData_<lang> (items.c)
     ('bui_record', 0x3A3874),  # (quest, em id) -> break reward record: em089's own for 0x59 (items.c)
@@ -637,7 +638,7 @@ def install():
         src = os.path.join(paths.gen(m['name']), m['name'] + '.bin')
         if not os.path.exists(src): sys.exit('no data file %s: run monsters/%s/build.sh' % (src, alloc.package(m)))
         shutil.copy(src, os.path.join(dst, 'nativeNX', 'mh4uport'))
-    for name, _, _ in ui_icons.ATLASES:
+    for name in ui_icons.FILES:
         shutil.copy(os.path.join(OUT, name), os.path.join(dst, 'nativeNX', 'mh4uport'))
     sel =os.environ.get('PORT_ASSETS', 'all')           # package names (an entry name selects its package)
     names = alloc.packages() if sel == 'all' else [] if sel == 'none' else \

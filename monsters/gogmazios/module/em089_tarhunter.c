@@ -24,6 +24,7 @@
  *       0x2baef0 and 0x2bbe8c) not posted.
  *   em089_tar_shellpost @0x44cdd0 (the shell post 0x2826f4 wraps): GU's status look unit 0x44d260 posts the white
  *       wrap (web status bit 0x100000 -> slot 4 shell 135) every frame from 0x44d4f8; not posted.
+ *   em089_tar_hudicon @0x634c60 (HUD status, second slot): GU's web icon (HD_hud_icon cell 22) -> 4U's tar icon.
  *   em089_tar_hunters_tick (from the em089 effect tick): a hunter in GU's web actions (66, 68, 70..73 = 4U 106..110)
  *       after a tar hit (em089_tar_dmg, this machine's hunter) or a struggle start (em089_tar_struggle, any hunter:
  *       a remote hunter's hit is resolved on its own machine) gets PEL 7000 (qe008_026) on its own attach model
@@ -46,6 +47,7 @@
 #include "game.h"
 #include "em089.h"
 #include "em089_efx.h"
+#include "icons.h"
 
 enum { R0, R1, R2, R3, R4, R5, R12, LR };
 
@@ -162,6 +164,30 @@ int em089_tar_shellpost_c(uint32_t *regs)
     if (++s_n <= 20) logf("gogport: em089 tar: GU web shell (slot %u shell %u, lr %x) skipped", regs[R1], regs[R2], lr);
     regs[R0] = 0;
     return 1;
+}
+
+/* Status icon (C, static 2026-11-01). GU's HUD status 0x63487c(ui) shows two status sprites per hunter: slot 2 =
+ * the first active entry of table 0x16395b0 (36 x {u8 word, _, _, u8 cell; u64 mask}), cell set by 0x56e6a8(ui,
+ * obj, sprite, kind 6, cell) at 0x634c68 on quest_eng.arc HD_hud_icon. Entry 34 = status word bit 0x100000 (web,
+ * the bit em089_tar_dmg's type 48 sets) -> cell 22, GU's only cell 22. 4U shows its tar icon (qst_icon row 7 col 1)
+ * there; the art is in our HUD atlas at cell 22 (tools/ui_icons.py), so only the texture changes.
+ * Hook 0x634c60 (before `str r0, [sp]` = the 5th argument): r0 = cell, r1 = obj, r2 = sprite, r4 = ui + 0x58.
+ * Runs only while slot 2 is shown; a sprite of ours gets GU's texture back at its next other cell. */
+#define HUD_WEB_CELL      22u
+#define HUD_UI_OBJ        0x58u       /* r4 = ui + 0x58 (the .gui object of the status sprites) */
+int em089_tar_hudicon_c(uint32_t *regs)
+{
+    uint8_t *spr = icons_sprite(regs[R4] - HUD_UI_OBJ, regs[R1], regs[R2]);
+    if (!spr) return 0;
+    int tar = regs[R0] == HUD_WEB_CELL && em089_efx_present();
+    static uint8_t s_last = 0xff;
+    static uint32_t s_logs;
+    if (tar != s_last && ++s_logs <= 40) {     /* several hunters' rows can alternate every frame */
+        s_last = (uint8_t)tar;
+        logf("gogport: em089 tar: HUD status icon cell %u -> %s", regs[R0], tar ? "4U tar icon" : "GU's");
+    }
+    icons_hud_own(spr, tar);
+    return 0;
 }
 
 static struct {

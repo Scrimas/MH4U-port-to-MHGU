@@ -10,7 +10,7 @@ never be built in hosted CI: the converters read ~15 GB of 4U / GU data and the 
                              CLI); asks first unless --yes. No installer apps (user, 2026-10-21): users extract the zips.
 
 Packages: core-<v>.zip = MH4U Port/exefs/{subsdk1, <build id>.ips} + MH4U Port/romfs/nativeNX/mh4uport/<every
-monster>.bin (always installed together: gear IDs depend on all of them) + the icon atlases micon_sd/hd.tex; <monster>-<v>.zip = MH4U Port/romfs/... (that
+monster>.bin (always installed together: gear IDs depend on all of them) + the icon atlases micon_sd/hd.tex and hudicon_sd/hd.tex; <monster>-<v>.zip = MH4U Port/romfs/... (that
 monster's assets, optional). Every zip extracts into the game's mod directory ('<mods>/contents/<title>/' for Ryujinx,
 '<load>/<TITLE>/' for the yuzu family) and they merge into the one 'MH4U Port' folder. NOTES.md (the release text):
 what the mod is, What's new (notes/release-news.md, one section per core version: write it before packaging), the
@@ -143,7 +143,7 @@ def package(out):
                ('exefs/' + build_id(), os.path.join(MODULE_OUT, build_id()))]
     members += [('romfs/nativeNX/mh4uport/%s.bin' % m['name'], os.path.join(paths.gen(m['name']), m['name'] + '.bin'))
                 for p in pk for m in p['entries']]
-    members += [('romfs/nativeNX/mh4uport/' + name, os.path.join(MODULE_OUT, name)) for name, _, _ in ui_icons.ATLASES]
+    members += [('romfs/nativeNX/mh4uport/' + name, os.path.join(MODULE_OUT, name)) for name in ui_icons.FILES]
     core_zip = 'core-%s.zip' % c['version']
     write_zip(os.path.join(out, core_zip), [(MOD_NAME + '/' + a, s) for a, s in members])
     for p in pk:
