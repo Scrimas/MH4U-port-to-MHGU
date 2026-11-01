@@ -12,7 +12,9 @@ Entries: one [[monster]] = one registry index. Optional keys: `package` (the mon
 several entries can share one package), `companion_of` (a second enemy spawned with its owner's monster, e.g. a tail
 half: registry index, em ID, donor and files of its own; its owner's name entry; a save tally slot that companions may
 share with each other, never with a monster; no Notes entry, quests, items or gear), `quest_append = true` (its quests
-are new quest list entries after GU's, module/quest.c quest_group_append, instead of renaming `quest_slots`).
+are new quest list entries after GU's, module/quest.c quest_group_append, instead of renaming `quest_slots`),
+`notes = false` (no Hunter's Notes entry, as a companion: module/notes.c skips notes_entry 0; for when the Notes save
+bits run out, so a forgotten notes_entry still fails).
 """
 import os, struct, sys, tomllib
 
@@ -103,8 +105,11 @@ def check(reg=None, gu_main=paths.GU_MAIN):
     for k, m in enumerate(ms):
         comp = m.get('companion_of')
         need = ('name', 'em_id', 'registry_index', 'donor_index', 'save_index', 'name_entry')
-        for key in need + (() if comp else ('notes_entry',)):
+        no_notes = m.get('notes', True) is False
+        for key in need + (() if comp or no_notes else ('notes_entry',)):
             if key not in m: errs.append('%s: missing %s' % (m.get('name', k), key))   # module/build.py needs them
+        if m.get('notes', True) not in (True, False) or (no_notes and 'notes_entry' in m):
+            errs.append('%s: notes is true or false, and notes = false takes no notes_entry' % m.get('name', k))
         if m.get('em_id', 0) >> 8 == 0 and 'mapicon_class' not in m:   # a new em number has no GU size class
             errs.append('%s: missing mapicon_class' % m.get('name', k))
         if ('ui_icon' in m) != ('icon_4u' in m):                        # a cell and its art (tools/ui_icons.py)
