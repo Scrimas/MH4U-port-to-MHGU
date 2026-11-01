@@ -4,6 +4,20 @@ tools/release.py puts the section of the core version being packaged into the re
 groups, **New** (something added) and **Fixed** (what works now, not what was broken), one short plain line each,
 written for players; write the section before `release.py package`.
 
+## v1.7.3
+**Fixed**
+- The mod now works together with the Key Quest Markers plugin (Forge).
+- Gogmazios fights a hunter on the side walls as in MH4U: he stands up and uses his tar body shake, his sweeping
+  downward laser and his wing scrape, instead of repeating bites and wing slams at the wall.
+- Gogmazios' quests now have their full MH4U supply box (First-aid Med+, Rations, Cleansers, ammo and more), with
+  Quagmire Quarrel and Act of Gog each getting their own.
+- Gogmazios closes his eyes when he dies.
+- Stygian Zinogre howls on his charged roar and leaves no charged aura behind when he changes area.
+- Stygian Zinogre's quests give only their MH4U rewards (no MHGU tickets or Valstrax materials), and their texts
+  name the monsters you actually meet.
+- Stygian Zinogre's body marks glow brighter, as in MH4U.
+- Stygian Zinogre and Tigerstripe Zamtrios now get a kill cam when the hunt ends.
+
 ## v1.7.2
 **New**
 - Building the mod yourself and contributing are now much easier: one setup script prepares everything from your
