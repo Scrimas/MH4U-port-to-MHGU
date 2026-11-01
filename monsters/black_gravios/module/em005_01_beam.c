@@ -1,0 +1,88 @@
+/* em005_01_beam.c: Black Gravios' own branch of 4U's beam handler (4U uEm038 0x8050e0, its em 41 sites 805320 and
+ * 805920; notes/plan.md "4U behaviour of em 41"). C = confirmed in code, S = strong, G = guess. 4U = MH4U v1.1,
+ * GU = MHGU 1.4.
+ *
+ * GU's beam handler d2e0b4 is 4U's 0x8050e0 (C: motion 7 / 89-90, motionCheck(3, 34, 134), the rank table byte 5, the
+ * beam volley at frame 105 = 4U's two at 100 / 105, the step counters rec+0x1a2 / 0x1a3 = 4U W+0x145 / 0x146) without
+ * 4U's em-41 branch. Both games join every frame of step 1 at the motion-end check (4U 805918, GU d2e3ec), and 4U's
+ * branch runs there, so the hook at d2e3ec runs it for variant 1, with 4U's frames (the same timing in both games, C):
+ *  - 4U 805300: frame 10, state bit 2 set and bit 4 clear: effect request 8 (0x809ae0(this, 8, 0)); Gravios posts none
+ *    there. GU posts 4U's ungated request 8 of the other handlers as its message id 10 | state bit 0 (d2d88c = 4U
+ *    0x803dc8: the same attack at 350; S).
+ *  - 4U 805998: 0x808410(this, 1, 120.0): frame 120 the heat burst effect (request 6; the forced path r1 == 1, so no
+ *    state bit needed), frame 140 its attack attackEx(0, 26, or 57 with state bit 4, 4096). GU's copy of the forced
+ *    path (d2ba30, r1 == 1) posts message id 3 / 7 / 8 / 9 (state bit 0, 0x8172c) for the effect (S); the attack
+ *    indexes are 4U's in every GU copy (d2bc88 d2d9e8 d2e030, C). Gravios skips all of it here (4U em 40: 805930 ->
+ *    8059f0, C).
+ *  - not ported: 4U's sound 216 at frame 120 (GU's class posts no sounds: they are motion data, G).
+ * State byte: GU work+0x24 = 4U [this+0x8c88]+0x28 (C: GU d2bca4 / 4U 0x808440 test the same bits 2 and 4). */
+#include <stdint.h>
+#include "game.h"
+#include "util.h"
+#include "alloc.h"
+
+enum { R0, R1, R2, R3, R4, R5, R12, LR };
+
+#define WK_STATE    0x24        /* u8 state bits [4U work+0x28]: 2 and 4 select the heat burst (meaning G) */
+#define EN_EFX_OWNER 0xcacc     /* u32 the message's +4 (GU d2bbb4 / d2d93c) */
+#define MSG_MGR     0x1892550   /* its manager, *(void **) (GOT 0x1838da0) */
+#define MSG_VT      0x175585c   /* the message vtable symbol (+8 = the vtable; GOT 0x183cd64) */
+#define MSG_VEC     0x191e850   /* u32[3] copied to +0x10..+0x18 (GOT 0x1838b4c) */
+
+typedef int (*atFrame_t)(void *self, float f);
+#define atFrame     FN(atFrame_t, 0xb0a30)      /* [0x941dbc] */
+typedef void *(*alloc_t)(uint32_t size, uint32_t align);
+#define msgAlloc    FN(alloc_t, 0x3fc428)       /* new(48, 16) as d2bb9c */
+typedef void (*post_t)(void *mgr, void *msg, uint32_t a, uint32_t b);
+#define msgPost     FN(post_t, 0x48c4f0)
+typedef int (*selfInt_t)(void *self);
+#define fn8172c     FN(selfInt_t, 0x8172c)      /* d2ba30's second selector (meaning G) */
+
+static int is_black_gravios(const void *self)
+{
+    return self && FIELD(uint16_t, self, EN_ID) == BLACK_GRAVIOS_EM_ID;
+}
+
+/* GU d2bb88..d2bc2c / d2d910..d2d9a0: the effect request message {vtable, owner, id, this, vector, 0, u16 0, 0xffff} */
+static void post_request(void *self, uint32_t id, uint32_t site)
+{
+    static uint32_t s_lines;
+    void *mgr = *(void **)MAIN(MSG_MGR);
+    const uint32_t *v = (const uint32_t *)MAIN(MSG_VEC);
+    uint8_t *m;
+    if (!mgr || !(m = msgAlloc(48, 16))) return;
+    FIELD(uint32_t, m, 0x00) = MAIN(MSG_VT) + 8;
+    FIELD(uint32_t, m, 0x04) = FIELD(uint32_t, self, EN_EFX_OWNER);
+    FIELD(uint32_t, m, 0x08) = id;
+    FIELD(void *, m, 0x0c) = self;
+    FIELD(uint32_t, m, 0x10) = v[0];
+    FIELD(uint32_t, m, 0x14) = v[1];
+    FIELD(uint32_t, m, 0x18) = v[2];
+    FIELD(uint32_t, m, 0x1c) = 0;
+    FIELD(uint16_t, m, 0x20) = 0;
+    FIELD(uint32_t, m, 0x24) = 0xffff;
+    msgPost(mgr, m, 0, 0);
+    if (++s_lines <= 20) logf("bgport: beam request %u (4U %x)", id, site);
+}
+
+/* GU 0xd2e3ec (r4 = this): d2e0b4 step 1, every frame, before the motion-end check */
+int em005_01_beam_c(uint32_t *regs)
+{
+    static uint32_t s_lines;
+    void *self = (void *)regs[R4];
+    uint32_t st;
+    if (!is_black_gravios(self)) return 0;
+    st = FIELD(uint8_t, FIELD(uint8_t *, self, EN_WORK), WK_STATE);
+    if (atFrame(self, 10.0f) && (st & 2) && !(st & 4))
+        post_request(self, 10 | (st & 1), 0x80536c);
+    if (atFrame(self, 120.0f)) {
+        uint32_t sel = fn8172c(self) != 0;
+        post_request(self, (st & 1) ? (sel ? 9 : 7) : (sel ? 8 : 3), 0x8084a0);
+    }
+    if (atFrame(self, 140.0f)) {
+        uint32_t idx = (st & 4) ? 57 : 26;
+        attackEx(self, 0, idx, 4096);
+        if (++s_lines <= 20) logf("bgport: beam heat burst attack %u (state %x, 4U 0x8084cc)", idx, st);
+    }
+    return 0;
+}
