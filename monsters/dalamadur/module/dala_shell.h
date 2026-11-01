@@ -120,3 +120,4 @@ void *dala_shell005_post(void *owner, uint32_t subtype, const float *pos, float 
 /* dala_shell038.c: 4U 0x6626e8(mgr, owner, kind 0 / Shah 1, area, &pos, yaw, ground byte): the meteor scale and its
  * mining point (the ground byte = the kobj the meteor hit: not passed, see the file) */
 void *dala_shell038_post(void *owner, uint32_t kind, const float *pos, uint32_t area, uint32_t yaw);
+uint32_t dala_shell038_alive(void);   /* scales alive now (DALA_TEST_MINING: one at a time, as 4U's 7200-frame gap) */

@@ -108,7 +108,11 @@ void dala_meteor_reset(void *self)
 /* 4U 0x77274c */
 void dala_meteor_set(void *self, uint32_t kind, uint32_t pattern, float duration, float delay)
 {
-    if (kind == 3 && MW(float, self, W_MT_COOL) > 0.0f) kind = 2;
+    if (kind == 3 && MW(float, self, W_MT_COOL) > 0.0f) {
+        logf("dalaport: %x meteors: mining kind 3 -> 2 (cooldown %d frames left)", (uint32_t)self,
+             (int32_t)MW(float, self, W_MT_COOL));
+        kind = 2;
+    }
     MW(uint8_t, self, W_MT_KIND) = (uint8_t)kind;
     const float *t = (const float *)(REC(self) + REC_TARGET);    /* target slot 0 W+0x218 = GU rec+464 */
     MW(float, self, W_MT_POS) = t[0];
@@ -384,7 +388,9 @@ static int meteor_step(void *self, void *owner)
     if (*life <= 0.0f) {                      /* 0xc7d344: state 2, lifetime 10 */
         *life = 10.0f;
         static uint32_t s_n;
-        if (++s_n <= 30) logf("dalaport: meteor %u kind %u timed out", serial, kind);
+        if (++s_n <= 30 || kind == 3 || kind == 6)   /* the mining meteor: every one (Shattered Omen test) */
+            logf("dalaport: meteor %u kind %u timed out at %d %d %d", serial, kind, (int32_t)FIELD(float, self, SH_POS),
+                 (int32_t)FIELD(float, self, SH_POS + 4), (int32_t)FIELD(float, self, SH_POS + 8));
         return 1;
     }
     float *pos = VEC(self, SH_POS), *vel = VEC(self, S_VEL), *acc = VEC(self, S_ACC), *prev = VEC(self, S_PREV);
@@ -408,17 +414,26 @@ static int meteor_step(void *self, void *owner)
         pos[0] = out[0]; pos[1] = out[1]; pos[2] = out[2];
         uint32_t shah = kind >= 5, sub = shah ? (kind == 7 ? 162 : 160) : (kind == 4 ? 126 : 113);
         static uint32_t s_n;
-        if (++s_n <= 60) logf("dalaport: meteor %u kind %u impact (%x) at %d %d %d", serial, kind, r, (int32_t)pos[0],
-                              (int32_t)pos[1], (int32_t)pos[2]);
+        if (++s_n <= 60 || kind == 3 || kind == 6)   /* the mining meteor: every one (Shattered Omen test) */
+            logf("dalaport: meteor %u kind %u impact (%x) at %d %d %d", serial, kind, r, (int32_t)pos[0],
+                 (int32_t)pos[1], (int32_t)pos[2]);
         /* 0x663220(shell mgr, owner, subtype, &pos, area, group +0x19c) -> 0x661c5c: type-3 blast shell; +0x19c =
          * attack slot 0 +0x34, the hit group the arming gave the meteor (dala_shell003.c) */
         if (!dala_shell003_post(owner, sub, pos, area, FIELD(uint16_t, self, SH_ATK0 + ATK_GROUP)))
             stub_once(owner, &s_n_blast, "meteor blast uShell003 0x663220 not posted, subtype", sub, kind);
         void *m = SND_MGR;
-        if (kind == 3 || kind == 6) {
+#ifdef DALA_TEST_MINING
+        /* test build only (issue: no Shattered Omen): any impact drops a scale while none is alive, so the first shower
+         * (2.x, about a minute in) tests the chain with one scale at a time, as in 4U (life 1800 < cooldown 7200).
+         * Not 4U: there only kind 3 / 6 (1.9-1.11's second meteor) does. */
+        const int scale = dala_shell038_alive() == 0;
+#else
+        const int scale = kind == 3 || kind == 6;
+#endif
+        if (scale) {
             /* 0x6626e8(shell mgr, owner, 0 / Shah 1, area, &pos, +0x114, ground byte) -> type 38 uShell038: the
              * meteor scale and its mining point (dala_shell038.c; the ground byte is not known here, see there) */
-            if (!dala_shell038_post(owner, kind == 6, pos, area, FIELD(uint32_t, self, SH_ANGLES + 4)))
+            if (!dala_shell038_post(owner, kind >= 5, pos, area,   /* Shah's meteors 5 / 6 / 7 (4U: kind 6 only) */ FIELD(uint32_t, self, SH_ANGLES + 4)))
                 stub_once(owner, &s_n_mine, "meteor scale uShell038 0x6626e8 not posted, kind / area", kind, area);
             if (m && owner) snd_req_pos(m, 213, owner, pos, area, -2);
         } else if (m && owner) snd_req_pos(m, 204, owner, pos, area, -2);
