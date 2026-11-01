@@ -2,7 +2,7 @@
 
 ## Built (2026-10-21, user decisions: packages on the GitHub repo's releases; standalone Linux AppImage + Windows exe)
 - `tools/release.py` (machine with the dumps; hosted CI cannot build: ~15 GB of 4U / GU data, and the module build
-  reads GU's main): `build` (every monster's build.sh + the module, no test switches), `check` (allocations, versions,
+  reads GU's main): `build` (every monster's build.py + the module, no test switches), `check` (allocations, versions,
   requires_core vs module/core.toml, RomFS overlaps, quest HP rows >= 10, module defines.txt empty), `package`
   (core-<v>.zip, <monster>-<v>.zip, manifest.json; deterministic zips), `publish` (gh release v<core>, asks first).
 - `installer/` (Rust, Slint 1.18.1 as MHGU_Editor; packaging/build.sh = MHGU_Editor's pipeline): finds Ryujinx

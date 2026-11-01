@@ -11,7 +11,7 @@ Mark every fact you write down as C (confirmed in code or data), S (strong) or G
 | `module/` | core module: hook framework (build.py), `port.c` (monsters, data files, installed check, file IDs), `quest.c`, `items.c`, `gear.c`, `notes.c`, `main.c` (shared hooks) |
 | `tools/` | core converters and helpers; `paths.py` (GU scratch / MHGU_Editor locations, overridable), `portdata.py` (data file writer / reader), `alloc.py` |
 | `notes/` | core notes (this guide, registry, enemy-class, port, api-map, assets, data, gear-weapons, installer) |
-| `monsters/<name>/` | one monster: `module/` (its C code, compiled into the core module), `tools/`, `notes/`, `package.toml` (version, C prefix), `build.sh` (every generator, in order) |
+| `monsters/<name>/` | one monster: `module/` (its C code, compiled into the core module), `tools/`, `notes/`, `package.toml` (version, C prefix), `build.py` (every generator, in order) |
 | `monsters/<name>/gen/`, `romfs/` | gitignored game data: its data file `<name>.bin` (+ the `.sec` sections) and its converted RomFS (= its assets) |
 | `dump/scratch/<monster>-session/` | gitignored local archive of a session scratchpad (the one-off RE / check scripts and outputs notes call "scratchpad"); copy yours there before a reboot wipes /tmp |
 
@@ -287,7 +287,7 @@ testable alone (the maintainer checks the smithy or one quest).
   request IDs come from 4U. mSndMaterial (bone / iron hit set) has no 4U source. `check` / `selftest` verify.
 
 ### Phase 6: test loop
-0. Rebuild the monster's data and assets from the dumps: `monsters/<name>/build.sh` (every generator in order, then
+0. Rebuild the monster's data and assets from the dumps: `python3 monsters/<name>/build.py` (every generator in order, then
    `tools/portdata.py pack`; one line per step).
 1. Build both variants and check for 0 warnings:
    `python3 module/build.py`, and with defines, e.g. `GOG_DEFINES="GOG_STAGE_ALIAS TEST_HP_PCT=55 TEST_RAGE=60"`.
@@ -410,7 +410,7 @@ Notes: monsters/tigerstripe_zamtrios/notes/ (plan, phase1-variant-map, missing-a
   IDs and DUMMY quest_group slots (only 11491 / 11492 and slots 1011009 / 1011003 are checked free: check more and
   extend the pools), and its gear tools: the Gogmazios ones compute IDs as the v1.0 counts, a second monster's must
   start at GU's count + alloc.offset(name, table) (allocations.toml [monster.append], frozen once released).
-- Its own folder monsters/<name>/ with a build.sh like Gogmazios'.
+- Its own folder monsters/<name>/ with a build.py like Gogmazios' (steps through tools/steps.py: Linux and Windows).
 
 ## Lessons from Stygian Zinogre's quests and gear (2026-10-28)
 - A quest with a real GU monster of the stand-in's own species (4U m10612: Zinogre + Stygian): name the port by a

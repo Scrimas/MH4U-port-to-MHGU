@@ -25,8 +25,10 @@ Instructions for AI coding assistants working in this repo (Claude Code, Codex, 
 ## Working
 - Environment: `source .venv/bin/activate`, then `python3 tools/doctor.py` must be all "ok". GU inputs come from
   `tools/paths.py` (`GU_EXEFS`, `GU_ROMFS`, `GU_CODE`), and the GU readers are in `tools/gulib/`.
-- Build one monster: `monsters/<name>/build.sh [STEP ...]`, then the module: `python3 module/build.py`. Step logs go to
-  `dump/build_logs/<name>/`.
+- Build one monster: `python3 monsters/<name>/build.py [STEP ...]`, then the module: `python3 module/build.py`. Step
+  logs go to `dump/build_logs/<name>/`.
+- The build runs on Linux and Windows: no shell scripts or Unix-only commands in it (a new step goes in the monster's
+  `build.py`, through `tools/steps.py`), paths through `os.path`, and new text files opened with `encoding='utf-8'`.
 - In-game tests need a human. Ask the tester to play and close, then read the Ryujinx log yourself (Gogmazios:
   `monsters/gogmazios/tools/gogreport.py`). Ask only about what a log can't show (visuals, sound).
 - Commit messages: `<Monster or area>: <what changed> (issue #N)`. No AI attribution trailers.

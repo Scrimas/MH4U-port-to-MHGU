@@ -1,7 +1,7 @@
 """release.py : build, check and package an MH4U Port release on the machine that holds the game dumps (a release can
 never be built in hosted CI: the converters read ~15 GB of 4U / GU data and the module build reads GU's main).
 
-  release.py build           every monster's build.sh (all steps), then the module, both without test switches
+  release.py build           every monster's build.py (all steps), then the module, both without test switches
   release.py check           release checks on the current outputs (exit 1 on any failure)
   release.py package [DIR]   check, then the zips + NOTES.md into DIR (default dump/release/v<core version>)
   release.py all [DIR]       build + package
@@ -61,7 +61,7 @@ def clean_env():
 def build():
     for p in packages():
         print('== build %s' % p['name'], flush=True)
-        subprocess.run(['bash', os.path.join(paths.monster(p['name']), 'build.sh')], check=True, env=clean_env())
+        subprocess.run([sys.executable, os.path.join(paths.monster(p['name']), 'build.py')], check=True, env=clean_env())
     print('== build module', flush=True)
     subprocess.run([sys.executable, os.path.join(ROOT, 'module', 'build.py')], check=True, env=clean_env())
 

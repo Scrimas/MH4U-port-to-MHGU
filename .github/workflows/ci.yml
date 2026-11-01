@@ -23,3 +23,21 @@ jobs:
           sudo apt-get install -y -q clang
           pip install -q numpy Pillow       # module/build.py imports tools/ui_icons.py
           python3 tools/ci_compile.py
+  windows:                                # the build also runs on Windows (CONTRIBUTING.md: MSYS2 toolchain)
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash                       # Git Bash, for these CI lines only: the build itself needs no shell
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Python compiles
+        run: git ls-files -z '*.py' | xargs -0 python -m py_compile
+      - name: Build scripts list their steps
+        run: for b in monsters/*/build.py; do python -X utf8 "$b" --list > /dev/null || exit 1; done
+      - name: C compiles
+        run: |
+          pip install -q numpy Pillow
+          python tools/ci_compile.py      # LLVM's clang is preinstalled on the Windows runners

@@ -17,10 +17,10 @@ import json, os, pickle, shutil, struct, subprocess, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import paths, nso  # noqa: E402
+from steps import VENV_PY  # noqa: E402   (.venv/bin/python, Windows: .venv\Scripts\python.exe)
 
 D = paths.DUMP
 ROOT = paths.ROOT
-VENV_PY = os.path.join(ROOT, '.venv', 'bin', 'python')
 WEAPON_PREFIXES = ('axe', 'bow', 'gaxe', 'gun', 'ham', 'hbg', 'hue', 'lan', 'lbg', 'one', 'rod', 'sou', 'swo', 'two', 'w')
 GU_STAGE_UNPACKED = [('a%02d' % i, 'arc/stage/m26d/a%02d.arc' % i) for i in range(4)] + [
     ('m26d', 'arc/stage/m26d/m26d.arc'), ('m26', 'loc/arc/stage/map_com/m26.arc'), ('m18_a00', 'arc/stage/m18d/a00.arc'),
