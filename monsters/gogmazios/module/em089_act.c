@@ -3195,6 +3195,50 @@ void em089_state_update(void *self)
             }
         }
 #endif
+        /* Lost phase-2 roar (issue #5 test 2026-11-01, log dump/issue5/test1_tartrace.log): GU's think dispatcher
+         * 0x7f0cc (= 4U 0x91f928, same design) consumes the rage request in ONE step: list 6 + group 6 s0 and setRage
+         * 0xbce6c(1), which clears request bits 4 / 0x10. The roar is only requested at the next AI pick. At 10:17
+         * the rage began during the flying breath 7/120, a wing break flinch (10/7) followed, and after it the AI
+         * was back in its normal list (7/127): no 1/25 / 1/31, no phase 2, and nothing retried it (the next rage is
+         * ~6 min away: 4U etd rage duration 10800). Fix: a rage that starts in phase 1 waits for g6 s0's actions
+         * (3/2 = CALL 45, then 1/25 / 1/31, or the phase-1 roar 1/26 / 1/32); if another non-reaction action starts
+         * instead and HP <= 50 %, re-post the request once (0x7fc40(this, 4)). With rage already on, 0xbce6c returns early WITHOUT clearing bit 4, so
+         * it is cleared here (0x7fc24) once the dispatcher has switched to list 6 (0x825fc). Rage timer untouched. */
+        {
+            typedef void (*think_ev_t)(void *self, uint32_t bits);
+            typedef uint32_t (*think_list_t)(void *self);
+            static uint8_t s_wait, s_reposted;     /* 1 = waiting for g6 s0; reposted: 1 = bit 4 ours to clear */
+            static uint16_t s_act;
+            uint8_t cat = FIELD(uint8_t, self, EN_ACT_CAT), num = FIELD(uint8_t, self, EN_ACT_NUM);
+            uint16_t act = (uint16_t)(cat << 8 | num);
+            /* armed at any phase-1 rage start: g6 s0 tests HP% when it runs, not at the rage edge (test 2026-11-01
+             * test2_probe 02:09: rage at 51 %, 1/31 picked 13 s later at < 50 %); re-posted only at <= 50 % (else 1/26 = no phase) */
+            if (s_self == self && angry && !s_angry && !FIELD(uint8_t, self, F_SHAKE)) {
+                s_wait = 1; s_reposted = 0; s_act = act;
+            }
+            if (!angry || FIELD(uint8_t, self, F_SHAKE)) s_wait = 0;
+            if (s_reposted == 1 && FN(think_list_t, 0x825fc)(self) == 6) {
+                FN(think_ev_t, 0x7fc24)(self, 4);
+                s_reposted = 2;
+                logf("gogport: em089 phase 2 retry: list 6 started, request cleared");
+            }
+            if (s_wait && act != s_act) {
+                s_act = act;
+                int reaction = cat >= 8 && cat <= 16 && cat != 15;   /* GU 0x7f0cc skips cats 8..14, 16 */
+                int g6 = (cat == 3 && num == 2) || (cat == 1 && (num == 25 || num == 31 || num == 26 || num == 32));
+                int idle = cat == 0 || (cat == 1 && (num == 5 || num == 20));   /* 0/x and its remaps (slot 127) */
+                if (g6 && num != 2) s_wait = 0;                      /* the roar started */
+                else if (!g6 && !reaction && !idle) {
+                    s_wait = 0;
+                    if (!s_reposted && pct <= 50) {
+                        FN(think_ev_t, 0x7fc40)(self, 4);
+                        s_reposted = 1;
+                        logf("gogport: em089 phase 2 retry: rage roar lost (action %u/%u, hp %d%%), rage request "
+                             "re-posted", cat, num, pct);
+                    }
+                }
+            }
+        }
         if (s_self == self && angry != s_angry && ++s_n <= 40) {
             s_angry = angry;
             logf("gogport: em089 rage %s (hp %d%%, anger %d, work+0xca %u, action %u/%u)", angry ? "on" : "off", pct,

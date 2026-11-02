@@ -63,14 +63,15 @@ tools/                ~60 Python scripts (shared by every port):
                       vtable slots to GU's, resolve 4U action dispatchers
   ids / packing       alloc.py portdata.py paths.py (every input / output path, overridable by environment)
   setup               setup.py (makes dump/ from your own dumps, step by step), doctor.py (checks the machine,
-                      inputs and outputs), gu_stage_files.txt (the GU stage files setup.py copies)
+                      inputs and outputs), gu_stage_files.txt (the GU stage files setup.py copies),
+                      steps.py (the step runner of every monsters/<name>/build.py: Linux and Windows, no shell)
   gulib/              GU readers vendored from MHGU_Editor: romfs (Ryujinx folder or image), arc, gmd, asm
                       (index of GU main's disassembly), vt, build_assets subset, monster-index.csv; tools put it
                       first on sys.path (paths.GU_PY), so its arc.py shadows tools/arc.py there
   pipeline            release.py (build, check, package, publish), ryutest.sh (isolated Ryujinx test run;
                       maintainer's machine: Hyprland, fixed NSP path)
 monsters/<name>/      One port each: gogmazios, dalamadur, stygian_zinogre, tigerstripe_zamtrios
-  build.sh              rebuilds every output of this monster from the dumps, step by step
+  build.py              rebuilds every output of this monster from the dumps, step by step (tools/steps.py)
   tools/                monster-specific generators (arc build, quests, gear, action tables)
   module/               the monster's C code (class, actions, shells, effects, stage gimmicks),
                         compiled into subsdk1 with the core
@@ -156,7 +157,7 @@ Intermediate data
   stage_alias_report.json   output of the stage alias check (module/stage_alias.c)
 
 Logs and outputs
-  build_logs/<monster>/ one log per build.sh step
+  build_logs/<monster>/ one log per build.py step
   install_logs/         one log per install.sh run (rebuilt steps, switches, targets)
   release/v<x.y.z>/     packaged release zips + NOTES.md (tools/release.py); release_build.log
   scratch/              per-session working notes and throwaway scripts
@@ -178,7 +179,7 @@ stay local; `notes/` records what came out of them.
 ```
 your 4U / GU dumps (dump/)
   -> python3 tools/setup.py        derived inputs in dump/ (once; tools/doctor.py checks everything)
-  -> monsters/<name>/build.sh      converters write monsters/<name>/romfs/ and gen/
+  -> python3 monsters/<name>/build.py   converters write monsters/<name>/romfs/ and gen/
   -> python3 module/build.py       core + every monster's module/ -> subsdk1 + IPS (reads allocations.toml)
   -> python3 tools/release.py all  build + checks + zips into dump/release/v<core version>/
 ```

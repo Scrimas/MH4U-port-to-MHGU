@@ -129,10 +129,23 @@ def resample(pcm, rate_in, ch=2):
 _lib = None
 
 
+def find_opus():
+    """the libopus file: $OPUS_LIB, else the system's (Linux libopus.so.0; Windows: an opus DLL on PATH, MSYS2 names it
+    libopus-0.dll); None when missing (tools/doctor.py)"""
+    if os.environ.get('OPUS_LIB'):
+        return os.environ['OPUS_LIB'] if os.path.exists(os.environ['OPUS_LIB']) else None
+    for name in ('opus', 'libopus-0', 'libopus'):
+        p = ctypes.util.find_library(name)
+        if p: return p
+    return None
+
+
 def lib():
     global _lib
     if _lib is None:
-        _lib = ctypes.CDLL(ctypes.util.find_library('opus'))
+        p = find_opus()
+        assert p, 'libopus not found (tools/doctor.py; or set OPUS_LIB to the library file)'
+        _lib = ctypes.CDLL(p)
         _lib.opus_encoder_create.restype = ctypes.c_void_p
         _lib.opus_decoder_create.restype = ctypes.c_void_p
         _lib.opus_encode.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_int]

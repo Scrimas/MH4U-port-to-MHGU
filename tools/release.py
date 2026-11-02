@@ -1,7 +1,7 @@
 """release.py : build, check and package an MH4U Port release on the machine that holds the game dumps (a release can
 never be built in hosted CI: the converters read ~15 GB of 4U / GU data and the module build reads GU's main).
 
-  release.py build           every monster's build.sh (all steps), then the module, both without test switches
+  release.py build           every monster's build.py (all steps), then the module, both without test switches
   release.py check           release checks on the current outputs (exit 1 on any failure)
   release.py package [DIR]   check, then the zips + NOTES.md into DIR (default dump/release/v<core version>)
   release.py all [DIR]       build + package
@@ -10,7 +10,7 @@ never be built in hosted CI: the converters read ~15 GB of 4U / GU data and the 
                              CLI); asks first unless --yes. No installer apps (user, 2026-10-21): users extract the zips.
 
 Packages: core-<v>.zip = MH4U Port/exefs/{subsdk1, <build id>.ips} + MH4U Port/romfs/nativeNX/mh4uport/<every
-monster>.bin (always installed together: gear IDs depend on all of them) + the icon atlases micon_sd/hd.tex; <monster>-<v>.zip = MH4U Port/romfs/... (that
+monster>.bin (always installed together: gear IDs depend on all of them) + the icon atlases micon_sd/hd.tex and hudicon_sd/hd.tex; <monster>-<v>.zip = MH4U Port/romfs/... (that
 monster's assets, optional). Every zip extracts into the game's mod directory ('<mods>/contents/<title>/' for Ryujinx,
 '<load>/<TITLE>/' for the yuzu family) and they merge into the one 'MH4U Port' folder. NOTES.md (the release text):
 what the mod is, What's new (notes/release-news.md, one section per core version: write it before packaging), the
@@ -61,7 +61,7 @@ def clean_env():
 def build():
     for p in packages():
         print('== build %s' % p['name'], flush=True)
-        subprocess.run(['bash', os.path.join(paths.monster(p['name']), 'build.sh')], check=True, env=clean_env())
+        subprocess.run([sys.executable, os.path.join(paths.monster(p['name']), 'build.py')], check=True, env=clean_env())
     print('== build module', flush=True)
     subprocess.run([sys.executable, os.path.join(ROOT, 'module', 'build.py')], check=True, env=clean_env())
 
@@ -143,7 +143,7 @@ def package(out):
                ('exefs/' + build_id(), os.path.join(MODULE_OUT, build_id()))]
     members += [('romfs/nativeNX/mh4uport/%s.bin' % m['name'], os.path.join(paths.gen(m['name']), m['name'] + '.bin'))
                 for p in pk for m in p['entries']]
-    members += [('romfs/nativeNX/mh4uport/' + name, os.path.join(MODULE_OUT, name)) for name, _, _ in ui_icons.ATLASES]
+    members += [('romfs/nativeNX/mh4uport/' + name, os.path.join(MODULE_OUT, name)) for name in ui_icons.FILES]
     core_zip = 'core-%s.zip' % c['version']
     write_zip(os.path.join(out, core_zip), [(MOD_NAME + '/' + a, s) for a, s in members])
     for p in pk:

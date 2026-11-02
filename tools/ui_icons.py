@@ -23,6 +23,14 @@ import arcpack, tex
 SRC_4U = os.path.join(paths.ROOT, 'dump/romfs/eng/data/core_common.arc')
 ATLASES = (('micon_sd.tex', 512, 72), ('micon_hd.tex', 1024, 144))   # module/icons.c s_atlas
 CELLS = 49                       # rows 0..6 (7 * 72 = 504 pixels of 512)
+# HUD status atlas (icons.c icons_hud_own): the size of GU's quest_eng.arc HD_hud_icon (256) / HD UI v4's (1024),
+# transparent except 4U's tar icon in GU's web cell 22 (0x63487c draws kind 6 = 12 x 16 cells x 2, 10 columns), so
+# the sprite keeps GU's rect. Art: 4U qst_icon_BM_MQ_NOMIP (128 x 256, 14 x 18 cells, 12 x 16 art from x + 1, 9
+# columns), tar = row 7 column 1 (user 2026-11-01); GU's cell 22 is 4U's web icon (row 2 column 4) at exactly 2x.
+HUD_ATLASES = (('hudicon_sd.tex', 256, 2), ('hudicon_hd.tex', 1024, 8))
+HUD_TAR_4U = (7, 1)
+HUD_WEB_CELL = 22
+FILES = [n for n, _, _ in ATLASES + HUD_ATLASES]
 
 
 def cells():
@@ -54,7 +62,16 @@ def build(out_dir):
             img[y:y + cell, x:x + cell] = icon_4u(src, i).repeat(cell // 36, 0).repeat(cell // 36, 1)
         with open(os.path.join(out_dir, name), 'wb') as f:
             f.write(tex.encode_gu(img, 'bc3', mips=1))
-    return [name for name, _, _ in ATLASES]
+    qst = tex.decode([d for p, _, d in e if p.endswith('qst_icon_BM_MQ_NOMIP')][0])
+    r, c = HUD_TAR_4U
+    art = qst[r * 18:r * 18 + 16, c * 14 + 1:c * 14 + 13]
+    for name, size, s in HUD_ATLASES:
+        img = np.zeros((size, size, 4), np.uint8)
+        x, y = (HUD_WEB_CELL % 10) * 12 * s, (HUD_WEB_CELL // 10) * 16 * s
+        img[y:y + 16 * s, x:x + 12 * s] = art.repeat(s, 0).repeat(s, 1)
+        with open(os.path.join(out_dir, name), 'wb') as f:
+            f.write(tex.encode_gu(img, 'bc3', mips=1))
+    return FILES
 
 
 if __name__ == '__main__':

@@ -4,7 +4,9 @@ Thanks for helping. Read this file first. `ARCHITECTURE.md` maps the repo, and `
 monster port is done.
 
 **No game data ever goes into this repo** (not in commits, issues or PRs): every asset is rebuilt locally from your
-own dumps. The project is GPL-3.0-or-later. By contributing, you agree to license your work under the same terms.
+own dumps. The project is GPL-3.0-or-later. By contributing, you agree to license your work under the same terms,
+and, as the project will later be merged into a larger one, to let your work be relicensed under that project's
+license when the merge happens.
 
 ## Ways to help
 
@@ -25,10 +27,20 @@ own dumps. The project is GPL-3.0-or-later. By contributing, you agree to licens
 
 ## Requirements
 
-- **Linux** (Windows: use WSL2; macOS is untested). Python 3.11 or newer, `clang`, `lld`, `llvm` (llvm-objdump),
-  `ffmpeg` built with libsoxr, `opus`. On Arch: `clang lld llvm ffmpeg opus`.
+- **Linux or Windows** (macOS is untested). Every build script is Python, so no shell is needed.
+- Python 3.11 or newer, plus `clang`, `lld`, `llvm` (llvm-objdump, llvm-nm), `ffmpeg` built with libsoxr, and `opus`.
+  - **Linux:** from your package manager. Arch: `clang lld llvm ffmpeg opus`. Debian / Ubuntu: `clang lld llvm ffmpeg
+    libopus0`.
+  - **Windows:** Python from [python.org](https://www.python.org/downloads/) (tick "Add python.exe to PATH"). The
+    other tools come from [MSYS2](https://www.msys2.org): install it, open the **MSYS2 UCRT64** terminal and run
+    `pacman -S mingw-w64-ucrt-x86_64-{clang,lld,llvm-tools,ffmpeg,opus}`, then add `C:\msys64\ucrt64\bin` to your
+    PATH (Windows search: "Edit the system environment variables" > Environment Variables > Path > New). Run the
+    commands below in a normal PowerShell, not in the MSYS2 terminal.
 - About **30 GB** of free disk: about 12 GB for the GU RomFS, 3 GB for the 4U ROM, and room for the converted files.
 - [Ryujinx](https://ryujinx.app) with your own keys and your own MHGU, to extract the game files and to test.
+
+`python3 tools/doctor.py` (Windows: `python tools/doctor.py`) checks all of this, and prints the fix for anything
+missing.
 
 ## What to dump, and how
 
@@ -50,6 +62,8 @@ repo.
 
 ## Quick start
 
+**Linux:**
+
 ```sh
 git clone https://github.com/Scrimas/MH4U-port-to-MHGU.git && cd MH4U-port-to-MHGU
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
@@ -57,18 +71,37 @@ source .venv/bin/activate          # fish: source .venv/bin/activate.fish
 # put your dumps in dump/ (table above), then:
 python3 tools/setup.py             # makes the rest of dump/ (a few minutes; safe to re-run)
 python3 tools/doctor.py            # every line must be "ok"; each failure prints its fix
-monsters/gogmazios/build.sh        # one monster (each one has its own build.sh), about a minute
+python3 monsters/gogmazios/build.py   # one monster (each one has its own build.py), about a minute
 python3 module/build.py            # the code module (all monsters) -> module/out/
 GOG_MOD_ROOT=~/.config/Ryujinx/mods python3 module/build.py install   # into your Ryujinx mods folder
 ```
 
-Then start MHGU in Ryujinx and play the monster's quest. To remove the mod, delete
-`~/.config/Ryujinx/mods/contents/0100770008dd8000/MH4U Port`, and unequip that monster's gear before removing it.
-`python3 module/build.py install` without `GOG_MOD_ROOT` installs into `ryuroot/`, the maintainer's isolated test
-setup (`tools/ryutest.sh`).
+**Windows** (PowerShell):
 
-Feature and test switches are C `#ifdef`s: `GOG_DEFINES="NAME1 NAME2" python3 module/build.py`. Release builds use
-none. `python3 tools/release.py all` builds and packages a full release into `dump/release/`.
+```powershell
+git clone https://github.com/Scrimas/MH4U-port-to-MHGU.git; cd MH4U-port-to-MHGU
+py -m venv .venv; .venv\Scripts\pip install -r requirements.txt
+.venv\Scripts\Activate.ps1         # if refused: Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+setx PYTHONUTF8 1                  # once, then open a new PowerShell (the tools read and write UTF-8 text)
+# put your dumps in dump\ (table above), then:
+python tools\setup.py
+python tools\doctor.py
+python monsters\gogmazios\build.py
+python module\build.py
+$env:GOG_MOD_ROOT = "$env:APPDATA\Ryujinx\mods"; python module\build.py install
+```
+
+Then start MHGU in Ryujinx and play the monster's quest. To remove the mod, delete the `MH4U Port` folder in
+`<Ryujinx mods>/contents/0100770008dd8000/` (Linux: `~/.config/Ryujinx/mods`, Windows: `%APPDATA%\Ryujinx\mods`),
+and unequip that monster's gear before removing it. `module/build.py install` without `GOG_MOD_ROOT` installs into
+`ryuroot/`, the maintainer's isolated test setup (`tools/ryutest.sh`, Linux only).
+
+A monster's `build.py` runs its steps in order, one line each, with the step's own output in
+`dump/build_logs/<monster>/<step>.log`. `build.py STEP ...` re-runs only those steps; `build.py --list` lists them.
+
+Feature and test switches are C `#ifdef`s: `GOG_DEFINES="NAME1 NAME2" python3 module/build.py` (PowerShell:
+`$env:GOG_DEFINES = "NAME1 NAME2"` first). Release builds use none. `python3 tools/release.py all` builds and packages a
+full release into `dump/release/`.
 
 ## Workflow
 
