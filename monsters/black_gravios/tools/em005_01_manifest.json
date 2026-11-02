@@ -3,7 +3,7 @@
  "id": "0x105",
  "registry_index": 144,
  "file_id_base": "0x10900",
- "file_count": 9,
+ "file_count": 16,
  "manifest": [
   {
    "field": 0,
@@ -117,45 +117,45 @@
   },
   {
    "field": 17,
-   "file_id": "0x843b",
-   "path": "effect\\pel\\em\\em005_00u",
+   "file_id": "0x1090a",
+   "path": "effect\\pel\\em\\em005_01u",
    "type": "0x5a525c16",
-   "source": "shared (GU em005_00, its file ID)"
+   "source": "converted (4U em041)"
   },
   {
    "field": 18,
-   "file_id": "0x841f",
-   "path": "effect\\psl\\enemy\\em005\\em005_00\\mot\\em005_00_0",
+   "file_id": "0x1090d",
+   "path": "effect\\psl\\enemy\\em005\\em005_01\\mot\\em005_01_0",
    "type": "0x254309c9",
-   "source": "shared (GU em005_00, its file ID)"
+   "source": "converted (4U em041)"
   },
   {
    "field": 19,
-   "file_id": "0x8420",
-   "path": "effect\\psl\\enemy\\em005\\em005_00\\mot\\em005_00_1",
+   "file_id": "0x1090e",
+   "path": "effect\\psl\\enemy\\em005\\em005_01\\mot\\em005_01_1",
    "type": "0x254309c9",
-   "source": "shared (GU em005_00, its file ID)"
+   "source": "converted (4U em041)"
   },
   {
    "field": 20,
-   "file_id": "0x843c",
-   "path": "effect\\psl\\enemy\\em005\\em005_00\\mot\\em005_00_2",
+   "file_id": "0x1090b",
+   "path": "effect\\psl\\enemy\\em005\\em005_01\\mot\\em005_01_2",
    "type": "0x254309c9",
-   "source": "shared (GU em005_00, its file ID)"
+   "source": "converted (4U em041)"
   },
   {
    "field": 21,
-   "file_id": "0x8422",
-   "path": "effect\\psl\\enemy\\em005\\em005_00\\mot\\em005_00_3",
+   "file_id": "0x1090f",
+   "path": "effect\\psl\\enemy\\em005\\em005_01\\mot\\em005_01_3",
    "type": "0x254309c9",
-   "source": "shared (GU em005_00, its file ID)"
+   "source": "converted (4U em041)"
   },
   {
    "field": 22,
-   "file_id": "0x843d",
-   "path": "effect\\psl\\enemy\\em005\\em005_00\\mot\\em005_00_4",
+   "file_id": "0x1090c",
+   "path": "effect\\psl\\enemy\\em005\\em005_01\\mot\\em005_01_4",
    "type": "0x254309c9",
-   "source": "shared (GU em005_00, its file ID)"
+   "source": "converted (4U em041)"
   },
   {
    "field": 23,
@@ -239,10 +239,10 @@
   },
   {
    "field": 37,
-   "file_id": "0x8448",
-   "path": "enemy\\cmd_tbl\\em005_00_cmdtbl",
+   "file_id": "0x10909",
+   "path": "enemy\\cmd_tbl\\em005_01_cmdtbl",
    "type": "0x3aabba02",
-   "source": "shared (GU em005_00, its file ID)"
+   "source": "converted (4U em041)"
   },
   {
    "field": 38,
@@ -390,6 +390,48 @@
    "path": "enemy\\hagi\\hagi_s4_em005_01",
    "type": "0x33a84e14",
    "path_hash": "0x596b9dc7"
+  },
+  {
+   "file_id": "0x10909",
+   "path": "enemy\\cmd_tbl\\em005_01_cmdtbl",
+   "type": "0x3aabba02",
+   "path_hash": "0xcb49e5d7"
+  },
+  {
+   "file_id": "0x1090a",
+   "path": "effect\\pel\\em\\em005_01u",
+   "type": "0x5a525c16",
+   "path_hash": "0xbf5b0acd"
+  },
+  {
+   "file_id": "0x1090b",
+   "path": "effect\\psl\\enemy\\em005\\em005_01\\mot\\em005_01_2",
+   "type": "0x254309c9",
+   "path_hash": "0xb71d4be0"
+  },
+  {
+   "file_id": "0x1090c",
+   "path": "effect\\psl\\enemy\\em005\\em005_01\\mot\\em005_01_4",
+   "type": "0x254309c9",
+   "path_hash": "0x5e7eeed5"
+  },
+  {
+   "file_id": "0x1090d",
+   "path": "effect\\psl\\enemy\\em005\\em005_01\\mot\\em005_01_0",
+   "type": "0x254309c9",
+   "path_hash": "0x59132acc"
+  },
+  {
+   "file_id": "0x1090e",
+   "path": "effect\\psl\\enemy\\em005\\em005_01\\mot\\em005_01_1",
+   "type": "0x254309c9",
+   "path_hash": "0x2e141a5a"
+  },
+  {
+   "file_id": "0x1090f",
+   "path": "effect\\psl\\enemy\\em005\\em005_01\\mot\\em005_01_3",
+   "type": "0x254309c9",
+   "path_hash": "0xc01a7b76"
   }
  ],
  "notes": [
@@ -403,7 +445,29 @@
   "parts states: 21 (GU layout), groups dropped (not in em041): [19], hidden at spawn: [50]",
   "dttune: GU em005_00 + 51 bytes of 4U em040 -> em041 differences before the ranges at +0x18e (50 were em040's in GU); GU's own ranges (+0x18e..+0x1e2) and bytes ['0xa', '0xb'] kept; tail = em041 conversion (1068 bytes)",
   "dttune +0x358 (4U etd word 24, not converted by dt_convert): 4 bytes set to em041's, 6 scaled from GU's retune",
+  "AI table: 4U em040_cmd for em 41 (op-0x46 blocks reduced; em 41 differs from em 40 in ['g0 s2', 'g1 s39', 'g1 s65', 'g1 s66', 'g1 s67', 'g1 s68', 'g1 s69', 'g1 s70', 'g1 s71', 'g1 s72', 'g1 s73']), GU's versions of ['g0 s0', 'g0 s1', 'g0 s4', 'g20 s0'], GU's group [16], GU extra entries appended (['g0 s22..s22', 'g1 s74..s94'])",
+  "AI table: GU's appended selector g0 s22 calls our 4U versions of g1 [6, 7, 8, 11, 12, 21, 23, 47, 50]",
+  "effect area colour: Volcanic Hollow soil median (146, 104, 79, 255) (areas 1..10: [[181, 161, 123, 255], [91, 46, 36, 255], [87, 45, 28, 255], [160, 80, 47, 255], [185, 117, 79, 255], [178, 115, 80, 255], [136, 104, 87, 255], [40, 14, 8, 255], [138, 64, 36, 255], [146, 119, 83, 255]])",
+  "roar: bank 0 motion 4 slot 2: GU's air (cm202_050) on joint 3, frames 116..227 (GU: no joint, 116..133)",
+  "roar: bank 0 motion 104 slot 0: GU's air (cm202_050) on joint 3, frames 109..389 (GU: no joint, 109..128)",
+  "PSL bank 0: 4U slots in motions [23, 26, 29] (GU gives them no effect); GU's kept (GU's effects) [4, 6, 7, 8, 22, 25, 28, 31, 103, 104]; retimed by GU []",
+  "PSL bank 1: 4U slots in motions [] (GU gives them no effect); GU's kept (GU's effects) [101]; retimed by GU []",
+  "PSL bank 2: 4U slots in motions [19, 21, 33, 50] (GU gives them no effect); GU's kept (GU's effects) [1, 3, 4, 13, 16, 22, 24, 27, 30, 46]; retimed by GU []",
+  "PSL bank 3: 4U slots in motions [112] (GU gives them no effect); GU's kept (GU's effects) [2, 3, 4, 11, 14, 15, 17, 18, 24, 25, 26, 28, 29, 107, 108, 109, 110, 114, 116, 118, 121]; retimed by GU []",
+  "PSL bank 4: 4U slots in motions [] (GU gives them no effect); GU's kept (GU's effects) [3, 55, 56, 57, 58, 59, 60]; retimed by GU []",
+  "effects: PEL u = GU em005_00u (list 1: 16, list 2: 30) + 4U em041_1 records (85) + code records [4042, 4043, 4044] (list 2); 62 converted 4U files",
+  "  MEF id 1027: group 115 file 102 has no 4U EFL -> no PEL record",
+  "  MEF id 1028: group 115 file 102 has no 4U EFL -> no PEL record",
+  "  MEF id 1030: group 115 file 101 has no 4U EFL -> no PEL record",
+  "  MODEL effect\\base\\cm\\cm000\\cm000_000: 1 materials",
+  "  MODEL effect\\base\\cm\\cm000\\cm000_002: 1 materials",
+  "  MODEL effect\\base\\em\\em040\\ef_em040: 2 materials",
+  "  MODEL effect\\base\\em\\em041\\ef_em041: 1 materials",
+  "  MODEL effect\\base\\qe\\qe000\\qe000_001: 1 materials",
+  "  MODEL effect\\base\\qe\\qe001\\qe001_000: 2 materials",
+  "  PEL effect\\pel\\em\\em005_01u: 85 records (list 1) + 30 GU records (list 2) + 3 code records [4042, 4043, 4044]; PSL x0 from LMT event group 2",
   "carves: 4U em041 High / G tables in hagi s2 / s4 (tools/hagi_em005_01.py)",
-  "shared from em005_00: 497 files kept, 18 dropped (replaced or its model)"
+  "kept effect\\pel\\em\\em005_00u although replaced: named by ['shell\\\\em\\\\em005_00_shell02\\\\em005_00_02', 'shell\\\\em\\\\em005_00_shell13\\\\em005_00_13']",
+  "shared from em005_00: 491 files kept, 24 dropped (replaced or its model)"
  ]
 }

@@ -42,7 +42,7 @@ sys.path.insert(0, paths.GU_PY)
 import alloc, arcpack, gear4u, gmd, quest4u   # noqa: E402
 sys.path.insert(0, HERE)
 import items_em005_01               # noqa: E402
-from items4u import EXE, EXE_BASE, text_4u   # noqa: E402
+from items4u import EXE, EXE_BASE, msg4u, text_4u   # noqa: E402
 from quest4u import (arc_files, text4u, ref, T_SET, T_ESL, T_REM, T_SUPP, T_PLUS,  # noqa: E402
                      REWARD_ROWS_4U, SUB_ROW_4U, STATS_4U, NANDO_4U)
 from romfs import RomFS             # noqa: E402
@@ -56,17 +56,32 @@ STAGE_GU = {15: 12, 3: 13}          # 4U Volcanic Hollow / Primal Forest -> GU s
                                     # texts, monsters/stygian_zinogre/notes/phase1-assets.md; GU em005_00's area data
                                     # covers maps 7 8 12 13 24)
 ICON = alloc.board_byte(ALLOC['ui_icon'])   # board icon: Black Gravios' cell (module/icons.c; 4U +0xE8 = 43)
-PARTNER_GU = {40: 0x5}              # 4U Gravios -> GU Gravios
-ICON_QUEST = {0x5: 10671}           # a GU quest with it first (its board icon)
+# the other 4U bosses of his quests -> GU ID (C: 4U em numbers of the spawn lists; GU IDs as Stygian's PARTNER_GU)
+PARTNER_GU = {40: 0x5,              # Gravios
+              12: 0x20,             # Brute Tigrex: not in GU -> Tigrex (a DEVIATION, as Stygian's m10608)
+              44: 0x3f}             # Brachydios
+ICON_QUEST = {0x5: 10671, 0x20: 10724, 0x3f: 1003}   # GU quests with it first (their board icon; Stygian's, C)
+# 4U species GU lacks, spawned as their base species: their 4U names in the quest texts become the base species' 4U
+# names (emName, 5 languages): Brute Tigrex 12 -> Tigrex 11 (Stygian's NAME_SUB)
+NAME_SUB = {12: 11}
+# their reward items likewise: 'B.Tigrex X' -> GU 'Tigrex X' when GU has that name (Stygian's m10608 maps the same
+# items by ID in its OTHER_4U_GU)
+SPECIES_ITEMS = [('B.Tigrex ', 'Tigrex ')]
 REM_EMPTY = struct.pack('<fI', 1.0, 1) + bytes(176)     # GU's rem_000000 (184 B, no group; C: q10706)
 # Quests (k = index in allocations.toml quests):
 #   num   4U quest            tpl   GU template (same rank, stage and kind)
 #   grav  index of the 4U Gravios stat block the ratio divides by (same quest), or
 #   ref   (4U quest, stat block): a Gravios in another quest of the same 4U stars (a single hunt has none), or of
 #         other stars where 4U has none (ref_stars = the reason, logged)
+#         neither: r = 1 (the base record's rows as they are: GU's own rows for that quest kind)
 #   base  (GU quest, em)      the GU boss record the ratio multiplies; partners take its own record of their GU ID
+#                             when it has one, else his rows (4U gives them his in every such quest of his)
 #   sub   ('break', GU target, GU code) or ('deliver',): GU type 5 {GU item, count} of the 4U delivery subquest
 #   alt   the quest names Black Gravios by ALT_ID (a real Gravios is in it)
+#   waves     bosses from every 4U spawn list, in list order (Stygian's; GU spawns them in record order)
+#   hunt_all  GU objective type 3 "hunt all large monsters", rule 0 (4U names the last wave's boss)
+#   tpl_stage the template sits on another stage (its stage byte is replaced); esl_tpl = the GU quest whose small
+#             monster sets are used instead of the template's (one on the quest's own stage)
 # m10601 Ore D'oeuvre (4U Hub HR6 urgent, stage 3, single hunt): GU Hub HR7 as m10611, as a regular quest (an appended
 # quest gates no rank: 4U's urgent mark is not kept, a DEVIATION); template q10739 (GU HR7, stage 13, one hunt target);
 # 4U has no HR6 single Gravios: ratio over m10524 (HR5 single Gravios, 37 / 58 / 55 vs 39 / 66 / 56, G); base q10767.
@@ -86,6 +101,23 @@ QUESTS = [
     dict(k=2, num=10601, tpl=10739, ref=(10524, 0), ref_stars='4U has no HR6 single Gravios', base=(10767, 0x5),
          sub=('break', EM_ID, 2)),
     dict(k=3, num=911, tpl=1035, ref=(903, 1), base=(1035, 0x5), sub=('deliver',)),
+    # m00902 Black Rock Down (caravan ★9, stage 15, single): village ★10 as m00911; template and base q1003 (GU village
+    # ★10 single on stage 12: GU's single rows 37 / 66 / 19, as Stygian's m00907), r = 1; wound the back -> code 2 (S)
+    dict(k=4, num=902, tpl=1003, base=(1003, 0x3f), sub=('break', EM_ID, 2)),
+    # m10606 Advanced: Dance with Dragons (Hub HR6, stage 15): three waves (him a8; Brute Tigrex a4 -> Tigrex; Brachydios
+    # a2), 4U "hunt all large monsters" (rows 19-20 / 64-66 / 52 for all three). GU has no HR7 hunt-all on stage 12 (C):
+    # template q10742 (HR7 hunt-all, stage 104) re-staged as Stygian's m10607, small monsters from q10707 (HR7 stage
+    # 12); base its own hunt-all record (0x39: 37 / 79 / 56), r = 1, partners his rows; deliver 1 Large Wyvern Tear
+    dict(k=5, num=10606, tpl=10742, tpl_stage=104, esl_tpl=10707, base=(10742, 0x39), sub=('deliver',), waves=True,
+         hunt_all=True),
+    # m10615 Advanced: Gravios Fortunes (Hub HR6, Primal Forest, capture, spawn +0xF 2 dropped): as m10601 (template
+    # q10739, ratio over m10524 HR5, base q10767); wound the head -> GU code 1 (C: q919 "Wound Gravios's head")
+    dict(k=6, num=10615, tpl=10739, ref=(10524, 0), ref_stars='4U has no HR6 single Gravios', base=(10767, 0x5),
+         sub=('break', EM_ID, 1)),
+    # m10927 Advanced: A Black Day (Hub G2, Primal Forest, him + Brute Tigrex -> Tigrex, both +0xF 1 dropped, both
+    # rows 42 / 104 / 56): GU Hub G4 two-hunt on stage 13 q11487 (Gravios 0x5 + 0x46: 84 / 109 / 96) as template and
+    # base, r = 1, Tigrex his rows; break the Tigrex's claw (4U part 2) -> GU code 2 (C: q11405 "Break Tigrex's claws")
+    dict(k=7, num=10927, tpl=11487, base=(11487, 0x5), sub=('break', 0x20, 2)),
 ]
 _SETS = {}           # setEmMain name -> data over every quest built: one content per name, as GU's
 
@@ -101,14 +133,17 @@ def quest_4u(num):
     raise KeyError('4U quest m%05d' % num)
 
 
-def spawns_4u(q):
-    """4U boss spawn records of the first list, 0x28 B each closed by em 0xffffffff: [(em, area, (x, y, z, rot), +0xF)]"""
-    rec = struct.unpack_from('<I', q, struct.unpack_from('<I', q, 0x28)[0])[0]
+def spawns_4u(q, waves=False):
+    """4U boss spawn records of the first list, 0x28 B each closed by em 0xffffffff: [(em, area, (x, y, z, rot), +0xF)];
+    waves: every list of the table at +0x28 (u32 list pointers, up to 4, 0 = none), in list order (Stygian's)"""
+    tbl = struct.unpack_from('<I', q, 0x28)[0]
     out = []
-    while struct.unpack_from('<I', q, rec)[0] != 0xFFFFFFFF:
-        out.append((struct.unpack_from('<I', q, rec)[0], q[rec + 9], struct.unpack_from('<4f', q, rec + 0x10),
-                    q[rec + 0xF]))
-        rec += 0x28
+    for rec in [struct.unpack_from('<I', q, tbl + 4 * i)[0] for i in range(4 if waves else 1)]:
+        if not rec or rec + 4 > len(q): continue
+        while struct.unpack_from('<I', q, rec)[0] != 0xFFFFFFFF:
+            out.append((struct.unpack_from('<I', q, rec)[0], q[rec + 9], struct.unpack_from('<4f', q, rec + 0x10),
+                        q[rec + 0xF]))
+            rec += 0x28
     return out
 
 
@@ -134,7 +169,7 @@ def stat_rows(R, exe, s, z, b):
     gu = {p: d for p, t, d in arcpack.read(R.read('/nativeNX/loc/arc/resident.arc'))[1]}['enemy\\resident\\em_nando_tbl']
     rows = [struct.unpack_from('<8f', gu, 16 + 32 * k) for k in range((len(gu) - 16) // 32)]
     r4 = lambda row: struct.unpack_from('<8f', exe, NANDO_4U - EXE_BASE + 32 * row)
-    r_hp, r_atk = r4(s[1])[0] / r4(z[1])[0], r4(s[2])[1] / r4(z[2])[1]
+    r_hp, r_atk = (1.0, 1.0) if z is None else (r4(s[1])[0] / r4(z[1])[0], r4(s[2])[1] / r4(z[2])[1])
 
     def pick(col, base_row, r):
         base = rows[base_row][col]
@@ -171,6 +206,10 @@ def gu_items(names):
         n = names4[k]
         if k in ours: return ours[k]
         if n in by_name: return by_name[n]
+        for src, dst in SPECIES_ITEMS:     # a stand-in species' items -> the base species' of the same part
+            if n.startswith(src) and dst + n[len(src):] in by_name:
+                print('reward: 4U %d %s -> GU %s (spawned as its base species)' % (k, n, dst + n[len(src):]))
+                return by_name[dst + n[len(src):]]
         print('reward: 4U %d %s has no GU item' % (k, n))
         return None
     return gu_item
@@ -190,10 +229,12 @@ def partner_icon(R, gid):
 
 def set_name(stage, em4, k, j=0):
     """setEmMain names, one content per name (asserted over the quests built), none in GU's quests (C, 2026-10-31: GU
-    uses b_mNNem005_00..02 only): Black Gravios' 60 + k, a partner's 80 + k; the j-th of the same em in a quest + 10 j"""
+    uses b_mNNem005_00..02 only): Black Gravios' 60 + k (the j-th in a quest + 10 j); a Gravios partner's 80 + k; the
+    other partners' 90 + k (Stygian's own partner names are 80 + k on the same ems and stages)"""
     assert k < 10 and j < 2, (k, j)
     if em4 == EM_4U: return 'b_m%02dem005_%02d' % (stage, 60 + 10 * j + k)
-    return 'b_m%02dem%03d_%02d' % (stage, PARTNER_GU[em4] & 0xff, 80 + 10 * j + k)
+    assert j == 0, (em4, j)
+    return 'b_m%02dem%03d_%02d' % (stage, PARTNER_GU[em4] & 0xff, (80 if em4 == 40 else 90) + k)
 
 
 def build(R, exe, gu_item, names, out, spec, hp_table=None):
@@ -201,7 +242,7 @@ def build(R, exe, gu_item, names, out, spec, hp_table=None):
     qid = ALLOC['quests'][k]
     sid, m4 = '%07d' % qid, 'm%05d' % num
     q4 = quest_4u(num)
-    sp = spawns_4u(q4)
+    sp = spawns_4u(q4, spec.get('waves', False))
     ems = [s[0] for s in sp]
     assert ems.count(EM_4U) >= 1 and all(e == EM_4U or e in PARTNER_GU for e in ems), (m4, ems)
     me = ems.index(EM_4U)
@@ -213,22 +254,30 @@ def build(R, exe, gu_item, names, out, spec, hp_table=None):
     base_qd = quest_data(R, spec['base'][0])
     objs, sub4 = objectives_4u(q4)
     assert 1 <= len(objs) <= 2 and all(t in (1, 0x81) for t, _, n in objs), (m4, objs)
-    assert sorted(e for _, e, n in objs for _ in range(n)) == sorted(ems), \
-        (m4, 'objectives are not the spawned bosses', objs, ems)
+    if spec.get('hunt_all'):    # 4U "Hunt all large monsters" names the last wave's boss (m10606: Brachydios)
+        assert set(e for _, e, _ in objs) <= set(ems) and len(ems) > len(objs), (m4, objs, ems)
+    else:
+        assert sorted(e for _, e, n in objs for _ in range(n)) == sorted(ems), \
+            (m4, 'objectives are not the spawned bosses', objs, ems)
 
     # --- questData: the template's (rank, board, start area, flags, money), then 4U's values
     qd = bytearray(tpl['loc\\quest\\questData\\questData_%07d' % tpl_id][1])
-    assert len(qd) == quest4u.QD_SIZE and qd[0x14] == stage and qd[0x1F] in (1, 2, 3), \
+    assert len(qd) == quest4u.QD_SIZE and qd[0x14] == spec.get('tpl_stage', stage) and qd[0x1F] in (1, 2, 3), \
         (tpl_id, 'not a hunt / capture on the stage')
+    qd[0x14] = stage
     assert (qd[0x12], qd[0x13]) == (base_qd[0x12], base_qd[0x13]), ('template and stat base differ in rank', tpl_id)
     struct.pack_into('<I', qd, 0x0C, qid)
     qd[0x16] = struct.unpack_from('<I', q4, 0xB4)[0]       # minutes (4U)
-    # objectives: 4U's, targets = the real IDs; two targets = clear rule 1 (+0x1D: objectives 0 AND 1)
-    qd[0x1D] = len(objs) - 1
+    # objectives: 4U's, targets = the real IDs; two targets = clear rule 1 (+0x1D: objectives 0 AND 1); hunt all =
+    # GU type 3, target / count 0, rule 0 (q10742 / Stygian's m10607, C)
+    qd[0x1D] = 0 if spec.get('hunt_all') else len(objs) - 1
     qd[0x1F:0x29] = bytes(10)
-    for i, (t, e, n) in enumerate(objs):
-        target = EM_ID if e == EM_4U else PARTNER_GU[e]
-        struct.pack_into('<BHH', qd, 0x1F + 5 * i, 2 if t == 0x81 else 1, target, n)
+    if spec.get('hunt_all'):
+        qd[0x1F] = 3
+    else:
+        for i, (t, e, n) in enumerate(objs):
+            target = EM_ID if e == EM_4U else PARTNER_GU[e]
+            struct.pack_into('<BHH', qd, 0x1F + 5 * i, 2 if t == 0x81 else 1, target, n)
     sub = spec.get('sub')
     if sub and sub[0] == 'break':          # GU code of the 4U part, on the 4U subquest's monster (real ID)
         assert sub4[0] == 0x204, (m4, 'the 4U subquest is not a wound / sever', sub4)
@@ -242,11 +291,12 @@ def build(R, exe, gu_item, names, out, spec, hp_table=None):
     # supply box from the 4U quest (quest4u.supp_4u, as Gogmazios', issue #11); a later delivery sets its group bytes
     supp, supp_later = quest4u.supp_4u(q4, text_4u('eng')[0], names)
     if supp_later:
-        qd[0x58:0x60] = quest4u.SUPP_QD
+        qd[0x58:0x60] = supp_later       # the delivery groups (quest4u.supp_4u)
 
     # boss records in 4U's spawn order: Black Gravios = the stand-in with the computed rows; partners = the base
-    # quest's record of their GU ID
+    # quest's record of their GU ID when it has one, else his rows
     b = boss_record(base_qd, spec['base'][1])
+    base_ids = [struct.unpack_from('<H', base_qd, 0x64 + 13 * i)[0] for i in range(5)]
     if 'ref' in spec:                      # a Gravios of the same 4U stars (+0xC2) in another quest
         qr = quest_4u(spec['ref'][0])
         assert spawns_4u(qr)[spec['ref'][1]][0] == 40, ('ratio reference is not a Gravios', spec['ref'])
@@ -255,16 +305,21 @@ def build(R, exe, gu_item, names, out, spec, hp_table=None):
             print('%s: ratio over m%05d (4U %d stars, his %d): %s (G)' % (m4, spec['ref'][0], qr[0xC2], q4[0xC2],
                                                                         spec['ref_stars']))
         grav = stats_block(qr, spec['ref'][1])
-    else:
+    elif 'grav' in spec:
         grav = stats_block(q4, spec['grav'])
+    else:                                  # r = 1: the base record's rows (GU's own rows for this quest kind)
+        grav = None
     (hp, atk, other), trace = stat_rows(R, exe, stats_block(q4, me), grav, b)
     if hp_table is not None: hp = hp_table
     recs, info = b'', []
     for i, e in enumerate(ems):
         size = stats_block(q4, i)[0]
         gid = gu_id(e, spec)
-        r = (hp, atk, other, b) if e == EM_4U else (lambda pb: (pb[4], pb[5], pb[6], pb))(
-            boss_record(base_qd, PARTNER_GU[e]))
+        if e != EM_4U and PARTNER_GU[e] in base_ids:
+            pb = boss_record(base_qd, PARTNER_GU[e])
+            r = (pb[4], pb[5], pb[6], pb)
+        else:
+            r = (hp, atk, other, b)
         if hp_table is not None: r = (hp_table,) + r[1:]
         recs += struct.pack('<HBBBBBBBHBB', gid, 0, 0, r[3][3], r[0], r[1], r[2], r[3][7], size, r[3][9], r[3][10])
         info.append('%#x rows %d/%d/%d size %d' % (gid, r[0], r[1], r[2], size))
@@ -290,9 +345,15 @@ def build(R, exe, gu_item, names, out, spec, hp_table=None):
         res.append(('quest\\boss\\setEmMain\\' + n, T_SET, bytes(se)))
         setnames.append(n)
     res.append(('quest\\boss\\setEmMain\\b_m00em000_00', T_SET, tpl['quest\\boss\\setEmMain\\b_m00em000_00'][1]))
-    esl = tnames[5:8]
+    esl_src, esl_names = tpl, tnames
+    if spec.get('esl_tpl'):                # small monsters of a GU quest on the quest's own stage
+        esl_src = arc_files(R.read('/nativeNX/loc/arc/quest/q%07d.arc' % spec['esl_tpl']))
+        el = esl_src['loc\\quest\\questLink\\questLink_%07d' % spec['esl_tpl']][1]
+        esl_names = [el[8 + 20 * i + 4:8 + 20 * (i + 1)].split(b'\0')[0].decode() for i in range(15)]
+        assert quest_data(R, spec['esl_tpl'])[0x14] == stage, ('esl_tpl on another stage', spec['esl_tpl'])
+    esl = esl_names[5:8]
     for n in sorted(set(esl)):
-        res.append(('quest\\zako\\emSetList\\' + n, T_ESL, tpl['quest\\zako\\emSetList\\' + n][1]))
+        res.append(('quest\\zako\\emSetList\\' + n, T_ESL, esl_src['quest\\zako\\emSetList\\' + n][1]))
     # rewards: rows A / B from 4U, the subquest row from 4U (row A's file when equal), slots 3 / 4 GU's empty row
     # rem_000000 (as Stygian's, issue #8: a template's condition-3 rows are its own quest's extras, none in 4U)
     ptr = lambda o: struct.unpack_from('<I', q4, o)[0]
@@ -318,6 +379,10 @@ def build(R, exe, gu_item, names, out, spec, hp_table=None):
 
     # --- text (4U, 5 languages) + arc layout + files (tools/quest4u.py)
     t4 = text4u(q4)
+    for lang, strs in t4.items():           # the stand-in species' names (NAME_SUB, as Stygian's m10608)
+        em_names = msg4u(lang)['emName']
+        for src, dst in NAME_SUB.items():
+            strs[:] = [s.replace(em_names[src], em_names[dst]) for s in strs]
     gmds = quest4u.quest_gmds(tpl, tpl_id, sid, t4)
     qd = bytes(qd)
     quest4u.write(out, quest4u.assemble(res, link, gmds, qd, sid))

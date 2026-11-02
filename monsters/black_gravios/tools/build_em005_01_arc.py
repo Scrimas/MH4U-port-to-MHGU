@@ -19,13 +19,16 @@ its models and tuning are its own. So:
                                            (GU's own AI distance ranges kept: em040's and em041's are equal)
       hagi\\hagi_s0..s4_em005_01           carves: 4U High tables in s2, G in s4, GU's filler in s0 / s1 / s3
                                            (tools/hagi_em005_01.py)
-  shared, GU em005_00 (original paths + file IDs): motions, camera, command table, sound, effects (PEL / PSL), shells,
+      cmd_tbl\\em005_01_cmdtbl             4U em040_cmd for em 41 in GU's language (cmdtbl(): op-0x46 em switches
+                                           reduced to their em-41 bodies, GU's area-move scripts, GU's extra entries)
+      effect\\pel\\em\\em005_01u, PSL      GU em005_00u + 4U em041_1's records; GU's PSLs, 4U's slots only in the
+      ...\\em005_01_0.._4                  motions GU gives no effect; his EFLs / effect model converted (effects())
+  shared, GU em005_00 (original paths + file IDs): motions, camera, sound, PEL c, PSLs 0 / 1 / 3, shells,
       attack / hit / body / cambody data, dtbase, dtbparts, dou mou ka, area data (maps 7 8 12 13 24: the Volcanic
       Hollow of its quests is map 12).
-Known deviations (later steps, notes/plan.md): em041's own effects (MEF em041_1, EFLs em041_002 / em041_101, effect
-model ef_em041) are not in yet, GU Gravios' effects play; the 4U emd word-32
-colour table (em041's darker part colours) has no known GU field.
-Inputs besides the arcs: dump/converted/em041/dt_em040/ and dt_em041/ (build.sh step dt: tools/dt_convert.py, donor
+Known deviations (notes/plan.md): the 4U emd word-32 colour table (em041's darker part colours) has no known GU field;
+4U's rest script (EMC group 16) and the shots of g1 s59 are not in; GU's versions of the shared Gravios effects play.
+Inputs besides the arcs: dump/converted/em041/dt_em040/ and dt_em041/ (build.py step dt: tools/dt_convert.py, donor
 em005_00).
 """
 import json, os, re, struct, sys, zlib
@@ -38,7 +41,7 @@ sys.path.insert(0, os.path.join(ROOT, 'tools'))     # core converters + paths.py
 import paths
 sys.path.insert(0, paths.GU_PY)
 from romfs import RomFS
-import alloc, arcpack, emdata4u, mod as modlib, mod4u2gu, mrl, mrl_anim, mrl_build, portdata, tex
+import alloc, arcpack, emc, emdata4u, mod as modlib, mod4u2gu, mrl, mrl_anim, mrl_build, portdata, tex
 
 NAME = 'black_gravios'
 ALLOC = alloc.monster(NAME)
@@ -52,11 +55,12 @@ FILES_TABLE = 0x1732A68          # registry index -> manifest (51 x s32 file IDs
 FILEID_TABLE = 0x15A0CE0         # file ID -> (path hash, type hash), 8 B, entry = ID
 T = dict(MOD=0x58A15856, MRL=0x2749C8A8, TEX=0x241F5DEB, XFS=0x7CD0E77E)
 P4 = 'enemy\\em041\\'            # 4U Black Gravios' own paths
+P40 = 'enemy\\em040\\'           # 4U Gravios' files em041.arc ships
 P0 = 'enemy\\em005\\em005_00\\'  # GU variant 0
 P = 'enemy\\em005\\em005_01\\'   # ours
 # manifest fields with our own file: IDs are given in this order (append only: IDs never move once shipped)
-OWN_ORDER = [0, 1, 3, 33, 46, 47, 48, 49, 50]
-DT_DIR = os.path.join(ROOT, 'dump/converted/em041')           # build.sh step dt
+OWN_ORDER = [0, 1, 3, 33, 46, 47, 48, 49, 50, 37, 17, 20, 22, 18, 19, 21]
+DT_DIR = os.path.join(ROOT, 'dump/converted/em041')           # build.py step dt
 MODELS = (('em041', 'em005_01', 0), ('em041_tail', 'em005_01_tail', 1))    # 4U name, ours, manifest field
 # Material type (MRL w6 bits 21-28) = the 'mNN' of the 4U name: GU em005_00's materials carry the same names as 4U
 # em041's (body m00 -> 0, add m01 -> 1, eye m02 -> 2, damage / wing m50 -> 50, tail m00 -> 0; C, 2026-10-31).
@@ -184,6 +188,336 @@ def shared_4u(S, notes):
                  'attackdata / hitsize / bodydata = em040\'s' % (len(shared), own))
 
 
+# AI table (notes/plan.md "His AI"). 4U em040_cmd (em041.arc ships it) serves em 38, 39, 40, 41 and 115: their
+# differences are EMC op 0x46 blocks, a switch on the em number. GU's interpreter has no op 0x46 (handler 0x8470c skips
+# the token, so every case body would run in turn), and GU em005_00's table is GU's rewrite of em040_cmd: 4U's 0x46
+# became GU's op 0x91 (switch on the em number this+0xb5f4) with case 4 (Basarios) and the else only, so the case-41
+# bodies (Black Gravios' own selectors in g0 s2, 7/71 in g1 s39 s70, 7/79 in g1 s65..s73) are gone, and GU emptied the
+# scripts its Gravios does not use (`a6 ff`, op 0xa6 = no-op: g0 s20 = his G-rank selector, g1 s35 s39 s42 s44 s45
+# s59..s61 s70 s71). Our table serves variant 1 only, so every 0x46 block is reduced to its case-41 body (else the else
+# body), as Stygian's (build_em057_01_arc.py). GU's language replaces 4U's where the engine needs it (EMC_GU: the area
+# move g0 s0 / s4 and patrol g0 s1 (4U ops 0x03 0x06 0x36 0x4d are no-ops in GU, area moves are GU's engine ops 0x94
+# 0x95 0x9e), g20 s0), GU's extra entries are appended (g0 s22, g1 s74..s94: GU's class picks group-1 scripts 74..82
+# by number, area_act_tbl entry 113), and group 16 (4U's rest script, g16 s0: 1/38 and 1/41, which GU's dispatcher
+# ends at once (0xca10c); GU's table has no group-16 entry) stays GU's (empty). Every native action of the table
+# reaches the GU handler of 4U's handler with 4U's parameters (C, dispatcher emulation 2026-11-01, plan.md).
+# Instruction lengths: GU's table main 0x1732c8c (byte < 0x80 = argument count; 0x8n..0xBn block ops: 00 opens with n
+# args, 01 = case with a 1..4-byte value, 02 else, ff end).
+EMC_LEN_TABLE, EMC_LEN_COUNT = 0x1732c8c, 167
+EMC_GU = {(0, 0), (0, 1), (0, 4), (20, 0)}           # (group, script): GU's version
+EMC_GU_GROUPS = (16,)                                 # whole group GU's
+EMC_4U_AREA_OPS = {0x03, 0x06, 0x22, 0x2a, 0x35, 0x36, 0x40, 0x41, 0x49, 0x4a, 0x4d, 0x63, 0x8b}   # 4U area / patrol
+
+
+def emc_tokens(s, lens):
+    """a script's instructions, by GU's length table (an op past the table = the end, 0xff)"""
+    out, i = [], 0
+    while i < len(s):
+        op = s[i]
+        if op >= len(lens):
+            out.append(s[i:]); break
+        v = lens[op]
+        n = 1 + v if v < 0x80 else 2 + (v & 0xf) if s[i + 1] == 0 else 2 + (v >> 4) - 7 if s[i + 1] == 1 else 2
+        out.append(s[i:i + n]); i += n
+    assert b''.join(out) == s, 'EMC script does not tokenize'
+    return out
+
+
+def emc_em_only(s, em, lens, op=0x46):
+    """the script with every em-switch block (4U op 0x46, GU op 0x91) reduced to em's body (its case, else the else)"""
+    out, frames = bytearray(), []                   # per open block: [taking, taken]
+    for t in emc_tokens(s, lens):
+        if t[0] == op:
+            if t[1] == 0x00: frames.append([False, False])
+            elif t[1] == 0x01: frames[-1][0] = t[2] == em and not frames[-1][1]; frames[-1][1] |= frames[-1][0]
+            elif t[1] == 0x02: frames[-1][0] = not frames[-1][1]; frames[-1][1] = True
+            else: frames.pop()
+            continue
+        if all(f[0] for f in frames): out += t
+    assert not frames, 'unbalanced em-switch block'
+    return bytes(out)
+
+
+def cmdtbl(d4, gu, img, notes):
+    """4U em040_cmd for em 41 in GU's language (see above) -> EMC bytes"""
+    lens = img[EMC_LEN_TABLE:EMC_LEN_TABLE + EMC_LEN_COUNT]
+    ver, u4 = emc.parse(d4)
+    _, g = emc.parse(gu)
+    assert len(u4) == 23 and len(g) == 21 and not u4[22], 'EMC group layout changed'
+    assert [emc_em_only(s, 41, lens) for s in u4[21]] == [b'\xff'], "4U group 21 (em 115's) is not empty for em 41"
+    ops = lambda s: {t[0] for t in emc_tokens(s, lens)}
+    out, own, gu_taken = [], [], []
+    for gi in range(21):
+        if gi in EMC_GU_GROUPS:
+            out.append(list(g[gi])); continue
+        scripts = []
+        for k, s in enumerate(u4[gi]):
+            if (gi, k) in EMC_GU:
+                scripts.append(g[gi][k]); gu_taken.append((gi, k)); continue
+            s = emc_em_only(s, 41, lens)
+            assert not ops(s) & {0x46, 0x91}, ('4U em switch / rest op left', gi, k)
+            assert not ops(s) & EMC_4U_AREA_OPS or s == g[gi][k], ('4U area op in a script GU changed', gi, k)
+            if s != emc_em_only(u4[gi][k], 40, lens): own.append((gi, k))
+            scripts.append(s)
+        assert len(scripts) <= len(g[gi]), gi
+        out.append(scripts + list(g[gi][len(scripts):]))
+    # the scripts GU's taken / appended group-1 ones call (em 5 bodies of GU's own em switches) must be GU's too; GU's
+    # appended selector g0 s22 (reached only through GU's g0 s2, which ours does not have) may call 4U versions
+    added = [(gi, k) for gi in range(21) if gi not in EMC_GU_GROUPS for k in range(len(u4[gi]), len(g[gi]))]
+    loose = set()
+    for gi, k in gu_taken + added:
+        for t in emc_tokens(emc_em_only(g[gi][k], 5, lens, 0x91), lens):
+            if t[0] == 0x14 and out[1][t[1]] != g[1][t[1]]:
+                assert gi == 0 and (gi, k) in added, ('GU script calls a 4U script that differs', gi, k, t[1])
+                loose.add(t[1])
+    assert [len(x) for x in out] == [len(x) for x in g], 'our table must carry every GU entry number'
+    notes.append('AI table: 4U em040_cmd for em 41 (op-0x46 blocks reduced; em 41 differs from em 40 in %s), GU\'s '
+                 'versions of %s, GU\'s group %s, GU extra entries appended (%s)' % (
+                     ['g%d s%d' % a for a in own], ['g%d s%d' % a for a in sorted(gu_taken)], list(EMC_GU_GROUPS),
+                     ['g%d s%d..s%d' % (gi, len(u4[gi]), len(g[gi]) - 1) for gi in range(21)
+                      if gi not in EMC_GU_GROUPS and len(g[gi]) > len(u4[gi])]))
+    notes.append('AI table: GU\'s appended selector g0 s22 calls our 4U versions of g1 %s' % sorted(loose))
+    return emc.build(out, ver)
+
+
+# Effects (notes/plan.md "His own AI and effects"). 4U em041.arc loads em040's MEF em040_0 (Gravios' records, ids
+# 0..1032, on em040's EFLs and the qe families) and its own em041_1 (28 records, ids 2004..2062, on em040_002 013 200
+# 201 and em041_002); the shared em040 motions name both sets in their event group 2 (in em040.arc the 20xx ids have
+# no record, so only Black Gravios plays them, C). Every em041_1 record carries a condition bit (MEF byte 0;
+# module/em005_01_fx.c gates them, its table asserted here). GU em005_00 renumbered Gravios' motion effects onto GU's
+# own EFLs (PSL kind 3 = PEL c list 1, kind 4 = PEL u list 1). User decision 2026-11-02 (after testing 0.4.2, which
+# played 4U's records in every motion: "beams and gas look odd"): a move GU's Gravios has looks as GU's Gravios does,
+# 4U's effects only on his own moves. So every motion GU gives an effect keeps GU's PSL entry, and only the motions GU
+# leaves without one and 4U's events give an em041_1 record (bank 2 motions 19 21 33 50: 7/79's 562 among them) play
+# 4U's slots at 4U's frames (psl_4u); PEL u list 1 = GU em005_00u's + em041_1's records, PEL list 2 (GU's class posts)
+# GU's. The EFLs are converted under their 4U paths (no GU arc uses them) with the Volcanic Hollow area colour (5 of
+# his 8 quests); grey rock chunks hidden as Stygian's (issue #6, efl4u2gu CHUNK_MODELS).
+PEL_U = 'effect\\pel\\em\\em005_01u'
+PSL = 'effect\\psl\\enemy\\em005\\em005_01\\mot\\em005_01_%d'
+MEF_4U = 'effect\\mef\\em\\em040_0'
+MEF_OWN = 'effect\\mef\\em\\em041_1'
+EFX_GROUPS = {40: 'effect\\efl\\em\\em040\\em040_%03d', 41: 'effect\\efl\\em\\em041\\em041_%03d'}
+EFX_GROUPS.update({g: 'effect\\efl\\qe\\qe%03d\\qe%03d_%%03d' % (g, g) for g in (0, 6, 8, 13)})
+EFX_BANKS = (0, 1, 2, 3, 4)     # motion lists: manifest fields 4 + bank (GU's motions), PSL fields 18 + bank (ours)
+EFX_KIND = 4                    # PSL slot kind of PEL u list 1
+# code-posted effects (PEL list 2 after GU's records): the spit's request 8 = em040_020 mask 1 on the monster
+# (0x809ae0, joint 255; module/em005_01_spit.c) and the 7/57 / 7/71 laser's two uEffect002 41 = em041_101 masks 1 /
+# 2, scale 1.0 (uShell016 33 / 35 init 0xc6a378; world records placed by module/em005_01_laser.c). 4040 / 4041 (the
+# spit's uShell016 effects em024_009 / em040_100, 0.4.5) are gone: GU gives that shell its own effect.
+CODE_FX = [('effect\\efl\\em\\em040\\em040_020', dict(id=4042, joint=-1, k=0, pos=(0.0, 0.0, 0.0), rot=(0.0, 0.0, 0.0),
+                                                     scl=(1.0, 1.0, 1.0))),
+           ('effect\\efl\\em\\em041\\em041_101', dict(id=4043, joint=-1, k=0, pos=(0.0, 0.0, 0.0), rot=(0.0, 0.0, 0.0),
+                                                     scl=(1.0, 1.0, 1.0))),
+           ('effect\\efl\\em\\em041\\em041_101', dict(id=4044, joint=-1, k=1, pos=(0.0, 0.0, 0.0), rot=(0.0, 0.0, 0.0),
+                                                     scl=(1.0, 1.0, 1.0)))]
+# the roars (bank 0 motions 104 = 1/17 and 4): GU's air effect on the head for 4U's length (roar_head)
+ROAR_MOTIONS = (4, 104)
+ROAR_ID = 3900                  # PEL u list 1
+ROAR_JOINT = 3                  # 4U's qe013 joint (em040_0 ids 16 / 17)
+
+
+def volcano_soil(notes):
+    """RGBA area colour for the effects: the per-channel median of the 4U Volcanic Hollow hunting areas'
+    area_color_soil (stage\\m15d\\m15aNNd\\sdl\\m15aNNd-col, areas 1..10; layout as the Battlequarters' m19a03d-col,
+    colour at +0xd0), as Tigerstripe's dunes_soil. GU has no area tint: one colour is baked in."""
+    import ctr, efl4u2gu
+    m19 = os.path.join(ROOT, 'dump/m19_unpacked/m19a03/stage/m19d/m19a03d/sdl/m19a03d-col.4c0db839')
+    ref = open(m19, 'rb').read()
+    names = re.findall(rb'[ -~]{4,}', ref)
+    n, _ = ctr.main_ncch(efl4u2gu.ROM_4U)
+    fs = n.romfs_reader()
+    cols = []
+    for a in range(1, 11):
+        _, ents = arcpack.read(fs.read('/loc/data/m15a%02d.arc' % a))
+        d = [d for p, t, d in ents if p == 'stage\\m15d\\m15a%02dd\\sdl\\m15a%02dd-col' % (a, a)][0]
+        assert len(d) == len(ref) and re.findall(rb'[ -~]{4,}', d) == names, 'm15a%02dd-col layout' % a
+        cols.append([round(255 * x) for x in struct.unpack_from('<4f', d, 0xd0)])
+    soil = bytes(sorted(c[i] for c in cols)[len(cols) // 2] for i in range(4))
+    notes.append('effect area colour: Volcanic Hollow soil median %s (areas 1..10: %s)' % (tuple(soil), cols))
+    return soil
+
+
+def pel_ids(body):
+    """record ids of a PEL list body (u8 path length, path, 2 bytes, 160 bytes: id at +0x30)"""
+    ids, i = [], 0
+    while i < len(body):
+        L = body[i]
+        ids.append(struct.unpack_from('<H', body, i + 1 + L + 2 + 0x30)[0])
+        i += 1 + L + 2 + 160
+    assert i == len(body), 'PEL list layout'
+    return ids
+
+
+def psl_4u(gu, lmt4, lmt_gu, known, bank):
+    """GU's PSL with 4U's slots in every motion GU gives no effect slot, whose 4U events name a record in `known` and
+    whose GU frame count is 4U's: that entry's data becomes the 4U slots (kind EFX_KIND, 4U slot numbers) and 4U's runs
+    (efl4u2gu build_psl's rules: GU's runs total frames - 1); every other entry stays GU's. GU's file stays as it is:
+    a replaced entry gets a new data block (and a new 16-byte entry where GU has none) appended at the end, its offsets patched (GU layout:
+    'PSL\\0', u16 2, u16 n, n entry offsets; entry {u32 frames, u16 0, u8 32, u8 0, u32 data, u32 0..3 (meaning G; 0 in
+    efl4u2gu's PSLs and ours)}; data {u32 slot mask, u16 id[32], u32 kind[32], u32 0[32], u32 runs, u32 run offset};
+    runs {u32 event bits, u32 frames}). -> (bytes, replaced, retimed by GU (kept), with GU's effects (kept))"""
+    import efl4u2gu
+    out = bytearray(gu)
+    assert out[:4] == b'PSL\0' and struct.unpack_from('<H', out, 4)[0] == 2
+    n = struct.unpack_from('<H', out, 6)[0]
+    ev4, evg = efl4u2gu.lmt_events(lmt4), efl4u2gu.lmt_events(lmt_gu)
+    assert n <= len(evg), ('PSL / motion list sizes', bank)         # GU's bank 0: 120 motions, PSL 105
+    replaced, retimed, shared = [], [], []
+    for e in ev4:
+        if not e or not e[2]: continue
+        i, frames4, remap, evs4 = e
+        mine = [(k, r) for k, r in enumerate(remap) if r and r in known]     # 0 = an empty slot (em040_0 has an id 0)
+        if not mine: continue
+        g = struct.unpack_from('<I', gu, 8 + 4 * i)[0] if i < n else 0
+        if g and struct.unpack_from('<I', gu, struct.unpack_from('<I', gu, g + 8)[0])[0]:
+            shared.append(i); continue           # GU's Gravios plays effects in it: GU's stay
+        frames = evg[i][1] if evg[i] else None
+        if frames != frames4 or i >= n:          # GU retimed it, or GU's PSL ends before it (bank 3: 123 motions, 122)
+            retimed.append(i); continue
+        o = struct.unpack_from('<I', out, 8 + 4 * i)[0]
+        if o:
+            assert struct.unpack_from('<IHBB', out, o) == (frames, 0, 32, 0), ('PSL entry', bank, i)
+        mask, ids, kinds = 0, [0] * 32, [0] * 32
+        for k, r in mine:
+            mask |= 1 << k; ids[k] = r; kinds[k] = EFX_KIND
+        per = [b & mask for b, f in evs4 for _ in range(f)][:frames - 1]          # GU's runs end one frame earlier
+        assert len(per) == frames - 1, ('4U runs', bank, i)
+        psl_put(out, i, frames, mask, ids, kinds, per)
+        replaced.append(i)
+    return bytes(out), replaced, retimed, shared
+
+
+def psl_put(out, i, frames, mask, ids, kinds, per):
+    """entry i of the PSL bytearray out -> a new data block (slot mask, ids, kinds, per-frame bits `per`, frames - 1
+    of them) appended at the end; a new 16-byte entry where the file has none (psl_4u's layout)"""
+    assert len(per) == frames - 1, ('PSL runs', i)
+    o = struct.unpack_from('<I', out, 8 + 4 * i)[0]
+    runs = []
+    for b in per:
+        if runs and runs[-1][0] == b: runs[-1][1] += 1
+        else: runs.append([b, 1])
+    while len(out) % 16: out.append(0)
+    data_at = len(out)
+    out += struct.pack('<I32H32I32I', mask, *ids, *kinds, *([0] * 32))
+    out += struct.pack('<II', len(runs), data_at + 0x144 + 8)
+    out += b''.join(struct.pack('<II', b, f) for b, f in runs)
+    if o:
+        struct.pack_into('<II', out, o + 8, data_at, 0)
+    else:
+        while len(out) % 16: out.append(0)
+        struct.pack_into('<I', out, 8 + 4 * i, len(out))
+        out += struct.pack('<IHBBII', frames, 0, 32, 0, data_at, 0)
+
+
+def roar_record(gu_pel_c):
+    """the roars of bank 0 get GU's own air effect on the head for 4U's length (PR #12 point 3; user 2026-11-02: GU's
+    look, not 4U's). GU em005_00 plays its roar air (PEL c id 90 = cm202_050, a screen blur) on no joint for 18 / 20
+    frames; 4U pulses qe013_004 on joint 3 (the head) through the roar (em040_0 id 17). GU's own monsters that put it
+    on the head (Tigrex em007_00 and others: joint 3 / 4, up to 200 frames) use the same record with the joint set
+    (em007_00's id 90 = em005_00's but +0x32 = 3, C). -> GU's record with joint ROAR_JOINT as PEL u list-1 id ROAR_ID"""
+    import efl4u2gu
+    body = efl4u2gu.pel_lists(gu_pel_c)[1][1]
+    rec, i = None, 0
+    while i < len(body):
+        L = body[i]
+        if struct.unpack_from('<H', body, i + 1 + L + 2 + 0x30)[0] == 90:
+            assert body[i + 1:i + 1 + L] == b'effect\\cm\\cm202_050', 'GU em005_00c id 90 is not the roar air'
+            rec = bytearray(body[i:i + 1 + L + 2 + 160])
+            struct.pack_into('<Hh', rec, 1 + L + 2 + 0x30, ROAR_ID, ROAR_JOINT)
+        i += 1 + L + 2 + 160
+    assert rec, 'GU em005_00c has no id 90'
+    return bytes(rec)
+
+
+def roar_head(psl, lmt4, notes):
+    """bank 0 PSL: in ROAR_MOTIONS GU's air slot (PEL c id 90) becomes roar_record, on from GU's first frame of its
+    air to 4U's last id-17 pulse; GU's other slots of the motion stay as they are"""
+    import efl4u2gu
+    ev4 = {e[0]: e for e in efl4u2gu.lmt_events(lmt4) if e}
+    out = bytearray(psl)
+    for m in ROAR_MOTIONS:
+        o = struct.unpack_from('<I', out, 8 + 4 * m)[0]
+        frames, _, _, _, da, _ = struct.unpack_from('<IHBBII', out, o)
+        mask = struct.unpack_from('<I', out, da)[0]
+        ids = list(struct.unpack_from('<32H', out, da + 4))
+        kinds = list(struct.unpack_from('<32I', out, da + 68))
+        assert not any(struct.unpack_from('<32I', out, da + 196)), ('GU roar entry rest', m)
+        nr, ra = struct.unpack_from('<II', out, da + 0x144)
+        per = [b for k in range(nr) for b, f in [struct.unpack_from('<II', out, ra + 8 * k)] for _ in range(f)]
+        air = [k for k in range(32) if mask >> k & 1 and (ids[k], kinds[k]) == (90, 3)]
+        assert len(air) == 1, ('GU roar slot', m)
+        k = air[0]
+        start = min(x for x, b in enumerate(per) if b >> k & 1)
+        gu_end = max(x for x, b in enumerate(per) if b >> k & 1)
+        _, frames4, remap, evs4 = ev4[m]
+        assert frames4 == frames and 17 in remap, ('4U roar', m)
+        k17 = remap.index(17)
+        per4 = [b for b, f in evs4 for _ in range(f)]
+        end = max(x for x, b in enumerate(per4) if b >> k17 & 1)
+        ids[k], kinds[k] = ROAR_ID, EFX_KIND
+        per = [(b & ~(1 << k)) | (int(start <= x <= end) << k) for x, b in enumerate(per)]
+        psl_put(out, m, frames, mask, ids, kinds, per)
+        notes.append('roar: bank 0 motion %d slot %d: GU\'s air (cm202_050) on joint %d, frames %d..%d (GU: no joint, '
+                     '%d..%d)' % (m, k, ROAR_JOINT, start, end, start, gu_end))
+    return bytes(out)
+
+
+def effects(S, gfile, notes):
+    """his effects -> ([(path, type, data)], {field: (path, type)}): see above"""
+    import efl4u2gu
+    T4 = efl4u2gu.T
+    gravios = efl4u2gu.mef_records(S[(MEF_4U, T4['MEF'])])
+    own = efl4u2gu.mef_records(S[(MEF_OWN, T4['MEF'])])
+    assert {r['grp'] for r in own} <= {40, 41}, 'em041_1 names another EFL group'
+    # the 4U condition bits (MEF byte 0, 4U 0x391a7c): module/em005_01_fx.c gates the posts by its table
+    fx_c = open(os.path.join(MON, 'module', 'em005_01_fx.c')).read()
+    table = re.search(r's_b0\[\] = \{(.*?)\};', fx_c, re.S).group(1)
+    assert [tuple(map(int, t)) for t in re.findall(r'\{(\d+), (\d+)\}', table)] == \
+        [(r['id'], r['b0']) for r in gravios + own if r['b0']], 'module/em005_01_fx.c s_b0 differs from the MEFs'
+    gu_lists = efl4u2gu.pel_lists(gfile(17))
+    spec = dict(arc=SRC_4U, stage_unpacked=[], mef=MEF_4U, em_efl='effect\\efl\\em\\em041\\', groups=EFX_GROUPS,
+                extra=[(EFX_GROUPS[r['grp']] % r['file'], r) for r in own], lmts=[], pel=PEL_U,
+                soil=volcano_soil(notes), list2=gu_lists[2], hide_grey_models='chunks', extra2=CODE_FX)
+    gu2 = set(pel_ids(gu_lists[2][1]))
+    assert not {r['id'] for _, r in CODE_FX} & gu2, 'CODE_FX ids collide with GU\'s list 2'
+    log = []
+    out = efl4u2gu.effect_set(spec, log)
+    for p, _ in CODE_FX:
+        assert (p, T4['EFL']) in out, 'code-posted effect not shipped: ' + p
+    mine_lists = efl4u2gu.pel_lists(out.pop((PEL_U, T4['PEL'])))
+    mine, list2 = mine_lists[1], mine_lists[2]
+    known = set(pel_ids(mine[1]))
+    assert ROAR_ID not in known
+    mine = (mine[0] + 1, mine[1] + roar_record(gfile(16)))
+    gu1 = pel_ids(gu_lists[1][1])
+    assert known and not known & set(gu1), 'PEL list-1 ids collide with GU\'s'       # list 2 is looked up apart
+    assert gu_lists[0][0] == 0, 'GU em005_00u list 0 not empty'
+    assert list2[0] == gu_lists[2][0] + len(CODE_FX) and list2[1].startswith(gu_lists[2][1]), 'PEL list 2 = GU + ours'
+    pel = b'PEL\0' + struct.pack('<I', 15) + struct.pack('<I', 0) + \
+        struct.pack('<I', gu_lists[1][0] + mine[0]) + gu_lists[1][1] + mine[1] + \
+        struct.pack('<I', list2[0]) + list2[1]
+    lists = efl4u2gu.pel_lists(pel)
+    assert pel_ids(lists[1][1]) == gu1 + pel_ids(mine[1]) and lists[2] == list2, 'merged PEL u layout'
+    ents = [(p, t, d) for (p, t), d in out.items()] + [(PEL_U, T4['PEL'], pel)]
+    fields = {17: (PEL_U, T4['PEL'])}
+    taken = 0
+    for b in EFX_BANKS:
+        psl, rep, ret, shared = psl_4u(gfile(18 + b), S[(P40 + 'mot\\em040_%d' % b, T4['LMT'])], gfile(4 + b), known, b)
+        if b == 0:
+            psl = roar_head(psl, S[(P40 + 'mot\\em040_0', T4['LMT'])], notes)
+        taken += len(rep)                        # a bank without any stays our file (= GU's bytes): file IDs keep
+        ents.append((PSL % b, T4['PSL'], psl))   # their order
+        fields[18 + b] = (PSL % b, T4['PSL'])
+        notes.append('PSL bank %d: 4U slots in motions %s (GU gives them no effect); GU\'s kept (GU\'s effects) %s; '
+                     'retimed by GU %s' % (b, rep, shared, ret))
+    assert taken, 'no motion takes 4U effects'
+    notes.append('effects: PEL u = GU em005_00u (list 1: %d, list 2: %d) + 4U em041_1 records (%d) + code records %s '
+                 '(list 2); %d converted 4U files' % (gu_lists[1][0], gu_lists[2][0], len(known),
+                                                     [r['id'] for _, r in CODE_FX], len(out)))
+    notes += ['  ' + l for l in log if not l.startswith('EFL ')]
+    return ents, fields
+
+
 def range_rows(em):
     """4U AI distance range rows of em (etd word 10 up to its all -1 row) + its word 11 offsets (None when absent)"""
     import dt_convert
@@ -271,6 +605,13 @@ def main():
     typ = ghash[fileid_entry(img, gman[33])][1]
     ents.append(('enemy\\dt_tune\\em005_01_dttune', typ, dttune(gfile(33), notes)))
     own[33] = ('enemy\\dt_tune\\em005_01_dttune', typ)
+    typ = ghash[fileid_entry(img, gman[37])][1]
+    ents.append(('enemy\\cmd_tbl\\em005_01_cmdtbl', typ, cmdtbl(S[(P40 + 'data\\em040_cmd', typ)], gfile(37), img,
+                                                                 notes)))
+    own[37] = ('enemy\\cmd_tbl\\em005_01_cmdtbl', typ)
+    files, fields = effects(S, gfile, notes)
+    ents += files
+    own.update(fields)
     sys.path.insert(0, HERE)
     import hagi_em005_01                 # carves: 4U High tables in s2, G in s4, GU's filler in s0 / s1 / s3
     for k, data in hagi_em005_01.files().items():
@@ -334,7 +675,8 @@ def main():
                    registry_index=ALLOC['registry_index'], file_id_base='0x%x' % FILE_ID_BASE,
                    file_count=len(new_files), manifest=fields,
                    files=[dict(file_id='0x%x' % f, path=p, type='0x%08x' % t, path_hash='0x%08x' % phash(p))
-                          for f, p, t in new_files], notes=notes), open(OUT_JSON, 'w'), indent=1)
+                          for f, p, t in new_files], notes=notes),
+              open(OUT_JSON, 'w', encoding='utf-8', newline='\n'), indent=1)    # LF on every OS (.gitattributes)
     # FILE section: the registry manifest of its index and the (path hash, type) of each of our file IDs
     sec = portdata.Section('FILE')
     sec.u32(FILE_ID_BASE, len(new_files), *[x & 0xFFFFFFFF for x in manifest])

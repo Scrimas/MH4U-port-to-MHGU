@@ -19,7 +19,7 @@ Data: raw, element, affinity, defense, slots, rarity, price, sharpness, GL shell
 Stand-ins (records copied, then every 4U field set): the GU weapon of each line's 4U parent (GU-folded), the DBs GU 23
 Flamestorm (fire, rarity 6: no Gravios DB in GU); bowgun recoil / reload / deviation / rapid fire / special ammo from
 the stand-in (logged by weapons4u).
-Models (C): 4U's numbers (allocations.toml weapon_models, free in GU), arcs tools/weapon4u2gu.py (build.sh weapons).
+Models (C): 4U's numbers (allocations.toml weapon_models, free in GU), arcs tools/weapon4u2gu.py (build.py weapons).
 Sounds (C): each 4U arc's own set (sound_set_4u) except SnS 103 (holds set 009, GU snd/009 = Flame Syphos') and DB
 094 (holds 008 = Melting Wail's, converted from sou008).
 """

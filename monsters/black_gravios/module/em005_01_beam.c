@@ -9,13 +9,18 @@
  *  - 4U 805300: frame 10, state bit 2 set and bit 4 clear: effect request 8 (0x809ae0(this, 8, 0)); Gravios posts none
  *    there. GU posts 4U's ungated request 8 of the other handlers as its message id 10 | state bit 0 (d2d88c = 4U
  *    0x803dc8: the same attack at 350; S).
- *  - 4U 805998: 0x808410(this, 1, 120.0): frame 120 the heat burst effect (request 6; the forced path r1 == 1, so no
- *    state bit needed), frame 140 its attack attackEx(0, 26, or 57 with state bit 4, 4096). GU's copy of the forced
- *    path (d2ba30, r1 == 1) posts message id 3 / 7 / 8 / 9 (state bit 0, 0x8172c) for the effect (S); the attack
- *    indexes are 4U's in every GU copy (d2bc88 d2d9e8 d2e030, C). Gravios skips all of it here (4U em 40: 805930 ->
- *    8059f0, C).
+ *  - 4U 805998: 0x808410(this, 1, 120.0): frame 120 the heat burst effect (request 6 = (50, 6) = em040_013, mask
+ *    1 << 0, 1 << 8 with state bit 4; the forced path r1 == 1, so no state bit needed) and sound 216, frame 140 its
+ *    attack attackEx(0, 26, or 57 with state bit 4, 4096). Gravios skips all of it here (4U em 40: 805930 -> 8059f0, C).
+ *    GU posts no effect for request 6 anywhere: its own bursts (d2ba30 7/12 7/17 heated, d2bd2c 7/50 forced at frame
+ *    100) arm attack 26 / 57 alone, and its message at d2ba30 (ids 3 / 7 / 8 / 9 by state bit 0 and 0x8172c) is that
+ *    move's request 8 = (50, 8) = em040_020, the gas (4U 0x802498 posts it unconditionally, the burst only when
+ *    heated, C). So the burst is attack 26 / 57 alone at frame 140, as GU's own; until test 2026-11-01 frame 120 posted
+ *    message 3 (the gas: user "explosion and sleep gas at the same time"). The attack indexes are 4U's in every GU
+ *    copy (d2bc88 d2d9e8 d2e030, C). In 4U every beam of a series (7/73 -> 7/89 -> 7/89 .., 0x805a90) ends this way.
  *  - not ported: 4U's sound 216 at frame 120 (GU's class posts no sounds: they are motion data, G).
- * State byte: GU work+0x24 = 4U [this+0x8c88]+0x28 (C: GU d2bca4 / 4U 0x808440 test the same bits 2 and 4). */
+ * State byte: GU work+0x24 = 4U [this+0x8c88]+0x28 (C: GU d2bca4 / 4U 0x808440 test the same bits 2 and 4).
+ * The spit 7/13 7/14 7/50 (4U 0x802768, GU d2bd2c) is in em005_01_spit.c. */
 #include <stdint.h>
 #include "game.h"
 #include "util.h"
@@ -35,8 +40,6 @@ typedef void *(*alloc_t)(uint32_t size, uint32_t align);
 #define msgAlloc    FN(alloc_t, 0x3fc428)       /* new(48, 16) as d2bb9c */
 typedef void (*post_t)(void *mgr, void *msg, uint32_t a, uint32_t b);
 #define msgPost     FN(post_t, 0x48c4f0)
-typedef int (*selfInt_t)(void *self);
-#define fn8172c     FN(selfInt_t, 0x8172c)      /* d2ba30's second selector (meaning G) */
 
 static int is_black_gravios(const void *self)
 {
@@ -75,10 +78,6 @@ int em005_01_beam_c(uint32_t *regs)
     st = FIELD(uint8_t, FIELD(uint8_t *, self, EN_WORK), WK_STATE);
     if (atFrame(self, 10.0f) && (st & 2) && !(st & 4))
         post_request(self, 10 | (st & 1), 0x80536c);
-    if (atFrame(self, 120.0f)) {
-        uint32_t sel = fn8172c(self) != 0;
-        post_request(self, (st & 1) ? (sel ? 9 : 7) : (sel ? 8 : 3), 0x8084a0);
-    }
     if (atFrame(self, 140.0f)) {
         uint32_t idx = (st & 4) ? 57 : 26;
         attackEx(self, 0, idx, 4096);

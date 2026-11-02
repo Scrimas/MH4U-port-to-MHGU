@@ -1,7 +1,7 @@
 """gear_em005_01.py : Black Gravios' armor (4U Gravios U: HR, Gravios Z: G = 2 series pairs, 20 pieces; in 4U both are
 crafted from Black Gravios materials) as records appended to GU's loaded tables -> data file sections TBLA / TXTA
 (gen/*-armor.sec, tools/portdata.py; module/gear.c). Formats, 4U records and the shared rules: tools/gear4u.py.
-Weapons: gear_weapons_em005_01.py. Models: build.sh step armor (tools/armor4u2gu.py, the 40 arcs
+Weapons: gear_weapons_em005_01.py. Models: build.py step armor (tools/armor4u2gu.py, the 40 arcs
 pl_{m,f}_<part>{185,186,394,395} from the 3DS image).
   gear_em005_01.py          write the sections
   gear_em005_01.py show     print them only
