@@ -18,12 +18,16 @@ ui_icon = [197, 244]                    # cells 1..48 of our own atlas (UI index
                                         # 0 = 4U's '?'): GU's micon00 / 01 end at 195, both full in HD UI v4
 notes_entry = [123, 127]                # Hunter's Notes save map S+0x35b0: bits 123..127 unused
 quests = [11491, 11492, 11493, 11494, 10790, 10791, 10792, 11495, 11496,   # checked free (no file, no list
-          10775, 10776, 10777, 10778, 10779, 11426, 11427, 11428, 11429, 1023, 1024, 10780, 11430, 10781, 1025]
+          10775, 10776, 10777, 10778, 10779, 11426, 11427, 11428, 11429, 1023, 1024, 10780, 11430, 10781, 1025,
+          1056, 10782, 10783, 11451]
                                         # entry; v1.0 RomFS); 107NN = Hub HR 7, 114NN = Hub G4 (the ID's digits decide
                                         # which hub loads it, the questData bytes the rank: plan.md Dalamadur 6.),
                                         # 10NN = village ★10 (Stygian Zinogre, 2026-10-28); 10780 / 11430 / 10781 /
                                         # 1025 (Black Gravios, 2026-10-31 / 11-01: no RomFS file, inside Stygian's
-                                        # checked free runs 10775..10789 / 11426..11430 / 1023..1025)
+                                        # checked free runs 10775..10789 / 11426..11430 / 1023..1025); 1056 / 10782 /
+                                        # 10783 / 11451 (Black Gravios, 2026-11-01, PR #12 review: in the checked free
+                                        # runs 1056..1099 / 10775..10789 / 11451..11453 of stygian_zinogre/notes/
+                                        # quests.md 3.)
 quest_slots = [1011009, 1011003, 1011048, 1011049, 1010007, 1010177, 1110009, 1110114, 1110115]
                                         # quest_group group-127 entries renamed in memory. 1010007 / 1010177 / 1110009 /
                                         # 1110114 / 1110115 (indexes 1307 / 1329 / 1314 / 1393 / 1394, 2026-10-21):
@@ -368,10 +372,13 @@ ui_icon = 204
 icon_4u = 43                            # its quests' board icon (4U m00902 / m10601 / m10923 +0xE8 list 43; Gravios'
                                         # m00505 lists 42)
 notes = false                           # no Hunter's Notes entry: save bits 123..127 are all taken (tools/alloc.py)
-quests = [10780, 11430, 10781, 1025]    # 4U m10611 Advanced: Armor Amore (Hub HR6 -> GU Hub HR7, as Stygian's), m10923
+quests = [10780, 11430, 10781, 1025, 1056, 10782, 10783, 11451]
+                                        # 4U m10611 Advanced: Armor Amore (Hub HR6 -> GU Hub HR7, as Stygian's), m10923
                                         # Hollow Promise (Hub G2 -> GU Hub G4), m10601 Ore D'oeuvre (Hub HR6 -> HR7),
-                                        # m00911 Advanced: Whale of a Hammer (caravan ★9 -> village ★10); the others
-                                        # later (notes/plan.md)
+                                        # m00911 Advanced: Whale of a Hammer (caravan ★9 -> village ★10), m00902 Black
+                                        # Rock Down (village ★10), m10606 Advanced: Dance with Dragons (HR7), m10615
+                                        # Advanced: Gravios Fortunes (HR7), m10927 Advanced: A Black Day (G4); m21006
+                                        # (arena) not ported (notes/plan.md)
 quest_append = true                     # new quest list entries after GU's (module/quest.c), no quest_slots
 standin_alt = [0x4, 10780]              # m10611 has a real Gravios next to him: that quest names him by Basarios
                                         # (em004_00, the same GU class uEm004_00), swapped like standin_id
