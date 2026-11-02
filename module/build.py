@@ -148,6 +148,18 @@ HOOKS = [
     ('em057_01_psl', 0x70028),     # uFestaEnemy slot 75 PSL post (uEm057_00's too): 4U's ground set for variant 1 (_efx.c)
     ('em005_01_beam', 0xD2E3EC),   # uEm004_00 beam handler d2e0b4, step 1 every frame: 4U Black Gravios' heat burst
                                    # (monsters/black_gravios/module/em005_01_beam.c)
+    ('em005_01_spit', 0xD2C734),   # uEm004_00 spit d2bd2c, step 1 every frame: 4U's gas puff at frame 150
+                                   # (monsters/black_gravios/module/em005_01_spit.c)
+    ('em005_01_laser', 0xD2DFE0),  # uEm004_00 7/57 / 7/71 d2da3c, before its frame-160 shell post: 4U's laser look
+                                   # em041_101 (monsters/black_gravios/module/em005_01_laser.c)
+    ('em005_01_act', 0xD31128),    # uEm004_00 slot 125 action dispatcher: Black Gravios (variant 1) action / motion
+                                   # log (monsters/black_gravios/module/em005_01_diag.c)
+    ('em005_01_pslgate', 0x70050), # uFestaEnemy slot 75 PSL post, after its request setup: Black Gravios' 4U effect
+                                   # records only under their 4U condition bit (monsters/black_gravios/module/em005_01_fx.c)
+    ('em005_01_objlog', 0x3A7ED8), # quest tally 0x3a75c8 after its objective loop: Black Gravios' objectives (log;
+                                   # em005_01_diag.c)
+    ('em005_01_eat_pre', 0xD27D58),   # uEm004_00 1/18 (d27c8c) around its 0x9cf7c(this, 1) call: Black Gravios'
+    ('em005_01_eat_post', 0xD27D64),  # 4U eating cost (em005_01_fx.c)
     ('dala_dmg_end', 0x98E44),     # enemy damage update 0x97ddc, after the rage add, before the reaction dispatcher
                                    # (r0 = this): Dalamadur tail rage -> head, shared reactions (dala_react.c)
     ('dala_heat_zone', 0x6A160),   # (mgr, area, pos) heat-aura zone test (Teostra only): 1 inside the Dalamadur
@@ -185,6 +197,7 @@ REPLACE_HOOKS = {'name_index'}
 MID_EXIT = {
     'quest_unlocked': 0x3B219C,  # ldrb r0, [sp, #7]: returns the result byte quest_unlocked_c wrote
     'tex_bind': 0xA4FB34,        # pop {r4, pc}: the bind is skipped, the sprite keeps its texture
+    'em005_01_pslgate': 0x7016C, # mov r0, #0; return: the PSL slot posts nothing (GU's own no-post path)
 }
 # functions whose first 0x20 bytes a Forge plugin checks (Key Quest Markers r18: its table of address + v1.4 bytes);
 # main() refuses a hook site inside them
@@ -437,6 +450,8 @@ def displaced_ok(w):
     if (w & 0x0FFFFFF0) == 0x012FFF10: return False              # bx
     if (w & 0x0F8003F0) == 0x06800070:                           # sxt*/uxt*: Rn = 15 means no accumulate
         return ((w >> 12) & 15) != 15 and (w & 15) != 15
+    if (w & 0x0FB00000) == 0x03000000:                           # movw / movt: bits 16-19 are imm4, not Rn
+        return ((w >> 12) & 15) != 15
     if ((w >> 16) & 15) == 15 and (w & 0x0C000000) in (0x04000000, 0x00000000): return False  # Rn = pc
     if ((w >> 12) & 15) == 15: return False                      # Rd = pc
     if (w & 0x0F000000) == 0x0D000000 and ((w >> 16) & 15) == 15: return False  # vldr [pc]
