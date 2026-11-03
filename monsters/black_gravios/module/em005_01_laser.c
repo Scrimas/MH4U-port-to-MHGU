@@ -94,6 +94,7 @@ typedef struct {
     const curve_key_t *run[2], *end1;  /* per element: curve while the shell lives; k 1's curve after it (spin only) */
     float off[3], life, t;
     uint32_t motion, ending, lines;
+    uint32_t vt[2], xf[2][2];    /* per element: the vtable at the post, the transform pointers when first alive */
 } beam_t;
 static beam_t s_beam[NBEAM];
 static const char *const k_name[NBEAM] = {"laser", "spin beam"};
@@ -111,6 +112,27 @@ static float sqrt_f(float x)
     return r;
 }
 static int efx_alive(void *eff) { return eff && (FIELD(uint32_t, eff, 0xc) & 7) - 1 < 2; }
+
+/* Our handles are raw pointers: GU can free an effect (and reuse its memory) without telling us. Test 2026-11-03
+ * crashed in efx_set_pos (0x32a45c) on the 8th laser: the handle's +0x150 held a float (0xc39750..). So an element
+ * is used only while its object keeps the vtable it had at the post, is in state 1 / 2 and keeps the same transform
+ * pointers (plausible heap addresses) it had on its first alive frame; otherwise the handle is dropped untouched. */
+static int ptr_ok(uint32_t p) { return !(p & 3) && p >= 0x01000000u && p < 0x80000000u; }
+static int beam_ok(beam_t *b, int k)
+{
+    void *eff = b->eff[k];
+    if (!eff) return 0;
+    uint32_t a = FIELD(uint32_t, eff, EFX_XF), c = FIELD(uint32_t, eff, EFX_XF + 4);
+    int ok = FIELD(uint32_t, eff, 0) == b->vt[k] && efx_alive(eff) && ptr_ok(a) && (!c || ptr_ok(c));
+    if (ok && !b->xf[k][0]) { b->xf[k][0] = a; b->xf[k][1] = c; }
+    else if (ok) ok = a == b->xf[k][0] && c == b->xf[k][1];
+    if (!ok && (FIELD(uint32_t, eff, 0) != b->vt[k] || b->xf[k][0])) {    /* gone (not merely not started yet) */
+        static uint32_t s_n;
+        if (++s_n <= 20) logf("bgport: beam effect %x k %d no longer ours (dropped)", (uint32_t)eff, k);
+        b->eff[k] = 0;
+    }
+    return ok;
+}
 static float owner_step(void *self)   /* 4U 0x94460c */
 {
     return FIELD(float, FIELD(uint8_t *, self, EN_RECORD), REC_MOT_SPEED) * FIELD(float, self, EN_DT);
@@ -167,7 +189,7 @@ static void set_scale(void *eff, float s)
 
 static void stop_eff(beam_t *b, int k)
 {
-    if (efx_alive(b->eff[k])) efx_stop(b->eff[k], 0);
+    if (beam_ok(b, k)) efx_stop(b->eff[k], 0);
     b->eff[k] = 0;
 }
 
@@ -205,6 +227,10 @@ static void start(void *self, int which, uint32_t sub, float life, float oy, flo
     b->run[0] = k0; b->run[1] = k1; b->end1 = end1;
     b->eff[0] = post_at(self, FX_K0, q, pitch, yaw);
     b->eff[1] = post_at(self, FX_K1, q, pitch, yaw);
+    for (int k = 0; k < 2; k++) {
+        b->vt[k] = b->eff[k] ? FIELD(uint32_t, b->eff[k], 0) : 0;
+        b->xf[k][0] = b->xf[k][1] = 0;
+    }
     if (++b->lines <= 20)
         logf("bgport: %s em041_101 (4U subtype %u) at %d %d %d pitch %x yaw %x -> %x %x", k_name[which], sub,
              (int32_t)q[0], (int32_t)q[1], (int32_t)q[2], pitch, yaw, (uint32_t)b->eff[0], (uint32_t)b->eff[1]);
@@ -218,7 +244,7 @@ static void tick_one(void *self, int which)
     float step = owner_step(self);
     if (b->ending) {                     /* spin: 0x1c4b84, k 1 at the last spot, x = y = B(t), ends at scale 0 */
         float s = curve(b->end1, b->t);
-        if (s <= 0.0f || !efx_alive(b->eff[1])) {
+        if (s <= 0.0f || !beam_ok(b, 1)) {
             if (++b->lines <= 40) logf("bgport: %s end (curve B done)", k_name[which]);
             finish(b);
             return;
@@ -232,7 +258,7 @@ static void tick_one(void *self, int which)
         if (++b->lines <= 40)
             logf("bgport: %s shell end (%s, life %d)", k_name[which], b->life <= 0.0f ? "life" : "motion / HP",
                  (int32_t)b->life);
-        if (which == SPIN && b->end1 && efx_alive(b->eff[1]) && FIELD(int32_t, rec, REC_HP) > 0) {
+        if (which == SPIN && b->end1 && beam_ok(b, 1) && FIELD(int32_t, rec, REC_HP) > 0) {
             stop_eff(b, 0);              /* kind 16 has no curve B: released */
             b->ending = 1;
             b->t = 0.0f;
@@ -247,8 +273,8 @@ static void tick_one(void *self, int which)
     float rot[4] = {(float)pitch * A16_RAD, (float)yaw * A16_RAD, 0.0f, 0.0f};
     if (which == SPIN) b->t += FIELD(float, self, EN_DT);    /* uEffect015: t += dt, then the curve */
     for (int k = 0; k < 2; k++) {
+        if (!beam_ok(b, k)) continue;
         void *eff = b->eff[k];
-        if (!efx_alive(eff)) continue;
         efx_set_pos(eff, q, 0);
         void *xf = FIELD(void *, eff, EFX_XF);
         if (xf) efx_set_rot(xf, rot);
@@ -257,11 +283,11 @@ static void tick_one(void *self, int which)
     if (which == LASER) b->t += step;    /* uEffect002 41: the curve, then t += the owner's motion step */
     {
         static uint32_t s_n;
-        void *xf = efx_alive(b->eff[0]) ? FIELD(void *, b->eff[0], EFX_XF) : 0;
+        void *xf = beam_ok(b, 0) ? FIELD(void *, b->eff[0], EFX_XF) : 0;
         if (xf && ++s_n <= 12)
             logf("bgport: %s t %d scale x1000 k0 %d k1 %d (states %u %u)", k_name[which], (int32_t)b->t,
                  (int32_t)(FIELD(float, xf, XF_SCALE) * 1000.0f), (int32_t)(curve(b->run[1], b->t) * 1000.0f),
-                 b->eff[0] ? FIELD(uint32_t, b->eff[0], 0xc) & 7 : 9, b->eff[1] ? FIELD(uint32_t, b->eff[1], 0xc) & 7 : 9);
+                 FIELD(uint32_t, b->eff[0], 0xc) & 7, beam_ok(b, 1) ? FIELD(uint32_t, b->eff[1], 0xc) & 7 : 9);
     }
 }
 
