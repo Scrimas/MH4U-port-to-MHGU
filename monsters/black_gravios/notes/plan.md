@@ -394,3 +394,10 @@ Test 2026-11-03 (log 16-52-51, quest 11430): lasers "condensed, not full height 
   GU d2e0b4 posts at d2e330 d2e3d0, more at d2ed44 d2ee00 d2eebc). Next: compare GU's shells with 4U's per move.
 - Not explained: MEF 2061 / 2062 (frame 100 of motion 0x232) never reached the PSL gate in the 16-52-51 log while
   2051 / 2052 did.
+- Hits, done (static, 2026-11-03; module/em005_01_shell016.c): GU's laser shell02 entry 4 / 12 = uShellEm005_sp_02, a
+  projectile placed once (setup 0xd33cfc, shared move 0x3fca34), not 4U's head-following capsule. Replaced for him by
+  a uShellEnemy class (Tigerstripe's framework) placing 4U's capsule every frame: 33 / 35 (Q = J3 + M3 (0, 0, 180),
+  life 162) and 43 / 44 (Q = J3 + M3 (0, -50, 100), life 100, 7/79 frame 99), P = Q + M3 (0, 0, 6400). Damage =
+  GU's own shell02 HDS entries 5 / 6 / 1 / 3 = 4U records 29 / 30 / 43 / 44 (Capcom's conversion, HTS r 360 / 240 /
+  180 / 110 = 4U volumes 14 / 15 / 6 / 10, C). GU's laser post skipped (MID_EXIT d2dfe8, message freed). The
+  stand-in of the previous build is gone.
