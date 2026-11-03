@@ -177,9 +177,10 @@ static int input(struct ms_state *s, uint32_t inp, uint32_t held, uint32_t trig,
     int rh = (held & r) != 0, aim = (s->flags & 1) != 0;
     switch (inp) {                                      /* R1 is a modifier: tri / circle alone not with R (test 4:
                                                            R + Y while walking did the walk's Y) */
-    case 2: return !rh && (combo & 2);                  /* tri (22 = stick + tri: cmd_type 0xc adds the stick) */
-    case 3: return !rh && (combo & 4);                  /* circle (6 = stick + circle) */
-    case 4: return !rh && (combo & 0x40);               /* tri + circle */
+    /* test 8: aim + Y without a marker did the plain Y: MHF's "aim:" inputs mask the plain ones while aiming */
+    case 2: return !rh && !aim && (combo & 2);          /* tri (22 = stick + tri: cmd_type 0xc adds the stick) */
+    case 3: return !rh && !aim && (combo & 4);          /* circle (6 = stick + circle) */
+    case 4: return !rh && !aim && (combo & 0x40);       /* tri + circle */
     case 5: return (trig & BTN_MINUS) != 0;
     case 7: return rh && (combo & 2);
     case 8: return rh && (combo & 4);
@@ -237,6 +238,10 @@ static void *flash_at(uint8_t *p, const float *t)       /* the marker's flash at
     FIELD(uint32_t, req, 0x1c) |= 1u;
     for (int i = 0; i < 3; i++) FIELD(float, req, 0xc0 + 4 * i) = t[i];
     FIELD(float, req, 0xcc) = 0.0f;
+    FIELD(uint32_t, req, 0x14) |= 0x80000u;             /* test 8: still unseen. The ground word (req+0x6c, field 19):
+                                                           an effect keeps only elements whose word meets (2 << kind)
+                                                           | 1, so 0 drew nothing; em089_efx.c's posts give 3 */
+    FIELD(uint32_t, req, 0x6c) = 3u;
     FIELD(void *, req, 0x4) = p;                        /* test 6: handles but no blink. em089_efx.c's world posts set */
     FIELD(uint8_t, req, 0xc) = FIELD(uint8_t, p, 0x2550 + 0xc);  /* the owner and its area: the area of the hunter's
                                                            own request (+0x2550, the guard flash's, which shows) */
@@ -314,6 +319,12 @@ void ms_input(uint8_t *p)
         if (s_n++ < 120)                                /* test 7: 3 hops, no change logged: every frame now */
             logf("msport: jump %u: held %x pressed %x combo %x table %u frame %d", jno, held, trig, combo,
                  FIELD(uint32_t, p, 0x24ac), (int)f);
+    }
+    if (trig) {                                         /* test 8: no Y in any hop frame: every press while airborne */
+        static int s_air;
+        int h = (int)(pos_of(p)[1] - MS_GROUND_Y(p));
+        if (h > 20 && s_air++ < 40) logf("msport: air press %x held %x combo %x in %u/%u frame %d, %d cm up", trig, held,
+                                         combo, jst, jno, (int)MS_FRAME(p), h);
     }
     uint32_t base = s->mode ? MS_ID_IMPACT : 0, set = 0;
     for (uint32_t k = 0; k < MS_NPAIRS; k++) {
@@ -450,7 +461,14 @@ static void elem_fix(uint8_t *p)
     if (k == 8) { if (!s_n++) logf("msport: element fix: no type-12 entry at hunter data +0x18 + 0x2c k"); return; }
     uint32_t id = FIELD(uint16_t, hd, 0x1e + 0x2c * k);
     int16_t *st = (int16_t *)(hd + 0x320);
-    if (st[0x11] || !ms_weapon_element(id, &t, &v) || !t) return;
+    if (st[0x11]) return;
+    if (!ms_weapon_element(id, &t, &v) || !t) {         /* test 8: silent here: which entry / id was read */
+        static int s_bad;
+        if (!s_bad++) logf("msport: element fix: slot %u id %u has no element (entry %x %x %x)", k, id,
+                           FIELD(uint32_t, hd, 0x18 + 0x2c * k), FIELD(uint32_t, hd, 0x1c + 0x2c * k),
+                           FIELD(uint32_t, hd, 0x20 + 0x2c * k));
+        return;
+    }
     if (s_n++ < 4) logf("msport: element fix: slot %u weapon %u, GU had type %d value %d -> %u / %u", k, id, st[0x11],
                         st[2], t, v);
     st[0x11] = (int16_t)t; st[2] = (int16_t)v;

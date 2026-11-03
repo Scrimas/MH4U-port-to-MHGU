@@ -154,6 +154,19 @@ monster, attraction / repulsion never trigger; no jump attack on Y in the air.
 | 4 | no jump attack | three hops 1/137, input polled from frame 0, no change logged | every jump frame logged (held, pressed, combo) |
 | 5 | element (stand-in) | elem_fix never ran: the weapon is not equipment slot 0 (slot by type, 0xdae68) | scans the 8 entries at hunter data +0x18 + 0x2c k for type 12 |
 
+## Test 8 results (maintainer, 2026-11-03) and fixes
+Log: dump/mhf/test_logs/ms_test8_Ryujinx_1.3.3_2026-11-03_19-48-39.log. The maintainer: hit boxes now in sync with
+the weapon (FIXED); the charge flash shows an effect but the wrong one (no MHF-ZZ effect is drawn at all: the MHF
+effects port is its own phase); no marker blink; aim (RT) + Y / A did the plain Y / A attacks; no jump attack, and
+running off a small step is enough for one in GU (not only high ledges).
+
+| # | issue | log / cause | change (test 9) |
+|---|---|---|---|
+| 1 | aim + Y / A = plain attacks | 7 "aim Y refused: marker -1": no mark, so the plain tri pair matched; MHF's "aim:" inputs mask the plain ones while aiming | plain tri / circle / tri+circle need aim off |
+| 2 | no marker blink | posted (handles) at the mark; the request's ground word (req+0x6c, body field 19) was 0: an effect keeps only elements whose word meets (2 << kind) \| 1 (em089_efx.c) | req+0x14 bit 19, req+0x6c = 3, as em089's posts |
+| 3 | no jump attack | four hops (1/137, 0.6 s, table 2018): held stays 0 on every frame in three; X (0x80) in one; nothing pressed in the class input during any hop, and no ground attack after them | every press while airborne logged (any action, height) |
+| 4 | element (stand-in) | still no fix line: a type-12 entry found, its id gave no element | logs the entry |
+
 | (test 5) | ghost size | tuned to ~60 updates / s (the 120 FPS cheat, dt 0.5): native 30 fps moves 2 frames per check | before release: a hunt without the cheat, resize (a dt-based second set would pass GU's 255-set limit) |
 
 ## Test 1 (Phase 3; save backup dump/save_backups/2026-10-29_before_magnet_spike)
