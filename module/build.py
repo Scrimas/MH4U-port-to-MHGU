@@ -95,7 +95,6 @@ HOOKS = [
     ('dmg_special', 0x98AC4),  # diagnostic: damage diverted (0x8187c true), no HP subtraction
     ('set_hp', 0x9A764),       # diagnostic: enemy setHP(this, value)
     ('add_hp', 0x9A7B8),       # diagnostic: enemy addHP(this, delta)
-    ('dmg_recv', 0x9D6F8),     # diagnostic: monster damage receiver (monster, part, damage, kind)
     ('name_index', 0x55BDA4),  # (mgr, id) -> monsterName GMD entry (= 0x50b64(id)); 137 -> EM089_NAME_ENTRY
     ('bgm_select', 0x4E60D4),  # (ctl, boss entry, u8 *has, u32 *id): battle theme id -> a registered monster's (bgm.c)
     ('bgm_stqr', 0xB6D72C),    # (stqr, id) -> sequence: its bgm_ids looked up in its own STQR (bgm.c)
@@ -200,15 +199,29 @@ MID_EXIT = {
     'em005_01_pslgate': 0x7016C, # mov r0, #0; return: the PSL slot posts nothing (GU's own no-post path)
     'em005_01_laser': 0xD2DFE8,  # b 0xd2e03c: GU's laser shell not posted (4U's capsule instead, em005_01_shell016.c)
 }
-# functions whose first 0x20 bytes a Forge plugin checks (Key Quest Markers r18: its table of address + v1.4 bytes);
-# main() refuses a hook site inside them
-PLUGIN_CHECKED = [
-    0x3B1A18, 0x3B1D70, 0x3B2174, 0x3B57D0, 0x50CBD0, 0x523DA4, 0x540C08, 0x540C38, 0x5456E4, 0x546F28,
-    0x54AF8C, 0x54D030, 0x616CB0, 0x7AA47C, 0x7AEF68, 0xA38B58, 0xA38FFC, 0xA47950, 0xA47A04, 0xA47A94, 0xA47D2C,
-    0xA4844C, 0xA48668, 0xA494A0, 0xA4964C, 0xA4A9F4, 0xA4AA24, 0xA4AA5C, 0xA4AA94, 0xA4AAC8, 0xA4AAFC, 0xA4D0D8,
-    0xA4DC24, 0xA4DC54, 0xA4DCA0, 0xA4E0B8, 0xA4F60C, 0xA4F6A4, 0xA4F77C, 0xA4FA5C, 0xA4FAF0, 0xA4FB58, 0xA53324,
-    0xA53348, 0xA5350C, 0xA53528, 0xA53AA8, 0xA56AB8,
-]
+# GU code that third-party Forge plugins check against v1.4 before hooking it (each plugin's table of main address +
+# v1.4 bytes, read with tools/plugin_sigs.py); a plugin whose check fails installs nothing. main() refuses a hook
+# site, and the IPS writer any patched byte, inside these ranges. {main offset: bytes checked from it}
+PLUGIN_CHECKED = {
+    # Key Quest Markers r18 (issue #10): 0x20 bytes
+    **{f: 0x20 for f in (
+        0x3B1A18, 0x3B1D70, 0x3B2174, 0x3B57D0, 0x50CBD0, 0x523DA4, 0x540C08, 0x540C38, 0x5456E4, 0x546F28,
+        0x54AF8C, 0x54D030, 0x616CB0, 0x7AA47C, 0x7AEF68, 0xA38B58, 0xA38FFC, 0xA47950, 0xA47A04, 0xA47A94,
+        0xA47D2C, 0xA4844C, 0xA48668, 0xA494A0, 0xA4964C, 0xA4A9F4, 0xA4AA24, 0xA4AA5C, 0xA4AA94, 0xA4AAC8,
+        0xA4AAFC, 0xA4D0D8, 0xA4DC24, 0xA4DC54, 0xA4DCA0, 0xA4E0B8, 0xA4F60C, 0xA4F6A4, 0xA4F77C, 0xA4FA5C,
+        0xA4FAF0, 0xA4FB58, 0xA53324, 0xA53348, 0xA5350C, 0xA53528, 0xA53AA8, 0xA56AB8)},
+    # Damage Numbers r36 (issue #13): 0x40 bytes; 0x172E52C = main's build-id note
+    **{f: 0x40 for f in (
+        0x09978C, 0x09D6F8, 0x0A2664, 0x0AAC54, 0x16DC6C, 0x16DD7C, 0x170968, 0x178660, 0x276278, 0x285C6C,
+        0x2A87A8, 0x885844, 0xB8909C, 0xBC0B74, 0x172E52C)},
+}
+
+
+def plugin_checked(site, size):
+    """the PLUGIN_CHECKED function whose checked bytes [site, site + size) overlaps, or None"""
+    for f, n in PLUGIN_CHECKED.items():
+        if site < f + n and f < site + size: return f
+    return None
 
 # Registry relocation (notes/registry.md): module copies of the per-index tables with one entry per ported monster
 # (indexes 137.., allocations.toml), and the code that addresses them repointed.
@@ -282,6 +295,9 @@ ITEM_SORT_FRAME = (0x199AE8, 0x199D4C)    # sub / add sp, sp, #708 (+ #11264): t
 if ITEMS_APPENDED:
     HOOKS += [('obtained_set', 0x1943D4), ('obtained_clear', 0x194408), ('obtained_test', 0x19443C)]
     REPLACE_HOOKS |= {'obtained_set', 'obtained_clear', 'obtained_test'}
+if 'EM089_DMG_RECV_DIAG' in os.environ.get('GOG_DEFINES', '').split():   # diagnostic: monster damage receiver
+    HOOKS += [('dmg_recv', 0x9D6F8)]   # (monster, part, damage, kind) log (em089_diag.c). Its entry is checked by
+    PLUGIN_CHECKED.pop(0x9D6F8)        # Damage Numbers: test builds only (that plugin then installs nothing)
 if 'TEST_QUEST_RANK' in os.environ.get('GOG_DEFINES', ''):   # test: Stygian's quests at that rank (em057_01_ai.c)
     HOOKS += [('em057_01_rank', 0x3A8D68)]                   # GU quest rank getter (4U 0x69ae70)
 
@@ -545,10 +561,10 @@ def main():
     for name, site in HOOKS:
         hit = branch_into(img, site)
         if hit is not None: sys.exit('hook %s: branch at %x targets %x (inside the patch)' % (name, hit, site + 4))
-        for f in PLUGIN_CHECKED:
-            if f <= site < f + 0x20:
-                sys.exit('hook %s at %x: inside the first 0x20 bytes of %x, checked by a Forge plugin (PLUGIN_CHECKED)'
-                         % (name, site, f))
+        f = plugin_checked(site, 4)
+        if f is not None:
+            sys.exit('hook %s at %x: inside the first 0x%x bytes of %x, checked by a Forge plugin (PLUGIN_CHECKED)'
+                     % (name, site, PLUGIN_CHECKED[f], f))
         inc.append(trampoline(img, name, site))
     open(os.path.join(OUT, 'hooks.inc'), 'w').write('\n'.join(inc) + '\n')
     open(os.path.join(OUT, 'layout.inc'), 'w').write('    .equ MAIN_GAP, 0x%x\n' % MAIN_GAP)
@@ -628,6 +644,13 @@ def main():
     for site, old, new in WORD_PATCHES + item_patches(img):
         if struct.unpack_from('<I', img, site)[0] != old: sys.exit('word patch %x: unexpected original' % site)
         recs += struct.pack('>IH', site + 0x100, 4) + struct.pack('<I', new)
+    p = 0
+    while p < len(recs):                               # every patched byte, hooks or not, off the plugins' checks
+        off, size = struct.unpack_from('>IH', recs, p); p += 6 + size
+        f = plugin_checked(off - 0x100, size)
+        if f is not None:
+            sys.exit('IPS record %x (+%d): inside the first 0x%x bytes of %x, checked by a Forge plugin (PLUGIN_CHECKED)'
+                     % (off - 0x100, size, PLUGIN_CHECKED[f], f))
     open(os.path.join(OUT, MAIN_BUILD_ID + '.ips'), 'wb').write(b'IPS32' + recs + b'EEOF')
 
     with open(os.path.join(OUT, 'symbols.txt'), 'w') as f:
