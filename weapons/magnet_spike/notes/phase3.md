@@ -212,3 +212,9 @@ landing; aim + A still rolls. Effects: port MHF-ZZ's own (next phase).
 | 1 | no element in the smithy | the quest's weapon was still box id 7 (Apophis "Clear", no element). The smithy / equipment rows test `type - 11 < 3` (HBG 11, LBG 13) at 0x5402dc, 0x6ceda4, 0x6d2fa0: type 12 = a bowgun row, no element line | build.py MS_GUNTYPE_SITES: type in {11, 13} (cmp / cmpne / bne) |
 | 2 | falling attack cut on landing | 59 ended on landing (kind-5 step) | landing 59 -> 60, 73 -> 74 (MHF's landing actions: motions 1015 / 1014, shake) |
 | 3 | aim + A rolls | no "aim A refused" line: aim + A never matched (aim + Y did) | every press while aiming logged with GU's common ids |
+
+Test 11 (smithy screenshots, maintainer): still no "Elem." line for Demon Flamespike "Flash" (GS Chicken Decapitator
+shows its fire 18 there), affinity 20 % (ours: 0). Cause (C on the code): the second base-record getter 0x13eef8
+(type - 7 switch over sEquip BaseData +0x50.., find by id 0x12f7ac; callers: the smithy 0x6eb6c0..0x70361c, equip
+0x26ec84) has no type-12 case: null base record, so no element type. Hook ms_base_find = ms_base (test 12); the
+gunner-type patch of test 10 stays (harmless, unconfirmed).

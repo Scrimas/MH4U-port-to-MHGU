@@ -524,6 +524,13 @@ int ms_base_c(uint32_t *regs)                /* 0x13c208 (sEquip, type, id) -> b
     return 1;
 }
 
+int ms_base_find_c(uint32_t *regs)          /* 0x13eef8 (sEquip, type, id) -> base record (smithy, equip 0x26ec84) */
+{
+    static int s_n;
+    if (regs[R1] == MS_TYPE && s_n++ < 6) logf("msport: base find id %u (lr %x)", regs[R2], regs[LR] - MAIN_BASE);
+    return ms_base_c(regs);
+}
+
 int ms_level_c(uint32_t *regs)               /* 0x13ed08 (sEquip, type, row) -> level row */
 {
     if (regs[R1] != MS_TYPE) return 0;

@@ -257,6 +257,8 @@ if MS_SLICE:
     HOOKS += [
         ('ms_factory', 0x275BC8),     # factory after a class constructor (r8 info, r10 object): class 5's vtable
         ('ms_base', 0x13C208),        # (sEquip, type, id) -> base record: type 12 = ours (ms_class.c)
+        ('ms_base_find', 0x13EEF8),   # the same by type - 7 (BaseData +0x50.., find by id 0x12f7ac): type 12 = the
+                                      # default "none" (test 10: the smithy showed no element, a wrong affinity)
         ('ms_level', 0x13ED08),       # (sEquip, type, row) -> level row: type 12 = ours
         ('ms_pwl_gmk', 0x13F554), ('ms_pwl_disp', 0x13F594), ('ms_pwl_carry', 0x13F5D4), ('ms_pwl_sub', 0x13F614),
         ('ms_box_ptr', 0x14B0B0),     # item box loader entry (r0 = the box)
