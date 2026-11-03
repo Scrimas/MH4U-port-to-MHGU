@@ -516,9 +516,22 @@ static void build_records(void *equip)
     logf("msport: %u type-12 weapons from Great Sword 1's records", (uint32_t)MS_NWEAPONS);
 }
 
+/* test 12: the smithy shows our attack but neither our element nor affinity: every distinct caller of the record
+ * getters for type 12 (which code reads what) */
+static void caller_log(const char *what, uint32_t id, uint32_t lr)
+{
+    static uint32_t s_seen[48];
+    static int s_n;
+    for (int i = 0; i < s_n; i++) if (s_seen[i] == lr) return;
+    if (s_n >= 48) return;
+    s_seen[s_n++] = lr;
+    logf("msport: %s id %u from %x", what, id, lr - MAIN_BASE);
+}
+
 int ms_base_c(uint32_t *regs)                /* 0x13c208 (sEquip, type, id) -> base record */
 {
     if (regs[R1] != MS_TYPE) return 0;
+    caller_log("base", regs[R2], regs[LR]);
     if (!s_records) build_records((void *)regs[R0]);
     regs[R0] = s_records > 0 && regs[R2] < MS_NWEAPONS ? (uint32_t)(uintptr_t)s_base[regs[R2]] : 0;
     return 1;
@@ -534,6 +547,7 @@ int ms_base_find_c(uint32_t *regs)          /* 0x13eef8 (sEquip, type, id) -> ba
 int ms_level_c(uint32_t *regs)               /* 0x13ed08 (sEquip, type, row) -> level row */
 {
     if (regs[R1] != MS_TYPE) return 0;
+    caller_log("level", regs[R2], regs[LR]);
     if (!s_records) build_records((void *)regs[R0]);
     regs[R0] = s_records > 0 && regs[R2] < MS_NWEAPONS ? (uint32_t)(uintptr_t)s_level[regs[R2]] : 0;
     return 1;
