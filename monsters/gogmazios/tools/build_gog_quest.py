@@ -175,7 +175,7 @@ def main():
     # supply box from the 4U quest (quest4u.supp_4u, issue #11): the template's box held only Maps at start
     supp, supp_later = quest4u.supp_4u(q4, items4u.text_4u('eng')[0], gu_names(R))
     if supp_later and not a.siege:
-        qd[0x58:0x60] = quest4u.SUPP_QD
+        qd[0x58:0x60] = supp_later       # the delivery groups (quest4u.supp_4u)
     qd[0x1F] = 1; struct.pack_into('<HH', qd, 0x20, EM_ID, 1)
     qd[0x24:0x29] = bytes(5)               # no second objective
     # subquest +0x29 {u8 type, u16 target, u16 code}: type 8 = wound / sever (template: 08 18 00 11 00 = Kushala head

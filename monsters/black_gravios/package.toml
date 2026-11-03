@@ -1,0 +1,29 @@
+# Black Gravios package: what the installer shows and installs, and the version written into its data file.
+name = "black_gravios"
+title = "Black Gravios"
+version = "0.4.6"       # bump on every published change of this monster's files (data, assets or code); 0.4.6:
+                        # the laser 7/57 / 7/71 shows his own 4U effect em041_101 (GU gives it none); the spit's
+                        # 4U beam of 0.4.5 removed (GU has its own effect there; user test 2026-11-02); 0.4.5:
+                        # the spit 7/13 7/14 7/50 shows 4U's beam (em024_009 + em040_100), its frame-150 puff is
+                        # 4U's em040_020 without a hit (was GU's gas shell), the roars play GU's air effect on the
+                        # head for 4U's length (PR #12 point 3) (user test 2026-11-02); 0.4.4:
+                        # GU's effects in every motion GU gives one, 4U's only where GU has none (user); 0.4.3:
+                        # slain in a capture quest fails it (GU's rule applied after the tally); 0.4.2:
+                        # all motion effects from 4U (em040_0 + em041_1, PSL 0..4), test logs (script per action,
+                        # capture-objective state); 0.4.1:
+                        # 4U effect conditions (MEF b0), no gas at the beam's burst, 7/50 gas puff, eating cost 20
+                        # (test 2026-11-01); 0.4.0:
+                        # his own 4U AI (4U em040_cmd for em 41) and 4U effects (em041_1 records, PR #12 review);
+                        # 0.3.0:
+                        # quests 1056 10782 10783 11451 (4U m00902 m10606 m10615 m10927; PR #12 review); 0.2.1:
+                        # supply box: 4U's first delivery no longer in the start box (quest4u.supp_4u); 0.2.0:
+                        # materials, carves, break rewards, Gravios U / Z armor, 6 weapon lines, G quest 11430
+requires_core = "1.8.0"    # oldest core module (exefs) that runs this version: the release that registers it
+code = "em005_01"          # C prefix of its module code (hooks gated on GU variant 1)
+gu_class = "uEm004_00"     # GU's Basarios / Gravios class runs it as variant 1 (module/build.py: registry DTI = donor's;
+                           # registry 112 and 113 share DTI 0x18518f8, built with that name at GU 0x503d8; the
+                           # class tools/apialign2.py pairs with 4U uEm038)
+
+[size]                     # quest-result size record (module/main.c size_data): 4U table 0xf32008 + 16 x em {f32 base
+                           # cm, mini, silver, gold}; em041 (Gravios em040: 2098.7, 0.9, 1.15, 1.23)
+black_gravios = [2098.7, 0.97, 1.17, 1.23]
