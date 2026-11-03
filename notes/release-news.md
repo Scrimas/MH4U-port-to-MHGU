@@ -4,6 +4,18 @@ tools/release.py puts the section of the core version being packaged into the re
 groups, **New** (something added) and **Fixed** (what works now, not what was broken), one short plain line each,
 written for players; write the section before `release.py package`.
 
+## v1.8.0
+**New**
+- Black Gravios, ported by @Rukasu1609, with his 8 quests from MH4U, his Gravios U / Gravios Z armor and 6 weapon
+  lines. He has no Hunter's Notes page yet.
+- The mod can now be built on Windows as well as Linux.
+
+**Fixed**
+- The mod no longer stops the Damage Numbers plugin (Forge) from showing its numbers.
+- Gogmazios' tar now shows MH4U's tar icon on the HUD instead of MHGU's web icon.
+- Gogmazios no longer skips his second phase when a flinch interrupts his rage roar.
+- Dalamadur's fallen meteor scales now show, so you can mine Shattered Omen from them during the fight.
+
 ## v1.7.3
 **Fixed**
 - The mod now works together with the Key Quest Markers plugin (Forge).

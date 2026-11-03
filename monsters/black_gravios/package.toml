@@ -1,13 +1,14 @@
 # Black Gravios package: what the installer shows and installs, and the version written into its data file.
 name = "black_gravios"
 title = "Black Gravios"
-version = "0.4.6"       # bump on every published change of this monster's files (data, assets or code); 0.4.6:
+version = "1.0.0"       # bump on every published change of this monster's files (data, assets or code); 1.0.0:
+                        # first release (core 1.8.0); 0.4.6:
                         # the laser 7/57 / 7/71 shows his own 4U effect em041_101 (GU gives it none); the spit's
-                        # 4U beam of 0.4.5 removed (GU has its own effect there; user test 2026-11-02); 0.4.5:
+                        # 4U beam of 0.4.5 removed (GU has its own effect there; maintainer's test 2026-11-02); 0.4.5:
                         # the spit 7/13 7/14 7/50 shows 4U's beam (em024_009 + em040_100), its frame-150 puff is
                         # 4U's em040_020 without a hit (was GU's gas shell), the roars play GU's air effect on the
-                        # head for 4U's length (PR #12 point 3) (user test 2026-11-02); 0.4.4:
-                        # GU's effects in every motion GU gives one, 4U's only where GU has none (user); 0.4.3:
+                        # head for 4U's length (PR #12 point 3) (maintainer's test 2026-11-02); 0.4.4:
+                        # GU's effects in every motion GU gives one, 4U's only where GU has none (the maintainer); 0.4.3:
                         # slain in a capture quest fails it (GU's rule applied after the tally); 0.4.2:
                         # all motion effects from 4U (em040_0 + em041_1, PSL 0..4), test logs (script per action,
                         # capture-objective state); 0.4.1:

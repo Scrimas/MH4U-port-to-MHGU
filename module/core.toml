@@ -3,7 +3,10 @@
 # (tools/release.py). Bump on every published change of the module or of any data file.
 name = "core"
 title = "MH4U Port core"
-version = "1.7.3"          # 1.7.3: hooks off Forge-checked bytes (issue #10), Stygian sound / aura / kill cam (#8),
+version = "1.8.0"          # 1.8.0: Black Gravios (PR #12, Gravios variant 1), hooks off Damage Numbers' checked
+                           #        bytes (issue #13), Gogmazios tar HUD icon / rage roar (#5), Dalamadur meteor
+                           #        scales, the build on Windows and Linux;
+                           # 1.7.3: hooks off Forge-checked bytes (issue #10), Stygian sound / aura / kill cam (#8),
                            #        Gogmazios wall AI, supply box, eyelids (#11), Tigerstripe kill cam;
                            # 1.7.2: quests on the v1.4 format (chT / chS refs), Gogmazios dttune regenerated;
                            # 1.7.1: effect fixes (issues #6 / #7 / #8: ground sets, Stygian parts, Gogmazios tar);
