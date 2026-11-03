@@ -313,7 +313,7 @@ CODE_FX = [('effect\\efl\\em\\em040\\em040_020', dict(id=4042, joint=-1, k=0, po
            # the beam's heat burst (0x808410 at frame 120: request 6 = (50, 6) = em040_013, mask 1 << 0, or 1 << 8 with
            # state bit 4; module/em005_01_beam.c): before 0.4.7 the burst's hit came with no look (test 2026-11-03)
            # on joint 2 (the body), where 4U plays em040_013 in his heat moves (MEF 2005 / 2007 / 2014 / 2016); 4U's
-           # request puts it on the monster's origin (joint 255): at his feet, "halfway into the floor" (user, 2026-11-03:
+           # request puts it on the monster's origin (joint 255): at his feet, "halfway into the floor" (maintainer, 2026-11-03:
            # keep 4U's look, on the body). DEVIATION (placement only)
            ('effect\\efl\\em\\em040\\em040_013', dict(id=4045, joint=2, k=0, pos=(0.0, 0.0, 0.0), rot=(0.0, 0.0, 0.0),
                                                      scl=(1.0, 1.0, 1.0))),

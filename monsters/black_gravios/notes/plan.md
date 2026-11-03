@@ -385,7 +385,7 @@ Test 2026-11-03 (log 16-52-51, quest 11430): lasers "condensed, not full height 
   posts no shell (attackEx at d2f300 / d2f4ec only). Now posted from em005_01_act_c (records 4043 / 4044).
 - Crash 2026-11-03 (log 17-21-11): efx_set_pos on a freed effect (+0x150 held a float) on the 8th laser: handles are
   now validated each frame (vtable, state, transform pointers).
-- Hits (user test 2026-11-03, open): 7/79 "doesn't hurt" (GU has no beam hit) -> GU's laser hit shell02 entry 4 / 12
+- Hits (maintainer test 2026-11-03, open): 7/79 "doesn't hurt" (GU has no beam hit) -> GU's laser hit shell02 entry 4 / 12
   posted at frame 99 as a stand-in (S; GU life 162 vs 4U 100: may hit after the beam ends). Laser 7/57 / 7/71 hits
   "inconsistent": GU's shell02 entry 4 geometry vs 4U's head-following capsule not compared yet (GU shell class not
   read). "Walks forward and fires a series of small projectiles (instead of lasers)": not identified in a log; his
@@ -403,6 +403,6 @@ Test 2026-11-03 (log 16-52-51, quest 11430): lasers "condensed, not full height 
   stand-in of the previous build is gone.
 - Beam heat burst (C, traced 2026-11-03): 0x805920 `cmp #41` -> 0x808410(this, 1, 120) after every beam of 7/73 /
   7/89: frame 120 request 6 (em040_013, mask 1 or 1 << 8 with state bit 4) + sound 216, frame 140 attack 26 (57 with
-  state bit 4); Gravios (40) only when its state bits say so. The user died to it twice (2026-11-03, "all around his
-  body"). Since then its look is posted (records 4045 / 4046), on joint 2 instead of 4U's monster origin (user's choice:
+  state bit 4); Gravios (40) only when its state bits say so. The maintainer died to it twice (2026-11-03, "all around his
+  body"). Since then its look is posted (records 4045 / 4046), on joint 2 instead of 4U's monster origin (the maintainer's choice:
   4U's look, on the body; deviation, placement only). Sound 216 still not posted.

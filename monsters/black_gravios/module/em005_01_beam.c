@@ -19,7 +19,7 @@
  *    message 3 (the gas: user "explosion and sleep gas at the same time"). The attack indexes are 4U's in every GU
  *    copy (d2bc88 d2d9e8 d2e030, C). In 4U every beam of a series (7/73 -> 7/89 -> 7/89 .., 0x805a90) ends this way.
  *  - not ported: 4U's sound 216 at frame 120 (GU's class posts no sounds: they are motion data, G).
- *  - 0.4.7 (user test 2026-11-03: died to "a wrong hitbox" in the 7/73 -> 7/89 series; log: attack 26 at 4:40.114,
+ *  - 0.4.7 (maintainer test 2026-11-03: died to "a wrong hitbox" in the 7/73 -> 7/89 series; log: attack 26 at 4:40.114,
  *    the cart tally 9 ms later): the burst's 4U look is posted at frame 120 as PEL list-2 records 4045 / 4046
  *    (em040_013 k 0 / k 8; em040_013 has no element 8, so the heated request shows nothing in 4U either, S), not GU's
  *    gas message 3 of 0.4.1.

@@ -26,7 +26,7 @@
  * Here GU's shells / attacks stay. em041_101 is posted as PEL list-2 world records 4043 / 4044 (k 0 / 1 = masks 1 /
  * 2, build_em005_01_arc.py CODE_FX) at Q along Q -> P, re-placed, re-scaled and ended every frame with 4U's rules
  * (tick from em005_01_act_c; the spin beam is posted from there too). 0.4.6 posted the laser without the curves, at
- * scale 1 (x 1/13 of 4U's width at its peak: user test 2026-11-03 "condensed, not full height / width"), and had no
+ * scale 1 (x 1/13 of 4U's width at its peak: maintainer test 2026-11-03 "condensed, not full height / width"), and had no
  * spin beam ("some lasers are just absent"). Hook: before GU's laser post (d2dfe0: mov r0, r6; bl 0x48c4f0; r1 = the
  * message, r4 = this). */
 #include <stdint.h>

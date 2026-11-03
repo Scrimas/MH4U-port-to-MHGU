@@ -3,7 +3,7 @@
  * Gogmazios' em089_shell016.c: own DTI, own request, slot 79 setup, slot 9 per frame). Their look is
  * em005_01_laser.c. C = confirmed in code, S = strong, G = guess. 4U = MH4U v1.1, GU = MHGU 1.4.
  *
- * Why (user test 2026-11-03: laser hits "inconsistent", spin beam "doesn't hurt"):
+ * Why (maintainer test 2026-11-03: laser hits "inconsistent", spin beam "doesn't hurt"):
  *  - GU's laser (d2da3c, d2dfe4) posts shell02 entry 4 / 12 = class uShellEm005_sp_02 (DTI 0x1892f28, vtable
  *    0x17a02a4): its setup 0xd33cfc places it once from the owner joint, then the shared projectile move 0x3fca34
  *    drives it (C). 4U's capsule follows the head every frame (0xc6b848, C), and so does the beam we draw: the hit and
