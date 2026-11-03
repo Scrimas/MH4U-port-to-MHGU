@@ -176,7 +176,7 @@ aim + Y does nothing, aim + A rolls on its first frame; aim + Y unmarked does no
 | 1 | no jump attack | every airborne Y came in 4/14 (the SHEATHED jump, table 2024) as sheathed command 5 = GS's jumping draw attack; s_ind_stand[5] = {1, 0, 0} (nothing). The jump code watched drawn jumps (category 1) only | command 5 in category 4 -> {0x10, 59}: MHF's falling attack 59, with the draw flag |
 | 2 | aim + A rolls | GU's common roll ids (+0x1418 bits 17-18) come before ours; only R held stripped them | stripped while aiming too |
 | 3 | no element | the equipped box entry is id 7 = Apophis Pillar "Clear", the one Magnet Spike with no element (stats raw 389 = its 374 + 15; "Flash" would be 352 + 15): likely no element bug at all | none; retest with Demon Flamespike "Flash" (id 2) |
-| 4 | no projectile, no blink | the projectile is not built (stand-in: the nearest large monster within 0.6 rad of the facing, 50 m); test 9's 3 shots found none in that cone, so no mark, no blink. The blink effect failed tests 6-8 with a mark | open: GS-template stand-ins at a world point never showed; MHF's projectile + mark effects belong to the effects port |
+| 4 | no projectile, no blink (-> MHF effects port, the maintainer's call after test 10) | the projectile is not built (stand-in: the nearest large monster within 0.6 rad of the facing, 50 m); test 9's 3 shots found none in that cone, so no mark, no blink. The blink effect failed tests 6-8 with a mark | open: GS-template stand-ins at a world point never showed; MHF's projectile + mark effects belong to the effects port |
 
 | (test 5) | ghost size | tuned to ~60 updates / s (the 120 FPS cheat, dt 0.5): native 30 fps moves 2 frames per check | before release: a hunt without the cheat, resize (a dt-based second set would pass GU's 255-set limit) |
 
@@ -201,3 +201,14 @@ aim L (or ZL). The gauge starts empty and fills 1 bar / 10 s and by hits; R move
 10. Magnetic Shock 5 x 3: evade through a monster attack with R + Y (or R + A) in Impact, then X / A: four ground
    impacts marching forward, each hitting (log "Magnetic Shock 5 x 3").
 Report: crashes, stuck actions, which aim button worked, what looked wrong.
+
+## Test 10 results (maintainer, 2026-11-03) and fixes
+Log: dump/mhf/test_logs/ms_test10_Ryujinx_1.3.3_2026-11-03_20-08-12.log. The maintainer: Demon Flamespike "Flash"
+shows no fire element in the smithy; the sheathed jump attack starts (airborne part) but goes back to idle on
+landing; aim + A still rolls. Effects: port MHF-ZZ's own (next phase).
+
+| # | issue | log / cause | change (test 11) |
+|---|---|---|---|
+| 1 | no element in the smithy | the quest's weapon was still box id 7 (Apophis "Clear", no element). The smithy / equipment rows test `type - 11 < 3` (HBG 11, LBG 13) at 0x5402dc, 0x6ceda4, 0x6d2fa0: type 12 = a bowgun row, no element line | build.py MS_GUNTYPE_SITES: type in {11, 13} (cmp / cmpne / bne) |
+| 2 | falling attack cut on landing | 59 ended on landing (kind-5 step) | landing 59 -> 60, 73 -> 74 (MHF's landing actions: motions 1015 / 1014, shake) |
+| 3 | aim + A rolls | no "aim A refused" line: aim + A never matched (aim + Y did) | every press while aiming logged with GU's common ids |

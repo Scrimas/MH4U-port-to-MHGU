@@ -350,6 +350,12 @@ void ms_input(uint8_t *p)
         FIELD(uint32_t, p, 0x1418) &= ~(3u << 17);
         if (set && (trig & (BTN_B | BTN_Y))) FIELD(uint32_t, p, 0x1414) &= ~CID_SHEATHE;
     }
+    if ((s->flags & 1) && trig) {                       /* test 10: aim + A rolled, no aim + A ever matched */
+        static int s_ap;
+        if (s_ap++ < 20) logf("msport: aim press %x held %x combo %x common %x %x in %u/%u", trig, held, combo,
+                              FIELD(uint32_t, p, 0x1414), FIELD(uint32_t, p, 0x1418), FIELD(uint16_t, p, 0x2506),
+                              FIELD(uint16_t, p, 0x250a));
+    }
     if (s->flags & 1) {                                 /* aiming: Y is not GU's sheathe (test 3), A not its roll */
         FIELD(uint32_t, p, 0x1414) &= ~CID_SHEATHE;
         FIELD(uint32_t, p, 0x1418) &= ~(3u << 17);      /* test 9: aim + A rolled on its first frame */
@@ -916,6 +922,12 @@ void ms_act(uint8_t *p)
     if (landed) {
         s->air = 0; s->att = 0; s->vy = 0; s->flags &= ~0x1000u;
         logf("msport: landed in action %u", no);
+        if (no == 59 || no == 73) {                     /* test 10: the falling attacks went back to idle on landing;
+                                                           MHF's next actions are their landings (60: motion 1015
+                                                           after 59's 1016, 74: 1014 after 73's 1017, both a shake) */
+            MS_SET_ACTION(p, 0x10, no + 1, 0);
+            return;
+        }
         if (s->end_on_land || st->kind == 5) { finish(p, s, a, k); return; }
     }
     if (st->kind == 5 && !s->att && !s->air && !s->pin_mon && s->step_t > 15) {

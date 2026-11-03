@@ -277,6 +277,9 @@ MS_ICON_ID = 121                    # weapons/magnet_spike/tools/ms_icon_hdui.py
 MS_LIT_PATCHES = [(0x6F2DA8, 0x6F2CEC, 'ms_forge_order'), (0x6F2B1C, 0x6F2A94, 'ms_forge_label'),
                   (0x6F29AC, 0x6F1D2C, 'ms_forge_label'), (0x5933F8, 0x5930B8, 'ms_shop_icons')] if MS_SLICE else []
 MS_GUNNER_SITES = [0x144968, 0x144A0C, 0x144B24, 0x6ECEFC, 0x6ED884, 0x6FCB2C, 0x7037A8, 0x70B738]
+# box-type tests `type - 11 < 3` (HBG 11, LBG 13: 12 between them) in the equipment / smithy UI rows (test 10: no
+# element shown for Demon Flamespike "Flash"; the bowgun rows have no element line). `bhs` = not a gunner
+MS_GUNTYPE_SITES = [0x5402DC, 0x6CEDA4, 0x6D2FA0]
 
 
 def ms_patches(img):
@@ -314,6 +317,12 @@ def ms_patches(img):
         ra, rb = (sub >> 12) & 15, (sub >> 16) & 15
         assert sub & 0xFFF00FFF == 0xE2400004 and cmp == 0xE3500003 | ra << 16 and blo >> 24 == 0x3A, hex(s)
         out += [(s, sub, 0xE3500004 | rb << 16), (s + 4, cmp, 0x13500006 | rb << 16), (s + 8, blo, blo & 0x0FFFFFFF)]
+    for s in MS_GUNTYPE_SITES:                 # sub rA, rB, #11; cmp rA, #3; bhs -> cmp rB, #11; cmpne rB, #13; bne
+        sub, cmp, bhs = word(s), word(s + 4), word(s + 8)    # (rA is rewritten before any read on both paths)
+        ra, rb = (sub >> 12) & 15, (sub >> 16) & 15
+        assert sub & 0xFFF00FFF == 0xE240000B and cmp == 0xE3500003 | ra << 16 and bhs >> 24 == 0x2A, hex(s)
+        out += [(s, sub, 0xE350000B | rb << 16), (s + 4, cmp, 0x1350000D | rb << 16),
+                (s + 8, bhs, bhs & 0x0FFFFFFF | 0x10000000)]
     # guard: class 5 joins the Great Sword's class masks (movw #imm, bit 5 added) in the can-guard check 0x2f2ba0, its
     # angle rule and the guard-level thresholds of 0x2f0670 (the Magnet Spike's Guard Counter / Impact guard windows)
     for site, old, new in ((0x2F2BC8, 0xC20B, 0xC22B), (0x2F2D8C, 0xC081, 0xC0A1), (0x2F07C0, 0xC001, 0xC021)):
