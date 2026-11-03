@@ -350,7 +350,10 @@ void ms_input(uint8_t *p)
         FIELD(uint32_t, p, 0x1418) &= ~(3u << 17);
         if (set && (trig & (BTN_B | BTN_Y))) FIELD(uint32_t, p, 0x1414) &= ~CID_SHEATHE;
     }
-    if (s->flags & 1) FIELD(uint32_t, p, 0x1414) &= ~CID_SHEATHE;   /* aiming: Y is not GU's sheathe (test 3) */
+    if (s->flags & 1) {                                 /* aiming: Y is not GU's sheathe (test 3), A not its roll */
+        FIELD(uint32_t, p, 0x1414) &= ~CID_SHEATHE;
+        FIELD(uint32_t, p, 0x1418) &= ~(3u << 17);      /* test 9: aim + A rolled on its first frame */
+    }
     uint32_t held32 = FIELD(uint32_t, p, 0x13fc);
     if ((held32 ^ s->held32) & ~0xfffu) {
         static int s_n;
@@ -765,7 +768,8 @@ static void action_start(uint8_t *p, struct ms_state *s, const struct ms_action 
     if (IN(s_cost, no)) gauge_add(s, -BAR);
     MS_ACTION_FLAGS(p, s->air || s->pin_mon ? 2 : 0, 1, 0);
     ((void (*)(void *, uint32_t))MS_VT(p, 0x46c))(p, 1);
-    if (no == 78 || no == 79) MS_DRAW_FLAG(p, 1);       /* the draw attacks, as GS's */
+    if (no == 78 || no == 79 || ((no == 59 || no == 73) && !ms_drawn(p)))
+        MS_DRAW_FLAG(p, 1);                             /* the draw attacks, as GS's (59: the sheathed jump's) */
     switch (no) {
     case 34: s->charge = 0; s->charge_lvl = 0; break;
     case 58: case 61: case 62: case 68: case 71: case 72:

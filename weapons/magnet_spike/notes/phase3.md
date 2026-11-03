@@ -167,6 +167,17 @@ running off a small step is enough for one in GU (not only high ledges).
 | 3 | no jump attack | four hops (1/137, 0.6 s, table 2018): held stays 0 on every frame in three; X (0x80) in one; nothing pressed in the class input during any hop, and no ground attack after them | every press while airborne logged (any action, height) |
 | 4 | element (stand-in) | still no fix line: a type-12 entry found, its id gave no element | logs the entry |
 
+## Test 9 results (maintainer, 2026-11-03) and fixes
+Log: dump/mhf/test_logs/ms_test9_Ryujinx_1.3.3_2026-11-03_20-00-47.log. The maintainer: no projectile, no blink;
+aim + Y does nothing, aim + A rolls on its first frame; aim + Y unmarked does nothing (OK); still no jump attack.
+
+| # | issue | log / cause | change (test 10) |
+|---|---|---|---|
+| 1 | no jump attack | every airborne Y came in 4/14 (the SHEATHED jump, table 2024) as sheathed command 5 = GS's jumping draw attack; s_ind_stand[5] = {1, 0, 0} (nothing). The jump code watched drawn jumps (category 1) only | command 5 in category 4 -> {0x10, 59}: MHF's falling attack 59, with the draw flag |
+| 2 | aim + A rolls | GU's common roll ids (+0x1418 bits 17-18) come before ours; only R held stripped them | stripped while aiming too |
+| 3 | no element | the equipped box entry is id 7 = Apophis Pillar "Clear", the one Magnet Spike with no element (stats raw 389 = its 374 + 15; "Flash" would be 352 + 15): likely no element bug at all | none; retest with Demon Flamespike "Flash" (id 2) |
+| 4 | no projectile, no blink | the projectile is not built (stand-in: the nearest large monster within 0.6 rad of the facing, 50 m); test 9's 3 shots found none in that cone, so no mark, no blink. The blink effect failed tests 6-8 with a mark | open: GS-template stand-ins at a world point never showed; MHF's projectile + mark effects belong to the effects port |
+
 | (test 5) | ghost size | tuned to ~60 updates / s (the 120 FPS cheat, dt 0.5): native 30 fps moves 2 frames per check | before release: a hunt without the cheat, resize (a dt-based second set would pass GU's 255-set limit) |
 
 ## Test 1 (Phase 3; save backup dump/save_backups/2026-10-29_before_magnet_spike)

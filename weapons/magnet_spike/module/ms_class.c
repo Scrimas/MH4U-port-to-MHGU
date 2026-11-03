@@ -92,6 +92,10 @@ static const uint16_t *indirect(uint8_t *p, uint32_t k)
         logf("msport: sheathed command %u in action %u/%u (%s)", k, FIELD(uint16_t, p, 0x2506),
              FIELD(uint16_t, p, 0x250a), moving ? "moving" : "standing");
     if (k > 8) k = 8;
+    /* test 9: every Y in a sheathed jump (4/14, table 2024) came as command 5 = GS's jumping draw attack; ours had
+     * {1, 0, 0} (nothing). MHF's falling attack 59 (Cutting; the attraction flight's tri) draws in the air */
+    static const uint16_t s_air[3] = {0x10, 59, 0};
+    if (k == 5 && FIELD(uint16_t, p, 0x2506) == 4) return s_air;
     return moving ? s_ind_move[k] : s_ind_stand[k];
 }
 
