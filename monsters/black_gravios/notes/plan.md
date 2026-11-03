@@ -24,7 +24,8 @@ Confidence: **C** confirmed in code / data, **S** strong, **G** guess.
 | Notes entry | none | save bits 123..127 all taken: `notes = false` (tools/alloc.py); a Notes page needs new save bits (open) |
 | UI icon | 204 | 4U icon 43 (its quests' board icon; Gravios' is 42) |
 | file IDs | 0x10900..0x1093f | |
-| quests, items, gear | later | quests need the placement decision below; items / gear counts come from the 4U tables |
+| quests | 10780 11430 10781 1025 1056 10782 10783 11451 | 4U m10611 m10923 m10601 m00911 m00902 m10606 m10615 m10927 |
+| items, gear | 3036..3040; [monster.append] | materials; armor / weapon records appended (allocations.toml) |
 
 ## 4U quests with Black Gravios (C: dump/romfs/loc/data/quest00 / 01.arc, spawn list +0x28)
 | 4U | title | stage | spawns (em, area, byte +0xF) | fee / reward / sub |
@@ -155,7 +156,7 @@ Reachable from his selectors (C): g1 0..2 6..9 11 12 21..27 31 32 34 38..42 47..
 calls (3..5 10 13..20 ...) are picked by code (GU keeps their numbers: same numbers, his 4U content).
 4U em==41 sites beyond plan.md's list: 0x800e60 in 1/18 (0x800d60): stamina cost 0x93bac0(1, 20) for em 39 / 41, 30
 for 38 / 40 / 115; GU d27c8c calls 0x9cf7c(this, 1), cost = float [this+0x75f0]+196 (a per-monster data record, field
-not identified): NOT ported (G that the record is in em005_00's files).
+not identified): not ported in 0.4.0; ported in 0.4.1 (hooks d27d58 / d27d64, see "Found and fixed in 0.4.1").
 
 Checks of the three gaps (2026-11-01, before the first 0.4.0 test):
 - Group 16 (4U rest script) never runs in GU (S): every write of the think group byte this+0x72fc (153 sites) stores
@@ -306,7 +307,7 @@ Test of 0.4.4 (2026-11-02, log 19-42-14, quest 10781): user "much better overall
 Test of 0.4.5 (2026-11-02, user; log not in the folder yet): roar air on the head "looks really good". A "huge blue
 explosion at the head" in a beam move followed by the body explosions: new in 0.4.5, so the spit effects (S: 7/50 =
 beam into the ground + step-2 burst; em024_009 / em040_100 at Q) -> to be removed (GU gives that shell its own
-effect 130 / 131: the GU-first rule). "The move that should get an animation" is NOT 7/50 (the parent's 7/50 mapping
+effect 130 / 131: the GU-first rule). "The move that should get an animation" is NOT 7/50 (the earlier 7/50 mapping
 was a guess): user: red fire at the mouth, hits in front first, then he lifts his face and hits at range, a laser.
 That is 7/57 / 7/71 (C, static):
 - 4U 0x803e6c (r1 0 / 2): frame 160 uShell016 33 / 35 (state bit 0; life 162, attack 29 / 30), joint 3, offset
@@ -331,7 +332,7 @@ Test of 0.4.6 (2026-11-02, user, no log): smithy preview of his armor fine; "the
 user described in the 0.4.5 test) still shows no visual. Left open and named in the PR #12 update comment (the user's
 choice: send 0.4.6 as it is); em005_01_laser.c stays as the attempt.
 
-## 4U behaviour of em 41 (static read 2026-11-01, S; full Phase 1 map still open)
+## 4U behaviour of em 41 (static read 2026-11-01, S; whole-exe re-scan 2026-11-03 below)
 Of the 9 `cmp #41` sites in uEm038, 7 treat em 41 exactly as Gravios em 40 (7ffb8c 808fb8 80910c 8091f0 919c38 9303bc
 931e80: shared branches, rank-5 G-rank tweak, sound 213 posts, state setup). Two are his own (with em 115):
 - 805320: in an attack's frame check, posts effect request 8 (0x809ae0(this, 8, 0), kind 50) when the state flag
@@ -345,9 +346,28 @@ request 6, frame 140 attack 26 (57 with state bit 4) = the heat burst after the 
 ends in a heat explosion Gravios' does not have. Ported (module/em005_01_beam.c, hook GU d2e3ec in GU's beam handler
 d2e0b4 = 4U 0x8050e0, C; same frames in both games, C; effect ids as GU's own copies post them, S; sound not ported, G).
 
-## Next
-1. User: placement of the quests (hub / village rank, which ones; m21006 or not), then quest IDs from the free lists
-   in monsters/stygian_zinogre/notes/quests.md section 3 (pool extended in allocations.toml).
-2. Phase 1 variant map (as monsters/tigerstripe_zamtrios/notes/phase1-variant-map.md): every 4U em==41 site in
-   uEm038 against GU uEm004_00's variant handling.
-3. Phase 2: arc em005_01.arc from 4U em041 (build_em067_01_arc.py as template), name, build.sh.
+Phase 1 variant map (2026-11-03): every `cmp #41` of the whole 4U exe (118) whose register comes from an
+`ldrb [.., #0x1c0]` within the 10 instructions before it is one of the 10 sites of this plan (the 9 above and 0x800e60,
+1/18's eating cost; S: a test on an em number loaded earlier or another way is not covered, nor is a table indexed by
+the em number, G). GU's uEm004_00 reads only the em number, 5 for Gravios and him alike, never the variant (section
+"His own AI and effects", C), so everything of his own runs through his AI table (dispatch check, C) and our hooks.
+
+## Known deviations from 4U (listed for review)
+- Effects: GU Gravios' wherever GU's PSL has one for the motion (user rule 2026-11-02); 4U's only where GU has none.
+- Roar: GU's air effect (cm202_050) on joint 3 for 4U's length instead of 4U's qe013 rings (user's choice).
+- Laser 7/57 / 7/71: no visual in game (GU posts the shell with no effect; em005_01_laser.c's em041_101 does not show,
+  user test of 0.4.6); 4U's frame-250 gas visual of it not ported. 7/50's 4U ground beam: GU's gas effect only.
+- Beam heat burst: 4U's request 6 (effect em040_013 + sound 216) not posted, the hit (attack 26 / 57) only (G: no GU
+  request for it found).
+- Rest group 16 (1/38, 1/41) and g1 s59 (7/75 7/76 7/82..7/85): not ported, no GU or 4U path reaches them (S).
+- etd header word-4 record list (empty in em041) and emd word-32 part colours: not ported (role unknown / no GU field).
+- Quests: 4U ranks moved to GU's (Hub HR6 -> HR7, G2 -> G4, caravan ★9 -> village ★10, as Stygian's); frenzy spawn
+  bytes dropped (GU has no frenzy); Brute Tigrex in m10606 -> GU Tigrex; arena m21006 not ported.
+- Rewards: 4U Gravios Shell has no same-name GU item; break groups 1 / 7 (frenzy) and 6 (Deviljho items) left out.
+- Armor: 4U Flame Aura has no GU tree (dropped). No Hunter's Notes entry (save bits 123..127 are taken).
+
+## Open
+1. Test log of 0.4.6 (user plays, the log is read): his own 7/58 7/71 7/79 7/80 and 7/28 7/31..33 7/42..45 have not
+   shown in a log yet (7/57 has, g1 s39); the laser lines "laser em041_101 ..."; a capture-kill objlog line.
+2. The laser visual: asked in PR #12.
+3. The burst's request 6 (em040_013 + sound 216): find what GU plays for it, if anything.
