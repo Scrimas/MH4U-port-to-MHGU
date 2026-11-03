@@ -371,3 +371,26 @@ the em number, G). GU's uEm004_00 reads only the em number, 5 for Gravios and hi
    shown in a log yet (7/57 has, g1 s39); the laser lines "laser em041_101 ..."; a capture-kill objlog line.
 2. The laser visual: asked in PR #12.
 3. The burst's request 6 (em040_013 + sound 216): find what GU plays for it, if anything.
+
+## Beams and their hits (2026-11-03, maintainer review of 0.4.6; module/em005_01_laser.c)
+Test 2026-11-03 (log 16-52-51, quest 11430): lasers "condensed, not full height / width" (7/71), "absent" (7/79).
+- C: em041_101 is a model-unit beam (EFL unit type 5). 4U scales it every frame: uEffect002 41 (0x1b5aa0) x = y =
+  curve(t), t += owner motion step: mask 1 0xfd0f3c (1 -> 3 at 20 -> 13 at 40), mask 2 0xfd0e4c / 0xfd0f0c (subtype
+  33 / 35: 1 -> 6 at 22 -> 3.2 / 1.6 to 147 -> 0 at 162). 0.4.6 left scale 1.0. Now applied (z = 1.0, both transform
+  objects).
+- C: 7/79 (4U 0x805eec r1 0; 7/80 = r1 1 posts none) fires uShell016 43 / 44 at frame 99 of motion 0x232 (life 100,
+  joint 3, offset (0, -50, 100), length 6400) whose init posts uEffect015 kinds 16 + 14 / 15 = em041_101 masks 1 / 2
+  (kind -> u16 0xfd16ac, 20-B records 0xfd16d0 {flags, curve A, curve B, 1000, mask}); 0x1c4fd0 t += dt then x = y =
+  A(t); after the shell, 0x1c4b84 releases kind 16 and shrinks 14 / 15 with B (3.2 / 1.6 -> 0 over 15). GU d2ef2c
+  posts no shell (attackEx at d2f300 / d2f4ec only). Now posted from em005_01_act_c (records 4043 / 4044).
+- Crash 2026-11-03 (log 17-21-11): efx_set_pos on a freed effect (+0x150 held a float) on the 8th laser: handles are
+  now validated each frame (vtable, state, transform pointers).
+- Hits (user test 2026-11-03, open): 7/79 "doesn't hurt" (GU has no beam hit) -> GU's laser hit shell02 entry 4 / 12
+  posted at frame 99 as a stand-in (S; GU life 162 vs 4U 100: may hit after the beam ends). Laser 7/57 / 7/71 hits
+  "inconsistent": GU's shell02 entry 4 geometry vs 4U's head-following capsule not compared yet (GU shell class not
+  read). "Walks forward and fires a series of small projectiles (instead of lasers)": not identified in a log; his
+  4U-only 7/28 7/31..33 7/42..45 (4U 0x8036f0: motion 0x419, N shots via 0x806c94 -> 0x661f6c type 14 / 16) never
+  ran in the three logs; best candidate 7/73 -> 7/89 (4U 0x8050e0 fires projectile shells via 0x661f6c / 0x661bec;
+  GU d2e0b4 posts at d2e330 d2e3d0, more at d2ed44 d2ee00 d2eebc). Next: compare GU's shells with 4U's per move.
+- Not explained: MEF 2061 / 2062 (frame 100 of motion 0x232) never reached the PSL gate in the 16-52-51 log while
+  2051 / 2052 did.
