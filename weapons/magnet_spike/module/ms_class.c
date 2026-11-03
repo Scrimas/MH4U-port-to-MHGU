@@ -461,6 +461,12 @@ static const struct ms_weapon *weapon_of(uint8_t *rec)
     return &s_weapons[id < MS_NWEAPONS ? id : 0];
 }
 static const char *w_name(uint8_t *rec) { return weapon_of(rec)->name; }
+int ms_weapon_element(uint32_t id, uint32_t *type, uint32_t *value)     /* ms_act.c elem_fix */
+{
+    if (id >= MS_NWEAPONS) return 0;
+    *type = s_weapons[id].element; *value = s_weapons[id].elem;
+    return 1;
+}
 static const char *w_desc(uint8_t *rec) { return weapon_of(rec)->desc; }
 static const char *w_name_lv(uint8_t *rec, uint32_t lv) { (void)lv; return weapon_of(rec)->name; }
 static const char *w_desc_lv(uint8_t *rec, uint32_t lv) { (void)lv; return weapon_of(rec)->desc; }

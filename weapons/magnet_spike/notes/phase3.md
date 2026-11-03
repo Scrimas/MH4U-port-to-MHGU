@@ -124,14 +124,22 @@ B 0x10, X 0x20, R 0x40, Y 0x80, A 0x100, ZL 0x200, L 0x400, ZR 0x800 (roles 0x65
 | 9 | viewer unchanged | the bounding sphere does not set its framing | reverted |
 | user | ghost size (test 5 note, kept below) | see below | see below |
 
-## Test 6 results (user, 2026-10-30; not analysed yet)
+## Test 6 results (maintainer, 2026-10-30) and fixes
 Log: dump/mhf/test_logs/ms_test6_Ryujinx_..._2026-10-30_16-13-37.log (956 msport lines; hit check, element stats,
-jump held-button and effect-handle logs inside). User's answers (Demon Flamespike equipped):
+jump held-button and effect-handle logs inside). The maintainer's answers (Demon Flamespike equipped):
 - crescent with the swing now: yes
 - Triple Strike full-charge flash (Impact B, B, hold B): no
 - flash on a guarded hit (RB + RT): yes
 - marker blink on the large monster (RT + B): no
 - jumping attack (Y in the air off a ledge): still none
+
+| # | issue | log / cause | change (test 7) |
+|---|---|---|---|
+| 1 | hits late (test 5) | NOT placement (C): the capsule end = the drawn blade, 0 cm at 31 of 37 checks, 16-18 cm at a few arming frames. Every hit lands at motion frame >= ~33 whatever its arming frame: f11 -> +0.37 s (9 of 9, also on a small monster 22 m from the large one), f27 -> +0.10 s, f31 -> +0.04 s, f33+ -> at once. No re-hit lockout (+0.37 s even 5 s after the previous hit). GS's HDP [0] / [1] are not start / live frames (GS: 96..280 / 75), 0x2b72d4 uses [0] only with flag 0x4000 clear | hit check off; slot trace: the armed slot (p+0x3020 + slot x 0xb8) per update for 40 updates, 6 early arms |
+| 2 | no element | hunter stats key 0x11 = 0, key 2 = 0, raw 389 (C): lost at equip time. The 13 "per-class mElement readers" are save serialisers (0x1014d8: stream writes), not the fill; the fill is not 0xdee34 (skills) nor 0xe1bbc. The type -> class table 0x159fdcc: gunner types 11 / 13 / 17, so `type - 11 < 3` tests (0x5402dc, 0x6ceda4, 0x6d2fa0, 0x11ffe4c) count type 12 as a gunner (S: the smithy's missing element; not patched, what they gate is unread) | stand-in elem_fix: the record's element into stats +0x342 / +0x324 (hunter data +0x320 + 2 key) while GU left them 0; weapon entry copy at hunter data +0x18 (+4 type, +6 id). Element skills are lost while it stands in |
+| 3 | no charge flash | posted (handle 47efcf80) through the guard flash's path: GS flash 7 itself is unseen | CHARGED = flash 9 (the guard's) |
+| 4 | no marker blink | 5 posts with handles at the monster: the request had no owner (req+4) nor area (req+0xc), which em089_efx.c's world posts set | req+4 = hunter, req+0xc = the area of the hunter's request +0x2550 |
+| 5 | no jump attack | one jump (1/140, table 2019): no input until RB at frame 41 (the log fires on any change: nothing was pressed, or the class input is not polled before frame 41) | log the first input frame of each jump |
 
 | (test 5) | ghost size | tuned to ~60 updates / s (the 120 FPS cheat, dt 0.5): native 30 fps moves 2 frames per check | before release: a hunt without the cheat, resize (a dt-based second set would pass GU's 255-set limit) |
 

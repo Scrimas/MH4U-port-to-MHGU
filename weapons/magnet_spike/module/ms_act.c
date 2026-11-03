@@ -203,6 +203,8 @@ static int input(struct ms_state *s, uint32_t inp, uint32_t held, uint32_t trig,
 
 static void arm(uint8_t *p, struct ms_state *s, uint32_t hit);
 static void hit_check(uint8_t *p, uint32_t hit, int late);
+static void slot_trace(uint8_t *p, struct ms_state *s);
+static void elem_fix(uint8_t *p);
 
 /* Magnetic Shock 5 x 3 (MHF task kind 0x0f, 0x1004d810): special #12 at task ticks 3 / 5 / 7 / 10 on spots 170 ->
  * 550 cm ahead (msbuild SHOCK; S: the hits follow the hunter, MHF's stay where spawned), each with GS's ground impact
@@ -235,6 +237,9 @@ static void *flash_at(uint8_t *p, const float *t)       /* the marker's flash at
     FIELD(uint32_t, req, 0x1c) |= 1u;
     for (int i = 0; i < 3; i++) FIELD(float, req, 0xc0 + 4 * i) = t[i];
     FIELD(float, req, 0xcc) = 0.0f;
+    FIELD(void *, req, 0x4) = p;                        /* test 6: handles but no blink. em089_efx.c's world posts set */
+    FIELD(uint8_t, req, 0xc) = FIELD(uint8_t, p, 0x2550 + 0xc);  /* the owner and its area: the area of the hunter's
+                                                           own request (+0x2550, the guard flash's, which shows) */
     void *h = ms_post(p, MS_EFX_MARKER, req);
     MS_REQ_DTOR(req);
     return h;
@@ -284,6 +289,7 @@ void ms_input(uint8_t *p)
     trace(p);
     struct ms_state *s = ms_of(p);
     static int s_stats;
+    elem_fix(p);
     if (!s_stats++) {                                   /* test 5: no element in the smithy nor on hits: the stats the
                                                            attack's element setup 0x2acfb8 reads (vt+0x15c 0x11 / 2) */
         typedef int (*ms_stat_t)(void *u, uint32_t k);
@@ -292,15 +298,22 @@ void ms_input(uint8_t *p)
     }
     tick(p, s, tick_len(p));
     if (s->chk_hit && MS_FRAME(p) >= s->chk_f) { hit_check(p, s->chk_hit, 1); s->chk_hit = 0; }
+    if (s->tr_n) { s->tr_n--; slot_trace(p, s); }
     uint32_t combo = FIELD(uint32_t, p, 0x1444), r = R_MASK();
     uint32_t held = FIELD(uint16_t, p, 0x13f4), trig = FIELD(uint16_t, p, 0x13f8);
     if ((held & BTN_ZR) && !(held & r) && ms_drawn(p)) s->flags |= 1; else s->flags &= ~1u;
     uint32_t jst = FIELD(uint16_t, p, 0x2506), jno = FIELD(uint16_t, p, 0x250a);
-    if (jst == 1 && (jno == 4 || jno == 5 || jno == 137 || jno == 140) && (trig || combo || held != s->held)) {
-        static int s_n;                                 /* test 4: "no jump attack" (tables 18 / 19, falling 59 / 73);
-                                                           test 5: no press logged in three hops */
-        if (s_n++ < 60) logf("msport: jump %u: held %x pressed %x combo %x table %u frame %d", jno, held, trig, combo,
-                             FIELD(uint32_t, p, 0x24ac), (int)MS_FRAME(p));
+    if (jst == 1 && (jno == 4 || jno == 5 || jno == 137 || jno == 140)) {
+        static int s_n, s_first;                        /* test 4: "no jump attack" (tables 18 / 19, falling 59 / 73);
+                                                           test 5: no press logged in three hops; test 6: one jump,
+                                                           nothing until RB at frame 41: is this polled earlier? */
+        static float s_last = 1e9f;
+        float f = MS_FRAME(p);
+        if (f < s_last && s_first++ < 20) logf("msport: jump %u: first input frame %d, held %x", jno, (int)f, held);
+        s_last = f;
+        if ((trig || combo || held != s->held) && s_n++ < 60)
+            logf("msport: jump %u: held %x pressed %x combo %x table %u frame %d", jno, held, trig, combo,
+                 FIELD(uint32_t, p, 0x24ac), (int)f);
     }
     uint32_t base = s->mode ? MS_ID_IMPACT : 0, set = 0;
     for (uint32_t k = 0; k < MS_NPAIRS; k++)
@@ -339,7 +352,8 @@ void ms_input(uint8_t *p)
  * world matrix of its joint record: joints +0x494, index from the id table +0x498, 160 bytes, rows +0x10 / +0x20 /
  * +0x30, position +0x40, as GU's lookup 0x53ab30) against the same point on the drawn weapon (its weapon bone in the
  * weapon model's own joint records, the part-0 object +0x23a0, same layout assumed), at arming and 8 frames later */
-#define MS_HIT_CHECK 1
+#define MS_HIT_CHECK 0                  /* test 6: 0 cm at 31 of 37 checks, 16-18 cm at a few arming frames: placement
+                                           is right */
 
 static int joint_point(const uint8_t *u, uint32_t id, const int16_t *v, float t[3])
 {
@@ -395,6 +409,38 @@ static void arm(uint8_t *p, struct ms_state *s, uint32_t hit)
     MS_ARM(p, s->slot, hit, 3);                         /* GU's weapon classes pass 3 or 0; 0x2b76cc sets the
                                                            element (bit 1) only for a non-zero value (test 4: 0, the
                                                            fire / dragon spikes hit raw) */
+    static int s_tr;                                    /* test 6: every hit landed at motion frame >= ~33 whatever
+                                                           its arming frame (f11 -> +0.37 s, f27 -> +0.10 s) */
+    if (MS_FRAME(p) < 30.0f && s_tr++ < 6) { s->tr_n = 40; s->tr_slot = s->slot; s->tr_hit = (uint16_t)hit; }
+}
+
+/* the armed slot (p + 0x3020 + slot * 0xb8, filled by 0x2b72d4 / 0x168960) once per update: which field holds the
+ * hit back until ~f33 */
+static void slot_trace(uint8_t *p, struct ms_state *s)
+{
+    uint8_t *a = p + 0x3020 + s->tr_slot * 0xb8;
+    logf("msport: slot %u hit %u f%d: +4 %x +30 %x +38 %d +48 %x +4c %x +5c %d +60 %d +6e %u +70 %x, 31b4 %x",
+         s->tr_slot, s->tr_hit, (int)MS_FRAME(p), FIELD(uint32_t, a, 4), FIELD(uint32_t, a, 0x30),
+         FIELD(int16_t, a, 0x38), FIELD(uint32_t, a, 0x48), FIELD(uint32_t, a, 0x4c),
+         (int)(FIELD(float, a, 0x5c) * 10), (int)(FIELD(float, a, 0x60) * 10), FIELD(uint8_t, a, 0x6e),
+         FIELD(uint32_t, a, 0x70), FIELD(uint32_t, p, 0x31b4));
+}
+
+/* test 6: hunter stats element 0 with the fire spike (GU's equip-time fill, 0xdee34 / 0xe1bbc callers, gives type
+ * 12 none; filler not located). Stand-in: the equipped record's element into the stats GU's arming reads (0x2acfb8:
+ * vt+0x15c keys 0x11 type, 2 value = hunter data +0x320 + 2 key), only while GU left them 0. Weapon entry copy =
+ * hunter data +0x18 (0xe0d90 slot 0, box entry layout: +4 type, +6 id) */
+static void elem_fix(uint8_t *p)
+{
+    uint8_t *hd = FIELD(uint8_t *, p, 0x13c4);
+    uint32_t t, v;
+    if (!hd || (FIELD(uint16_t, hd, 0x1c) & 0x1f) != MS_TYPE) return;
+    int16_t *st = (int16_t *)(hd + 0x320);
+    if (st[0x11] || !ms_weapon_element(FIELD(uint16_t, hd, 0x1e), &t, &v) || !t) return;
+    static int s_n;
+    if (s_n++ < 4) logf("msport: element fix: weapon %u, GU had type %d value %d -> %u / %u", FIELD(uint16_t, hd, 0x1e),
+                        st[0x11], st[2], t, v);
+    st[0x11] = (int16_t)t; st[2] = (int16_t)v;
 }
 
 /* slot 37 (+0x94): GU calls it after the damage of the owner's attack on a monster (kind 1). MHF on hit: gauge

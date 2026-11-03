@@ -59,6 +59,8 @@ struct ms_state {
     uint16_t armed[2];              /* hit-data entry armed in each attack slot */
     uint16_t chk_hit;               /* hit check pending (ms_act.c hit_check) at motion frame chk_f */
     float chk_f;
+    uint8_t tr_n, tr_slot;          /* attack-slot trace (ms_act.c slot_trace): updates left, slot */
+    uint16_t tr_hit;
     uint8_t shock_on, shock_k;      /* Magnetic Shock 5 x 3 task running, spots spawned */
     float shock_t;                  /* its ticks */
     float mk_blink, aura_t;         /* ticks to the marker's and Magnetise's next flash */
@@ -150,6 +152,7 @@ static inline int ms_drawn(uint8_t *p) { return ((int (*)(void *))MS_VT(p, 0x178
 
 void ms_act(uint8_t *p);            /* ms_act.c: slot 201 */
 void ms_input(uint8_t *p);          /* ms_act.c: slot 139 */
+int ms_weapon_element(uint32_t id, uint32_t *type, uint32_t *value);   /* ms_class.c: record id -> element, GU units */
 void ms_on_hit(uint8_t *p, uint8_t *atk, uint8_t *mon, uint32_t kind);      /* ms_act.c: slot 37 */
 void ms_guarded(uint8_t *p, uint32_t level, uint8_t *info, int32_t *dmg);   /* ms_act.c: slot 356 */
 int ms_invuln(uint8_t *p);          /* ms_act.c: slot 44 */
