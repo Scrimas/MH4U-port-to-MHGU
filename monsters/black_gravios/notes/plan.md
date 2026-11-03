@@ -401,3 +401,8 @@ Test 2026-11-03 (log 16-52-51, quest 11430): lasers "condensed, not full height 
   GU's own shell02 HDS entries 5 / 6 / 1 / 3 = 4U records 29 / 30 / 43 / 44 (Capcom's conversion, HTS r 360 / 240 /
   180 / 110 = 4U volumes 14 / 15 / 6 / 10, C). GU's laser post skipped (MID_EXIT d2dfe8, message freed). The
   stand-in of the previous build is gone.
+- Beam heat burst (C, traced 2026-11-03): 0x805920 `cmp #41` -> 0x808410(this, 1, 120) after every beam of 7/73 /
+  7/89: frame 120 request 6 (em040_013, mask 1 or 1 << 8 with state bit 4) + sound 216, frame 140 attack 26 (57 with
+  state bit 4); Gravios (40) only when its state bits say so. The user died to it twice (2026-11-03, "all around his
+  body"). Since then its look is posted (records 4045 / 4046), on joint 2 instead of 4U's monster origin (user's choice:
+  4U's look, on the body; deviation, placement only). Sound 216 still not posted.
