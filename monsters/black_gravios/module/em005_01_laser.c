@@ -43,16 +43,7 @@ enum { R0, R1, R2, R3, R4, R5, R12, LR };
 #define FX_K1       4044u       /* em041_101 k 1 (mask 2) */
 #define SPIN_MOTION 0x232u      /* 4U 0x8061ec */
 #define SPIN_FRAME  99.0f       /* 4U 0x806218 */
-/* GU's laser hit shell (d2df54..d2dfe4, the same message as em005_01_beam.c post_request): shell02 entry 4 | state
- * bit 0 << 3, owner slot this+0xcacc; life 162 from GU's data (4U's spin shell 43 / 44: 100) */
-#define EN_EFX_OWNER 0xcacc
-#define MSG_MGR     0x1892550
-#define MSG_VT      0x175585c
-#define MSG_VEC     0x191e850
-typedef void *(*alloc_t)(uint32_t size, uint32_t align);
-#define msgAlloc    FN(alloc_t, 0x3fc428)
-typedef void (*post_t)(void *mgr, void *msg, uint32_t a, uint32_t b);
-#define msgPost     FN(post_t, 0x48c4f0)
+void *em005_01_beam_hit_post(void *self, uint32_t subtype);   /* em005_01_shell016.c: 4U's head-following capsule */
 
 /* jointMtx(unit, joint, float out[16]): world matrix of a joint [4U 0x930894] (em089_shell016.c, C) */
 typedef void (*joint_mtx_t)(void *unit, uint32_t joint, float *out);
@@ -301,29 +292,6 @@ static void tick_one(void *self, int which)
     }
 }
 
-/* the spin beam's hit: 4U's shell 43 / 44 carries it (GU d2ef2c has only short attack colliders, user test
- * 2026-11-03: "doesn't hurt me"); GU's own laser hit shell stands in (S: GU's version of 4U's capsule on joint 3) */
-static void spin_hit(void *self, int b0)
-{
-    static uint32_t s_lines;
-    void *mgr = *(void **)MAIN(MSG_MGR);
-    const uint32_t *v = (const uint32_t *)MAIN(MSG_VEC);
-    uint8_t *m;
-    if (!mgr || !(m = msgAlloc(48, 16))) return;
-    FIELD(uint32_t, m, 0x00) = MAIN(MSG_VT) + 8;
-    FIELD(uint32_t, m, 0x04) = FIELD(uint32_t, self, EN_EFX_OWNER);
-    FIELD(uint32_t, m, 0x08) = 4u | (uint32_t)b0 << 3;
-    FIELD(void *, m, 0x0c) = self;
-    FIELD(uint32_t, m, 0x10) = v[0];
-    FIELD(uint32_t, m, 0x14) = v[1];
-    FIELD(uint32_t, m, 0x18) = v[2];
-    FIELD(uint32_t, m, 0x1c) = 0;
-    FIELD(uint16_t, m, 0x20) = 0;
-    FIELD(uint32_t, m, 0x24) = 0xffff;
-    msgPost(mgr, m, 0, 0);
-    if (++s_lines <= 20) logf("bgport: spin beam hit: GU laser shell02 entry %u", 4u | (uint32_t)b0 << 3);
-}
-
 /* every frame (em005_01_act_c, before GU's dispatch): the spin beam's post (4U 0x806170: 7/79 only, motion 0x232,
  * frame 99), then 4U 0xc6b848 placement + the effects' scale and end for both beams (HP 0 too: the death action runs
  * outside slot 125, so its motion change may never be seen here) */
@@ -333,19 +301,24 @@ void em005_01_laser_tick(void *self)
         curMotion(self) == SPIN_MOTION && atFrame(self, SPIN_FRAME)) {
         int b0 = FIELD(uint8_t, FIELD(uint8_t *, self, EN_WORK), WK_STATE) & 1;
         start(self, SPIN, b0 ? 44 : 43, 100.0f, -50.0f, 100.0f, K_MASK1, b0 ? K_S15 : K_S14, b0 ? K_E15 : K_E14);
-        spin_hit(self, b0);
+        em005_01_beam_hit_post(self, b0 ? 44 : 43);
     }
     tick_one(self, LASER);
     tick_one(self, SPIN);
 }
 
 /* GU 0xd2dfe0 (r1 = the shell message, r4 = this): d2da3c's frame-160 shell post, before the request; GU's entry 4 /
- * 12 = 4U subtype 33 / 35 (d2dfe4: 4 | state bit 0 << 3) */
+ * 12 = 4U subtype 33 / 35 (d2dfe4: 4 | state bit 0 << 3). For him GU's shell (uShellEm005_sp_02, a projectile that
+ * does not follow the head) is replaced by 4U's capsule (em005_01_shell016.c): the message is deleted unposted and
+ * the hook exits past the post (MID_EXIT d2dfe8). */
 int em005_01_laser_c(uint32_t *regs)
 {
     void *self = (void *)regs[R4];
     if (!self || FIELD(uint16_t, self, EN_ID) != BLACK_GRAVIOS_EM_ID) return 0;
-    int b0 = (FIELD(uint32_t, (void *)regs[R1], 0x8) & 8) != 0;
+    void *msg = (void *)regs[R1];
+    int b0 = (FIELD(uint32_t, msg, 0x8) & 8) != 0;
     start(self, LASER, b0 ? 35 : 33, 162.0f, 0.0f, 180.0f, K_MASK1, b0 ? K_L35 : K_L33, 0);
-    return 0;
+    if (!em005_01_beam_hit_post(self, b0 ? 35 : 33)) return 0;    /* ours failed: GU's shell after all */
+    VCALL0(msg, 1);                                               /* deleting dtor */
+    return 1;
 }

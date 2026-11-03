@@ -198,6 +198,7 @@ MID_EXIT = {
     'quest_unlocked': 0x3B219C,  # ldrb r0, [sp, #7]: returns the result byte quest_unlocked_c wrote
     'tex_bind': 0xA4FB34,        # pop {r4, pc}: the bind is skipped, the sprite keeps its texture
     'em005_01_pslgate': 0x7016C, # mov r0, #0; return: the PSL slot posts nothing (GU's own no-post path)
+    'em005_01_laser': 0xD2DFE8,  # b 0xd2e03c: GU's laser shell not posted (4U's capsule instead, em005_01_shell016.c)
 }
 # functions whose first 0x20 bytes a Forge plugin checks (Key Quest Markers r18: its table of address + v1.4 bytes);
 # main() refuses a hook site inside them
