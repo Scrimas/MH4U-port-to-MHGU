@@ -309,6 +309,12 @@ CODE_FX = [('effect\\efl\\em\\em040\\em040_020', dict(id=4042, joint=-1, k=0, po
            ('effect\\efl\\em\\em041\\em041_101', dict(id=4043, joint=-1, k=0, pos=(0.0, 0.0, 0.0), rot=(0.0, 0.0, 0.0),
                                                      scl=(1.0, 1.0, 1.0))),
            ('effect\\efl\\em\\em041\\em041_101', dict(id=4044, joint=-1, k=1, pos=(0.0, 0.0, 0.0), rot=(0.0, 0.0, 0.0),
+                                                     scl=(1.0, 1.0, 1.0))),
+           # the beam's heat burst (0x808410 at frame 120: request 6 = (50, 6) = em040_013, mask 1 << 0, or 1 << 8 with
+           # state bit 4; module/em005_01_beam.c): before 0.4.7 the burst's hit came with no look (test 2026-11-03)
+           ('effect\\efl\\em\\em040\\em040_013', dict(id=4045, joint=-1, k=0, pos=(0.0, 0.0, 0.0), rot=(0.0, 0.0, 0.0),
+                                                     scl=(1.0, 1.0, 1.0))),
+           ('effect\\efl\\em\\em040\\em040_013', dict(id=4046, joint=-1, k=8, pos=(0.0, 0.0, 0.0), rot=(0.0, 0.0, 0.0),
                                                      scl=(1.0, 1.0, 1.0)))]
 # the roars (bank 0 motions 104 = 1/17 and 4): GU's air effect on the head for 4U's length (roar_head)
 ROAR_MOTIONS = (4, 104)

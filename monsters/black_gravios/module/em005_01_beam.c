@@ -19,6 +19,10 @@
  *    message 3 (the gas: user "explosion and sleep gas at the same time"). The attack indexes are 4U's in every GU
  *    copy (d2bc88 d2d9e8 d2e030, C). In 4U every beam of a series (7/73 -> 7/89 -> 7/89 .., 0x805a90) ends this way.
  *  - not ported: 4U's sound 216 at frame 120 (GU's class posts no sounds: they are motion data, G).
+ *  - 0.4.7 (user test 2026-11-03: died to "a wrong hitbox" in the 7/73 -> 7/89 series; log: attack 26 at 4:40.114,
+ *    the cart tally 9 ms later): the burst's 4U look is posted at frame 120 as PEL list-2 records 4045 / 4046
+ *    (em040_013 k 0 / k 8; em040_013 has no element 8, so the heated request shows nothing in 4U either, S), not GU's
+ *    gas message 3 of 0.4.1.
  * State byte: GU work+0x24 = 4U [this+0x8c88]+0x28 (C: GU d2bca4 / 4U 0x808440 test the same bits 2 and 4).
  * The spit 7/13 7/14 7/50 (4U 0x802768, GU d2bd2c) is in em005_01_spit.c. */
 #include <stdint.h>
@@ -40,6 +44,12 @@ typedef void *(*alloc_t)(uint32_t size, uint32_t align);
 #define msgAlloc    FN(alloc_t, 0x3fc428)       /* new(48, 16) as d2bb9c */
 typedef void (*post_t)(void *mgr, void *msg, uint32_t a, uint32_t b);
 #define msgPost     FN(post_t, 0x48c4f0)
+
+typedef void *(*efx_post_t)(void *self, uint32_t mode, uint32_t id, void *req);
+#define efx_post_u   FN(efx_post_t, 0x6ff74)     /* PEL u list 2 (em005_01_spit.c) */
+typedef void (*efx_req_t)(void *req);
+#define efx_req_ctor FN(efx_req_t, 0x40b10)
+#define efx_req_dtor FN(efx_req_t, 0x40b50)
 
 static int is_black_gravios(const void *self)
 {
@@ -78,6 +88,14 @@ int em005_01_beam_c(uint32_t *regs)
     st = FIELD(uint8_t, FIELD(uint8_t *, self, EN_WORK), WK_STATE);
     if (atFrame(self, 10.0f) && (st & 2) && !(st & 4))
         post_request(self, 10 | (st & 1), 0x80536c);
+    if (atFrame(self, 120.0f)) {          /* 4U 0x808428: request 6 = em040_013 on the monster (records 4045 / 4046) */
+        uint32_t buf[0x100 / 4 + 4];
+        void *req = (void *)(((uint32_t)buf + 15u) & ~15u);
+        efx_req_ctor(req);
+        void *e = efx_post_u(self, 2, (st & 4) ? 4046u : 4045u, req);
+        efx_req_dtor(req);
+        if (++s_lines <= 20) logf("bgport: beam heat burst look em040_013 k %u -> %x", (st & 4) ? 8u : 0u, (uint32_t)e);
+    }
     if (atFrame(self, 140.0f)) {
         uint32_t idx = (st & 4) ? 57 : 26;
         attackEx(self, 0, idx, 4096);
