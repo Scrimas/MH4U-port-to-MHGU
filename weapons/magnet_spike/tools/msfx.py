@@ -34,10 +34,11 @@ SHOCK_TEMPLATE = 105          # GS's charged slash ground impact (cm001_004, pos
 # looks with no MHF counterpart converted (S): GS's charge flashes copied under ids its PTS does not tie a sound to.
 # Code posts (vt+0x39c) read PEL list 2 (GS's: 500-517, its code-posted charge glows; list 1 = the PSL's): test 4,
 # every code post asked list-1 ids and showed nothing (the marker's returned 0); CODE_EFX go to lists 1 and 2
-MARKER_EFX = (1200, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), 0.5, 9)          # the marker, posted at its point (ms_act.c)
+MARKER_EFX = (1200, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), 0.5, 6)          # the marker, posted at its point (ms_act.c);
+# GS's charge glow 6 (tests 6 / 7: template 9 is a GS slash trail, unseen at a still point)
 AURA_EFX = (1201, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), 0.6, 11, 8)        # Magnetise on: on the weapon hand (joint 8)
-FLASH_EFX = {'CHARGED': (1300, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), 1.0, 9, 8),     # Triple Strike charged (test 6:
-             # GS flash 7 posted (handle) but unseen; flash 9 = the guard's, seen)
+FLASH_EFX = {'CHARGED': (1300, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), 1.0, 7),     # Triple Strike charged: GS's charge
+             # flash 7 on its own joint (65535; test 6: forced onto joint 8 it was unseen; test 7: 9 = a GS slash)
              'GUARD': (1301, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), 1.0, 9, 8),       # guarded hit (flash 9)
              'MAGNETISE': (1302, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), 1.0, 11, 8)}  # Magnetise on (flash 11)
 LEAD = 4                      # frames before the hit the swing path starts

@@ -311,11 +311,20 @@ void ms_input(uint8_t *p)
         float f = MS_FRAME(p);
         if (f < s_last && s_first++ < 20) logf("msport: jump %u: first input frame %d, held %x", jno, (int)f, held);
         s_last = f;
-        if ((trig || combo || held != s->held) && s_n++ < 60)
+        if (s_n++ < 120)                                /* test 7: 3 hops, no change logged: every frame now */
             logf("msport: jump %u: held %x pressed %x combo %x table %u frame %d", jno, held, trig, combo,
                  FIELD(uint32_t, p, 0x24ac), (int)f);
     }
     uint32_t base = s->mode ? MS_ID_IMPACT : 0, set = 0;
+    for (uint32_t k = 0; k < MS_NPAIRS; k++) {
+        uint32_t in = ms_pairs[k].inp, c = ms_pairs[k].cond;
+        if ((in == 23 || in == 24) && (c == 10 || c == 11) && input(s, in, held, trig, combo, r) && !cond(p, s, c)) {
+            static int s_ref;                           /* test 7: "cannot trigger attract / repulse" */
+            if (s_ref++ < 20) logf("msport: aim %s refused: marker %d cm (attract 1400-4000, repel 0-1400), gauge %d, "
+                                   "stamina %d", in == 24 ? "Y" : "A", (int)marker_dist(p, s), s->gauge,
+                                   (int)MS_STAMINA_NOW(p));
+        }
+    }
     for (uint32_t k = 0; k < MS_NPAIRS; k++)
         if (input(s, ms_pairs[k].inp, held, trig, combo, r) && cond(p, s, ms_pairs[k].cond)) {
             MS_SET_CLASS_ID(p, base + k);
@@ -433,13 +442,17 @@ static void slot_trace(uint8_t *p, struct ms_state *s)
 static void elem_fix(uint8_t *p)
 {
     uint8_t *hd = FIELD(uint8_t *, p, 0x13c4);
-    uint32_t t, v;
-    if (!hd || (FIELD(uint16_t, hd, 0x1c) & 0x1f) != MS_TYPE) return;
-    int16_t *st = (int16_t *)(hd + 0x320);
-    if (st[0x11] || !ms_weapon_element(FIELD(uint16_t, hd, 0x1e), &t, &v) || !t) return;
+    uint32_t t, v, k;
+    if (!hd) return;
+    for (k = 0; k < 8 && (FIELD(uint16_t, hd, 0x1c + 0x2c * k) & 0x1f) != MS_TYPE; k++) ;  /* test 7: not slot 0 (the
+                                                           slot comes from the type, 0xdae68) */
     static int s_n;
-    if (s_n++ < 4) logf("msport: element fix: weapon %u, GU had type %d value %d -> %u / %u", FIELD(uint16_t, hd, 0x1e),
-                        st[0x11], st[2], t, v);
+    if (k == 8) { if (!s_n++) logf("msport: element fix: no type-12 entry at hunter data +0x18 + 0x2c k"); return; }
+    uint32_t id = FIELD(uint16_t, hd, 0x1e + 0x2c * k);
+    int16_t *st = (int16_t *)(hd + 0x320);
+    if (st[0x11] || !ms_weapon_element(id, &t, &v) || !t) return;
+    if (s_n++ < 4) logf("msport: element fix: slot %u weapon %u, GU had type %d value %d -> %u / %u", k, id, st[0x11],
+                        st[2], t, v);
     st[0x11] = (int16_t)t; st[2] = (int16_t)v;
 }
 

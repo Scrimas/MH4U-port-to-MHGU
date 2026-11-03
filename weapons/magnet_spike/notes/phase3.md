@@ -141,6 +141,19 @@ jump held-button and effect-handle logs inside). The maintainer's answers (Demon
 | 4 | no marker blink | 5 posts with handles at the monster: the request had no owner (req+4) nor area (req+0xc), which em089_efx.c's world posts set | req+4 = hunter, req+0xc = the area of the hunter's request +0x2550 |
 | 5 | no jump attack | one jump (1/140, table 2019): no input until RB at frame 41 (the log fires on any change: nothing was pressed, or the class input is not polled before frame 41) | log the first input frame of each jump |
 
+## Test 7 results (maintainer, 2026-11-03) and fixes
+Log: dump/mhf/test_logs/ms_test7_Ryujinx_1.3.3_2026-11-03_19-25-59.log. The maintainer: hits still late in both
+forms; the charge flash showed a GS slash, not GS's charge glow; the marker shot animates but nothing shows on the
+monster, attraction / repulsion never trigger; no jump attack on Y in the air.
+
+| # | issue | log / cause | change (test 8) |
+|---|---|---|---|
+| 1 | hits late | C: slot +0x5c (start countdown, -0.5 per update) = 21.9 at f12, live at ~f34, +0x60 (live) = 10.0. HDP [2] is the absolute motion frame the hit goes live on (0x2b72d4: [2] - current frame), [3] the live frames: mshit wrote MHF's live frames into [1] and kept GS's [2] = 34 / [3] = 10 (Impact: MHF's KO went into [2] = its start frame) | [2] = 0 (live at the ATTACK event), [3] = MHF's live frames; MHF's KO has no GU field yet (template's) |
+| 2 | charge flash = a GS slash | template 9 = a GS slash trail | GS's charge flash 7 on its own joint (65535; test 6 forced it onto joint 8) |
+| 3 | no marker blink; attract / repulse never | two marks landed (37 m, 16 m); 5 flashes posted with template 9 (a slash trail: nothing at a still point). One attraction (58) started. MHF's rule: attract = aim (RT) + Y with the mark 14-40 m away, repulse = aim + A within 14 m, both 1 gauge bar + stamina | marker = GS's charge glow 6; refused aim + Y / A logged with the mark's distance |
+| 4 | no jump attack | three hops 1/137, input polled from frame 0, no change logged | every jump frame logged (held, pressed, combo) |
+| 5 | element (stand-in) | elem_fix never ran: the weapon is not equipment slot 0 (slot by type, 0xdae68) | scans the 8 entries at hunter data +0x18 + 0x2c k for type 12 |
+
 | (test 5) | ghost size | tuned to ~60 updates / s (the 120 FPS cheat, dt 0.5): native 30 fps moves 2 frames per check | before release: a hunt without the cheat, resize (a dt-based second set would pass GU's 255-set limit) |
 
 ## Test 1 (Phase 3; save backup dump/save_backups/2026-10-29_before_magnet_spike)

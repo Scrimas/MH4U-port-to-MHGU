@@ -2,8 +2,9 @@
 attack records (dat/mhfsdt.bin kind 0x78, tools/sdt.py) and the weapon poses at each attack's frame.
 
 GU formats (C, notes/gu-weapon-class.md "Hit data"; reader 0x168960):
-  HDP: 'HDP\\0', u32 0x20160209, u32 count, count x 56 B (28 i16): [0] frames before the hit goes live (counted
-       from the motion's current frame; 0 = live now), [1] live frames, [4] attack byte (+0x3a; GU keeps it = the
+  HDP: 'HDP\\0', u32 0x20160209, u32 count, count x 56 B (28 i16): [0] / [1] not timing (GS 96..280 / 75), [2] the
+       motion frame the hit goes live on (C, test 7: 0x2b72d4 counts slot +0x5c = [2] - current frame down; 0 = live
+       at arming), [3] live frames (slot +0x60; GS 6..28), [4] attack byte (+0x3a; GU keeps it = the
        motion value, <= 250 in every class; the hit code also compares it with kind codes), [8] damage type (1 impact,
        2 cut), [16] low byte = hit shape set, [22..25] two f32 1.0 multipliers, [26] motion value (short).
        The other fields come from a GU template entry of the same damage type (GS 1 for cut, Hammer 3 for impact).
@@ -40,8 +41,8 @@ def hdp_entry(template, mv, dur, kind, shape, ko=None):
     """a GU entry from a template: live now for dur frames, motion value mv, damage type, hit shape set; ko = MHF's
     KO value into i16[2] (S: GU's KO, Hammer 22..52; the template's otherwise)"""
     e = list(template)
-    e[0], e[1] = 0, dur
-    if ko is not None: e[2] = int(round(ko))
+    e[2], e[3] = 0, dur             # live now (the ATTACK event arms at MHF's frame) for MHF's live frames; ko: no GU
+    #                                 field known yet (it was written over the start frame, test 7), the template's
     e[4] = min(mv, 250)
     e[8] = kind
     e[16] = (e[16] & ~0xff) | shape
