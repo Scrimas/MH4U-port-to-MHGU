@@ -111,10 +111,29 @@ Strike, else 36 Triple Strike 3; the hold expiring (step kind 2) -> 36. Module: 
 scaled), GS's charge flash as the cue.
 
 ## Marker, attraction, repulsion
-- Shot (82 / 84, event 4 special #1 + event 17): MHF aims with the camera and fires a projectile that sticks (4
-  global slots, life 9000 ticks, frozen during the attraction). Module (S): the hunter faces the camera at the
-  start; the shot marks the nearest large monster within 0.6 rad and 5000 units; marker position = the monster's
-  origin + 300 up (GU has no shot point).
+- Aim (C, static study 2026-11-04):
+  - **Aim flag:** MS flag 0x1 is written only by 0x1033a270, per tick for the local hunter, while drawn:
+    - cmd 0xe6 held aims (S: L2);
+    - R1 released then held again within about 6 ticks also aims; releasing R1 ends it.
+  - **No pose:** there is no aim action, motion, pose or speed change.
+  - **Masking:** 0x10337330 masks the other inputs while aiming.
+  - **Camera:** the MS camera 0x1033a880 is over the shoulder, pivot = position + a preset offset by yaw.
+    - Free look: yaw ±0x240 and pitch ±0x160 per tick, pitch clamped to −0x12e4..+0xd1c.
+    - It stays on in idle / walk / runs and in 98 / 99; it is off in the pin actions.
+  - **Reticle:** HUD 0x10b87b40 → 0x10339700 draws sprite 0xb6 at the screen centre. Frame 0 = repel possible, 1 = attract possible, 2 = neither. Scale = screen height / 720. No lock-on.
+  - **"Launcher":** not a model. The weapon is one mesh with no part scaling; the shot and effect 0x312 (event 17's task 0x3c, 0x1004d700) both come from bone 18, the −x hand.
+- Shot (82 / 84; 0x103333a0, 0x101e8de0 / 0x101e9070 / 0x101eb540, C):
+  - **Start:** the hunter takes the camera yaw; the direction = normalize(look-at − eye), pitch included.
+  - **Spawn:** bone 18 + R(yaw) (22, 0, 0) + 20 up, at event 4 (f14 in 82, f12 in 84).
+  - **Flight:** 500 per tick (prm16), no gravity, sphere r 30, life 150 ticks (mhfsdt kind 0x79 record 1, S).
+  - **End:** below the ground or into the map (segment ends raised 50).
+  - **Hit:** a monster hit stores the point in the hit volume's bone frame (0x101e84d0). A miss leaves no marker.
+  - **Marker:** special #2, 4 global slots, one per hunter, life prm14 = 9000. It follows the bone every tick (0x101e9450) and ends on death, area change or a broken part.
+  - **Module:**
+    - shot_step every tick: the swept segment against each large monster's hurt volumes, placed by GU's 0x16de70 from bodydata 0x710b0 (push-only records skipped);
+    - the surface point toward the shot goes into that joint's frame (joint_mat); marker() rebuilds it from the joint each tick;
+    - deviations (S): GU's marker flash every 2 ticks as the shot's look, no wall test (ground − 300 instead);
+    - not done: the reticle and the aim camera.
 - Ranges (3-D distance to the marker): attract 1400 < d < 4000, repel 0 < d < 1400.
 - Attraction (58 / 61 / 62 / 68 / 71 / 72): face the marker; phases 1 ease-in along the flight direction,
   v = 90 (0.2t)(2 - 0.2t) per tick while t <= 4 (0x10332dd0 case 1, C), 2 fly 90 / tick toward the marker until

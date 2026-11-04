@@ -50,6 +50,10 @@ struct ms_state {
     float charge;                   /* P+0xb24: Triple Strike charge ticks */
     float step_t;                   /* ticks in the current step */
     uint8_t *mk_mon;                /* the monster the marker sticks to (0 none) */
+    uint16_t mk_joint;              /* its joint (0xffff: the stand-in point, the origin + MARKER_Y) */
+    uint8_t shot_on;                /* the marker shot in flight (MHF special #1) */
+    float mk_local[3];              /* the marker point in that joint's frame (MHF: the hit point, bone-local) */
+    float shot_p[3], shot_v[3], shot_t, aim_dir[3];   /* the shot: position, velocity per tick, age; aim direction */
     float mk_t;                     /* marker lifetime */
     uint8_t att;                    /* attraction phase: 0 off, 1 lift, 2 fly, 3 fall */
     float att_t, att_h, dir[3];

@@ -114,9 +114,25 @@ static int em_ok(uint8_t *m)        /* a large monster the hit pass would test (
     return r && FIELD(uint8_t, r, 0x1a0) && !FIELD(uint8_t, r, 0x444) && FIELD(int32_t, r, 0x370) > 0;
 }
 
+/* a joint's world matrix (rows +0x10 / +0x20 / +0x30 = axes, +0x40 = position: joints +0x494, index from the id
+ * table +0x498, 160 bytes; GU's 0x53aad8 / 0x53ab30, the same for the hunter and the monsters) */
+static const float *joint_mat(const uint8_t *u, uint32_t id)
+{
+    const uint8_t *ids = u ? FIELD(const uint8_t *, u, 0x498) : 0, *js = u ? FIELD(const uint8_t *, u, 0x494) : 0;
+    if (!ids || !js || ids[id & 0xff] == 0xff) return 0;
+    return (const float *)(js + 0xa0 * ids[id & 0xff] + 0x10);
+}
+
 static int marker(struct ms_state *s, float t[3])
 {
     if (!s->mk_mon) return 0;
+    const float *m = s->mk_joint != 0xffff ? joint_mat(s->mk_mon, s->mk_joint) : 0;
+    if (m) {                                            /* MHF (0x101e9450, C): the bone's translation + rotation x
+                                                           the local offset, every tick: the marker follows the part */
+        const float *l = s->mk_local;
+        for (int k = 0; k < 3; k++) t[k] = l[0] * m[k] + l[1] * m[4 + k] + l[2] * m[8 + k] + m[12 + k];
+        return 1;
+    }
     uint8_t *r = em_rec(s->mk_mon);
     t[0] = FIELD(float, r, 0x40); t[1] = FIELD(float, r, 0x44) + MARKER_Y; t[2] = FIELD(float, r, 0x48);
     return 1;
@@ -128,28 +144,126 @@ static float marker_dist(uint8_t *p, struct ms_state *s)   /* 3-D, -1 = no marke
     return marker(s, t) ? root(sq(t[0] - q[0]) + sq(t[1] - q[1]) + sq(t[2] - q[2])) : -1.0f;
 }
 
-/* the shot (82 / 84 event 4, special #1): MHF fires a projectile that sticks where it hits. Stand-in (S): the nearest
- * large monster within 0.6 rad of the hunter's facing (the camera's, set at the action start) and MARKER_RANGE */
-static void marker_shot(uint8_t *p, struct ms_state *s)
+/* the marker shot (82 / 84 event 4 = MHF special #1; MHF 0x101e8de0 / 0x101e9070 / 0x101eb540, C):
+ * - spawn: hunter bone 18 (the -x hand = GU joint 12) + R(yaw) (22, 0, 0) + 20 up;
+ * - velocity: the camera's 3-D view direction at the action start x prm16 = 500 per tick, no gravity;
+ * - life: mhfsdt kind 0x79 record 1 field 1 = 150 ticks (S); it ends below the ground (and on map walls in MHF:
+ *   not tested here, S);
+ * - hit: its sphere (r 30) against the monster's hurt volumes, the hit point kept in the hit bone's frame; a miss
+ *   leaves no marker.
+ * Module: each tick the swept segment against every hurt volume of every large monster, placed as GU places them
+ * (bodydata 0x710b0, world shapes 0x16de70 as the shape cache 0x16abac; push-only records, +10 & 0x100, skipped) */
+#define SHOT_SPEED 500.0f                               /* prm16 */
+#define SHOT_LIFE 150.0f
+#define SHOT_R 30.0f
+#define SHOT_HAND 12                                    /* GU joint of MHF bone 18 (msgrip) */
+struct shape_in { int16_t a, b, shape; uint16_t flag; float radius; uint32_t pad0; float o1[4], o2[4];
+                  uint8_t attach, pad1[3]; float scale; };
+typedef int (*ms_shape_t)(uint32_t mode, void *m, struct shape_in *in, float *out);
+typedef const int16_t *(*ms_bdd_t)(void *m);
+#define MS_SHAPE FN(ms_shape_t, 0x16de70)               /* -> 1 sphere (out p0, radius [8]), else p0 -> p1 */
+#define MS_BODYDATA FN(ms_bdd_t, 0x710b0)               /* 44-B records until bone 0xffff */
+
+static float dot3(const float *a, const float *b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
+static float clamp01(float x) { return x < 0 ? 0 : x > 1 ? 1 : x; }
+
+/* closest points of segments a0-a1 and b0-b1 (Ericson 5.1.9): squared distance, the parameters in sa / sb */
+static float seg_seg(const float *a0, const float *a1, const float *b0, const float *b1, float *sa, float *sb)
 {
+    float d1[3], d2[3], r[3], s = 0, t = 0;
+    for (int k = 0; k < 3; k++) { d1[k] = a1[k] - a0[k]; d2[k] = b1[k] - b0[k]; r[k] = a0[k] - b0[k]; }
+    float a = dot3(d1, d1), e = dot3(d2, d2), f = dot3(d2, r);
+    if (a < 1e-6f && e < 1e-6f) s = t = 0;
+    else if (a < 1e-6f) { s = 0; t = clamp01(f / e); }
+    else {
+        float c = dot3(d1, r);
+        if (e < 1e-6f) { t = 0; s = clamp01(-c / a); }
+        else {
+            float b = dot3(d1, d2), den = a * e - b * b;
+            s = den > 1e-6f ? clamp01((b * f - c * e) / den) : 0;
+            t = (b * s + f) / e;
+            if (t < 0) { t = 0; s = clamp01(-c / a); } else if (t > 1) { t = 1; s = clamp01((b - c) / a); }
+        }
+    }
+    float d = 0;
+    for (int k = 0; k < 3; k++) { float x = a0[k] + d1[k] * s - b0[k] - d2[k] * t; d += x * x; }
+    *sa = s; *sb = t;
+    return d;
+}
+
+/* one step of the shot from s->shot_p over tk ticks: 1 = it hit (marker placed), -1 = it ended, 0 = flying */
+static int shot_step(uint8_t *p, struct ms_state *s, float tk)
+{
+    float a0[3], a1[3];
+    for (int k = 0; k < 3; k++) { a0[k] = s->shot_p[k]; a1[k] = a0[k] + s->shot_v[k] * tk; }
     void *mgr = MS_EM_MGR;
-    float *q = pos_of(p), a0 = FIELD(uint16_t, p, 0xfec) * MS_U16_RAD, best_d = 0;
-    uint8_t *best = 0;
+    float best = 1e30f, hit[3] = {0, 0, 0};
+    uint8_t *bm = 0; uint16_t bj = 0;
     for (int i = 0; mgr && i < 10; i++) {
         uint8_t *m = MS_EM_GET(mgr, i);
         if (!em_ok(m)) continue;
-        uint8_t *r = em_rec(m);
-        float dx = FIELD(float, r, 0x40) - q[0], dz = FIELD(float, r, 0x48) - q[2], d = sq(dx) + sq(dz);
-        float da = atan2f_gu(dx, dz) - a0;
-        while (da > 3.1415927f) da -= 6.2831853f;
-        while (da < -3.1415927f) da += 6.2831853f;
-        if (da > 0.6f || da < -0.6f || d > sq(MARKER_RANGE)) continue;
-        if (!best || d < best_d) { best = m; best_d = d; }
+        const int16_t *r = MS_BODYDATA(m);
+        for (int n = 0; r && r[0] != -1 && n < 256; n++, r += 22) {
+            uint16_t fl = (uint16_t)r[5];
+            if (fl & 0x100) continue;                   /* push only */
+            struct shape_in in = {r[0], r[1], r[2], (uint16_t)((fl >> 12) & 1), *(const float *)(r + 8), 0,
+                                  {*(const float *)(r + 10), *(const float *)(r + 12), *(const float *)(r + 14), 0},
+                                  {*(const float *)(r + 16), *(const float *)(r + 18), *(const float *)(r + 20), 0},
+                                  1, {0, 0, 0}, 1.0f};
+            float out[12] = {0};
+            int ty = MS_SHAPE((fl & 0x1fff) >> 12, m, &in, out);
+            if (!ty) continue;
+            const float *c1 = ty == 1 ? out : out + 4;
+            float sa, sb, d = seg_seg(a0, a1, out, c1, &sa, &sb), rr = out[8] + SHOT_R;
+            if (d > rr * rr || sa >= best) continue;
+            best = sa; bm = m;
+            bj = (uint16_t)(ty != 1 && sb > 0.5f && r[1] != -1 ? r[1] : r[0]);
+            float ax[3], sp[3], n3[3], nl;                     /* the volume's surface toward the shot */
+            for (int k = 0; k < 3; k++) {
+                ax[k] = out[k] + (c1[k] - out[k]) * sb; sp[k] = a0[k] + (a1[k] - a0[k]) * sa; n3[k] = sp[k] - ax[k];
+            }
+            nl = root(dot3(n3, n3));
+            for (int k = 0; k < 3; k++) hit[k] = nl > 1 ? ax[k] + n3[k] / nl * out[8] : sp[k];
+        }
     }
-    if (!best) { logf("msport: marker shot missed"); return; }
-    s->mk_mon = best; s->mk_t = MARKER_TIME;
-    logf("msport: marker on monster %x (em %u) at %d", (uint32_t)(uintptr_t)best, FIELD(uint8_t, best, 0xb5f4),
-         (int)root(best_d));
+    if (bm) {
+        const float *m = joint_mat(bm, bj);
+        s->mk_mon = bm; s->mk_t = MARKER_TIME;
+        s->mk_joint = m ? bj : 0xffff;
+        if (m)                                          /* world -> the joint's frame (orthogonal axes, scaled) */
+            for (int k = 0; k < 3; k++) {
+                const float *ax = m + 4 * k;
+                float w[3] = {hit[0] - m[12], hit[1] - m[13], hit[2] - m[14]}, l2 = dot3(ax, ax);
+                s->mk_local[k] = l2 > 1e-9f ? dot3(w, ax) / l2 : 0;
+            }
+        float *q = pos_of(p);
+        logf("msport: marker shot hit monster %x (em %u) joint %u at %d %d %d, %d cm away, after %d ticks",
+             (uint32_t)(uintptr_t)bm, FIELD(uint8_t, bm, 0xb5f4), bj, (int)hit[0], (int)hit[1], (int)hit[2],
+             (int)root(sq(hit[0] - q[0]) + sq(hit[1] - q[1]) + sq(hit[2] - q[2])), (int)s->shot_t);
+        return 1;
+    }
+    for (int k = 0; k < 3; k++) s->shot_p[k] = a1[k];
+    s->shot_t += tk;
+    if (s->shot_t >= SHOT_LIFE || s->shot_p[1] < MS_GROUND_Y(p) - 300.0f) {
+        logf("msport: marker shot missed (%d ticks, %d cm)", (int)s->shot_t, (int)(s->shot_t * SHOT_SPEED));
+        return -1;
+    }
+    return 0;
+}
+
+static void marker_shot(uint8_t *p, struct ms_state *s)
+{
+    const float *h = joint_mat(p, SHOT_HAND), *q = pos_of(p);
+    float y = FIELD(uint16_t, p, 0xfec) * MS_U16_RAD, c = cosf_gu(y), sn = sinf_gu(y);
+    const float o[3] = {22.0f * c, 20.0f, -22.0f * sn};   /* R(yaw) (22, 0, 0) + 20 up */
+    for (int k = 0; k < 3; k++) {
+        s->shot_p[k] = (h ? h[12 + k] : q[k] + (k == 1 ? 150.0f : 0)) + o[k];
+        s->shot_v[k] = s->aim_dir[k] * SHOT_SPEED;
+    }
+    s->shot_t = 0; s->shot_on = 1;
+    logf("msport: marker shot from %d %d %d (hand %s), direction %d %d %d / 1000", (int)s->shot_p[0],
+         (int)s->shot_p[1], (int)s->shot_p[2], h ? "joint 12" : "missing", (int)(s->aim_dir[0] * 1000),
+         (int)(s->aim_dir[1] * 1000), (int)(s->aim_dir[2] * 1000));
 }
 
 /* ------------------------------------------------------------------------------------------------ gauge, inputs */
@@ -277,6 +391,12 @@ static void marker_blink(uint8_t *p, struct ms_state *s)
 static void tick(uint8_t *p, struct ms_state *s, float tk)
 {
     shock_tick(p, s, tk);
+    if (s->shot_on) {                                   /* the marker shot (S: GU's marker flash as its look) */
+        int r = shot_step(p, s, tk);
+        if (r) s->shot_on = 0;
+        else if ((int)(s->shot_t * 0.5f) != (int)((s->shot_t - tk) * 0.5f)) flash_at(p, s->shot_p);   /* every
+                                                           2 ticks (MHF: special #9 trail posts at 100..1500 cm) */
+    }
     if (s->mk_mon && (s->mk_blink -= tk) <= 0) { s->mk_blink = MARKER_BLINK; marker_blink(p, s); }
     if (s->mag[s->mode] == 1 && ms_drawn(p) && (s->aura_t -= tk) <= 0) {
         s->aura_t = AURA_EVERY;
@@ -828,10 +948,18 @@ static void action_start(uint8_t *p, struct ms_state *s, const struct ms_action 
     case 66: case 67:                                   /* repulsion: face the marker, the motion pushes away */
         if (marker(s, t)) face(p, yaw_to(t[0] - q[0], t[2] - q[2]));
         break;
-    case 82: case 84: {                                 /* the shot: aim with the camera */
+    case 82: case 84: {                                 /* the shot: MHF's action start 0x103333a0 (C): the hunter
+                                                           takes the camera's yaw, the shot its 3-D view direction */
         uint8_t *cm = MS_CAM_MGR, *cam = cm ? FIELD(uint8_t *, cm, 0x54) : 0;
-        if (cam) face(p, yaw_to(FIELD(float, cam, 0x60) - FIELD(float, cam, 0x40),
-                                FIELD(float, cam, 0x68) - FIELD(float, cam, 0x48)));
+        float y = FIELD(uint16_t, p, 0xfec) * MS_U16_RAD;
+        s->aim_dir[0] = sinf_gu(y); s->aim_dir[1] = 0; s->aim_dir[2] = cosf_gu(y);
+        if (cam) {
+            float d[3], n;
+            for (int k = 0; k < 3; k++) d[k] = FIELD(float, cam, 0x60 + 4 * k) - FIELD(float, cam, 0x40 + 4 * k);
+            n = root(dot3(d, d));
+            face(p, yaw_to(d[0], d[2]));
+            if (n > 1) for (int k = 0; k < 3; k++) s->aim_dir[k] = d[k] / n;
+        }
         break; }
     case 163: case 164:
         if (s->mag[s->mode] == 0 && s->mag_v[s->mode] >= MAG_READY) {
