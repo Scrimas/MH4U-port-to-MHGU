@@ -233,3 +233,13 @@ follow-up on "X + A"; no reticle, projectile nor launcher while aiming; MHF's ef
 | 4 | R moves without i-frames | MHF: event 8 = param (7 ticks) + 5 / + 10 with Evasion +1 / +2 (0x10337e30: skills 0xb1 / 0xb2 or their other sources): Capcom's chart's 17 = 7 + 10. The module grants 2 x 7 GU frames (+0x2b40 in 1/60 s, = MHF's 7 ticks) with GU's Evasion. Test 14's hit in RB + Y came 0.53 s in (after 7 ticks, inside 17) | none (MHF's values); log of each grant and of every hit during an MS action |
 | 5 | no Guard Counter follow-up | 57 / 76 / 77's tables have MHF's tri + circle -> 154 (f28 / f68) and tri -> 16 (f46-f76) = Xbox Y + B / Y (MHF keyconfig: tri + circle = pad bits 0xa, top + right); "X + A" was the test-3 checklist's Switch letters; test 6's one try rolled | press log during 57 / 76 / 77 / 114 / 115 |
 | 6 | aim: no reticle, projectile, launcher | MHF (static study, mechanics.md "Aim" / "Shot"): a projectile flies 500 per tick along the camera's 3-D view and sticks to the hit bone (a miss = no marker); the reticle is HUD sprite 0xb6; there is no launcher model (the left hand + effect 0x312). The stand-in picked the nearest monster in a cone and used its origin + 300 (item 3's "too far") | MHF's shot against GU's hurt volumes (0x710b0 / 0x16de70), the marker on the hit joint; reticle, aim camera and effect 0x312 open |
+
+## Test 15 (PENDING: built and installed 2026-11-04, commit 0a90839; the maintainer was not available)
+Build: `GOG_DEFINES=MS_SLICE` (items 1-6 above). Play, then close the game; the log answers the rest. Xbox letters.
+1. RT + B at a large monster's body: the shot log says hit (joint, point) or miss; the marker stays on that part.
+2. RT + Y from 14-40 m to the marker, then Y or A in the air (MHF's 58 / 61 follow-ups).
+3. RT + A from under 14 m: repulsion, no roll.
+4. Guard Counter (RB + RT) into an attack, then Y + B (follow-up 154).
+5. An RB move (RB + Y / A / X / B) through an attack: the log prints each i-frame grant and any hit.
+6. The smithy element line of Demon Flamespike "Flash" (and the element in a quest).
+Ask only about visuals: did the attraction look too fast / too far, what the shot looked like.

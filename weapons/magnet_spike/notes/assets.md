@@ -135,18 +135,44 @@ MHF's), the attach offset on GU's weapon bone, all 40 models.
   2. convert the textures (PNG -> GU RGBA8 .tex, as tools/efl4u2gu.py convert_tex);
   3. build GU EFL per MHF effect from GU template units (billboard particle / ribbon / mesh: tools/efl4u2gu.py knows the containers and block layouts), with MHF's colours, sizes, lifetimes, counts and velocities;
   4. post them where MHF does (msfx PEL ids, ms_act posts); they replace the GS stand-ins.
-- **Effect runtime** (decode in progress):
+- **Effect runtime** (decoded 2026-11-04 except the F emitters):
   - **Effect** = every A record with A +0x50 == the effect id: the posted "index" is that id, not an A row. 0x113d3fc0 runs the timeline per frame:
     - each matching A spawns at its frame +0x4e: +0x58 particles, flags +0x54 (bit 0 = no particle);
     - particle definition = the E record whose +4 == A +0x4c; params A +0x48 / +0x5c / +0x52;
-    - A floats 0x00-0x47 = position / velocity / rotation / scale bases and random ranges (0x113d37e0, 0x113d3bd0, 0x113d3d80, 0x113d3f00);
+    - A floats 0x00-0x47 = position / rotation / scale bases and random ranges ("Emitter" below);
     - spawn = 0x113cd960 (plain), 0x113cd4b0, or 0x113cd9c0 (attached variants: unit, joint).
-  - **Particle** = a 300-B task, update 0x113cda30. E +0x8 = life (frames); E +0xa = texture / animation id (0x113cc8a0); curve ids E +0xe, +0x10, +0x12, +0x22, +0x26 (0x113ccd10 / 0x113ccd50: keyed curves, S colour / alpha / scale / rotation); E +0x20 -> 0x113ccab0.
-  - Not decoded yet: the curve sections' key layout, the update and draw (blend, billboard / ribbon / mesh), the texture-id -> effect.bin entry mapping.
-  - Sections (0x113ccd10 / 0x113cc8a0 / 0x113ccab0, C):
-    - B (0x18 B) = curve keys grouped by curve id (byte +0x12), key frame at +0xc (the curve length = the largest);
-    - D (0x10 B) = texture-animation frames grouped by u16 +6 (= E +0xa), value +8; 0x113cc8e0 picks one at random among a group's entries whose +0 == 0;
-    - C (0x10 B) = grouped by byte +6 (= E +0x20), meaning open.
+  - **Particle** (C, 0x113cd4b0 spawn, 0x113cda30 update, 0x113ce4d0 draw; tools/mhffx.py decodes all below):
+    - a particle is a MESH of the effect model (effect.bin entry 0 part 0 = an FMOD of 446 meshes, part 1 its
+      FSKL; textures = entry 1's 13 PNG atlases), drawn with a world matrix = scale x rotation (x the view
+      matrix for the billboard flags E +0 bits 0 / 1 / 0x200) at its position. Loader 0x1089e0e0 -> 0x108f88e0:
+      8 model packs (table 0x11a458e0: entry pairs 0/1, 2/3, 4/5, 8/9, 12/13, 16/17); pack 0 = the common one.
+      Mesh -> material (FMOD dir 9, last u32 = texture index) -> texture (dir 0xa: u32 image index into the PNG
+      list, width, height). Meshes are quads (28 of 446 are 4-vertex) or shaped strips / rings, with atlas UVs.
+    - E (0x38): +0 flags (above; 4 / 0xc00 / particle flag 0x10 pick the render queue, 0x40 colour override,
+      0x80 snap to the ground, 0x400 distance cull); +4 id (= A +0x4c); +6 == 1: the set's own pack; +8 mesh;
+      +0xa D group (mesh flipbook; +0 frame, +8 mesh, random pick among frame-0 keys); +0xc life (scaled by the
+      A life scale +0x5c when >= 1); B curves: +0xe position offset (in the particle's rotated frame, + the
+      effect yaw), +0x10 rotation (degrees, added to the spawn rotation), +0x12 scale (x the spawn scale),
+      +0x22 (-> particle +0x78, draw, meaning open), +0x26 (open); +0x16 UV mode (1 scroll u / v by 1 / +0x18,
+      1 / +0x1c per tick; 2 u only; 3 v only; 4-6 flipbook of +0x18 cells over +0x1c frames; 7 UV from curve
+      +0x18); +0x20 colour curve (C group); +0x24 second D group; +0x15 draw mode; +0x28 f32 alpha parameter.
+    - B key (0x18): vec3 +0, i32 frame +0xc, u16 flags +0x10 (first key bit 0 = loop), byte curve id +0x12.
+      Linear between keys, the end values outside (0x113ccd90). C key (0x10): i32 frame, u16 flags +4, byte
+      group +6, RGBA bytes +8..+0xb (0x113ccaf0 packs A = +0xb, R = +8, G = +9, B = +0xa), linear.
+    - Ages count 2 per MHF tick (1/60 s), the effect timeline too (A +0x4e).
+  - **Emitter** A (0x70; 0x113d37e0 / 0x113d3bd0 / 0x113d3d80 / 0x113d3f00, C): position = base +0 + U(-1, 1) x
+    range +0xc per axis (turned by the effect yaw); rotation (rad) = base +0x18 + U x range +0x24, wrapped to
+    [-pi, pi]; scale = base +0x30 + U x range +0x3c (flag 2: one U for the three axes); flags 4 / 8 random mirror
+    of x / y; flag 1 = spawn F records (0x8c, second emitter kind, 0x113d0ca0 family, not decoded) instead of E.
+    The MHF RNG: r = r x 0xb0 mod 0xff53 (0x1ed5f2a2).
+  - **The Magnet Spike's 35 posted effects** (sets 0xfc5 / 0xfc6): 513 particles. 431 have no position curve
+    (they stay where they spawn, with the random spread, and only scale, turn, recolour). 52 move on one straight
+    segment (2 keys = constant speed). 15 move on two segments (3 keys). 15 are F emitters. 0xfc6 0xf has no A
+    record.
+  - **Deviation rule (maintainer, 2026-11-04)**: GU particles move by speed / gravity / drag, MHF's by keyed
+    paths. Any effect whose motion GU can only approximate (from the 3-key paths on, or anything the converter
+    fits with an error above its tolerance) goes on the deviation list with its error; the converter prints that
+    list.
 - **GU side**: GU's generator classes (DTI names at 0x157816d..):
   - Billboard, BillboardStrip, SizeBillboard, LiteBillboard, MassBillboard, Polyline, LitePolyline, Polygon, PolygonStrip, LitePolygon, AxisPolygon, ClothPolygon, Texline, Trail, Line, Model, PrimModel, Point, Custom, Filter, Force, Hit, LensFlare, Light, LightShaft, Adhesion.
   - tools/efl4u2gu.py knows EFL containers / blocks only structurally. No public layout of their fields (searched 2026-11-04). Writing new MHF-shaped effects needs those fields decoded from GU's code (unit factory, the Billboard / Trail generators' parameter reads).
