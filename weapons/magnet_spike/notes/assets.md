@@ -108,3 +108,45 @@ vertices in 0x14D40022, one strip per triangle, envelopes from mod4u2gu. The PNG
 and textures into a GU weapon arc in place of its own (template MRL kept): wk400 in Great Sword 001's arc parses
 back clean (`armor4u2gu.check`). Still to do for real weapons: edge and proxy meshes, the MRL (materials from
 MHF's), the attach offset on GU's weapon bone, all 40 models.
+
+## Effects (MHF side, C unless marked; 2026-11-04)
+- **Container**: `dat/effect.bin` = u32 count 20 + (offset, size) pairs; the client keeps it at 0x1ed528bc.
+  - Entries 0-17 are texture sub-archives (u32 n, offsets; PNG data).
+  - Entry 18 (header +0x94, JKR/JPK) = the effect-set container, unpacked and walked by 0x113d5910:
+    - layout: u32 count, u32 type-table offset; (u16 kind, u16 set id) per entry; (u32 offset, u32 size) from u32 3;
+    - kind 1 = a set, registered by 0x113d55b0 -> 0x113d4a70(data, size, set id) into the set table 0x1e8d31a8 (0x44-B slots, id at +0x38).
+  - Entry 19 (+0x9c) goes to 0x108df7d0 (not read).
+- **Sets**: 61 in ZZ, ids 0xbb8-0xbcc, 0xfa0-0xfc6, 0x1004-0x100a, 0x13ee-0x13ef. The player's are 0xfc5 (114504 B) and 0xfc6 (37868 B).
+- **Set layout** (0x113d4a70):
+  - header 14 x u16: version (> 3; 4 in ZZ), then section counts;
+  - record sizes A 0x70, B 0x18, C 0x10, D 0x10, E 0x38, F 0x8c, G u16 list (+ 1), H 0x20, then the rest;
+  - 0xfc6 = A 208, B 195, C 261, D 2, E 101.
+- **Spawn**:
+  - 0x113d61f0 (fastcall, edx = set id; stack: index, position, ...) finds the set and calls 0x113d35a0(set, index, ...);
+  - index = an A record (0xfc6 A[0x11]: f32 position (0, -200, 320), 1.047 rad, ..., u16 +0x4c = 38, +0x4e = 4, +0x50 = 3: links into later sections; semantics not decoded);
+  - a second request form 0x113d66b0(set, id, k, pos..., flags) -> 0x1146aa50 (a 0x40 task carrying the same set / id).
+- **Motion effects**: 0x113d4c50 walks a motion-keyed table of 32-B records (+0xc motion, +0xe frame, +0x12 index, +0x14 set id, +0x16 flags) per action (+0x32c): MHF ties effects to motion frames as data (table source not located).
+- **The MS code's posts**: about 60 (scratch inventory ms_effect_calls.txt).
+  - Magnetic Shock task 0x1004d810: 0xfc5 0x4d / 0x14 / 0x54 / 0x53, 0xfc6 0x2d-0x34.
+  - Triple Strike charge levels (0x10333d0c..): 0xfc6 0xe / 0x11 / 0xf.
+  - Attraction / marker / pin (0x10332..0x10336): 0xfc5 0x16, 0x22, 0x30, 0x3a, 0x39, 0x3e, 0x40, 0x45, 0x4f, 0x5e, 0x5d, 0x1a, 0x3, 0x14, 0x15, 0x37, 0x38.
+- **Plan** (port, maintainer's request after test 14):
+  1. decode the set sections' meaning from the spawn / update / draw code (0x113d35a0 on);
+  2. convert the textures (PNG -> GU RGBA8 .tex, as tools/efl4u2gu.py convert_tex);
+  3. build GU EFL per MHF effect from GU template units (billboard particle / ribbon / mesh: tools/efl4u2gu.py knows the containers and block layouts), with MHF's colours, sizes, lifetimes, counts and velocities;
+  4. post them where MHF does (msfx PEL ids, ms_act posts); they replace the GS stand-ins.
+- **Effect runtime** (decode in progress):
+  - **Effect** = every A record with A +0x50 == the effect id: the posted "index" is that id, not an A row. 0x113d3fc0 runs the timeline per frame:
+    - each matching A spawns at its frame +0x4e: +0x58 particles, flags +0x54 (bit 0 = no particle);
+    - particle definition = the E record whose +4 == A +0x4c; params A +0x48 / +0x5c / +0x52;
+    - A floats 0x00-0x47 = position / velocity / rotation / scale bases and random ranges (0x113d37e0, 0x113d3bd0, 0x113d3d80, 0x113d3f00);
+    - spawn = 0x113cd960 (plain), 0x113cd4b0, or 0x113cd9c0 (attached variants: unit, joint).
+  - **Particle** = a 300-B task, update 0x113cda30. E +0x8 = life (frames); E +0xa = texture / animation id (0x113cc8a0); curve ids E +0xe, +0x10, +0x12, +0x22, +0x26 (0x113ccd10 / 0x113ccd50: keyed curves, S colour / alpha / scale / rotation); E +0x20 -> 0x113ccab0.
+  - Not decoded yet: the curve sections' key layout, the update and draw (blend, billboard / ribbon / mesh), the texture-id -> effect.bin entry mapping.
+  - Sections (0x113ccd10 / 0x113cc8a0 / 0x113ccab0, C):
+    - B (0x18 B) = curve keys grouped by curve id (byte +0x12), key frame at +0xc (the curve length = the largest);
+    - D (0x10 B) = texture-animation frames grouped by u16 +6 (= E +0xa), value +8; 0x113cc8e0 picks one at random among a group's entries whose +0 == 0;
+    - C (0x10 B) = grouped by byte +6 (= E +0x20), meaning open.
+- **GU side**: GU's generator classes (DTI names at 0x157816d..):
+  - Billboard, BillboardStrip, SizeBillboard, LiteBillboard, MassBillboard, Polyline, LitePolyline, Polygon, PolygonStrip, LitePolygon, AxisPolygon, ClothPolygon, Texline, Trail, Line, Model, PrimModel, Point, Custom, Filter, Force, Hit, LensFlare, Light, LightShaft, Adhesion.
+  - tools/efl4u2gu.py knows EFL containers / blocks only structurally. No public layout of their fields (searched 2026-11-04). Writing new MHF-shaped effects needs those fields decoded from GU's code (unit factory, the Billboard / Trail generators' parameter reads).
