@@ -81,6 +81,7 @@ struct ms_state {
     void *mk_fx[MS_FXH], *shot_fx[MS_FXH];   /* MHF's marker (fc5:e) / shot (fc5:b) effects, moved every tick */
     float shot_o[3];                /* the shot's start (its trail fc5:a at 100 / 300 / 600 / 1000 / 1500 from it) */
     uint8_t trail_k;                /* trail points posted */
+    float mk_fx_t;                  /* ticks since the marker effect was re-posted */
 };
 struct ms_state *ms_of(uint8_t *p);
 void ms_reset(struct ms_state *s);

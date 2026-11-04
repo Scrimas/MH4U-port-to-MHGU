@@ -117,13 +117,14 @@ static int em_ok(uint8_t *m)        /* a large monster the hit pass would test (
 /* the marker's monster still exists and lives (MHF ends the marker on death, area change, a broken part: test 15,
  * "consumed too fast": em_ok's hurt gates rec+0x1a0 / +0x444 / m+0x7652 drop for moments (around the attraction's
  * landing), which ended the marker 1.8-4.3 s after the shot; S: the area and part ends are not ported) */
-static int em_alive(uint8_t *m)
+static int em_alive(uint8_t *m, uint8_t *hunter)
 {
     void *mgr = MS_EM_MGR;
     for (int i = 0; m && mgr && i < 10; i++)
         if (MS_EM_GET(mgr, i) == m) {
             uint8_t *r = em_rec(m);
-            return !FIELD(uint8_t, m, 0xb5f7) && r && FIELD(int32_t, r, 0x370) > 0;
+            return !FIELD(uint8_t, m, 0xb5f7) && r && FIELD(int32_t, r, 0x370) > 0 &&
+                   FIELD(uint8_t, m, 0x1054) == FIELD(uint8_t, hunter, 0x1054);   /* MHF: an area change ends it */
         }
     return 0;
 }
@@ -420,21 +421,25 @@ static void fx_at(uint8_t *p, uint32_t k, uint32_t n, const float *t, const floa
             void *x = post_at(p, ms_fxq[k + i].id + r, t, rot);
             if (h && j < MS_FXH) h[j++] = x;
         }
-    static int s_n;
-    if (s_n++ < 20) logf("msport: mhf carrier %u (%u rows) at %d %d %d: %x", k, n, (int)t[0], (int)t[1], (int)t[2],
+    static uint32_t s_seen;
+    if (!(s_seen & (1u << (k & 31))) && (s_seen |= 1u << (k & 31))) logf("msport: mhf carrier %u (%u rows) at %d %d %d: %x", k, n, (int)t[0], (int)t[1], (int)t[2],
                          h ? (uint32_t)(uintptr_t)h[0] : 0);
 }
 
-static void fx_place(void **h, const float *t)
+static void fx_stop(void **h)          /* kill (0x32a400 mode 1, em089_efx_kill): mode 0 only ends the emission, and
+                                           the marker / shot particles live 631-848 s (test 16: spheres left behind,
+                                           through area changes) */
 {
-    float q[4] __attribute__((aligned(16))) = {t[0], t[1], t[2], 0.0f};
-    for (int j = 0; j < MS_FXH; j++)
-        if (ms_efx_alive(h[j])) MS_EFX_SET_POS(h[j], q, 0); else h[j] = 0;
+    for (int j = 0; j < MS_FXH; j++) { if (ms_efx_alive(h[j])) MS_EFX_STOP(h[j], 1); h[j] = 0; }
 }
 
-static void fx_stop(void **h)
+/* a carrier follows its point: its particles are emitted once, in world space, so moving the effect (0x32a45c) left
+ * them at the spawn point (test 16); re-posted at the point every MHF tick instead, the previous one killed (S: their
+ * UV scroll restarts each tick) */
+static void fx_follow(uint8_t *p, uint32_t k, uint32_t n, const float *t, const float *rot, void **h)
 {
-    for (int j = 0; j < MS_FXH; j++) { if (ms_efx_alive(h[j])) MS_EFX_STOP(h[j], 0); h[j] = 0; }
+    fx_stop(h);
+    fx_at(p, k, n, t, rot, h);
 }
 
 static void shot_dir_deg(const struct ms_state *s, float r[3])   /* S: (pitch, yaw, 0) of the shot, GU's beam order */
@@ -516,13 +521,17 @@ static void tick(uint8_t *p, struct ms_state *s, float tk)
                 for (int k = 0; k < 3; k++) q[k] = s->shot_o[k] + s->shot_v[k] * d;
                 fx_at(p, MS_FXQ_TRAIL, q, rot, 0);
             }
-            if (r) fx_stop(s->shot_fx); else fx_place(s->shot_fx, s->shot_p);
+            if (r) fx_stop(s->shot_fx); else fx_follow(p, MS_FXQ_SHOT, s->shot_p, rot, s->shot_fx);
         }
         if (r) s->shot_on = 0;
         else if (!MS_FXQ_ON && (int)(s->shot_t * 0.5f) != (int)((s->shot_t - tk) * 0.5f)) flash_at(p, s->shot_p);   /* every
                                                            2 ticks (MHF: special #9 trail posts at 100..1500 cm) */
     }
-    if (s->mk_mon && MS_FXQ_ON) { float t[3]; if (marker(s, t)) fx_place(s->mk_fx, t); }   /* MHF: fc5:e follows it */
+    if (s->mk_mon && MS_FXQ_ON && (s->mk_fx_t += tk) >= 1.0f) {   /* MHF: fc5:e follows it, once per tick */
+        float t[3];
+        s->mk_fx_t = 0;
+        if (marker(s, t)) fx_follow(p, MS_FXQ_MARKER, t, 0, s->mk_fx);
+    }
     else if (s->mk_mon && (s->mk_blink -= tk) <= 0) { s->mk_blink = MARKER_BLINK; marker_blink(p, s); }
     if (s->mag[s->mode] == 1 && ms_drawn(p) && (s->aura_t -= tk) <= 0) {
         s->aura_t = AURA_EVERY;
@@ -537,8 +546,8 @@ static void tick(uint8_t *p, struct ms_state *s, float tk)
     }
     if (s->mk_mon) {
         if (!s->att) s->mk_t -= tk;                     /* frozen during the attraction */
-        if (s->mk_t <= 0 || !em_alive(s->mk_mon)) {
-            logf("msport: marker gone (%d ticks left, alive %d)", (int)s->mk_t, em_alive(s->mk_mon));
+        if (s->mk_t <= 0 || !em_alive(s->mk_mon, p)) {
+            logf("msport: marker gone (%d ticks left, alive %d)", (int)s->mk_t, em_alive(s->mk_mon, p));
             s->mk_mon = 0;
             fx_stop(s->mk_fx);
         }

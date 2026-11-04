@@ -12,7 +12,7 @@ What a converted particle is (one GU entry per MHF particle; the MHF count of a 
   by D (GU's start wait comes from the poster, not the unit: 0xa5abc4 case 0, C);
 - scale curve (unit +0x3a, 0xa6a2d0, C): key = (base - range) x curve x R, random range 2 range x curve x R (MHF
   scale = (base + U range) x curve, U in [-1, 1); GU = value + r range, r in [0, 1) per particle, C); R = the
-  sprite's half size (cm): GU's billboard size unit is G (half extent assumed; test: compare with MHF footage);
+  sprite's half size in GU size units = cm / (cell texels / 2) (test 16: cm drew 16-64x too big; factor G);
 - colour curve (unit +0x42, C): the MHF C keys (RGBA bytes, linear, C both); no C group -> the E record's flags
   only (white). Blend: MHF E flag 4 (render queue, S additive) -> BSBlendAddAlpha (0), else BSBlendBlendAlpha (1);
 - roll (unit +0x170 value / range, rad, C): MHF spawn rotation z +- range -> (z - range, 2 range).
@@ -249,6 +249,10 @@ class Builder:
         anim = uv_frames(e, ls) if e['uv_mode'] else None
         idx, imgs, R = self.cell(e['mesh'], anim[0] if anim else ((0.0, 0.0),))
         img = imgs[0]
+        # GU sizes count the sprite's texels (0xa7e768 builds the quad from the EAN frame's w / h; GU's own hunter
+        # billboards: size 0.2-1.25 on 256-px frames; test 16: cm sizes drew 16-64x too big): size 1 = one cm per
+        # texel from the pivot (G: the exact factor is not traced), so the MHF half size R cm = R / (S / 2)
+        R = R / (img.shape[0] / 2.0)
         D = a['frame']
         life = int(round(e['life'] * ls))
         tm = lambda f: D + int(round(f * ls))
@@ -297,9 +301,11 @@ class Builder:
             for o in (0x3a, 0x42):
                 v = struct.unpack_from('<H', q, o)[0]
                 if v: struct.pack_into('<H', q, o, v + shift)
-            struct.pack_into('<IIII', q, 0x1a8, 0, 0, off_s + shift, off_s + shift)
-            w = struct.unpack_from('<ff', u, 0x28)
-            struct.pack_into('<8f', q, 0x1c0, w[0], w[1], w[0], w[1], 0.0, 0.0, 0.0, 0.0)
+            # width / height: the sprite's half size in texels, the size curve (+0x3a) scaling it as the
+            # Billboard's (G: GU's Polygon template cm121_041 = 100 x size 4 on a 64-px pivot); no width curves
+            struct.pack_into('<IIII', q, 0x1a8, 0, 0, 0, 0)
+            h = img.shape[0] / 2.0
+            struct.pack_into('<8f', q, 0x1c0, h, 0.0, h, 0.0, 0.0, 0.0, 0.0, 0.0)
             return (2, bytes(q) + tail), bytes(emit)
         return (0, bytes(u) + tail), bytes(emit)
 

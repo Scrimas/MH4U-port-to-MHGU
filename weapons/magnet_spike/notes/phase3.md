@@ -269,7 +269,7 @@ is right; (7) no MHF effect at all.
 | 5 | RB moves: no i-frames | the log: 7 ticks granted in each RB move (11, 106, 107, 108, 135); the hits came at motion frames 14 and 18 (the window is 0-14). MHF decrements +0x4ee once per tick (0x10a72ed0, 0x10ad23f0): 7 ticks = 14/60 s, as here; Evasion +1 / +2 = 12 / 17 | none: MHF's value (question: was the maintainer's MHF set on Evasion?) |
 | 7 | no MHF effect | posts returned handles, nothing drew: the 41 EFLs and their atlas came after effect\pel\pl\w05_000 in w05.arc. GU's arcs always hold a PEL's EFLs before it (781 / 781 references) and resolve paths while loading (test 1 had the same with a command list): S, the PEL loader not traced | the atlas, then the EFLs, then the PEL (w05.arc entries 91 / 93-136 / 137) |
 
-## Test 16 (built and installed 2026-11-04)
+## Test 16 (built 2026-11-04, commit dc1c514; played 2026-11-04)
 Build: `GOG_DEFINES=MS_SLICE`. Play, then close the game; the log answers the rest. Xbox letters.
 1. Any MHF effect at all (step 7 of test 15: guard, Triple Strike, attraction, Magnetic Shock...). If a quest with
    the Magnet Spike crashes on load: say so (MS_MHF_FX=0 for msbuild.py leaves the effects out).
@@ -280,4 +280,21 @@ Build: `GOG_DEFINES=MS_SLICE`. Play, then close the game; the log answers the re
 4. RB + A while moving, with at least one gauge bar.
 Ask only about visuals: the effects' size (too big / small = one global factor), colour, placement (hand / ahead /
 ground); the marker and shot looks.
+
+### Test 16 results and fixes
+Log: dump/mhf/test_logs/ms_test16_Ryujinx_1.3.3_2026-11-04_16-39-33.log. The maintainer: RB + A and the Guard
+Counter's Y + B fixed; no shot / marker visual, reticle or hand piece yet; the attraction still janky. Effects now
+draw, but every one is the same huge white sphere (about 10x the hunter), some stay at a fixed point, even through an
+area change; none on RB moves, plain Y / B attacks or the Guard Counter follow-ups.
+
+| # | issue | cause (C unless marked) | change (test 17) |
+|---|---|---|---|
+| 7 | every effect = one huge sphere | GU's billboard quad comes from the EAN frame's texels (0xa7e768: corners from frame w / h; GU's hunter billboards in w00.arc: size 0.2-1.25 on 256-px frames). Ours were cm (R x scale: 50-2000 on 32-128-px cells), 16-64x too big, so the camera sat inside each sprite and they all looked alike (S) | size = cm / (cell px / 2) (G: 1 cm per texel at size 1, not traced to the shader); Polygon width / height = the cell's half size, no width curves (G) |
+| 7 | spheres stay, through area changes | only the marker / shot effects (fc5:e / fc5:b, particles 631-848 s) live long: the stop call 0x32a400(eff, 0) only ends the emission (em089_efx.c kills with 1), and their once-emitted world-space particles do not follow 0x32a45c | kill (mode 1); the marker / shot effect re-posted at its point every MHF tick, the previous one killed (S: its UV scroll restarts); the marker also ends when its monster's area (+0x1054) is not the hunter's (MHF) |
+| 7 | none on RB moves, Y / B, GC follow-ups | MHF posts no code effect there (notes/effect-posts.md); no action uses event 15. Their look comes from another MHF source (S: the weapon trail / per-motion data, not mapped) | none yet: next study |
+
+## Test 17 (built and installed 2026-11-04)
+1. Effects at all the moments of test 15 step 7: their size next to MHF's (still one global factor if wrong),
+   colour, placement; no sphere left behind (also after an area change).
+2. RT + B at a monster: the marker's look on it, following it; the shot's look.
 
