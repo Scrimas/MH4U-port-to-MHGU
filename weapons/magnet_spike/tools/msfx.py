@@ -41,6 +41,9 @@ FLASH_EFX = {'CHARGED': (1300, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), 1.0, 7),     # 
              # flash 7 on its own joint (65535; test 6: forced onto joint 8 it was unseen; test 7: 9 = a GS slash)
              'GUARD': (1301, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), 1.0, 9, 8),       # guarded hit (flash 9)
              'MAGNETISE': (1302, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), 1.0, 11, 8)}  # Magnetise on (flash 11)
+# flashes that post a converted MHF effect (mhffx2gu) instead of GS's: Triple Strike charged = MHF 0xfc6 0xe (the
+# charge-step flash, 0x10333d0a: posted on each charge step after the first; 0x11 = the first level, S)
+MHF_FX = {'CHARGED': (0xfc6, 0xe)}
 LEAD = 4                      # frames before the hit the swing path starts
 SND_LEAD = 2
 WHOOSH_B, WHOOSH_FAST, WHOOSH_SLOW = 65, 90, 94
@@ -104,7 +107,8 @@ def arc(sw, wdata, holders):
 
 
 def pel_add(d, recs, code=()):
-    """the class PEL (v15, lists 0 / 1 / 2) + list-1 records [(id, pos, rot, scale[, template id[, joint]])] copied
+    """the class PEL (v15, lists 0 / 1 / 2) + list-1 records [(id, pos, rot, scale[, template id[, joint[, EFL path,
+    element mask]]])] copied
     from GS's list-1 record template (default ARC_TEMPLATE); `code` records (code posts) go to lists 1 and 2"""
     assert d[:4] == b'PEL\0' and struct.unpack_from('<I', d, 4)[0] == 15
     lists, i, tmpls = [], 8, {}
@@ -128,6 +132,10 @@ def pel_add(d, recs, code=()):
         struct.pack_into('<3f', r, st + 0x20, scl, scl, scl)
         struct.pack_into('<H', r, st + 0x30, rid)
         if len(t) > 1: struct.pack_into('<H', r, st + 0x32, t[1] & 0xffff)      # joint
+        if len(t) > 2:                     # own EFL: (template, joint, EFL path, element mask)
+            path = t[2].encode()
+            r = bytearray(bytes([len(path)]) + path + bytes(r[1 + tmpl[0]:]))
+            struct.pack_into('<I', r, 1 + len(path) + 2 + 0x48, t[3])
         for li in (1, 2) if k >= len(recs) else (1,):
             lists[li][0] += 1
             lists[li][1] += bytes(r)

@@ -27,7 +27,7 @@ ROOT = os.path.dirname(os.path.dirname(WEAPON))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(ROOT, 'tools'))
 import paths, arcpack, xfs, lmt
-import aan, fskl, msact, sdt, msgrip, msmot, mshit, msfx, fmod2gu, mshud
+import aan, fskl, msact, sdt, msgrip, msmot, mshit, msfx, fmod2gu, mshud, mhffx2gu
 sys.path.append(paths.GU_PY)
 from romfs import RomFS
 from arc import arc_entries, arc_read
@@ -620,8 +620,18 @@ def main(report_only=False):
     cmds, tbl, tbl_index, creport = build_commands(acts, gs_m0)
     freport = []
     arcs, posts, snd_drop, sounds = msfx.build(swings, wdata, holders, own, GU_COPY, COMMON, freport)
+    # MHF's own effects (mhffx2gu.py): every posted MHF effect's convertible particles, in the class arc; the flashes
+    # with an MHF counterpart (msfx.MHF_FX) post it instead of GS's stand-in
+    mfx_ents, mfx_made, mfx_rep = mhffx2gu.build_all(lambda a, p: gu_arc(a)[p][1])
+    flash = dict(msfx.FLASH_EFX)
+    for k, key in msfx.MHF_FX.items():
+        path, n = mfx_made[key]
+        if path:
+            r = flash[k]
+            flash[k] = (r[0], r[1], r[2], 1.0, r[4], r[5] if len(r) > 5 else 0xffff, path, 0xffffffff)
     code_fx = [(msfx.SHOCK_EFX + k, (x, 0.0, z), (0.0, 0.0, 0.0), 1.0, msfx.SHOCK_TEMPLATE)
-               for k, (x, z) in enumerate(SHOCK)] + [msfx.MARKER_EFX, msfx.AURA_EFX] + list(msfx.FLASH_EFX.values())
+               for k, (x, z) in enumerate(SHOCK)] + [msfx.MARKER_EFX, msfx.AURA_EFX] + list(flash.values())
+    freport += mfx_rep
     rep = mreport + hreport + creport + freport
     open(os.path.join(OUT_GEN, 'report.txt'), 'w').write('\n'.join(rep) + '\n')
     if report_only:
@@ -653,6 +663,7 @@ def main(report_only=False):
     # with the class; its Hunter Arts bank (two_arts) left out
     fx += [(p, t, b) for n in ('001', 'mat_b') for p, t, b in gu_entries('weapon/w00/snd/%s.arc' % n)
            if '_arts' not in p]
+    fx += mfx_ents
     write('player/quest/w05.arc', arcpack.build([
         ('player\\mot\\w05\\w05', T_LMT, body),
         ('player\\mot\\w05\\w05_sa', T_LMT, empty_list()),

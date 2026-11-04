@@ -17,7 +17,8 @@ usage: python3 -I mhffx.py SETS.bin list                     sets and section co
 import struct, sys, math
 
 SIZES = dict(A=0x70, B=0x18, C=0x10, D=0x10, E=0x38, F=0x8c)
-RAND = 1 / 512.0      # (rng & 0x3ff) - 0x200, x DAT_119b5f6c: uniform in [-1, 1)
+RAND = 0.002          # (rng & 0x3ff) - 0x200, x DAT_119b5f6c (0.002): uniform in [-1.024, 1.022)
+LIFE_MIN = 0.01       # DAT_119b5ef0: the A life scale +0x5c applies to life and key frames when >= it
 
 
 def container(c):
@@ -50,7 +51,7 @@ class Set:
         rotation (rad) = base +0x18 + U x range +0x24, wrapped to [-pi, pi]; scale = base +0x30 + U x range +0x3c
         (flag 2: one U for all axes); flags 4 / 8: random mirror of x / y; spawns at effect frame +0x4e, count +0x58,
         particle id +0x4c (every E with E +4 == it), effect id +0x50; +0x48 / +0x5c / +0x52 passed to the particle
-        (+0x5c = life scale: key frames and life x it when >= 1, S)."""
+        (+0x5c = life scale: key frames and life x it when >= 0.01, C)."""
         f = struct.unpack_from('<18f', r, 0)
         return dict(pos=f[0:3], pos_r=f[3:6], rot=f[6:9], rot_r=f[9:12], scl=f[12:15], scl_r=f[15:18],
                     p48=struct.unpack_from('<f', r, 0x48)[0], part=struct.unpack_from('<H', r, 0x4c)[0],

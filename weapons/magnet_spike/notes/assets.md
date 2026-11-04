@@ -165,6 +165,13 @@ MHF's), the attach offset on GU's weapon bone, all 40 models.
     [-pi, pi]; scale = base +0x30 + U x range +0x3c (flag 2: one U for the three axes); flags 4 / 8 random mirror
     of x / y; flag 1 = spawn F records (0x8c, second emitter kind, 0x113d0ca0 family, not decoded) instead of E.
     The MHF RNG: r = r x 0xb0 mod 0xff53 (0x1ed5f2a2).
+  - **F emitter** (A flag 1; spawn 0x113d0b60 -> task update 0x113d1950 / 0x113d2700, partly read, S): F +4 id
+    (= A +0x4c), +0xc life; three vec3 parameters base + U x range: +0x14 / +0x20, +0x2c / +0x38, +0x44 / +0x50
+    (the third is added to particle +0x60.. each tick and clamped at 0: a growth rate; the first two S velocity /
+    acceleration, 0x113d2190 / 0x113d1b30 not read); curve +0xe; at its end it posts the child effect +0x7a of
+    its set (0x113d35a0), and along its life the effects keyed in a D-like group (0x113cc970 -> 0x113d34f0 /
+    0x113d47e0): a moving emitter that drops other effects (sparks with trails). GU: a particle unit with speed
+    and child units.
   - **The Magnet Spike's 35 posted effects** (sets 0xfc5 / 0xfc6): 513 particles. 431 have no position curve
     (they stay where they spawn, with the random spread, and only scale, turn, recolour). 52 move on one straight
     segment (2 keys = constant speed). 15 move on two segments (3 keys). 15 are F emitters. 0xfc6 0xf has no A
@@ -173,6 +180,17 @@ MHF's), the attach offset on GU's weapon bone, all 40 models.
     paths. Any effect whose motion GU can only approximate (from the 3-key paths on, or anything the converter
     fits with an error above its tolerance) goes on the deviation list with its error; the converter prints that
     list.
+- **Conversion** (tools/mhffx2gu.py, run by msbuild; GU format: notes/gu-efl-units.md), 2026-11-04:
+  - each MHF particle = one GU Billboard entry cloned from em001_00_500 entry 0 (one particle, once, no motion);
+    its MHF mesh baked into a sprite of one atlas (effect\base\ms_mhf_000 TEX + EAN), scale / colour curves from
+    MHF's keys, the burst frame as an invisible lead-in (alpha 0, keys shifted), life in the emit block;
+  - msbuild packs every converted effect into w05.arc (effect\pl\w05\ms_SSS_EEE); msfx.MHF_FX picks the code
+    posts that use one: Triple Strike charged (PEL 1300) = 0xfc6 0xe;
+  - first pass: 92 GU entries over the 35 effects. Not converted yet (gen/report.txt lists each): spawn offsets
+    (259 particles), world-oriented meshes (140), position curves (67), UV modes 2 / 3 / 4 / 7 / 1 (57 / 25 / 53 /
+    3 / 1), F emitters (15);
+  - deviations (until a test says otherwise): GU's billboard size unit is G (half extent in cm assumed); mesh
+    overlaps baked with "max"; the GU volume setting may shorten fades.
 - **GU side**: GU's generator classes (DTI names at 0x157816d..):
   - Billboard, BillboardStrip, SizeBillboard, LiteBillboard, MassBillboard, Polyline, LitePolyline, Polygon, PolygonStrip, LitePolygon, AxisPolygon, ClothPolygon, Texline, Trail, Line, Model, PrimModel, Point, Custom, Filter, Force, Hit, LensFlare, Light, LightShaft, Adhesion.
   - tools/efl4u2gu.py knows EFL containers / blocks only structurally. No public layout of their fields (searched 2026-11-04). Writing new MHF-shaped effects needs those fields decoded from GU's code (unit factory, the Billboard / Trail generators' parameter reads).

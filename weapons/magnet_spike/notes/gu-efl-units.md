@@ -1,0 +1,185 @@
+# GU EFL effect entries and units (for authoring particle effects)
+
+Static study, 2026-11-04 (MHGU 1.4 main, Ghidra project dump/gu/ghidra; corpus = the 1648 unique EFLs of the GU
+romfs nativeNX/arc, version 0x20120306, all with fps 60). Marks: **C** confirmed by code (function + logic),
+**S** strong (corpus statistics), **G** guess. 4U uses the same container (efl4u2gu.py), so this mostly holds there too.
+Reader: `weapons/magnet_spike/tools/efldump.py` (prints these fields by name; `--raw` adds the unknown words).
+
+## Container (recap, C + S, see tools/efl4u2gu.py)
+Header 0x30 B (`EFL\0`, u32 version, u32 size - 0x30, f32 fps, u16 n entries, u16 n2), then n x 16-B entries,
+then n2 u32 tail offsets, then the blocks. Offsets are from file +0x30. Blocks can be shared between entries.
+
+## One entry = 4 blocks (C: 0xaec864 / 0xa58fa8)
+Each entry word = `(block offset - 0x30) << 8 | type byte`; resource +0x68 = entry table.
+
+| word | generator field | block | type byte |
+|---|---|---|---|
+| w0 | gen +0x30 (0xaec864) | **element** block, always 0xc0 B (S) | 0..44: copied to gen +0x1e (C); an index, not a class |
+| w1 | gen +0x34 (0xa58fa8) | **unit** block (class specific, 0x1a0+ B for Billboard) | class, gen +0x40 byte 0 (C) |
+| w2 | gen +0x38 | **emit** block, 16 B (0x20 B when type high nibble is 5) (S) | 0x11 / 0x12 / 0x21 / 0x22 / 0x51 / 0x52; bits 4-7 -> gen +0x40 bits 12-15 (C) = fade mode used at particle init/update (0xa7d870, 0xa7de94: mask 0xaa vs 0x154 picks alpha vs colour scaling by life) |
+| w3 | gen +0x3c | **move** block (kind = low nibble: 0 16 B, 1 / 2 0x50 B, 5 / 8 0xc0 B, 6 0x80 B) (S) | low nibble -> gen +0x40 bits 16-19 and 20-23 (C); **bit 4 set = 'Lite' class** (factory, C) |
+
+Also per entry (C, 0xaec864): gen +0x28 = resource +0x70 + index * 0x44 (runtime record; its +0x14 = the loaded EAN /
+texture-anim resource: zero -> no UV animation, 0xa69d00); gen +0x14 = index << 16 | count.
+
+## Unit type -> class (C: GU factory 0x9bdc68, called by the unit build 0x9bda64)
+All generator objects are 0x1d0 B (0x250 for type 0x19). `L` = class when w3 type bit 4 is set.
+
+| type | class | type | class |
+|---|---|---|---|
+| 0 | Billboard (L LiteBillboard) | 0xd | Texline |
+| 1 | Polyline when L (LitePolyline), else same as 0xc | 0xe | Line |
+| 2 | Polygon (L LitePolygon) | 0xf | PolygonStrip |
+| 3 | Texline | 0x10 | Custom |
+| 4 | Line | 0x11 | ClothPolygon |
+| 5 | Model | 0x12 | Adhesion |
+| 6 | PrimModel | 0x13 | BillboardStrip |
+| 7 | LensFlare | 0x14 | SizeBillboard |
+| 8 | MassBillboard | 0x15 | LightShaft |
+| 9 | Filter | 0x16 | Point |
+| 0xa | Light | 0x17 | AxisPolygon |
+| 0xb | Hit | 0x18 | Force |
+| 0xc | Polyline (0x1790c84) | 0x19 | node class (DTI 0x2123d5c; L cParticleNodeInfinite) |
+| | | 0x1a | Trail |
+
+Type 1 without the Lite bit is created as type 0xc = cParticleGeneratorPolyline (C).
+Vtables (slot 0 address; DTI GOT 0x1843968..): cEffectUnitGenerator 0x179007c, cParticleGenerator 0x17900fc,
+Billboard 0x179017c, LiteBillboard 0x17902c0, Model 0x17907fc, Polygon 0x17908fc, Polyline 0x1790c84,
+Filter 0x17903fc, BillboardStrip 0x17901e8, SizeBillboard 0x1790254. 25 virtual slots.
+Billboard overrides: 6 0xa7b114 (bind entry 0xa58fa8, then allocate the particle pool: 0xb0-B particles, C),
+8 0xa7b140 (setup from the unit), 15 0xa7b370 (create), 16 0xa7b42c (frame update; Strip / Size sub-blocks at
+unit +0x19c / +0x1b0), 17 0xa7b560 (translate all particles), 21 0xa7b580 (vertex build / draw, switch on gen
++0x46), 23 0xa7d870 (**particle init**), 24 0xa7dd74 (**per-frame particle loop**, 0xa7de94 per particle;
+dead particles freed by 0xa5b224). Base: slot 8 0xa59268 (shared setup), slot 16 0xa5a0c4 (matrices).
+
+Random numbers (C): every random draw is `table[++gen->counter & 0xfff]`, a 4096-entry float table; the
+fields below combine as `value + r * range`. The colour code scales r by 256 (0xa6be40), so r is in [0, 1) (S:
+rotation -pi + r * 2pi covers the full circle in 1848 / 2096 Billboard units). Integer ranges use
+`lo + rand_u32 % (range + 1)`.
+
+## Element block (w0, 0xc0 B, shared by every generator class)
+| off | type | meaning | ev |
+|---|---|---|---|
+| +0x00..+0x0c | u32 | ids / flags; +0x08 bit 27 = GU-only flag (0x08000000 in 1258 / 1634), copied to gen +0x8c (0xaec900) | C / S |
+| +0x10..+0x2c | s32 x 8 | joint / attach references, -1 = none (1578 / 1634 all -1) | S, G |
+| +0x30 | u32 | always 0x66 (S); bits 0-3 -> gen +0xe8 bits 12-15, bits 4-7 -> bits 8-11 (0xa59268) | C |
+| +0x40, +0x44 | f32 x 2 | value + random -> gen +0xf8 (1.0 in 1573 / 1634; time scale / frame speed) | C, G meaning |
+| +0x48 / +0x4c / +0x50 / +0x54 | u32 | small ints (1-4) | S |
+| +0x60/64, +0x68/6c, +0x70/74 | f32 pairs | value + range, frame-like magnitudes (30, 50, 100) | S, G (wait / life / interval) |
+| +0x78 | u32 | byte 0 -> gen +0xe4 bits 16-23, byte 1 -> gen +0xe4 bits 24-31, byte 3 -> gen +0xe8 byte 0; bit 16 -> gen +0x194 bit 25 | C |
+| +0x80, +0x84 | f32 pair | value + range (0..1) | S |
+| +0x88/8c, +0x90/94, +0x98/9c | f32 pairs | value + random -> gen +0x160 / +0x164 / +0x168 (1.0 in all 1634: element scale x/y/z) | C, G meaning |
+| +0xa0 | u16 | -> gen +0xe4 low 16 | C |
+| +0xa2 | u16 | bits 0-3: transform mode (-> gen +0x50 bits 24-27) when +0xbe != 0 | C |
+| +0xb0 | f32 | != 0 -> gen +0x194 bit 24 | C |
+| +0xb4 | u16 / u16 | lo != 0: random draw -> gen +0x1a8, gen +0x10 bit 9; hi != 0: gen +0x10 bit 10 | C |
+| +0xbe | u16 | offset (from the element block) of a transform sub-block: floats [0..2] -> gen +0x60, [4..6] -> gen +0x70, [8], [9] -> gen +0x80 / +0x84 | C (0xaec900) |
+
+## Emit block (w2, 16 B) — S / G only
+Four u32, observed as small integers or u16 pairs: +0 (0 / 5 / 10), +4 (often a u16 pair, e.g. lo 0 hi 15),
++8 (10 / 20 / 30), +0xc 0 or 1 (152 / 1586). G: wait / interval, count (+ random), emitter life, loop. The reader
+was not traced (next step: callers reading gen +0x38).
+
+## Move block, kind 2 (w3, 0x50 B) — the most common (8980 of 15086 entries)
+| off | type | meaning | ev |
+|---|---|---|---|
+| +0x00 | u32 | flags; byte 0 bit 4 -> gen +0xdc bit 25 (0xa59268); 0x01000000 in 2390 / 3123 | C / S |
+| +0x04 | u32 | bits 8-11 -> gen +0xec bits 4-7, bits 12-15 -> gen +0xec bits 0-3 (0x4200 / 0x4400 / 0x4500 = mode) | C, G meaning (spawn shape / direction mode) |
+| +0x10/14, +0x18/1c, +0x20/24 | f32 pairs | angle + range in radians (-pi..pi, ranges up to 2pi) | S (emission direction X / Y / Z) |
+| +0x28, +0x2c | f32 pair | 10 / 5 / 20 + range 2 / 4 | S, G initial speed |
+| +0x30, +0x34 | f32 pair | 0.1 / 0.2 (-20..5) + range | S, G acceleration / gravity |
+| +0x40, +0x44 | f32 pair | 1.0 / 0.98 / 0.95 + range | S, G velocity damping per frame |
+| +0x48 | u32 | 0 / 4 / 8 / 5 | S |
+| +0x50..+0x6c (0xc0-B kinds) | f32 pairs | value + random -> light object gen +0x1b8 +0x10..+0x1c (colour * intensity) | C (0xa59268) |
+
+## Unit block, Billboard (type 0), 0x1a0 B + appended curve tables
+Common head (all generator units, C 0xaec900): +0 byte 0 -> gen +0x44 byte 0, byte 1 -> 0xafccc8 -> gen +0x45,
+byte 3 = blend index (BSBlend table, efl4u2gu.py); +4 -> gen +0x90 (flags; bits 18 / 20 / 21 / 22 select
+gen +0xec bits 7 / 11 / 12, 0xa59268); +8 -> gen +0xa0; +0x18 bits 0-3 colour mode -> gen +0x40 bits 24-27,
+bit 17 -> gen +0x40 bit 31, bit 18 -> gen +0x194 bit 28, bits 4-7 != 0 -> draw variant gen +0x46 = 0x17 / 0x2f
+(else 0x19) (0xa7b140); +0x1a bit 0 -> gen +0xec bit 10; +0x1b -> gen +0x52.
+
+| off | type | meaning | ev |
+|---|---|---|---|
+| +0x0c | s32 | -100 / -200 / -50 typical | S (G: draw priority / z bias) |
+| +0x10 | f32 | 0 / -100 / -500 / -1e4 | S |
+| +0x14 | u32 | byte 2 = 20 / 10 / 60 | S |
+| +0x18 | u32 | flags (above); 0x00080000 = bit 19 on almost every GU Billboard | C / S |
+| +0x1c | f32 | 0.5..1.15 (1.0, 0.98, 0.95) | S, G per-frame size / alpha factor |
+| +0x20 | f32 | -> gen +0x188 -> particle +0x58 and +0x50 / +0x54 = int(value * k) (0xa6a2a4); 1 / 2 / 4 / 10 | C, G meaning |
+| +0x28, +0x2c | f32 pair | 0.75 / 1.25 / 2.5 + range (0..2.5) | S, G particle size + random |
+| +0x30, +0x34 | f32 pair | 0.05 / 0.075 (-1.25..3.75) + range | S, G size change per frame |
+| +0x38..+0x46 | u16 x 8 | offsets (from the unit) of appended curve tables, 0 = none: +0x42 = colour / alpha curve (C: slot 23 / 0xa7de94 `unit +0x40 >> 16`), +0x44 = UV-animation frame curve (C 0xa69d00), +0x3e = table for gen +0xcc (C slot 23); +0x38 / +0x3a / +0x3c / +0x46 G (size, other tracks) | C / G |
+| +0x40 | u8 | **colour random mode** (Billboard copies it to gen +0x194, 0xa7b140): bits 0-3 != 0 -> lerp colour A..B by r (bit 4: one r per channel), else bit 5 -> pick A or B at random, else A (0xa6be40) | C |
+| +0x41 | u8 | bit 0: UV frame curve gives an offset added to the start frame instead of an absolute frame (0xa69d00) | C |
+| +0x48, +0x4c | RGBA8 | colour A / B (gen +0x170 / +0x174, gen +0x180 = &A for the GU PEL recolour) | C |
+| +0x50 | u32 | lo16 UV flags: bit 4 / 10 / 11 = randomly set particle flip bits 2 / 8 / 9; bits 8 / 9 / 12 = draw state (0xa7c210); byte 2 = EAN entry index, byte 3 = its random range (index + rand % (b3 + 1)) | C |
+| +0x54 | u16 / u16 | UV start frame + random range (frame + rand % (hi + 1)) | C (0xa69d00) |
+| +0x58 | f32 | UV animation speed (frames per frame) | C |
+| +0x5c | f32 | UV frame clamp when a frame curve is used | C |
+| +0x60, +0x64 | u32 | pivot x / y in texels (= EAN pivot; 256 / 64 / 128) | S |
+| +0x6c | f32 | 5.0 in all 2096 | S |
+| +0x70 | char[0xc0] | texture path (`effect\base\...`, no extension; tex type 0x241F5DEB) | S |
+| +0x130 | char[0x40] | EAN path (`effect\base\...`) | S (C notes: EAN = UV atlas) |
+| +0x170, +0x174 | f32 pair | initial rotation (rad) + random range (-pi + r * 2pi typical) -> particle +0x74 / +0x84 | C (0xa7d870) |
+| +0x178, +0x17c | f32 pair | angular speed (rad / frame) + range -> particle +0xa4 (non-zero sets particle flag 8 / 1) | C |
+| +0x180, +0x184 | f32 pair | 1.0 + range | S |
+| +0x190 | f32 | angular speed damping: each frame rot += w; w *= +0x190 (bit 13 of the particle flags also multiplies a per-particle factor) | C (0xa7de94) |
+| +0x194 | u32 | 1 = random sign for the angular speed | C (0xa7d870, G for the exact op: a conditional vneg) |
+| +0x198 | u32 | offset of a rotation curve; when set, rotation = curve(particle time) instead of the constant (0xa7de94 / 0xa7d870) | C |
+| +0x19c / +0x1b0 | u32 | (BillboardStrip / SizeBillboard only) offsets of their extra track blocks (0xa7b42c) | C |
+
+Curve tables (C for the colour use, S for the layout, efl4u2gu.unit_curve_props): `u32 count | 2 << 8 | prop << 24`
+(prop 0 colour, 1 alpha, 0x40 scale), then `count` keys of 12 B `{u32 frame, u32 a, u32 b}`. The evaluator
+0xaed74c (time) + 0xaf938c (colour) / 0xaf7958 (float) takes the particle; key word 0 < 0 (bit 31) marks a
+looping / non-life track (`-1 < *curve` sets particle flag 0x20000 / 0x80000). Time base (frames vs life fraction)
+and interpolation: not traced (G: linear, frames).
+
+## Particle (0xb0 B, list at gen +0xb0, next +4) — runtime, for reading the code
++0x20 / +0x30 position (current / previous), +0x50 / +0x54 / +0x58 from unit +0x20, +0x60 motion state (0xa6a004),
++0x70 / +0x80 rotation pair (double-buffered by particle +0xf bit 0), +0x90 / +0x94 colour, +0x98 base colour,
++0xa4 angular speed, +0xa8 second rate (adds to +0x78, death when < 0), +0xa0 motion record.
+
+## Open
+- Emit block reader (count / interval / burst / loop) and emitter life: find the readers of gen +0x38.
+- Particle life, spawn position / shape (move +0x04 mode), velocity, gravity and drag: 0xa6a004 (per-frame motion,
+  returns 0 = dead) and the emission path; the move-block meanings above are S / G.
+- Size: unit +0x28..+0x34 and the scale curve (prop 0x40); read 0xa6a2cc / 0xa6a434 next.
+- Curve interpolation and time base: 0xaed74c, 0xaf7958, 0xaf938c.
+- Billboard orientation modes (gen +0x46 0x17 / 0x19 / 0x2f from unit +0x18 bits 4-7) in the draw 0xa7b580.
+- Polyline (types 1 / 0xc, vtable 0x1790c84: init 0xab76d8, loop 0xab7f2c) and Model (type 5, 0x17907fc: init
+  0xa9958c, loop 0xa9a154) not decoded beyond the shared head.
+
+## Main-agent decode (2026-11-04, C unless marked)
+- **Emit block = particle life** (0xaed0d0, called per new particle by 0xa5ca24 for emit-type high nibble 1 / 2):
+  three u32 = (u16 frames, u16 random range) each: +0 fade-in A, +4 hold B (or a curve at the block +
+  (word3 lo16 >> 1)), +8 fade-out C; word 3 lo16 is kept. Per particle frames = value + rand % (range + 1).
+  Life = A + B + C frames; the generator fades alpha (high nibble masks 0xaa) or colour (0x154) by the phase
+  (x 256 at 0xa7d870 / 0xa7de94). The effect-volume setting (owner +0x11a & 0xf: 0 -> / 4, 1 -> / 2, 2 -> as
+  is) shortens A and C. Corpus: cm300_012 (0, 20 +- 5, 0) vs its colour curve ending at 25; em072_00_012
+  (0, 60, 0) vs 60; em033_00_002 (0, 10, 40) vs 51 (S).
+- **Emission** (generator update 0xa5a48c, state byte gen +0x47): emit type low nibble 1 -> 0xa5a900 = ONE
+  particle, once, then the generator finishes (vt +0x2c); 2 -> 0xa5abc4 = bursts: count = element +0x48
+  (u16 + random) or the curve at element +0xb4 (lo16), repeats from element +0x4c (u16 + random) -> gen
+  +0x1aa, interval / end via 0xa5c464 / 0xa5c7dc (not read). The start wait of both (gen +0xe0 hi16) =
+  owner +0x1fc (f32) x (gen +0x18) +0x11c: set by the posting effect, not by the unit.
+- **Particle age** = particle +0x14, +1 per update (move kind 2 step 0xa631fc); curves read it by default.
+- **Curve header** (0xaf7958 / 0xaed74c): u32 = count (byte 0) | 2 << 8 | flags << 24; byte 3 & 7 = time
+  source (0 particle age, 1 generator time gen +0x88, 2 / 3 owner +0x10c, 4 a global); bit 30 = wrap (loop);
+  bits 27-29 = interpolation (jump table at 0xaf7a80, not read). Keys {u32 time, f32 value, f32 random
+  range}: value + range x the particle's random draw. So the old "prop 0 colour / 1 alpha / 0x40 scale"
+  reading was the flags byte; the curve's role comes from the slot that points to it (+0x3a scale, +0x42
+  colour, +0x44 UV frame, +0x198 rotation).
+- **Size** (0xa6a2d0 / 0xa6a434): no scale curve (unit +0x38 hi16 = +0x3a == 0): size = +0x28 + r x +0x2c,
+  rate = +0x30 + r x +0x34 (non-zero: particle flag 0x100), each frame size += rate, rate x= unit +0x1c;
+  with the curve: size = curve(age) (particle flag 0x100000).
+- **UV / time state** (0xa69d00 -> particle +0x60): flags = unit +0x50 lo16 (random flips), EAN entry = +0x50
+  byte 2 + rand % (byte 3 + 1), start frame = +0x54 lo16 + rand % (hi16 + 1) (or the frame curve +0x44),
+  speed +0x58; 0xa6a004 steps it; with flag 8 the particle dies at the animation end.
+- **Spawn transform** (element +0xbe sub-block, 0xaec900): floats [0..2] -> gen +0x60 (offset), [4..6] -> +0x70.
+
+## Template
+Simplest GU Billboard found (1 entry, unit 0x1a0 B, no curves, move kind 2): `/nativeNX/arc/enemy/em021_00.arc`,
+`effect\em\em021\em021_00_007`, entry 0 (same shape: em063_00 `effect\em\em063\em063_00_010`, em065_00
+`effect\em\em065\em065_00_004`). `python3 weapons/magnet_spike/tools/efldump.py /nativeNX/arc/enemy/em021_00.arc
+'effect\em\em021\em021_00_007'`.

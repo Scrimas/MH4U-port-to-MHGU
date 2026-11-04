@@ -242,4 +242,9 @@ Build: `GOG_DEFINES=MS_SLICE` (items 1-6 above). Play, then close the game; the 
 4. Guard Counter (RB + RT) into an attack, then Y + B (follow-up 154).
 5. An RB move (RB + Y / A / X / B) through an attack: the log prints each i-frame grant and any hit.
 6. The smithy element line of Demon Flamespike "Flash" (and the element in a quest).
-Ask only about visuals: did the attraction look too fast / too far, what the shot looked like.
+7. (Added 2026-11-04, build after 5648bc1) Triple Strike: charge until the "charged" flash. It is now MHF's own
+   effect 0xfc6 0xe, converted (mhffx2gu.py): a light-blue glow shrinking from about 1.8 m, rays and a growing ring
+   over 0.6 s, instead of GS's flash. If the game crashes when a quest loads with the Magnet Spike, it is the new
+   effect files in w05.arc (say so; the stand-in comes back with MS_MHF_FX off).
+Ask only about visuals: did the attraction look too fast / too far, what the shot looked like; the charge effect's
+size (too big / small), colour and shape next to MHF's.
