@@ -27,7 +27,7 @@ ROOT = os.path.dirname(os.path.dirname(WEAPON))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(ROOT, 'tools'))
 import paths, arcpack, xfs, lmt
-import aan, fskl, msact, sdt, msgrip, msmot, mshit, msfx, fmod2gu, mshud, mhffx2gu
+import aan, fskl, msact, sdt, msgrip, msmot, mshit, msfx, fmod2gu, mshud, mhffx2gu, msfxposts
 sys.path.append(paths.GU_PY)
 from romfs import RomFS
 from arc import arc_entries, arc_read
@@ -84,6 +84,46 @@ def pair_id(inp, cond):
 
 
 FLASH_IDS = {}       # flash name -> (first PEL id, records), filled by main before c_tables
+FX_POSTS, FX_QUEUE = [], []   # MHF effect posts for ms_act.c (fx_post_tables)
+POST_BASE = 3000              # PEL ids of the MHF effect posts (msfxposts.py)
+
+
+def fx_post_tables(acts, own, made, report):
+    """msfxposts rows -> (PEL code records, motion rows (slot, frame, action, gate, id, n), queue rows
+    (name, [(delay, id, n)])); one record block per (effect, bone, offset): a record per converted group (its
+    MHF base offset added), joint = msmot.BODY_MAP[bone] (bone 0 = the hunter's own frame: none)"""
+    recs, blocks, nxt = [], {}, [POST_BASE]
+    def block(eff, bone, off):
+        key = (eff, bone, tuple(off))
+        if key not in blocks:
+            groups = made.get(eff) or []
+            if not groups:
+                blocks[key] = None
+                report.append('mhf post %#x %#x: nothing converted, not posted' % eff)
+            else:
+                j = msmot.BODY_MAP[bone] if bone else 0xffff
+                blocks[key] = (nxt[0], len(groups))
+                for g, (path, mask, pos) in enumerate(groups):
+                    recs.append((nxt[0] + g, tuple(o + b for o, b in zip(off, pos)), (0.0, 0.0, 0.0), 1.0,
+                                 msfx.FLASH_EFX['CHARGED'][4], j, path, mask))
+                nxt[0] += len(groups)
+        return blocks[key]
+    mrows = []
+    for key, frame, eff, bone, off, gate in msfxposts.MOTION_POSTS:
+        if key[0] == 'act':
+            a = key[1]; mots = [m for kind, m, *_ in (acts[a]['steps'] if a < len(acts) else []) if kind in (3, 4, 5)]
+            mot = mots[0] if mots else None
+        else:
+            mot, a = key[1], key[2] if len(key) > 2 else 0xffff
+        if mot not in own:
+            report.append('mhf post %s f%d: MHF motion %s not ported' % (key, frame, mot)); continue
+        b = block(eff, bone, off)
+        if b: mrows.append((own[mot], frame, a, gate) + b)
+    qrows = []
+    for name, rows in sorted(msfxposts.EVENT_POSTS.items()):
+        qrows.append((name, [(d,) + b for d, eff, bone, off in rows for b in [block(eff, bone, off)] if b]))
+    report.append('mhf posts: %d motion rows, %d queue sets, %d PEL records' % (len(mrows), len(qrows), len(recs)))
+    return recs, sorted(mrows), qrows
 
 
 def rom():
@@ -546,6 +586,18 @@ def c_tables(acts, modes, own, tbl_index, hit_index, mvs):
           '#define MS_EFX_AURA %d  /* msfx.AURA_EFX */' % msfx.AURA_EFX[0]]
     L += ['#define MS_EFX_%s %d  /* msfx.FLASH_EFX / MHF_FX */\n#define MS_EFX_%s_N %d' % (n, i, n, c)
           for n, (i, c) in sorted(FLASH_IDS.items())]
+    L += ['#define MS_NFXPOSTS %d' % len(FX_POSTS),
+          'static const struct ms_fxpost ms_fxposts[] = {   /* motion slot, frame, action (0xffff any), gate (1 '
+          'Magnetise on, 2 off), PEL id, records (msfxposts.py) */'] + [
+        '    {%d, %d, %d, %d, %d, %d},' % r for r in FX_POSTS] + (['    {0, 0, 0, 0, 0, 0},'] if not FX_POSTS else []) + ['};']
+    qa, k = [], 0
+    for name in sorted(set(msfxposts.EVENT_POSTS) - {n for n, _ in FX_QUEUE}):
+        L.append('#define MS_FXQ_%s 0, 0' % name)
+    for name, rows in FX_QUEUE:
+        L.append('#define MS_FXQ_%s %d, %d' % (name, k, len(rows))); k += len(rows); qa += rows
+    L += ['#define MS_FXQ_ON %d' % (1 if FX_QUEUE else 0),
+          'static const struct ms_fxq ms_fxq[] = {   /* delay frames, PEL id, records */'] + [
+        '    {%d, %d, %d},' % r for r in qa] + (['    {0, 0, 0},'] if not qa else []) + ['};']
     L += ['#define MS_NHITS %d' % len(mvs), 'static const uint16_t ms_hit_mv[] = {'] + [
         '    %s,' % ', '.join(str(v) for v in mvs[i:i + 20]) for i in range(0, len(mvs), 20)] + ['};']
     L += ['#define MS_NCAPS %d' % len(HIT_CAPS),
@@ -626,8 +678,11 @@ def main(report_only=False):
     arcs, posts, snd_drop, sounds = msfx.build(swings, wdata, holders, own, GU_COPY, COMMON, freport)
     # MHF's own effects (mhffx2gu.py): every posted MHF effect's convertible particles, in the class arc; the flashes
     # with an MHF counterpart (msfx.MHF_FX) post it instead of GS's stand-in
-    mfx_ents, mfx_made, mfx_rep = (mhffx2gu.build_all(lambda a, p: gu_arc(a)[p][1])
-                                   if os.environ.get('MS_MHF_FX', '1') != '0' else ([], {}, ['mhf effects: off']))
+    mfx_on = os.environ.get('MS_MHF_FX', '1') != '0'
+    mfx_list = sorted(set(mhffx2gu.MS_EFFECTS) | set(msfxposts.effects()))
+    mfx_ents, mfx_made, mfx_rep = (mhffx2gu.build_all(lambda a, p: gu_arc(a)[p][1], mfx_list)
+                                   if mfx_on else ([], {}, ['mhf effects: off']))
+    post_recs, FX_POSTS[:], FX_QUEUE[:] = fx_post_tables(acts, own, mfx_made, mfx_rep) if mfx_on else ([], [], [])
     flash = {k: [r] for k, r in msfx.FLASH_EFX.items()}
     FLASH_IDS.clear(); FLASH_IDS.update({k: (r[0], 1) for k, r in msfx.FLASH_EFX.items()})
     for j, (k, key) in enumerate(sorted(msfx.MHF_FX.items())):
@@ -640,7 +695,7 @@ def main(report_only=False):
             FLASH_IDS[k] = (base, len(groups))
     code_fx = [(msfx.SHOCK_EFX + k, (x, 0.0, z), (0.0, 0.0, 0.0), 1.0, msfx.SHOCK_TEMPLATE)
                for k, (x, z) in enumerate(SHOCK)] + [msfx.MARKER_EFX, msfx.AURA_EFX] + [
-               x for k in sorted(flash) for x in flash[k]]
+               x for k in sorted(flash) for x in flash[k]] + post_recs
     freport += mfx_rep
     rep = mreport + hreport + creport + freport
     open(os.path.join(OUT_GEN, 'report.txt'), 'w').write('\n'.join(rep) + '\n')

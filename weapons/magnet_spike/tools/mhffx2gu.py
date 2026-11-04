@@ -40,7 +40,7 @@ T_EFL, T_TEX, T_EAN = 0x6D5AE854, 0x241F5DEB, 0x4E397417
 EFL_DIR = 'effect\\pl\\w05'               # GU's EFL names carry no 'efl' folder (w00.arc: effect\\pl\\w00\\w00_000)
 ATLAS = 'effect\\base\\ms_mhf_000'          # EAN path; the texture = ATLAS + TEX_SUFFIX (GU's effect textures)
 TEX_SUFFIX = '_HQ_NOMIP'
-CELL_MIN, CELL_MAX, ATLAS_W = 32, 256, 1024
+CELL_MIN, CELL_MAX, ATLAS_W = 32, 128, 1024   # one 1024 x 1024 RGBA8 atlas (4 MB) for every effect
 CELL_MAX_ANIM, SCROLL_FRAMES = 64, 8     # animated sprites: smaller cells; a UV scroll cycle in this many frames
 ADD_BLEND, ALPHA_BLEND = 0, 1
 

@@ -242,9 +242,12 @@ Build: `GOG_DEFINES=MS_SLICE` (items 1-6 above). Play, then close the game; the 
 4. Guard Counter (RB + RT) into an attack, then Y + B (follow-up 154).
 5. An RB move (RB + Y / A / X / B) through an attack: the log prints each i-frame grant and any hit.
 6. The smithy element line of Demon Flamespike "Flash" (and the element in a quest).
-7. (Added 2026-11-04) Triple Strike: charge until the "charged" flash, and guard a hit (RB). Both are now MHF's own
-   effects, converted (mhffx2gu.py): charged = 0xfc6 0x11 (light-blue glows / rays), guarded hit = 0xfc5 0x14 on
-   the weapon hand (4 spots), instead of GS's flashes. If the game crashes when a quest loads with the Magnet Spike, it is the new
+7. (Added 2026-11-04) MHF's own effects, converted (mhffx2gu.py) and posted where MHF posts them (msfxposts.py,
+   notes/effect-posts.md; the log prints each "mhf effect" post): Triple Strike (charge to the flash, then let it
+   overcharge), a guard (RB) and an Impact guard, Magnetic Shock (hit and whiff), the attraction and repulsion,
+   Guard Counter success, Charged Strike, Supplex, Magnetic Assault, Double Slash, Finishing Slash, the pin slam
+   and finisher, Guard Assault; some only while Magnetised (as MHF). Still GS stand-ins: the marker, the shot,
+   Magnetise's aura. If the game crashes when a quest loads with the Magnet Spike, it is the new
    effect files in w05.arc (say so; MS_MHF_FX=0 for msbuild.py leaves them out).
-Ask only about visuals: did the attraction look too fast / too far, what the shot looked like; the charge effect's
-size (too big / small), colour and shape next to MHF's.
+Ask only about visuals: did the attraction look too fast / too far, what the shot looked like; the effects' size
+(too big / small: one global factor), colour, placement (on the hand / ahead / on the ground) next to MHF's.

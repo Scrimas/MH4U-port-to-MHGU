@@ -44,7 +44,7 @@ FLASH_EFX = {'CHARGED': (1300, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), 1.0, 7),     # 
 # flashes that post a converted MHF effect (mhffx2gu) instead of GS's, as groups of PEL records (one per MHF base
 # offset) from MHF_BASE + 16 k: Triple Strike charged (the module's first charge level) = MHF 0xfc6 0x11 (0x10333d74,
 # the first level; 0xe = the later steps, S); guarded hit = MHF 0xfc5 0x14 (ms_guarded, S; MHF also posts 0x38)
-MHF_FX = {'CHARGED': (0xfc6, 0x11), 'GUARD': (0xfc5, 0x14)}
+MHF_FX = {}         # (2026-11-04: the charged / guard posts moved to msfxposts.EVENT_POSTS)
 MHF_BASE = 2000
 LEAD = 4                      # frames before the hit the swing path starts
 SND_LEAD = 2

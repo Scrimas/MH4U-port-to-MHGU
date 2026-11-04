@@ -185,8 +185,12 @@ MHF's), the attach offset on GU's weapon bone, all 40 models.
     its MHF mesh baked into a sprite of one atlas (effect\base\ms_mhf_000 TEX + EAN), scale / colour curves from
     MHF's keys, the burst frame as an invisible lead-in (alpha 0, keys shifted), life in the emit block;
   - msbuild packs every converted effect into w05.arc (effect\pl\w05\ms_SSS_EEE[_k], <= 32 entries per file);
-    msfx.MHF_FX picks the code posts that use one (PEL ids MHF_BASE + 16 k, one record per MHF base offset with
-    its entry mask, posted together by MS_EFFECT_N): Triple Strike charged = 0xfc6 0x11, guarded hit = 0xfc5 0x14;
+  - posts (msfxposts.py, from notes/effect-posts.md): PEL records from POST_BASE 3000, one block per (effect, bone,
+    offset) = a record per MHF base-offset group with its entry mask and joint (msmot.BODY_MAP; bone 0 = none);
+    ms_act.c fx_posts posts the motion rows (117) at their frames with MHF's Magnetise gate, fx_queue the event
+    rows (guard, Impact guard, Triple Strike level 1 / overcharge / early release); GS's Magnetic Shock stand-ins
+    are off when the table is on. Not posted yet: the carriers (marker, shot and trail, beams, Magnetise loops),
+    the pin's, event 17's hand piece (effect-posts.md "Not posted yet" in msfxposts.py);
   - spawn spread: the MHF base offset = the record's position, the range = GU's box spawn shape (element +0x78
     byte 0 = 1, extents +0x60 / +0x68 / +0x70: 0xa5e450 case 1, C);
   - world-oriented MHF meshes -> GU Polygons (type 2, template w04.arc cm121_041 entry 2; layout C 0xa9ff8c:

@@ -344,7 +344,7 @@ static void shock_tick(uint8_t *p, struct ms_state *s, float tk)
     s->shock_t += tk;
     while (s->shock_k < MS_NSHOCK && s->shock_t >= s_shock_at[s->shock_k]) {
         arm(p, s, MS_HIT_SHOCK + s->shock_k);
-        MS_EFFECT(p, MS_EFX_SHOCK + s->shock_k);
+        if (!MS_NFXPOSTS) MS_EFFECT(p, MS_EFX_SHOCK + s->shock_k);   /* GS's stand-in; MHF's spots: fx_posts */
         s->shock_k++;
     }
     if (s->shock_k >= MS_NSHOCK) s->shock_on = 0;
@@ -388,8 +388,51 @@ static void marker_blink(uint8_t *p, struct ms_state *s)
 
 /* every update, drawn or not: gauge regen, Magnetise timers, the marker's life, mode reset when sheathed, the
  * Magnetic Shock task, the marker's and Magnetise's looks */
+/* MHF's converted effects (msfxposts.py -> ms_data.inc): motion rows posted once per motion run at their frame (MHF's
+ * fN: the first update at or after frame N), gated by Magnetise in the current mode; event rows queued (fx_queue)
+ * and posted after their delay in frames (MHF task ticks x 2) */
+static void fx_posts(uint8_t *p, struct ms_state *s)
+{
+    uint32_t m = CUR_MOTION(p);
+    if (m != s->fx_mot) { s->fx_mot = m; for (int i = 0; i < 32; i++) s->fx_done[i] = 0; }
+    if (m < 5000 || m >= 6000) return;
+    m -= 5000;
+    uint16_t a = s->action;
+    int mag = s->mag[s->mode] == 1;
+    for (int i = 0; i < MS_NFXPOSTS && i < 256; i++) {
+        const struct ms_fxpost *f = &ms_fxposts[i];
+        if (f->mot != m || !f->n || (s->fx_done[i >> 3] & (1 << (i & 7)))) continue;
+        if (f->action != 0xffff && f->action != a) continue;
+        if ((f->gate == 1 && !mag) || (f->gate == 2 && mag)) continue;
+        if (!MS_REACHED(p, (float)f->frame)) continue;
+        s->fx_done[i >> 3] |= 1 << (i & 7);
+        void *h = ms_post_n(p, f->id, f->n);
+        logf("msport: mhf effect %u x%u at motion %u f%u (action %u, gate %u): %x", f->id, f->n, m, f->frame, a,
+             f->gate, (uint32_t)(uintptr_t)h);
+    }
+}
+
+static void fx_queue(uint8_t *p, struct ms_state *s, int k, int n)
+{
+    for (int i = k; i < k + n; i++) {
+        const struct ms_fxq *q = &ms_fxq[i];
+        if (!q->delay) { ms_post_n(p, q->id, q->n); continue; }
+        for (int j = 0; j < MS_FXQ_MAX; j++)
+            if (s->fxq_t[j] <= 0) { s->fxq_t[j] = q->delay; s->fxq_id[j] = q->id; s->fxq_n[j] = q->n; break; }
+    }
+    if (n) logf("msport: mhf effect queue %d (%d posts)", k, n);
+}
+
+static void fx_queue_tick(uint8_t *p, struct ms_state *s, float tk)
+{
+    for (int j = 0; j < MS_FXQ_MAX; j++)
+        if (s->fxq_t[j] > 0 && (s->fxq_t[j] -= 2 * tk) <= 0) { s->fxq_t[j] = 0; ms_post_n(p, s->fxq_id[j], s->fxq_n[j]); }
+}
+
 static void tick(uint8_t *p, struct ms_state *s, float tk)
 {
+    fx_posts(p, s);
+    fx_queue_tick(p, s, tk);
     shock_tick(p, s, tk);
     if (s->shot_on) {                                   /* the marker shot (S: GU's marker flash as its look) */
         int r = shot_step(p, s, tk);
@@ -666,7 +709,11 @@ void ms_guarded(uint8_t *p, uint32_t level, uint8_t *info, int32_t *dmg)
     if (s->gc_hits < 255) s->gc_hits++;
     s->flags |= 8;
     MS_GUARD_STAMINA(p);
-    void *h = MS_EFFECT_N(p, MS_EFX_GUARD);             /* MHF 0xfc5 0x14 (msfx.MHF_FX; 0x38 not yet) */
+    void *h = 0;                                        /* MHF: guard 14 (< 2 guard hits) / Impact guard 112 */
+    if (MS_FXQ_ON) {
+        if (s->action == 112) fx_queue(p, s, MS_FXQ_GUARD112);
+        else if (s->action == 14 && s->gc_hits < 2) fx_queue(p, s, MS_FXQ_GUARD);
+    } else h = MS_EFFECT(p, MS_EFX_GUARD);
     logf("msport: guarded hit %u (level %u, damage %d) in action %u, effect %x (list handle %x)", s->gc_hits, level,
          dmg ? (int)*dmg : 0, s->action, (uint32_t)(uintptr_t)h, FIELD(uint32_t, p, 0x3304));
 }
@@ -1013,11 +1060,13 @@ static int charge_tick(uint8_t *p, struct ms_state *s, float tk)   /* 34: 1 = re
     s->charge += tk;
     if (!s->charge_lvl && s->charge >= CHARGE_T) {
         s->charge_lvl = 1;
-        void *h = MS_EFFECT_N(p, MS_EFX_CHARGED);       /* MHF 0xfc6 0x11 (msfx.MHF_FX) + rumble */
-        if (!h) MS_SHAKE(p, 0xf, 0);                    /* no effect posted: the camera cue */
+        void *h = 0;                                    /* MHF: fc6 0x11 on bone 10, fc5 0x15 rising + rumble */
+        if (MS_FXQ_ON) fx_queue(p, s, MS_FXQ_CHARGED); else h = MS_EFFECT(p, MS_EFX_CHARGED);
+        if (!h) MS_SHAKE(p, 0xf, 0);                    /* the camera cue (MHF's rumble 7) */
         logf("msport: Triple Strike charged (effect %x)", (uint32_t)(uintptr_t)h);
     } else if (s->charge_lvl && s->charge >= CHARGE_OVER) {
         s->charge_lvl = 0;
+        fx_queue(p, s, MS_FXQ_RELEASE);                 /* MHF fc6 0xe with the auto-release (0x10333d11) */
         logf("msport: Triple Strike overcharged: released");
         MS_SET_ACTION(p, 0x10, 36, 0);
         return 1;
@@ -1042,6 +1091,7 @@ void ms_act(uint8_t *p)
     if (no == MS_RELEASE) {                     /* MHF shared 208: the charge released */
         logf("msport: Triple Strike released at f%d, A %s, charge %d/%d ticks (level %u)", (int)MS_FRAME(p),
              (FIELD(uint16_t, p, 0x13f4) & PAD_R) ? "held" : "up", (int)s->charge, CHARGE_T, s->charge_lvl);
+        if (!s->charge_lvl) fx_queue(p, s, MS_FXQ_EARLY);   /* MHF fc6 0x13: released before level 1 */
         MS_SET_ACTION(p, 0x10, s->charge_lvl ? 35 : 36, 0);
         return;
     }

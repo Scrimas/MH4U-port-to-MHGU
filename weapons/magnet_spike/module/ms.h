@@ -18,6 +18,9 @@ enum { R0, R1, R2, R3, R4, R5, R12, LR };
 struct ms_pair { uint8_t inp, cond; };                                        /* class id k = MHF input + condition */
 struct ms_step { uint16_t kind, mot, start, blend, frame, loops, table; };   /* MHF step; mot = bank-5 slot */
 struct ms_event { uint8_t step, when; uint16_t frame, loop; uint8_t lvl, id; uint16_t prm, hit; };
+struct ms_fxpost { uint16_t mot, frame, action; uint8_t gate; uint16_t id; uint8_t n; };   /* msfxposts.py */
+struct ms_fxq { uint16_t delay, id; uint8_t n; };
+#define MS_FXQ_MAX 12
                                     /* when 0 step start, 1 frame, 2 never, 3 charge level >= lvl; id = MHF event */
 struct ms_action { uint16_t no; uint8_t mode, nsteps; uint16_t step0; uint8_t nevents; uint16_t ev0; };
 
@@ -69,6 +72,11 @@ struct ms_state {
     uint8_t shock_on, shock_k;      /* Magnetic Shock 5 x 3 task running, spots spawned */
     float shock_t;                  /* its ticks */
     float mk_blink, aura_t;         /* ticks to the marker's and Magnetise's next flash */
+    uint32_t fx_mot;                /* MHF effect posts (ms_act.c fx_posts): the motion they were armed for */
+    uint8_t fx_done[32];            /* rows of ms_fxposts posted in this motion run */
+    float fxq_t[MS_FXQ_MAX];        /* queued event posts: frames left (0 = free slot) */
+    uint16_t fxq_id[MS_FXQ_MAX];
+    uint8_t fxq_n[MS_FXQ_MAX];
 };
 struct ms_state *ms_of(uint8_t *p);
 void ms_reset(struct ms_state *s);
