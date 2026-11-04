@@ -18,9 +18,11 @@ What a converted particle is (one GU entry per MHF particle; the MHF count of a 
 - roll (unit +0x170 value / range, rad, C): MHF spawn rotation z +- range -> (z - range, 2 range).
 - spawn position: the base = the group's PEL record offset (one record per MHF base, posted together); the range =
   GU's box shape (element()).
-Not converted yet (each reported by particles()): position curves (motion), non-billboard meshes (E flags & 0x203
-== 0: world-oriented, need a Polygon / Model unit), UV modes 1-7, mesh flipbooks, rotation curves, F emitters, sets'
-own packs (E +6 == 1), colour flags 0x40."""
+- world-oriented MHF meshes (E flags & 0x203 == 0) -> cParticleGeneratorPolygon (type 2, POLY_TEMPLATE): spawn
+  rotation x / y / z, width / height = the sprite with the scale curve.
+- UV animation (modes 2-6): baked frames on one looping EAN entry (uv_frames).
+Not converted yet (each reported by particles()): position curves (motion), UV modes 1 / 7, mesh flipbooks, rotation
+curves, F emitters, sets' own packs (E +6 == 1), colour flags 0x40."""
 import io, math, os, struct, random
 import numpy as np
 
@@ -30,11 +32,16 @@ import mhffx, fmod
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
 SRC = os.path.join(ROOT, 'dump', 'mhf', 'effect')
 TEMPLATE = ('enemy/em001_00.arc', 'effect\\em\\em001\\em001_00_500', 0)
+POLY_TEMPLATE = ('player/quest/w04.arc', 'effect\\cm\\cm121_041', 2)   # one-shot static Polygon (type 2)
+POLY_SIZE = 0x1f0           # Polygon unit head + tail (0xa9ff8c, C): rotation x / y / z (value, range) +0x170..,
+                            # angular speeds +0x188.., curves +0x1a8 / rot +0x1ac / width +0x1b0 / height +0x1b4,
+                            # width +0x1c0 / +0x1c4, height +0x1c8 / +0x1cc, rates +0x1d0 / +0x1d8
 T_EFL, T_TEX, T_EAN = 0x6D5AE854, 0x241F5DEB, 0x4E397417
 EFL_DIR = 'effect\\pl\\w05'               # GU's EFL names carry no 'efl' folder (w00.arc: effect\\pl\\w00\\w00_000)
 ATLAS = 'effect\\base\\ms_mhf_000'          # EAN path; the texture = ATLAS + TEX_SUFFIX (GU's effect textures)
 TEX_SUFFIX = '_HQ_NOMIP'
 CELL_MIN, CELL_MAX, ATLAS_W = 32, 256, 1024
+CELL_MAX_ANIM, SCROLL_FRAMES = 64, 8     # animated sprites: smaller cells; a UV scroll cycle in this many frames
 ADD_BLEND, ALPHA_BLEND = 0, 1
 
 
@@ -99,11 +106,12 @@ def _vertex_colours(b):
     return out
 
 
-def bake(src, mi):
-    """mesh mi -> (RGBA cell (S, S, 4) uint8, half size R in cm); the cell centre = the mesh origin, +y up"""
+def bake(src, mi, du=0.0, dv=0.0, cap=CELL_MAX):
+    """mesh mi (its UVs + (du, dv): MHF's UV animation offset) -> (RGBA cell (S, S, 4) uint8, half size R in cm);
+    the cell centre = the mesh origin, +y up"""
     m = src.meshes[mi]
     P = np.array(m['pos'], float)
-    UV = np.array([(u, 1.0 - v) for u, v in m['uv']], float)      # fmod.py flips v; images are top-down (D3D)
+    UV = np.array([(u + du, 1.0 - v + dv) for u, v in m['uv']], float)   # fmod.py flips v; images top-down
     tris = fmod.triangles(m)
     img = src.images[src.tex_img[src.mat_tex[m['material_list'][0]]]].astype(np.float32)
     H, W = img.shape[:2]
@@ -115,7 +123,7 @@ def bake(src, mi):
         g = np.linalg.norm(P[b, :2] - P[a, :2])
         t = np.linalg.norm((UV[b] - UV[a]) * (W, H))
         if g > 1e-3: dens.append(t / g)
-    S = int(2 ** round(math.log2(max(CELL_MIN, min(CELL_MAX, 2 * R * (np.median(dens) if dens else 1.0))))))
+    S = int(2 ** round(math.log2(max(CELL_MIN, min(cap, 2 * R * (np.median(dens) if dens else 1.0))))))
     out = np.zeros((S, S, 4), np.float32)
     ys, xs = np.mgrid[0:S, 0:S]
     px = (xs + 0.5) / S * 2 * R - R
@@ -143,6 +151,32 @@ def bake(src, mi):
     return np.clip(out, 0, 255).astype(np.uint8), R
 
 
+def uv_frames(e, ls):
+    """MHF UV animation (0x113d0690, C) -> ([(du, dv)] per baked frame, GU frames per baked frame) or None.
+    Ages count 1/60 s (= GU effect frames), 2 per MHF tick; the offsets add to the mesh UVs (wrapping sampler).
+    4: flipbook of N = +0x18 cells on an isqrt(N) square grid over L = +0x1c x ls age units, frame k at
+    (k % C, k // C) / C, L // N units each, looping; 5 / 6: a strip along u / v; 2 / 3: u / v scroll by
+    1 / (+0x18 or +0x1c) / ls per tick, baked as SCROLL_FRAMES frames over one cycle (S: GU shows it as a flipbook)."""
+    m = e['uv_mode']
+    if m in (4, 5, 6):
+        N = max(1, e['uv_u']); L = max(1, int(e['uv_v'] * ls)); C = max(1, math.isqrt(N))
+        step = max(1, L // N)
+        if m == 4: fr = [((k % C) / C, (k // C) / C) for k in range(N)]
+        elif m == 5: fr = [(k / N, 0.0) for k in range(N)]
+        else: fr = [(0.0, k / N) for k in range(N)]
+        return fr, float(step)
+    if m in (2, 3):
+        n = e['uv_u'] if m == 2 else e['uv_v']
+        if not n: return None
+        rate = 1.0 / n / ls                       # UV per tick
+        T = 2.0 / abs(rate)                       # age units per cycle
+        K = int(max(2, min(SCROLL_FRAMES, round(T))))
+        sg = 1.0 if rate > 0 else -1.0
+        fr = [((sg * k / K, 0.0) if m == 2 else (0.0, sg * k / K)) for k in range(K)]
+        return fr, T / K
+    return None
+
+
 # ------------------------------------------------------------------------------------------------ plan
 
 def particles(st, eid, life_min=mhffx.LIFE_MIN):
@@ -156,8 +190,8 @@ def particles(st, eid, life_min=mhffx.LIFE_MIN):
             why = []
             k = st.curve(e['c_pos'])
             if len(k) > 1 and any(v != k[0][1] for _, v, _ in k): why.append('position curve (%d keys)' % len(k))
-            if not e['flags'] & 0x203: why.append('world-oriented mesh')
-            if e['uv_mode']: why.append('UV mode %d' % e['uv_mode'])
+            ls = a['p5c'] if a['p5c'] >= life_min else 1.0
+            if e['uv_mode'] and not uv_frames(e, ls): why.append('UV mode %d' % e['uv_mode'])
             if e['mesh_anim']: why.append('mesh flipbook')
             if e['pack'] == 1: why.append("set's own pack")
             if len(st.curve(e['c_rot'])) > 1: why.append('rotation curve')
@@ -184,6 +218,8 @@ class Builder:
     def __init__(self, src, gu_read):
         """gu_read(arc, path) -> bytes of a GU file (the EFL template)"""
         self.src = src
+        self.poly = _template(gu_read, POLY_TEMPLATE)
+        assert self.poly[1][0] == 2 and len(self.poly[1][1]) >= POLY_SIZE, 'polygon template'
         d = gu_read(TEMPLATE[0], TEMPLATE[1])
         self.tpl_head = d[:0x30]
         n, n2 = struct.unpack_from('<HH', d, 0x10)
@@ -198,16 +234,21 @@ class Builder:
         self.cells = {}          # mesh -> (index, cell rgba, R)
         self.report = []
 
-    def cell(self, mi):
-        if mi not in self.cells:
-            img, R = bake(self.src, mi)
-            self.cells[mi] = (len(self.cells), img, R)
-        return self.cells[mi]
+    def cell(self, mi, frames=((0.0, 0.0),)):
+        """-> (EAN entry index, [frame images], R): one entry per (mesh, UV frames)"""
+        key = (mi, tuple(frames))
+        if key not in self.cells:
+            cap = CELL_MAX if len(frames) == 1 else CELL_MAX_ANIM
+            imgs = [bake(self.src, mi, du, dv, cap) for du, dv in frames]
+            self.cells[key] = (len(self.cells), [i for i, _ in imgs], imgs[0][1])
+        return self.cells[key]
 
     def unit(self, a, e):
-        idx, img, R = self.cell(e['mesh'])
         st = self.cur_set
         ls = a['p5c'] if a['p5c'] >= mhffx.LIFE_MIN else 1.0
+        anim = uv_frames(e, ls) if e['uv_mode'] else None
+        idx, imgs, R = self.cell(e['mesh'], anim[0] if anim else ((0.0, 0.0),))
+        img = imgs[0]
         D = a['frame']
         life = int(round(e['life'] * ls))
         tm = lambda f: D + int(round(f * ls))
@@ -232,7 +273,8 @@ class Builder:
         off_c = 0x1a0 + len(tail); tail += curve(keys)
         struct.pack_into('<HHHHHHHH', u, 0x38, 0, off_s, 0, 0, 0, off_c, 0, 0)    # +0x40 byte 0 = 0: one colour
         struct.pack_into('<4s4s', u, 0x48, cols[0][1], cols[0][1])
-        struct.pack_into('<IIff', u, 0x50, idx << 16, 0, 0.0, 0.0)
+        # UV animation (0xa69d00 / 0xa6a004, C): flags 1 = animate, 2 = loop (GU's own: 0x3 with speed 0.1, S)
+        struct.pack_into('<IIff', u, 0x50, idx << 16 | (3 if anim else 0), 0, 1.0 / anim[1] if anim else 0.0, 0.0)
         S = img.shape[0]
         struct.pack_into('<II', u, 0x60, S // 2, S // 2)
         u[0x70:0x130] = (ATLAS + TEX_SUFFIX).encode().ljust(0xc0, b'\0')
@@ -242,7 +284,24 @@ class Builder:
         struct.pack_into('<fII', u, 0x190, 1.0, 0, 0)
         emit = bytearray(self.tpl[2][1])
         struct.pack_into('<III', emit, 0, 0, D + life, 0)
-        return bytes(u) + tail, bytes(emit)
+        if not e['flags'] & 0x203:
+            # world-oriented MHF mesh (no view matrix in 0x113ce4d0) -> a GU Polygon: the same head (colour,
+            # texture, EAN, curves), the MHF spawn rotation on x / y / z (rad, value - range, 2 range; order G),
+            # width = height = the sprite size with the scale curve (half extent assumed, as the Billboard: G)
+            q = bytearray(self.poly[1][1][:POLY_SIZE])         # Polygon's own head flags; ours copied in:
+            for a0, a1 in ((3, 4), (0x1c, 0x20), (0x28, 0x68), (0x70, 0x170)):   # blend, size / curves / colours /
+                q[a0:a1] = u[a0:a1]                            # UV / pivot, texture + EAN paths
+            rot = [(a['rot'][k] - a['rot_r'][k], 2 * a['rot_r'][k]) for k in range(3)]
+            struct.pack_into('<6f6f', q, 0x170, *[x for r in rot for x in r], *([0.0] * 6))
+            shift = POLY_SIZE - 0x1a0                          # our curves move behind the Polygon block
+            for o in (0x3a, 0x42):
+                v = struct.unpack_from('<H', q, o)[0]
+                if v: struct.pack_into('<H', q, o, v + shift)
+            struct.pack_into('<IIII', q, 0x1a8, 0, 0, off_s + shift, off_s + shift)
+            w = struct.unpack_from('<ff', u, 0x28)
+            struct.pack_into('<8f', q, 0x1c0, w[0], w[1], w[0], w[1], 0.0, 0.0, 0.0, 0.0)
+            return (2, bytes(q) + tail), bytes(emit)
+        return (0, bytes(u) + tail), bytes(emit)
 
     def element(self, a):
         """the template element; an MHF position range -> GU's box spawn shape (element +0x78 byte 0 = 1 ->
@@ -268,7 +327,7 @@ class Builder:
             key = tuple(round(x, 2) for x in a['pos'])
             for _ in range(max(1, a['count'])):
                 u, em = self.unit(a, e)
-                by_pos.setdefault(key, []).append([self.element(a), (0, u), (self.tpl[2][0], em), self.tpl[3]])
+                by_pos.setdefault(key, []).append([self.element(a), u, (self.tpl[2][0], em), self.tpl[3]])
         files, groups, cur, n = [], [], [], 0
         def flush():
             if cur:
@@ -285,27 +344,44 @@ class Builder:
         return files, groups, n, skipped
 
     def atlas(self):
-        """-> (RGBA atlas image, EAN bytes): shelf-packed cells, one EAN entry per cell (index = cell index)"""
-        cells = sorted(self.cells.values())
-        x = y = row = 0; place = []
-        for idx, img, R in cells:
-            S = img.shape[0]
+        """-> (RGBA atlas image, EAN bytes): shelf-packed frames (largest first), one EAN entry per cell (index =
+        cell index) with its frames (EAN layout: notes/gu-efl-units.md, efl4u2gu.py)"""
+        cells = sorted(self.cells.values(), key=lambda c: c[0])
+        order = sorted(((img.shape[0], c, f) for c, (idx, imgs, R) in enumerate(cells) for f, img in enumerate(imgs)),
+                       key=lambda t: -t[0])
+        x = y = row = 0; place = {}
+        for S, c, f in order:
             if x + S > ATLAS_W: x, y, row = 0, y + row, 0
-            place.append((x, y, S)); x += S; row = max(row, S)
+            place[(c, f)] = (x, y, S); x += S; row = max(row, S)
         H = max(32, 1 << (y + row - 1).bit_length())
         A = np.zeros((H, ATLAS_W, 4), np.uint8)
-        for (x, y, S), (idx, img, R) in zip(place, cells):
-            A[y:y + S, x:x + S] = img
-        n = len(place)
+        for (c, f), (x, y, S) in place.items():
+            A[y:y + S, x:x + S] = cells[c][1][f]
+        n = len(cells)
         ents, frames = b'', b''
-        base = 32 * n
-        for k, (x, y, S) in enumerate(place):
-            ents += struct.pack('<IIIIIIII', base + 24 * k, 1, S // 2, S // 2, x, y, 1 | 1 << 16, S | S << 16)
-            frames += struct.pack('<II4f', x | y << 16, S | S << 16, x / ATLAS_W, y / H, (x + S) / ATLAS_W,
-                                  (y + S) / H)
+        off = 32 * n
+        for c, (idx, imgs, R) in enumerate(cells):
+            x0, y0, S = place[(c, 0)]
+            ents += struct.pack('<IIIIIIII', off + len(frames), len(imgs), S // 2, S // 2, x0, y0, 1 | 1 << 16,
+                                S | S << 16)
+            for f in range(len(imgs)):
+                x, y, S = place[(c, f)]
+                frames += struct.pack('<II4f', x | y << 16, S | S << 16, x / ATLAS_W, y / H, (x + S) / ATLAS_W,
+                                      (y + S) / H)
         body = ents + frames
         ean = b'EAN\0' + struct.pack('<III', 0x20120224, len(body), n | 1 << 24) + body
         return A, ean
+
+
+def _template(gu_read, t):
+    """(arc, EFL path, entry) -> the entry's 4 (type, block bytes)"""
+    d = gu_read(t[0], t[1])
+    n, n2 = struct.unpack_from('<HH', d, 0x10)
+    ents = [struct.unpack_from('<4I', d, 0x30 + 16 * i) for i in range(n)]
+    tail = struct.unpack_from('<%dI' % n2, d, 0x30 + 16 * n)
+    starts = sorted({(w >> 8) + 0x30 for e in ents for w in e if w >> 8} | {x + 0x30 for x in tail})
+    size = {o: (starts[i + 1] if i + 1 < len(starts) else len(d)) - o for i, o in enumerate(starts)}
+    return [(w & 0xff, d[(w >> 8) + 0x30:(w >> 8) + 0x30 + size[(w >> 8) + 0x30]]) for w in ents[t[2]]]
 
 
 def write_efl(head, ents, tail_recs):

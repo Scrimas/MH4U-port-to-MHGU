@@ -189,8 +189,12 @@ MHF's), the attach offset on GU's weapon bone, all 40 models.
     its entry mask, posted together by MS_EFFECT_N): Triple Strike charged = 0xfc6 0x11, guarded hit = 0xfc5 0x14;
   - spawn spread: the MHF base offset = the record's position, the range = GU's box spawn shape (element +0x78
     byte 0 = 1, extents +0x60 / +0x68 / +0x70: 0xa5e450 case 1, C);
-  - 203 GU entries over the 35 effects. Not converted yet (gen/report.txt lists each): world-oriented meshes
-    (140 particles), position curves (67), UV modes 2 / 3 / 4 / 7 / 1 (57 / 25 / 53 / 3 / 1), F emitters (15);
+  - world-oriented MHF meshes -> GU Polygons (type 2, template w04.arc cm121_041 entry 2; layout C 0xa9ff8c:
+    rotation x / y / z pairs +0x170, width / height +0x1c0 / +0x1c8 with curves +0x1b0 / +0x1b4); rotation order G;
+  - MHF UV animation (modes 2-6) -> baked frames on one looping EAN entry (flags 3, speed = 1 / frames per cell):
+    flipbooks exact, scrolls as SCROLL_FRAMES (8) steps per cycle (deviation: choppier than MHF's smooth scroll);
+  - 453 GU entries over the 35 effects (one 1024 x 1024 atlas, 28 cells / 106 frames). Not converted yet
+    (gen/report.txt lists each): position curves (67 particles), F emitters (15), UV modes 7 / 1 (3 / 1);
   - deviations (until a test says otherwise): GU's billboard size unit is G (half extent in cm assumed); mesh
     overlaps baked with "max"; the GU volume setting may shorten fades.
 - **GU side**: GU's generator classes (DTI names at 0x157816d..):
