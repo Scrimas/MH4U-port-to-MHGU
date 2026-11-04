@@ -622,10 +622,11 @@ def main(report_only=False):
     arcs, posts, snd_drop, sounds = msfx.build(swings, wdata, holders, own, GU_COPY, COMMON, freport)
     # MHF's own effects (mhffx2gu.py): every posted MHF effect's convertible particles, in the class arc; the flashes
     # with an MHF counterpart (msfx.MHF_FX) post it instead of GS's stand-in
-    mfx_ents, mfx_made, mfx_rep = mhffx2gu.build_all(lambda a, p: gu_arc(a)[p][1])
+    mfx_ents, mfx_made, mfx_rep = (mhffx2gu.build_all(lambda a, p: gu_arc(a)[p][1])
+                                   if os.environ.get('MS_MHF_FX', '1') != '0' else ([], {}, ['mhf effects: off']))
     flash = dict(msfx.FLASH_EFX)
     for k, key in msfx.MHF_FX.items():
-        path, n = mfx_made[key]
+        path, n = mfx_made.get(key, (None, 0))
         if path:
             r = flash[k]
             flash[k] = (r[0], r[1], r[2], 1.0, r[4], r[5] if len(r) > 5 else 0xffff, path, 0xffffffff)

@@ -245,6 +245,6 @@ Build: `GOG_DEFINES=MS_SLICE` (items 1-6 above). Play, then close the game; the 
 7. (Added 2026-11-04, build after 5648bc1) Triple Strike: charge until the "charged" flash. It is now MHF's own
    effect 0xfc6 0xe, converted (mhffx2gu.py): a light-blue glow shrinking from about 1.8 m, rays and a growing ring
    over 0.6 s, instead of GS's flash. If the game crashes when a quest loads with the Magnet Spike, it is the new
-   effect files in w05.arc (say so; the stand-in comes back with MS_MHF_FX off).
+   effect files in w05.arc (say so; MS_MHF_FX=0 for msbuild.py leaves them out).
 Ask only about visuals: did the attraction look too fast / too far, what the shot looked like; the charge effect's
 size (too big / small), colour and shape next to MHF's.
