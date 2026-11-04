@@ -16,9 +16,11 @@ What a converted particle is (one GU entry per MHF particle; the MHF count of a 
 - colour curve (unit +0x42, C): the MHF C keys (RGBA bytes, linear, C both); no C group -> the E record's flags
   only (white). Blend: MHF E flag 4 (render queue, S additive) -> BSBlendAddAlpha (0), else BSBlendBlendAlpha (1);
 - roll (unit +0x170 value / range, rad, C): MHF spawn rotation z +- range -> (z - range, 2 range).
-Not converted yet (each reported by plan()): position curves (motion), non-billboard meshes (E flags & 0x203 == 0:
-world-oriented, need a Polygon / Model unit), UV modes 1-7, mesh flipbooks, rotation curves, spawn position
-offsets / ranges, F emitters, sets' own packs (E +6 == 1), colour flags 0x40."""
+- spawn position: the base = the group's PEL record offset (one record per MHF base, posted together); the range =
+  GU's box shape (element()).
+Not converted yet (each reported by particles()): position curves (motion), non-billboard meshes (E flags & 0x203
+== 0: world-oriented, need a Polygon / Model unit), UV modes 1-7, mesh flipbooks, rotation curves, F emitters, sets'
+own packs (E +6 == 1), colour flags 0x40."""
 import io, math, os, struct, random
 import numpy as np
 
@@ -159,7 +161,6 @@ def particles(st, eid, life_min=mhffx.LIFE_MIN):
             if e['mesh_anim']: why.append('mesh flipbook')
             if e['pack'] == 1: why.append("set's own pack")
             if len(st.curve(e['c_rot'])) > 1: why.append('rotation curve')
-            if any(a['pos']) or any(a['pos_r']): why.append('spawn offset')
             out.append((a, e, not why, why))
     return out
 
@@ -243,17 +244,45 @@ class Builder:
         struct.pack_into('<III', emit, 0, 0, D + life, 0)
         return bytes(u) + tail, bytes(emit)
 
+    def element(self, a):
+        """the template element; an MHF position range -> GU's box spawn shape (element +0x78 byte 0 = 1 ->
+        0xa5e450 case 1: offset = (2r - 1) x (+0x60, +0x68, +0x70) per axis, C), MHF U spans +-1.024 x range"""
+        el = bytearray(self.tpl[0][1])
+        r = a['pos_r']
+        if any(r):
+            for k, o in enumerate((0x60, 0x68, 0x70)):
+                struct.pack_into('<ff', el, o, abs(r[k]) * 1.024, 0.0)
+            el[0x78] = 1
+        return (self.tpl[0][0], bytes(el))
+
     def efl(self, sid, eid):
-        """one MHF effect -> (EFL bytes, entries made, [(E id, reasons)] not converted)"""
+        """one MHF effect -> ([(EFL path, EFL bytes)], groups [(EFL path, element mask, base position)], entries,
+        [(E id, reasons)] not converted). A group = the entries of one MHF base position (turned by the effect yaw
+        in MHF, 0x113d37e0, C), posted as one PEL record with that offset; at most 32 entries per EFL (the record's
+        element mask)"""
         st = self.cur_set = self.src.set(sid)
-        ents, skipped = [], []
+        by_pos, skipped = {}, []
         for a, e, ok, why in particles(st, eid):
             if not ok:
                 skipped.append((e['id'] if e else a['part'], why)); continue
+            key = tuple(round(x, 2) for x in a['pos'])
             for _ in range(max(1, a['count'])):
                 u, em = self.unit(a, e)
-                ents.append([self.tpl[0], (0, u), (self.tpl[2][0], em), self.tpl[3]])
-        return (write_efl(self.tpl_head, ents, self.tpl_tail) if ents else None), len(ents), skipped
+                by_pos.setdefault(key, []).append([self.element(a), (0, u), (self.tpl[2][0], em), self.tpl[3]])
+        files, groups, cur, n = [], [], [], 0
+        def flush():
+            if cur:
+                path = efl_name(sid, eid) + ('_%d' % len(files) if files else '')
+                files.append((path, write_efl(self.tpl_head, [x for _, x in cur], self.tpl_tail)))
+                masks = {}
+                for i, (pos, _) in enumerate(cur): masks[pos] = masks.get(pos, 0) | 1 << i
+                groups.extend((path, m, pos) for pos, m in masks.items())
+        for pos, es in by_pos.items():
+            for x in es:
+                if len(cur) == 32: flush(); cur.clear()
+                cur.append((pos, x)); n += 1
+        flush()
+        return files, groups, n, skipped
 
     def atlas(self):
         """-> (RGBA atlas image, EAN bytes): shelf-packed cells, one EAN entry per cell (index = cell index)"""
@@ -319,15 +348,14 @@ MS_EFFECTS = [(0xfc5, e) for e in (0x1, 0x3, 0x4, 0x14, 0x15, 0x16, 0x1a, 0x22, 
 
 
 def build_all(gu_read, effects=MS_EFFECTS, src=SRC):
-    """-> (arc entries [(path, type, bytes)], {(set, effect): (EFL path or None, entries)}, report lines)"""
+    """-> (arc entries [(path, type, bytes)], {(set, effect): [(EFL path, element mask, position)]}, report)"""
     import tex
     b = Builder(Source(src), gu_read)
     ents, made, rep = [], {}, []
     for sid, eid in effects:
-        efl, n, skipped = b.efl(sid, eid)
-        name = efl_name(sid, eid) if efl else None
-        if efl: ents.append((name, T_EFL, efl))
-        made[(sid, eid)] = (name, n)
+        files, groups, n, skipped = b.efl(sid, eid)
+        ents += [(path, T_EFL, d) for path, d in files]
+        made[(sid, eid)] = groups
         rep.append('mhf effect %#x %#x: %d GU entries%s' % (sid, eid, n, ''.join(
             '; not converted: E %d (%s)' % (k, ', '.join(w)) for k, w in skipped)))
     if b.cells:

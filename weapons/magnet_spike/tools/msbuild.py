@@ -83,6 +83,9 @@ def pair_id(inp, cond):
     return PAIRS[key]
 
 
+FLASH_IDS = {}       # flash name -> (first PEL id, records), filled by main before c_tables
+
+
 def rom():
     global _ROM
     try: return _ROM
@@ -541,7 +544,8 @@ def c_tables(acts, modes, own, tbl_index, hit_index, mvs):
           '#define MS_EFX_SHOCK %d  /* + k: its effect (msfx.SHOCK_TEMPLATE moved to spot k) */' % msfx.SHOCK_EFX,
           '#define MS_EFX_MARKER %d  /* msfx.MARKER_EFX */' % msfx.MARKER_EFX[0],
           '#define MS_EFX_AURA %d  /* msfx.AURA_EFX */' % msfx.AURA_EFX[0]]
-    L += ['#define MS_EFX_%s %d  /* msfx.FLASH_EFX */' % (n, r[0]) for n, r in sorted(msfx.FLASH_EFX.items())]
+    L += ['#define MS_EFX_%s %d  /* msfx.FLASH_EFX / MHF_FX */\n#define MS_EFX_%s_N %d' % (n, i, n, c)
+          for n, (i, c) in sorted(FLASH_IDS.items())]
     L += ['#define MS_NHITS %d' % len(mvs), 'static const uint16_t ms_hit_mv[] = {'] + [
         '    %s,' % ', '.join(str(v) for v in mvs[i:i + 20]) for i in range(0, len(mvs), 20)] + ['};']
     L += ['#define MS_NCAPS %d' % len(HIT_CAPS),
@@ -624,14 +628,19 @@ def main(report_only=False):
     # with an MHF counterpart (msfx.MHF_FX) post it instead of GS's stand-in
     mfx_ents, mfx_made, mfx_rep = (mhffx2gu.build_all(lambda a, p: gu_arc(a)[p][1])
                                    if os.environ.get('MS_MHF_FX', '1') != '0' else ([], {}, ['mhf effects: off']))
-    flash = dict(msfx.FLASH_EFX)
-    for k, key in msfx.MHF_FX.items():
-        path, n = mfx_made.get(key, (None, 0))
-        if path:
-            r = flash[k]
-            flash[k] = (r[0], r[1], r[2], 1.0, r[4], r[5] if len(r) > 5 else 0xffff, path, 0xffffffff)
+    flash = {k: [r] for k, r in msfx.FLASH_EFX.items()}
+    FLASH_IDS.clear(); FLASH_IDS.update({k: (r[0], 1) for k, r in msfx.FLASH_EFX.items()})
+    for j, (k, key) in enumerate(sorted(msfx.MHF_FX.items())):
+        groups = mfx_made.get(key)
+        if groups:
+            r, base = flash[k][0], msfx.MHF_BASE + 16 * j
+            assert len(groups) <= 16, 'mhf effect %s: %d groups' % (key, len(groups))
+            flash[k] = [(base + g, pos, (0.0, 0.0, 0.0), 1.0, r[4], r[5] if len(r) > 5 else 0xffff, path, mask)
+                        for g, (path, mask, pos) in enumerate(groups)]
+            FLASH_IDS[k] = (base, len(groups))
     code_fx = [(msfx.SHOCK_EFX + k, (x, 0.0, z), (0.0, 0.0, 0.0), 1.0, msfx.SHOCK_TEMPLATE)
-               for k, (x, z) in enumerate(SHOCK)] + [msfx.MARKER_EFX, msfx.AURA_EFX] + list(flash.values())
+               for k, (x, z) in enumerate(SHOCK)] + [msfx.MARKER_EFX, msfx.AURA_EFX] + [
+               x for k in sorted(flash) for x in flash[k]]
     freport += mfx_rep
     rep = mreport + hreport + creport + freport
     open(os.path.join(OUT_GEN, 'report.txt'), 'w').write('\n'.join(rep) + '\n')

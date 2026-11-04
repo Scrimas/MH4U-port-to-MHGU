@@ -666,7 +666,7 @@ void ms_guarded(uint8_t *p, uint32_t level, uint8_t *info, int32_t *dmg)
     if (s->gc_hits < 255) s->gc_hits++;
     s->flags |= 8;
     MS_GUARD_STAMINA(p);
-    void *h = MS_EFFECT(p, MS_EFX_GUARD);               /* MHF: 0xfc5 0x14 / 0x38 (S: a GS charge flash) */
+    void *h = MS_EFFECT_N(p, MS_EFX_GUARD);             /* MHF 0xfc5 0x14 (msfx.MHF_FX; 0x38 not yet) */
     logf("msport: guarded hit %u (level %u, damage %d) in action %u, effect %x (list handle %x)", s->gc_hits, level,
          dmg ? (int)*dmg : 0, s->action, (uint32_t)(uintptr_t)h, FIELD(uint32_t, p, 0x3304));
 }
@@ -1013,7 +1013,7 @@ static int charge_tick(uint8_t *p, struct ms_state *s, float tk)   /* 34: 1 = re
     s->charge += tk;
     if (!s->charge_lvl && s->charge >= CHARGE_T) {
         s->charge_lvl = 1;
-        void *h = MS_EFFECT(p, MS_EFX_CHARGED);         /* MHF: effect 0xfc6/0x11 + rumble (S: a GS charge flash) */
+        void *h = MS_EFFECT_N(p, MS_EFX_CHARGED);       /* MHF 0xfc6 0x11 (msfx.MHF_FX) + rumble */
         if (!h) MS_SHAKE(p, 0xf, 0);                    /* no effect posted: the camera cue */
         logf("msport: Triple Strike charged (effect %x)", (uint32_t)(uintptr_t)h);
     } else if (s->charge_lvl && s->charge >= CHARGE_OVER) {

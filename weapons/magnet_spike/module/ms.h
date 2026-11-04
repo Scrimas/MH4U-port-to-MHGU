@@ -146,6 +146,14 @@ static inline void *ms_post(uint8_t *p, uint32_t id, void *req)
     return pel ? MS_POST(p, pel, 1, id, req, 0) : 0;
 }
 #define MS_EFFECT(p, id) ms_post((uint8_t *)(p), id, (uint8_t *)(p) + 0x2550)
+/* a converted MHF effect = id##_N PEL records from id (one per MHF base offset, msbuild FLASH_IDS); the first handle */
+static inline void *ms_post_n(uint8_t *p, uint32_t id, uint32_t n)
+{
+    void *h = 0;
+    for (uint32_t k = 0; k < n; k++) { void *x = ms_post(p, id + k, p + 0x2550); if (!h) h = x; }
+    return h;
+}
+#define MS_EFFECT_N(p, id) ms_post_n((uint8_t *)(p), id, id##_N)
 typedef void (*ms_req_t)(void *req);
 #define MS_REQ_CTOR FN(ms_req_t, 0x40b10)             /* a proof-effect request (~0xd8 B, em089_efx.c): +0x1c flags (bit
                                                          0 = at the world position +0xc0), +0xd0 attach model */

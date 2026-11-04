@@ -41,9 +41,11 @@ FLASH_EFX = {'CHARGED': (1300, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), 1.0, 7),     # 
              # flash 7 on its own joint (65535; test 6: forced onto joint 8 it was unseen; test 7: 9 = a GS slash)
              'GUARD': (1301, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), 1.0, 9, 8),       # guarded hit (flash 9)
              'MAGNETISE': (1302, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), 1.0, 11, 8)}  # Magnetise on (flash 11)
-# flashes that post a converted MHF effect (mhffx2gu) instead of GS's: Triple Strike charged = MHF 0xfc6 0xe (the
-# charge-step flash, 0x10333d0a: posted on each charge step after the first; 0x11 = the first level, S)
-MHF_FX = {'CHARGED': (0xfc6, 0xe)}
+# flashes that post a converted MHF effect (mhffx2gu) instead of GS's, as groups of PEL records (one per MHF base
+# offset) from MHF_BASE + 16 k: Triple Strike charged (the module's first charge level) = MHF 0xfc6 0x11 (0x10333d74,
+# the first level; 0xe = the later steps, S); guarded hit = MHF 0xfc5 0x14 (ms_guarded, S; MHF also posts 0x38)
+MHF_FX = {'CHARGED': (0xfc6, 0x11), 'GUARD': (0xfc5, 0x14)}
+MHF_BASE = 2000
 LEAD = 4                      # frames before the hit the swing path starts
 SND_LEAD = 2
 WHOOSH_B, WHOOSH_FAST, WHOOSH_SLOW = 65, 90, 94

@@ -184,11 +184,13 @@ MHF's), the attach offset on GU's weapon bone, all 40 models.
   - each MHF particle = one GU Billboard entry cloned from em001_00_500 entry 0 (one particle, once, no motion);
     its MHF mesh baked into a sprite of one atlas (effect\base\ms_mhf_000 TEX + EAN), scale / colour curves from
     MHF's keys, the burst frame as an invisible lead-in (alpha 0, keys shifted), life in the emit block;
-  - msbuild packs every converted effect into w05.arc (effect\pl\w05\ms_SSS_EEE); msfx.MHF_FX picks the code
-    posts that use one: Triple Strike charged (PEL 1300) = 0xfc6 0xe;
-  - first pass: 92 GU entries over the 35 effects. Not converted yet (gen/report.txt lists each): spawn offsets
-    (259 particles), world-oriented meshes (140), position curves (67), UV modes 2 / 3 / 4 / 7 / 1 (57 / 25 / 53 /
-    3 / 1), F emitters (15);
+  - msbuild packs every converted effect into w05.arc (effect\pl\w05\ms_SSS_EEE[_k], <= 32 entries per file);
+    msfx.MHF_FX picks the code posts that use one (PEL ids MHF_BASE + 16 k, one record per MHF base offset with
+    its entry mask, posted together by MS_EFFECT_N): Triple Strike charged = 0xfc6 0x11, guarded hit = 0xfc5 0x14;
+  - spawn spread: the MHF base offset = the record's position, the range = GU's box spawn shape (element +0x78
+    byte 0 = 1, extents +0x60 / +0x68 / +0x70: 0xa5e450 case 1, C);
+  - 203 GU entries over the 35 effects. Not converted yet (gen/report.txt lists each): world-oriented meshes
+    (140 particles), position curves (67), UV modes 2 / 3 / 4 / 7 / 1 (57 / 25 / 53 / 3 / 1), F emitters (15);
   - deviations (until a test says otherwise): GU's billboard size unit is G (half extent in cm assumed); mesh
     overlaps baked with "max"; the GU volume setting may shorten fades.
 - **GU side**: GU's generator classes (DTI names at 0x157816d..):
