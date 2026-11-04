@@ -728,7 +728,11 @@ def main(report_only=False):
     # with the class; its Hunter Arts bank (two_arts) left out
     fx += [(p, t, b) for n in ('001', 'mat_b') for p, t, b in gu_entries('weapon/w00/snd/%s.arc' % n)
            if '_arts' not in p]
-    fx += mfx_ents
+    # MHF's effects before the class PEL that names them: GU resolves a PEL record's EFL path while the PEL loads
+    # (GU's arcs: 781 / 781 PEL -> EFL references point back; test 15: ours came after it and nothing drew. S:
+    # the PEL loader is not traced)
+    k = next(i for i, (p, t, b) in enumerate(fx) if p == 'effect\\pel\\pl\\w05_000')
+    fx[k:k] = mfx_ents
     write('player/quest/w05.arc', arcpack.build([
         ('player\\mot\\w05\\w05', T_LMT, body),
         ('player\\mot\\w05\\w05_sa', T_LMT, empty_list()),

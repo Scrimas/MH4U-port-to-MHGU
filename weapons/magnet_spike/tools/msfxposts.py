@@ -13,8 +13,9 @@ Bones: MHF hunter bones (0 = floor = the hunter's own frame: no joint; 10 = S up
 GU joints by msmot.BODY_MAP; MHF HP(x, y, z) = bone 0 + R(yaw) (x, y, z) = joint none + offset; a TASK post keeps
 its bone (S: GU's joint-attached record follows it as MHF's re-read matrix does). MHF's single-player view: the
 "not O" branches (other hunters' clients) are left out.
-Not posted yet (module work): carriers that follow the marker / shot / beams / weapon matrix (fc5 0 / 2 / 7 / 0x4d at
-the marker / 0x4e / 0xa / 0xb / 0xe / 0x28, fc6 0x10 / 0x12 / 0x22 / 0x1e, Magnetise fc5 0x55-0x58), the pin's,
+Carriers posted by the module (EVENT_POSTS 'MARKER' / 'SHOT' / 'TRAIL'): fc5 0xe / 0xb / 0xa. Not posted yet
+(module work): the other carriers that follow the marker / beams / weapon matrix (fc5 0 / 2 / 7 / 0x4d at the marker
+/ 0x4e / 0x28, fc6 0x10 / 0x12 / 0x22 / 0x1e, Magnetise fc5 0x55-0x58), the pin's,
 event 17's hand piece (no effect id: three model meshes)."""
 
 ANY = 0xffff
@@ -104,6 +105,11 @@ EVENT_POSTS = {
                 (16, (0xfc5, 0x15), 14, (0, 0, 80)), (24, (0xfc5, 0x15), 14, (0, 0, 120))],
     'RELEASE': [(0, (0xfc6, 0xe), 10, (0, 0, 0))],
     'EARLY': [(0, (0xfc6, 0x13), 10, (0, 0, 0))],
+    # carriers (ms_act.c fx_at, posted at a world point and moved every tick; not queued): the marker (special #2,
+    # 0x101e938a), the shot (special #1, 0x101e9059), its trail points (special #9, 0x101eb0a1)
+    'MARKER': [(0, (0xfc5, 0xe), 0, (0, 0, 0))],
+    'SHOT': [(0, (0xfc5, 0xb), 0, (0, 0, 0))],
+    'TRAIL': [(0, (0xfc5, 0xa), 0, (0, 0, 0))],
 }
 
 

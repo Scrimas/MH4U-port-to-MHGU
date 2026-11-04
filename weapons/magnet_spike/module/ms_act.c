@@ -114,6 +114,20 @@ static int em_ok(uint8_t *m)        /* a large monster the hit pass would test (
     return r && FIELD(uint8_t, r, 0x1a0) && !FIELD(uint8_t, r, 0x444) && FIELD(int32_t, r, 0x370) > 0;
 }
 
+/* the marker's monster still exists and lives (MHF ends the marker on death, area change, a broken part: test 15,
+ * "consumed too fast": em_ok's hurt gates rec+0x1a0 / +0x444 / m+0x7652 drop for moments (around the attraction's
+ * landing), which ended the marker 1.8-4.3 s after the shot; S: the area and part ends are not ported) */
+static int em_alive(uint8_t *m)
+{
+    void *mgr = MS_EM_MGR;
+    for (int i = 0; m && mgr && i < 10; i++)
+        if (MS_EM_GET(mgr, i) == m) {
+            uint8_t *r = em_rec(m);
+            return !FIELD(uint8_t, m, 0xb5f7) && r && FIELD(int32_t, r, 0x370) > 0;
+        }
+    return 0;
+}
+
 /* a joint's world matrix (rows +0x10 / +0x20 / +0x30 = axes, +0x40 = position: joints +0x494, index from the id
  * table +0x498, 160 bytes; GU's 0x53aad8 / 0x53ab30, the same for the hunter and the monsters) */
 static const float *joint_mat(const uint8_t *u, uint32_t id)
@@ -191,6 +205,10 @@ static float seg_seg(const float *a0, const float *a1, const float *b0, const fl
     return d;
 }
 
+static void fx_at(uint8_t *p, uint32_t k, uint32_t n, const float *t, const float *rot, void **h);
+static void fx_stop(void **h);
+static void shot_dir_deg(const struct ms_state *s, float r[3]);
+
 /* one step of the shot from s->shot_p over tk ticks: 1 = it hit (marker placed), -1 = it ended, 0 = flying */
 static int shot_step(uint8_t *p, struct ms_state *s, float tk)
 {
@@ -236,6 +254,7 @@ static int shot_step(uint8_t *p, struct ms_state *s, float tk)
                 float w[3] = {hit[0] - m[12], hit[1] - m[13], hit[2] - m[14]}, l2 = dot3(ax, ax);
                 s->mk_local[k] = l2 > 1e-9f ? dot3(w, ax) / l2 : 0;
             }
+        if (MS_FXQ_ON) { float t[3]; fx_stop(s->mk_fx); if (marker(s, t)) fx_at(p, MS_FXQ_MARKER, t, 0, s->mk_fx); }
         float *q = pos_of(p);
         logf("msport: marker shot hit monster %x (em %u) joint %u at %d %d %d, %d cm away, after %d ticks",
              (uint32_t)(uintptr_t)bm, FIELD(uint8_t, bm, 0xb5f4), bj, (int)hit[0], (int)hit[1], (int)hit[2],
@@ -260,7 +279,9 @@ static void marker_shot(uint8_t *p, struct ms_state *s)
         s->shot_p[k] = (h ? h[12 + k] : q[k] + (k == 1 ? 150.0f : 0)) + o[k];
         s->shot_v[k] = s->aim_dir[k] * SHOT_SPEED;
     }
-    s->shot_t = 0; s->shot_on = 1;
+    s->shot_t = 0; s->shot_on = 1; s->trail_k = 0;
+    for (int k = 0; k < 3; k++) s->shot_o[k] = s->shot_p[k];
+    if (MS_FXQ_ON) { float r[3]; shot_dir_deg(s, r); fx_stop(s->shot_fx); fx_at(p, MS_FXQ_SHOT, s->shot_p, r, s->shot_fx); }
     logf("msport: marker shot from %d %d %d (hand %s), direction %d %d %d / 1000", (int)s->shot_p[0],
          (int)s->shot_p[1], (int)s->shot_p[2], h ? "joint 12" : "missing", (int)(s->aim_dir[0] * 1000),
          (int)(s->aim_dir[1] * 1000), (int)(s->aim_dir[2] * 1000));
@@ -305,12 +326,17 @@ static int input(struct ms_state *s, uint32_t inp, uint32_t held, uint32_t trig,
                                                         /* R1 is a modifier: tri / circle alone not with R (test 4:
                                                            R + Y while walking did the walk's Y) */
     /* test 8: aim + Y without a marker did the plain Y: MHF's "aim:" inputs mask the plain ones while aiming */
-    case 2: return !rh && !aim && (combo & 2);          /* tri (22 = stick + tri: cmd_type 0xc adds the stick) */
-    case 3: return !rh && !aim && (combo & 4);          /* circle (6 = stick + circle) */
+    /* test 15 (Guard Counter, then Y + B -> 154 from f68): B, then Y 8 ms later = GU combo 0x42, tri and the chord;
+       tri's pri 20 (-> 16, f46-f76) beat the chord's 0 and the maintainer never got 154. MHF reads tri+circle as
+       its own key action (0xe1 / 0xdc, 0x10336c70, C) and its tables give tri the higher priority in the chord's
+       go window, so a chord press must not count as tri / circle (S: the key layer 0x108f7010 not traced) */
+    case 2: return !rh && !aim && (combo & 2) && !(combo & 0x40);   /* tri (22 = stick + tri: cmd_type 0xc adds the
+                                                           stick) */
+    case 3: return !rh && !aim && (combo & 4) && !(combo & 0x40);   /* circle (6 = stick + circle) */
     case 4: return !rh && !aim && (combo & 0x40);       /* tri + circle */
     case 5: return (trig & BTN_MINUS) != 0;
-    case 7: return rh && (combo & 2);
-    case 8: return rh && (combo & 4);
+    case 7: return rh && (combo & 2) && !(combo & 0x40);
+    case 8: return rh && (combo & 4) && !(combo & 0x40);
     case 9: return rh && (combo & 0x40);
     case 10: return rh && (trig & PAD_D);               /* R1 + special(A) */
     case 11: return rh && (trig & BTN_MINUS);
@@ -356,7 +382,7 @@ static void shock_tick(uint8_t *p, struct ms_state *s, float tk)
 #define MARKER_BLINK 60.0f
 #define AURA_EVERY 45.0f
 
-static void *flash_at(uint8_t *p, const float *t)       /* the marker's flash at a world point */
+static void *post_at(uint8_t *p, uint32_t id, const float *t, const float *rot_deg)   /* a PEL id at a world point */
 {
     uint32_t buf[0x100 / 4 + 4];
     void *req = (void *)(((uint32_t)buf + 15u) & ~15u);
@@ -371,9 +397,52 @@ static void *flash_at(uint8_t *p, const float *t)       /* the marker's flash at
     FIELD(void *, req, 0x4) = p;                        /* test 6: handles but no blink. em089_efx.c's world posts set */
     FIELD(uint8_t, req, 0xc) = FIELD(uint8_t, p, 0x2550 + 0xc);  /* the owner and its area: the area of the hunter's
                                                            own request (+0x2550, the guard flash's, which shows) */
-    void *h = ms_post(p, MS_EFX_MARKER, req);
+    if (rot_deg) {                                      /* em089_efx.c post_full: req+0x14 bit 1, degrees at +0x30 */
+        FIELD(uint32_t, req, 0x14) |= 2u;
+        for (int i = 0; i < 3; i++) FIELD(float, req, 0x30 + 4 * i) = rot_deg[i];
+        FIELD(float, req, 0x3c) = 0.0f;
+    }
+    void *h = ms_post(p, id, req);
     MS_REQ_DTOR(req);
     return h;
+}
+
+static void *flash_at(uint8_t *p, const float *t) { return post_at(p, MS_EFX_MARKER, t, 0); }   /* GS's stand-in */
+
+/* MHF effects carried by a moving thing (msfxposts.EVENT_POSTS 'MARKER' / 'SHOT' / 'TRAIL' = ms_fxq rows k..k+n):
+ * every record at the point (handles kept in h), moved every tick (MHF: attached to its special), stopped at its
+ * end. S: one point for all records (their MHF base offsets are 0). */
+static void fx_at(uint8_t *p, uint32_t k, uint32_t n, const float *t, const float *rot, void **h)
+{
+    int j = 0;
+    for (uint32_t i = 0; i < n; i++)
+        for (uint32_t r = 0; r < ms_fxq[k + i].n; r++) {
+            void *x = post_at(p, ms_fxq[k + i].id + r, t, rot);
+            if (h && j < MS_FXH) h[j++] = x;
+        }
+    static int s_n;
+    if (s_n++ < 20) logf("msport: mhf carrier %u (%u rows) at %d %d %d: %x", k, n, (int)t[0], (int)t[1], (int)t[2],
+                         h ? (uint32_t)(uintptr_t)h[0] : 0);
+}
+
+static void fx_place(void **h, const float *t)
+{
+    float q[4] __attribute__((aligned(16))) = {t[0], t[1], t[2], 0.0f};
+    for (int j = 0; j < MS_FXH; j++)
+        if (ms_efx_alive(h[j])) MS_EFX_SET_POS(h[j], q, 0); else h[j] = 0;
+}
+
+static void fx_stop(void **h)
+{
+    for (int j = 0; j < MS_FXH; j++) { if (ms_efx_alive(h[j])) MS_EFX_STOP(h[j], 0); h[j] = 0; }
+}
+
+static void shot_dir_deg(const struct ms_state *s, float r[3])   /* S: (pitch, yaw, 0) of the shot, GU's beam order */
+{
+    const float *v = s->shot_v;
+    r[0] = -atan2f_gu(v[1], root(v[0] * v[0] + v[2] * v[2])) * 57.29578f;
+    r[1] = atan2f_gu(v[0], v[2]) * 57.29578f;
+    r[2] = 0.0f;
 }
 
 static void marker_blink(uint8_t *p, struct ms_state *s)
@@ -436,11 +505,25 @@ static void tick(uint8_t *p, struct ms_state *s, float tk)
     shock_tick(p, s, tk);
     if (s->shot_on) {                                   /* the marker shot (S: GU's marker flash as its look) */
         int r = shot_step(p, s, tk);
+        if (MS_FXQ_ON) {                                /* MHF: fc5:b on the shot, fc5:a dropped as its flight
+                                                           passes 100 / 300 / 600 / 1000 / 1500 (0x101e9070, C) */
+            static const float trail_d[5] = {100, 300, 600, 1000, 1500};
+            float t[3], lim = s->shot_t * SHOT_SPEED, rot[3];
+            if (r == 1 && marker(s, t)) lim = root(sq(t[0] - s->shot_o[0]) + sq(t[1] - s->shot_o[1]) + sq(t[2] - s->shot_o[2]));
+            shot_dir_deg(s, rot);
+            while (s->trail_k < 5 && trail_d[s->trail_k] <= lim) {
+                float d = trail_d[s->trail_k++] / SHOT_SPEED, q[3];
+                for (int k = 0; k < 3; k++) q[k] = s->shot_o[k] + s->shot_v[k] * d;
+                fx_at(p, MS_FXQ_TRAIL, q, rot, 0);
+            }
+            if (r) fx_stop(s->shot_fx); else fx_place(s->shot_fx, s->shot_p);
+        }
         if (r) s->shot_on = 0;
-        else if ((int)(s->shot_t * 0.5f) != (int)((s->shot_t - tk) * 0.5f)) flash_at(p, s->shot_p);   /* every
+        else if (!MS_FXQ_ON && (int)(s->shot_t * 0.5f) != (int)((s->shot_t - tk) * 0.5f)) flash_at(p, s->shot_p);   /* every
                                                            2 ticks (MHF: special #9 trail posts at 100..1500 cm) */
     }
-    if (s->mk_mon && (s->mk_blink -= tk) <= 0) { s->mk_blink = MARKER_BLINK; marker_blink(p, s); }
+    if (s->mk_mon && MS_FXQ_ON) { float t[3]; if (marker(s, t)) fx_place(s->mk_fx, t); }   /* MHF: fc5:e follows it */
+    else if (s->mk_mon && (s->mk_blink -= tk) <= 0) { s->mk_blink = MARKER_BLINK; marker_blink(p, s); }
     if (s->mag[s->mode] == 1 && ms_drawn(p) && (s->aura_t -= tk) <= 0) {
         s->aura_t = AURA_EVERY;
         MS_EFFECT(p, MS_EFX_AURA);
@@ -454,7 +537,11 @@ static void tick(uint8_t *p, struct ms_state *s, float tk)
     }
     if (s->mk_mon) {
         if (!s->att) s->mk_t -= tk;                     /* frozen during the attraction */
-        if (s->mk_t <= 0 || !em_ok(s->mk_mon)) { s->mk_mon = 0; logf("msport: marker gone"); }
+        if (s->mk_t <= 0 || !em_alive(s->mk_mon)) {
+            logf("msport: marker gone (%d ticks left, alive %d)", (int)s->mk_t, em_alive(s->mk_mon));
+            s->mk_mon = 0;
+            fx_stop(s->mk_fx);
+        }
     }
     if (!ms_drawn(p)) { s->mode = 0; s->flags &= ~(1u | 0x8000u); }
     if (FIELD(uint16_t, p, 0x2506) != 0x10) {          /* GU's own action (hit, roll...): no flight, no pin */
@@ -541,7 +628,12 @@ void ms_input(uint8_t *p)
         if ((trig & PAD_L) && s_n++ < 8) logf("msport: R + B: common ids %x %x", FIELD(uint32_t, p, 0x1414),
                                               FIELD(uint32_t, p, 0x1418));
         FIELD(uint32_t, p, 0x1418) &= ~(3u << 17);
-        if (set && (trig & (PAD_L | PAD_D))) FIELD(uint32_t, p, 0x1414) &= ~CID_SHEATHE;
+        if (set && (trig & (PAD_L | PAD_D))) {          /* test 15: R + A rolled (1/6) when the gauge was under one
+                                                           bar (MHF's cost, condition 1); with our command set, GU's
+                                                           moving roll ids go too */
+            FIELD(uint32_t, p, 0x1414) &= ~(CID_SHEATHE | CID_ROLL_LO);
+            FIELD(uint32_t, p, 0x1418) &= ~CID_ROLL_HI;
+        }
     }
     if ((s->flags & 1) && trig) {                       /* test 10: aim + A rolled, no aim + A ever matched */
         static int s_ap;

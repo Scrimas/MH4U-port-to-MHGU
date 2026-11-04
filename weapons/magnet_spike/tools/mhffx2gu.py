@@ -436,6 +436,8 @@ def build_all(gu_read, effects=MS_EFFECTS, src=SRC):
             '; not converted: E %d (%s)' % (k, ', '.join(w)) for k, w in skipped)))
     if b.cells:
         A, ean = b.atlas()
-        ents += [(ATLAS + TEX_SUFFIX, T_TEX, tex.encode_gu(A, 'rgba8', mips=1)), (ATLAS, T_EAN, ean)]
+        # the atlas first: an arc's resources resolve the paths they name while they load (GU's arcs hold every
+        # texture / EAN before the EFLs naming it, every EFL before its PEL: msbuild puts these before the PEL)
+        ents = [(ATLAS + TEX_SUFFIX, T_TEX, tex.encode_gu(A, 'rgba8', mips=1)), (ATLAS, T_EAN, ean)] + ents
         rep.append('mhf effect atlas %dx%d, %d sprites' % (A.shape[1], A.shape[0], len(b.cells)))
     return ents, made, rep

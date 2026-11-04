@@ -21,6 +21,7 @@ struct ms_event { uint8_t step, when; uint16_t frame, loop; uint8_t lvl, id; uin
 struct ms_fxpost { uint16_t mot, frame, action; uint8_t gate; uint16_t id; uint8_t n; };   /* msfxposts.py */
 struct ms_fxq { uint16_t delay, id; uint8_t n; };
 #define MS_FXQ_MAX 12
+#define MS_FXH 8                    /* effect handles kept per carrier */
                                     /* when 0 step start, 1 frame, 2 never, 3 charge level >= lvl; id = MHF event */
 struct ms_action { uint16_t no; uint8_t mode, nsteps; uint16_t step0; uint8_t nevents; uint16_t ev0; };
 
@@ -77,6 +78,9 @@ struct ms_state {
     float fxq_t[MS_FXQ_MAX];        /* queued event posts: frames left (0 = free slot) */
     uint16_t fxq_id[MS_FXQ_MAX];
     uint8_t fxq_n[MS_FXQ_MAX];
+    void *mk_fx[MS_FXH], *shot_fx[MS_FXH];   /* MHF's marker (fc5:e) / shot (fc5:b) effects, moved every tick */
+    float shot_o[3];                /* the shot's start (its trail fc5:a at 100 / 300 / 600 / 1000 / 1500 from it) */
+    uint8_t trail_k;                /* trail points posted */
 };
 struct ms_state *ms_of(uint8_t *p);
 void ms_reset(struct ms_state *s);
@@ -162,6 +166,13 @@ static inline void *ms_post_n(uint8_t *p, uint32_t id, uint32_t n)
     return h;
 }
 #define MS_EFFECT_N(p, id) ms_post_n((uint8_t *)(p), id, id##_N)
+/* live effects (em089_efx.c, C): 0x32a45c(eff, pos, 0) moves one, 0x32a400(eff, 0) stops it (its particles finish);
+ * alive while (eff+0xc & 7) is 1 or 2 */
+typedef void (*ms_efx_pos_t)(void *eff, const float *pos, int32_t k);
+#define MS_EFX_SET_POS FN(ms_efx_pos_t, 0x32a45c)
+typedef void (*ms_efx_stop_t)(void *eff, uint32_t now);
+#define MS_EFX_STOP FN(ms_efx_stop_t, 0x32a400)
+static inline int ms_efx_alive(void *e) { return e && (FIELD(uint32_t, e, 0xc) & 7) - 1u < 2u; }
 typedef void (*ms_req_t)(void *req);
 #define MS_REQ_CTOR FN(ms_req_t, 0x40b10)             /* a proof-effect request (~0xd8 B, em089_efx.c): +0x1c flags (bit
                                                          0 = at the world position +0xc0), +0xd0 attach model */

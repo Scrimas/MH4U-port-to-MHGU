@@ -234,7 +234,7 @@ follow-up on "X + A"; no reticle, projectile nor launcher while aiming; MHF's ef
 | 5 | no Guard Counter follow-up | 57 / 76 / 77's tables have MHF's tri + circle -> 154 (f28 / f68) and tri -> 16 (f46-f76) = Xbox Y + B / Y (MHF keyconfig: tri + circle = pad bits 0xa, top + right); "X + A" was the test-3 checklist's Switch letters; test 6's one try rolled | press log during 57 / 76 / 77 / 114 / 115 |
 | 6 | aim: no reticle, projectile, launcher | MHF (static study, mechanics.md "Aim" / "Shot"): a projectile flies 500 per tick along the camera's 3-D view and sticks to the hit bone (a miss = no marker); the reticle is HUD sprite 0xb6; there is no launcher model (the left hand + effect 0x312). The stand-in picked the nearest monster in a cone and used its origin + 300 (item 3's "too far") | MHF's shot against GU's hurt volumes (0x710b0 / 0x16de70), the marker on the hit joint; reticle, aim camera and effect 0x312 open |
 
-## Test 15 (PENDING: built and installed 2026-11-04, commit 0a90839; the maintainer was not available)
+## Test 15 (built 2026-11-04, commit d32b247; played 2026-11-04)
 Build: `GOG_DEFINES=MS_SLICE` (items 1-6 above). Play, then close the game; the log answers the rest. Xbox letters.
 1. RT + B at a large monster's body: the shot log says hit (joint, point) or miss; the marker stays on that part.
 2. RT + Y from 14-40 m to the marker, then Y or A in the air (MHF's 58 / 61 follow-ups).
@@ -251,3 +251,33 @@ Build: `GOG_DEFINES=MS_SLICE` (items 1-6 above). Play, then close the game; the 
    effect files in w05.arc (say so; MS_MHF_FX=0 for msbuild.py leaves them out).
 Ask only about visuals: did the attraction look too fast / too far, what the shot looked like; the effects' size
 (too big / small: one global factor), colour, placement (on the hand / ahead / on the ground) next to MHF's.
+
+### Test 15 results and fixes
+Log: dump/mhf/test_logs/ms_test15_Ryujinx_1.3.3_2026-11-04_16-05-36.log. The maintainer: (1) no shot, marker or
+launcher visual, and the marker "consumed too fast"; (2) the attraction works but is janky (sometimes too high and too
+slow on the follow-up, the attracted-to point slightly off or behind); (3) RT + A fixed, but RB + A while moving
+rolls; (4) still no Y + B after a Guard Counter; (5) RB moves still seem to have no i-frames; (6) the smithy element
+is right; (7) no MHF effect at all.
+
+| # | issue | cause (C unless marked) | change (test 16) |
+|---|---|---|---|
+| 1 | marker gone too soon | "marker gone" 1.8-4.3 s after each hit, at the attraction's landing: the marker life test used em_ok, the hit pass's filter, whose hurt gates (rec+0x1a0 / +0x444, m+0x7652) drop for moments. MHF ends the marker on death, area change or a broken part (life prm14 = 9000 ticks) | em_alive: still in the monster manager, not small, HP > 0 (S: area / part ends not ported) |
+| 1 | no shot / marker look | stand-ins only (GS's flash, never seen in tests 6-15) | MHF's fc5:e on the marker, fc5:b on the shot, fc5:a at 100 / 300 / 600 / 1000 / 1500 of its flight (msfxposts 'MARKER' / 'SHOT' / 'TRAIL'): posted at the point (post_at), moved every tick (0x32a45c), stopped at the end (0x32a400). Trail rotation (pitch, yaw, 0) in GU's beam order: S. Reticle, aim camera, hand piece still open |
+| 2 | attraction janky, follow-up too high / slow | the log: Y in the flight -> 59, which climbs 111-124 cm before its slam. That is MHF's 59 (f0: drive up 15 / tick x 0.97^n, gravity 4 x 0.1 t; f54: the slam, gravity 60, drive -81). MHF's attraction update 0x10332dd0 runs only in 58 / 61 / 62 / 68 / 71 / 72 (its caller 0x103339d0), so 59 drops the flight's motion, as here. The flight re-targets the marker each tick (S; MHF's direction is set at the start) | none (no confirmed cause); question to the maintainer |
+| 3 | RB + A rolls while moving | every roll came with the gauge under one bar (1200, 0): R1 + special(A) costs a bar (condition 1, MHF), so GU's roll took the press; with 2000 it gave 106 | with our command set under R, GU's moving roll ids (4 / 24 / 38) are cleared too (they could take it, S). Under one bar GU still rolls: question (MHF's) |
+| 4 | no Y + B after a Guard Counter | both counters: Y + B at f32-f50 (combo 0x40, kept for 154 at f68), then B and Y 8 ms apart at f43 / f62: GU combo 0x42 = tri and the chord, tri's priority 20 (-> 16, f46-f76) beat the chord's 0 -> 16. MHF reads tri + circle as its own key action (0xe1 / 0xdc, 0x10336c70) and gives tri the higher priority inside the chord's go window, so a chord press is not tri there (S: the key layer 0x108f7010 not traced) | inputs 2 / 3 / 7 / 8 (tri, circle, R1 + tri / circle) not when the press is the chord (combo 0x40) |
+| 5 | RB moves: no i-frames | the log: 7 ticks granted in each RB move (11, 106, 107, 108, 135); the hits came at motion frames 14 and 18 (the window is 0-14). MHF decrements +0x4ee once per tick (0x10a72ed0, 0x10ad23f0): 7 ticks = 14/60 s, as here; Evasion +1 / +2 = 12 / 17 | none: MHF's value (question: was the maintainer's MHF set on Evasion?) |
+| 7 | no MHF effect | posts returned handles, nothing drew: the 41 EFLs and their atlas came after effect\pel\pl\w05_000 in w05.arc. GU's arcs always hold a PEL's EFLs before it (781 / 781 references) and resolve paths while loading (test 1 had the same with a command list): S, the PEL loader not traced | the atlas, then the EFLs, then the PEL (w05.arc entries 91 / 93-136 / 137) |
+
+## Test 16 (built and installed 2026-11-04)
+Build: `GOG_DEFINES=MS_SLICE`. Play, then close the game; the log answers the rest. Xbox letters.
+1. Any MHF effect at all (step 7 of test 15: guard, Triple Strike, attraction, Magnetic Shock...). If a quest with
+   the Magnet Spike crashes on load: say so (MS_MHF_FX=0 for msbuild.py leaves the effects out).
+2. RT + B at a large monster: the shot's look and its trail; the marker's look on the hit part, following it;
+   several attractions on one marker (it should last).
+3. Guard Counter (RB + RT) into an attack, then Y + B pressed together (154 comes at MHF's frame 68, about 0.6 s
+   after the counter's start).
+4. RB + A while moving, with at least one gauge bar.
+Ask only about visuals: the effects' size (too big / small = one global factor), colour, placement (hand / ahead /
+ground); the marker and shot looks.
+
