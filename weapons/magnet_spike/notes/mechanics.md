@@ -6,7 +6,9 @@ The module side is weapons/magnet_spike/module/ms_act.c (Phase 3).
 
 ## Time and units
 - MHF counters tick at 30 / s (S: executor tick); motion frames are 1/60 s. GU: `dt` = float p+0x1c in 1/60-s frames
-  (2.0 at 30-Hz logic, S; logged once per run), timers do `t -= dt` (0x53aa84). Module: MHF ticks = dt / 2.
+  (C: 0.5 per update at the FPS patch's 120 updates / s, test 13's per-update log; 2.0 at 30-Hz logic), timers do
+  `t -= dt` (0x53aa84), the i-frame timer +0x2b40 too. Module: MHF ticks = dt / 2 (tests 1-14 used dt: every MHF
+  timer ran twice as fast).
 - Distances: MHF units = GU units (S: both ~cm). Stamina: MHF 75 = a roll, GU 150 = a roll (GU = 6 x displayed,
   S) -> GU = 2 x MHF.
 
@@ -59,10 +61,12 @@ Inputs: 0 evade + stamina; 1 stick; 2 / 3 / 4 tri / circle / tri+circle pressed;
 7-11 R1 held + tri / circle / tri+circle / special(A) / SELECT; 13 R2; 14 / 15 circle held / NOT held (levels);
 16 R1 pressed; 17 R1 + evade; 19 / 23 / 24 aiming (MS flag 0x1) + circle / special(A) / tri; 20 always; 21 tri NOT
 held; 22 stick + tri; 12 / 18 never.
-Module (positional, user-confirmed for tri / circle / SELECT / R2): tri X, circle A, special(A) B, R1 = GU's R role
-(0x65f93c), R2 ZR, SELECT Minus, L2 aim = 0x400 (L / ZL), R1 + evade = R + Y (S; R + B is R1 + special). GU press
-combos +0x1444 (2 X, 4 A, 0x40 X + A). With R held, GU's common evade ids 49 / 50 (+0x1418 bits 17 / 18,
-plcmd_com_0x0001_013a / 014a) are cleared (S).
+Module (positional; MHF's MS keyconfig, Rain Client/keyconfig.cfg category 13): tri = top (GU 0x20, Xbox Y), circle =
+right (0x100, Xbox B), special(A) = bottom (0x80, Xbox A; also GU's roll), the MS evade (R1 + evade) = left (0x10,
+Xbox X; also GU's sheathe), R1 = GU's R role (0x65f93c), R2 / L2 = ZR (aim = ZR without R), SELECT = Minus (C, tests
+10 / 13: every press and the GU action it started). GU press combos +0x1444 (2 top, 4 right, 0x40 both). GU's rolls
+test common ids 4 / 24 / 38 (1/6) and 49 / 50 (1/13, 1/14); with R held 49 / 50 are cleared, while aiming all five
+(test 13: aim + A rolled, as input 23 read the left button).
 
 ## Gauge and Magnetise (C)
 - Gauge MS+0x7a 0..10000 (5 bars of 2000). Regen +200 every 30 ticks (+300 with the MS skill at level 4 and

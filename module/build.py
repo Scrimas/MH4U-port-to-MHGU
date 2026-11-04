@@ -279,9 +279,14 @@ MS_ICON_ID = 121                    # weapons/magnet_spike/tools/ms_icon_hdui.py
 MS_LIT_PATCHES = [(0x6F2DA8, 0x6F2CEC, 'ms_forge_order'), (0x6F2B1C, 0x6F2A94, 'ms_forge_label'),
                   (0x6F29AC, 0x6F1D2C, 'ms_forge_label'), (0x5933F8, 0x5930B8, 'ms_shop_icons')] if MS_SLICE else []
 MS_GUNNER_SITES = [0x144968, 0x144A0C, 0x144B24, 0x6ECEFC, 0x6ED884, 0x6FCB2C, 0x7037A8, 0x70B738]
-# box-type tests `type - 11 < 3` (HBG 11, LBG 13: 12 between them) in the equipment / smithy UI rows (test 10: no
-# element shown for Demon Flamespike "Flash"; the bowgun rows have no element line). `bhs` = not a gunner
+# box-type tests `type - 11 < 3` (HBG 11, LBG 13: 12 between them) in the equipment / smithy UI rows: type 12 is no
+# bowgun there. `bhs` = not a gunner. (Test 10's missing element line was not these: MS_ELEMENT_MASKS)
 MS_GUNTYPE_SITES = [0x5402DC, 0x6CEDA4, 0x6D2FA0]
+# the element getters by box entry, 0xdb984 (type, element k) and 0xdba5c (value): only the box types in the mask
+# 0x3bc780 (the blademasters but bows / dual blades, which have their own cases) answer; type 12 got 0 = no element
+# in the smithy / equipment panel (0x586574, test 13) and in the equip-time stat fill 0xdee34 (the hunter's element
+# stats 0x11 / 2: the quest hits). movw #0xc780 -> #0xd780 (+ bit 12; the movt #0x3b stays)
+MS_ELEMENT_MASKS = [0xDB9A4, 0xDBA78]
 
 
 def ms_patches(img):
@@ -325,6 +330,10 @@ def ms_patches(img):
         assert sub & 0xFFF00FFF == 0xE240000B and cmp == 0xE3500003 | ra << 16 and bhs >> 24 == 0x2A, hex(s)
         out += [(s, sub, 0xE350000B | rb << 16), (s + 4, cmp, 0x1350000D | rb << 16),
                 (s + 8, bhs, bhs & 0x0FFFFFFF | 0x10000000)]
+    for site in MS_ELEMENT_MASKS:
+        w = word(site)
+        assert w & 0xFFF00000 == 0xE3000000 and (w >> 4 & 0xF000 | w & 0xFFF) == 0xC780, hex(site)
+        out.append((site, w, movw_imm(w, 0xD780)))
     # guard: class 5 joins the Great Sword's class masks (movw #imm, bit 5 added) in the can-guard check 0x2f2ba0, its
     # angle rule and the guard-level thresholds of 0x2f0670 (the Magnet Spike's Guard Counter / Impact guard windows)
     for site, old, new in ((0x2F2BC8, 0xC20B, 0xC22B), (0x2F2D8C, 0xC081, 0xC0A1), (0x2F07C0, 0xC001, 0xC021)):

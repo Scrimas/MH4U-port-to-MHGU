@@ -61,6 +61,7 @@ struct ms_state {
     float chk_f;
     uint8_t tr_n, tr_slot;          /* attack-slot trace (ms_act.c slot_trace): updates left, slot */
     uint16_t tr_hit;
+    uint16_t was_no; uint8_t was_st; float was_f, if_given;   /* hit diag: the action before a hit */
     uint8_t shock_on, shock_k;      /* Magnetic Shock 5 x 3 task running, spots spawned */
     float shock_t;                  /* its ticks */
     float mk_blink, aura_t;         /* ticks to the marker's and Magnetise's next flash */

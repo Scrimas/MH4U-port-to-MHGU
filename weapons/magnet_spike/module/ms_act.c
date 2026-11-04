@@ -4,9 +4,9 @@
  * +0x13f4 held, +0x13f8 pressed) and press combos (+0x1444, after a short simultaneity window: bit 2 = X alone, 4 = A
  * alone, 0x40 = X + A); the translator sets the class's input ids (+0x1424, 0x285e54) that plcmd_w05 commands test
  * (cmd_type 8, 0xc = stick tilted + id). Id k (+ MS_ID_IMPACT in Impact) = the MHF (input, condition) pair
- * ms_pairs[k]: it is set while MHF's input test and cancel condition both hold (mechanics.md 2). MHF -> Switch by
- * position: tri = X, circle = A, special(A) = B, R1 = GU's R role, R2 = ZR, SELECT = Minus, L2 (aim) = L / ZL;
- * R1 + evade = R + Y, as R + B is R1 + special (S, user to confirm).
+ * ms_pairs[k]: it is set while MHF's input test and cancel condition both hold (mechanics.md 2). MHF -> the pad by
+ * position (MHF's MS keyconfig; PAD_* below): tri = top, circle = right, special(A) = bottom, the MS evade = left,
+ * R1 = GU's R role, R2 = ZR, SELECT = Minus, L2 (aim) = ZR alone.
  *
  * Mechanics (MHF ticks of 1/30 s = dt / 2, dt = player +0x1c in 1/60-s frames): the magnet gauge and Magnetise
  * (every update, from the translator), the marker, the attraction, the pin, the Triple Strike charge and the guard
@@ -24,17 +24,25 @@
 #include "ms.h"
 #include "ms_data.inc"
 
-#define BTN_B 0x10
-#define BTN_X 0x20
-#define BTN_Y 0x80
-#define BTN_A 0x100
-/* GU's player bits (+0x13f4; the control type swaps 0x40 / 0x800 and 0x200 / 0x400, roles 0x65f93c / 0x65f9b4 /
- * 0x65f8ec): d-pad 0x1-0x8, B 0x10, X 0x20, R 0x40, Y 0x80, A 0x100, ZL 0x200, L 0x400, ZR 0x800 under the user's type
- * (0x400 = GU's camera-reset role 0x27e970; test 3: ZL switched modes, as MHF's SELECT read 0x200) */
+/* GU's virtual pad bits (+0x13f4 held, +0x13f8 pressed), named by position on the maintainer's pad (Ryujinx maps by
+ * position; Xbox letters). Tests 10 / 13 (every press and the action it started): 0x80 starts GU's rolls 1/6, 1/13,
+ * 1/14 = the bottom button; 0x10 its sheathe 1/3 = the left one. MHF's MS keyconfig (Rain Client/keyconfig.cfg,
+ * category 13): tri = top, circle = right, special(A) (key 0xeb, the repulsion) = bottom (pad bit 1, DRD), the MS
+ * evade (R1 + evade) = left (DRL). */
+#define PAD_L 0x10                  /* Xbox X: MHF's MS evade */
+#define PAD_U 0x20                  /* Xbox Y: tri */
+#define PAD_D 0x80                  /* Xbox A: special(A); GU's roll */
+#define PAD_R 0x100                 /* Xbox B: circle */
+/* the others (+0x13f4; the control type swaps 0x40 / 0x800 and 0x200 / 0x400, roles 0x65f93c / 0x65f9b4 /
+ * 0x65f8ec): d-pad 0x1-0x8, R 0x40, ZL 0x200, L 0x400, ZR 0x800 under the maintainer's type (0x400 = GU's
+ * camera-reset role 0x27e970; test 3: ZL switched modes, as MHF's SELECT read 0x200) */
 #define BTN_MINUS 0x4000u           /* MHF's SELECT = Minus (the user's Back): test 4 log, Back held = 0x4000 (pressed
                                        0x5000); 0xf000 also took Plus */
 #define BTN_ZR 0x800                /* MHF's R2 and L2 (user, test 2): ZR held = aim, R + ZR = Guard Counter */
 #define CID_SHEATHE (3u << 13)      /* GU's common ids 0xd / 0xe (+0x1414): sheathe standing / moving (1/2, 1/3) */
+/* GU's rolls (plcmd_com_0x0001_006d / 6e / 6f -> 1/6: common ids 4, 24, 38; 013a / 014a -> 1/13, 1/14: 49, 50) */
+#define CID_ROLL_LO ((1u << 4) | (1u << 24))        /* +0x1414 */
+#define CID_ROLL_HI ((1u << 6) | (3u << 17))        /* +0x1418 */
 typedef uint32_t (*ms_mask_t)(void);
 #define R_MASK FN(ms_mask_t, 0x65f93c)   /* GU's R role: 0x40, or 0x800 under the other option (GS's translator) */
 typedef void (*ms_pre_t)(void *p);
@@ -72,9 +80,11 @@ static float root(float x) { float r; __asm__("vsqrt.f32 %0, %1" : "=t"(r) : "t"
 static float *pos_of(uint8_t *p) { return &FIELD(float, p, 0x40); }
 static uint32_t yaw_to(float dx, float dz) { return (uint32_t)(int32_t)(atan2f_gu(dx, dz) * 10430.378f) & 0xffff; }
 static void face(uint8_t *p, uint32_t yaw) { FIELD(uint16_t, p, 0xfec) = (uint16_t)yaw; FIELD(uint16_t, p, 0x14a0) = (uint16_t)yaw; }
-/* MHF ticks (30 per s) this update: GU's dt +0x1c counts 1/30 s (0.5 at 60 fps; test 1's "x 0.5" ran every MHF
- * timer at half speed: gauge regen ~100 / s, the Triple Strike charge twice as long) */
-static float tick_len(uint8_t *p) { return FIELD(float, p, 0x1c); }
+/* MHF ticks (30 per s) this update: GU's dt +0x1c counts 1/60 s (C, test 13: 40 updates in 0.326 s with dt 0.5 =
+ * the FPS patch's 120 updates / s, the motion frame + 0.5 per update; test 14: the gauge regen ran 200 per 15 ticks
+ * of real time = 2 x MHF with tick = dt). Test 1's "x 0.5 = half speed" was wrong (its run under 120 updates / s
+ * not checked); this made every MHF timer, the attraction flight and the falls twice MHF's speed until test 14 */
+static float tick_len(uint8_t *p) { return FIELD(float, p, 0x1c) * 0.5f; }
 
 /* diagnostic (tests): every change of the action, its step, the body motion, the weapon's motion (part 0 object
  * +0x23a0, its +0x4b4 = list << 8 | slot) and the command table (+0x24ac id, +0x24a8 table, +0x24f0 the class list) */
@@ -175,7 +185,10 @@ static int cond(uint8_t *p, struct ms_state *s, uint32_t c)   /* MHF cancel cond
 static int input(struct ms_state *s, uint32_t inp, uint32_t held, uint32_t trig, uint32_t combo, uint32_t r)
 {
     int rh = (held & r) != 0, aim = (s->flags & 1) != 0;
-    switch (inp) {                                      /* R1 is a modifier: tri / circle alone not with R (test 4:
+    switch (inp) {
+    case 0: return (trig & PAD_D) && MS_STAMINA_NOW(s->p) >= 150;   /* MHF's evade key + 75 stamina (GU 150): only
+                                                           the approach cancels 63 / 69 use it (msbuild APPROACH) */
+                                                        /* R1 is a modifier: tri / circle alone not with R (test 4:
                                                            R + Y while walking did the walk's Y) */
     /* test 8: aim + Y without a marker did the plain Y: MHF's "aim:" inputs mask the plain ones while aiming */
     case 2: return !rh && !aim && (combo & 2);          /* tri (22 = stick + tri: cmd_type 0xc adds the stick) */
@@ -185,18 +198,17 @@ static int input(struct ms_state *s, uint32_t inp, uint32_t held, uint32_t trig,
     case 7: return rh && (combo & 2);
     case 8: return rh && (combo & 4);
     case 9: return rh && (combo & 0x40);
-    case 10: return rh && (trig & BTN_Y);               /* R1 + special (the left step): R + the left button */
+    case 10: return rh && (trig & PAD_D);               /* R1 + special(A) */
     case 11: return rh && (trig & BTN_MINUS);
     case 13: return (rh && (trig & BTN_ZR)) || ((held & BTN_ZR) && (trig & r));     /* R + ZR, either order */
-    case 14: return (held & BTN_A) != 0;
-    case 15: return !(held & BTN_A);                    /* circle not held (a level) */
+    case 14: return (held & PAD_R) != 0;
+    case 15: return !(held & PAD_R);                    /* circle not held (a level) */
     case 16: return (trig & r) != 0;
-    case 17: return rh && (trig & BTN_B);               /* R1 + evade (cross, the back step): R + the bottom one
-                                                           (test 3: positions; they were the other way round) */
+    case 17: return rh && (trig & PAD_L);               /* R1 + evade (the MS evade key: left) */
     case 19: return aim && (combo & 4);
     case 20: return 1;
-    case 21: return !(held & BTN_X);
-    case 23: return aim && (trig & BTN_B);
+    case 21: return !(held & PAD_U);
+    case 23: return aim && (trig & PAD_D);           /* test 13: was the left button: aim + A rolled */
     case 24: return aim && (combo & 2);
     }
     return 0;                                           /* 0 / 1: GU's common evade / move commands; 12 / 18 never */
@@ -302,6 +314,17 @@ void ms_input(uint8_t *p)
         logf("msport: hunter stats: element type %d value %d, raw %d", st(p, 0x11), st(p, 2), st(p, 0));
     }
     tick(p, s, tick_len(p));
+    {                                                   /* hit diag: a hit (GU's damage actions, category 64) during
+                                                           one of ours: which, how far in, the i-frames given */
+        uint32_t st = FIELD(uint16_t, p, 0x2506), no = FIELD(uint16_t, p, 0x250a);
+        static int s_dmg;
+        if (st == 64 && s->was_st == 0x10 && s_dmg++ < 30)
+            logf("msport: hit into 64/%u during action %u at motion frame %d (i-frames given %d ticks, timer now %d)",
+                 no, s->was_no, (int)s->was_f, (int)s->if_given, (int)FIELD(float, p, 0x2b40));
+        s->was_st = (uint8_t)st;
+        if (st != 64) { s->was_no = (uint16_t)no; s->was_f = MS_FRAME(p); }
+        if (st != 0x10) s->if_given = 0;
+    }
     if (s->chk_hit && MS_FRAME(p) >= s->chk_f) { hit_check(p, s->chk_hit, 1); s->chk_hit = 0; }
     if (s->tr_n) { s->tr_n--; slot_trace(p, s); }
     uint32_t combo = FIELD(uint32_t, p, 0x1444), r = R_MASK();
@@ -319,6 +342,13 @@ void ms_input(uint8_t *p)
         if (s_n++ < 120)                                /* test 7: 3 hops, no change logged: every frame now */
             logf("msport: jump %u: held %x pressed %x combo %x table %u frame %d", jno, held, trig, combo,
                  FIELD(uint32_t, p, 0x24ac), (int)f);
+    }
+    if (trig && jst == 0x10 && (jno == 57 || jno == 76 || jno == 77 || jno == 114 || jno == 115)) {
+        static int s_gc;                                /* after test 14: "Guard Counter -> X + A does nothing": MHF's
+                                                           follow-ups are tri + circle (combo 0x40, Xbox Y + B) -> 154
+                                                           from f68, tri -> 16 in f46-f76 */
+        if (s_gc++ < 40) logf("msport: GC follow-up press %x held %x combo %x in %u frame %d", trig, held, combo, jno,
+                              (int)MS_FRAME(p));
     }
     if (trig) {                                         /* test 8: no Y in any hop frame: every press while airborne */
         static int s_air;
@@ -345,10 +375,10 @@ void ms_input(uint8_t *p)
                                            plcmd_com 0x0001_013a / 014a ids) nor its sheathe (test 1: R + B at idle
                                            sheathed, common 1/2 comes before our commands in the idle table) */
         static int s_n;
-        if ((trig & BTN_B) && s_n++ < 8) logf("msport: R + B: common ids %x %x", FIELD(uint32_t, p, 0x1414),
+        if ((trig & PAD_L) && s_n++ < 8) logf("msport: R + B: common ids %x %x", FIELD(uint32_t, p, 0x1414),
                                               FIELD(uint32_t, p, 0x1418));
         FIELD(uint32_t, p, 0x1418) &= ~(3u << 17);
-        if (set && (trig & (BTN_B | BTN_Y))) FIELD(uint32_t, p, 0x1414) &= ~CID_SHEATHE;
+        if (set && (trig & (PAD_L | PAD_D))) FIELD(uint32_t, p, 0x1414) &= ~CID_SHEATHE;
     }
     if ((s->flags & 1) && trig) {                       /* test 10: aim + A rolled, no aim + A ever matched */
         static int s_ap;
@@ -357,8 +387,9 @@ void ms_input(uint8_t *p)
                               FIELD(uint16_t, p, 0x250a));
     }
     if (s->flags & 1) {                                 /* aiming: Y is not GU's sheathe (test 3), A not its roll */
-        FIELD(uint32_t, p, 0x1414) &= ~CID_SHEATHE;
-        FIELD(uint32_t, p, 0x1418) &= ~(3u << 17);      /* test 9: aim + A rolled on its first frame */
+        FIELD(uint32_t, p, 0x1414) &= ~(CID_SHEATHE | CID_ROLL_LO);
+        FIELD(uint32_t, p, 0x1418) &= ~CID_ROLL_HI;     /* test 13: 1/6's ids were never cleared (S: MHF's evade
+                                                           input 0 has no aim test; the maintainer: no roll) */
     }
     uint32_t held32 = FIELD(uint32_t, p, 0x13fc);
     if ((held32 ^ s->held32) & ~0xfffu) {
@@ -455,10 +486,11 @@ static void slot_trace(uint8_t *p, struct ms_state *s)
          FIELD(uint32_t, a, 0x70), FIELD(uint32_t, p, 0x31b4));
 }
 
-/* test 6: hunter stats element 0 with the fire spike (GU's equip-time fill, 0xdee34 / 0xe1bbc callers, gives type
- * 12 none; filler not located). Stand-in: the equipped record's element into the stats GU's arming reads (0x2acfb8:
- * vt+0x15c keys 0x11 type, 2 value = hunter data +0x320 + 2 key), only while GU left them 0. Weapon entry copy =
- * hunter data +0x18 (0xe0d90 slot 0, box entry layout: +4 type, +6 id) */
+/* the hunter's element stats GU's arming reads (0x2acfb8: vt+0x15c keys 0x11 type, 2 value = hunter data +0x320 +
+ * 2 key). GU's equip-time fill 0xdee34 takes them from 0xdb984 / 0xdba5c, which answered 0 for type 12 until
+ * build.py MS_ELEMENT_MASKS (test 13). Check + fallback: GU's values logged once; the equipped record's written only
+ * if GU still left the type 0 (the fallback loses element skills). Weapon entry copy = hunter data +0x18 + 0x2c k
+ * (box entry layout: +4 type, +6 id) */
 static void elem_fix(uint8_t *p)
 {
     uint8_t *hd = FIELD(uint8_t *, p, 0x13c4);
@@ -470,6 +502,8 @@ static void elem_fix(uint8_t *p)
     if (k == 8) { if (!s_n++) logf("msport: element fix: no type-12 entry at hunter data +0x18 + 0x2c k"); return; }
     uint32_t id = FIELD(uint16_t, hd, 0x1e + 0x2c * k);
     int16_t *st = (int16_t *)(hd + 0x320);
+    static int s_gu;
+    if (!s_gu++) logf("msport: element: GU filled type %d value %d for weapon %u", st[0x11], st[2], id);
     if (st[0x11]) return;
     if (!ms_weapon_element(id, &t, &v) || !t) {         /* test 8: silent here: which entry / id was read */
         static int s_bad;
@@ -545,8 +579,8 @@ static void set_air(uint8_t *p, struct ms_state *s)
 
 /* the attraction (mechanics.md 5; MHF 0x10332dd0): 1 ease-in along the flight, v = 90 (0.2t)(2 - 0.2t) per tick
  * while t <= 4, 2 fly 90 / tick toward the marker until 300 short (re-targeted each tick; S: 90-tick cap), y kept
- * in [target - 550, target + 1000], 3 fall: horizontal 90 * 0.97^t, vertical v0 + g t (g = 2.3 or event 31's).
- * Returns 1 on landing */
+ * in [target - 550, target + 1000], 3 fall (below). MHF's flight budget (0x103317c6, C): |marker - hunter| - 300 =
+ * the ease-in's 252 + 90 per tick, so it stops 300 short as here. Returns 1 on landing */
 static int attraction(uint8_t *p, struct ms_state *s, float tk)
 {
     float t[3], *q = pos_of(p);
@@ -574,12 +608,14 @@ static int attraction(uint8_t *p, struct ms_state *s, float tk)
         }
         return 0;
     }
-    float h = root(sq(s->dir[0]) + sq(s->dir[2]));
-    s->att_h *= 1 - 0.03f * tk;
-    s->vy -= ((s->flags & 0x80) ? s->fall_g : 2.3f) * tk;
-    if (h > 0.01f) { q[0] += s->dir[0] / h * s->att_h * tk; q[2] += s->dir[2] / h * s->att_h * tk; }
+    /* MHF case 3 (0x103327a0, C): n fall ticks, v = 90 x 0.97^n along the flight's 3-D unit direction, plus n x g
+     * down (g 2.3, or event 31's with MS flag 0x80); the landing test once the step goes down */
+    float g = (s->flags & 0x80) ? s->fall_g : 2.3f, n = s->att_t - tk;
+    s->vy = s->dir[1] * s->att_h - g * n;
+    for (int i = 0; i < 3; i += 2) q[i] += s->dir[i] * s->att_h * tk;
     q[1] += s->vy * tk;
-    return s->vy <= 0 && MS_LANDED(p, 0.0f, 0);
+    s->att_h *= 1 - 0.03f * tk;
+    return s->vy < 0 && MS_LANDED(p, 0.0f, 0);
 }
 
 /* MHF's drive (0x1032f700, C from its asm; curve bits from events 29 / 30, 0x10338c90: p 1 -> 1, 2 -> 2, 3 -> 4):
@@ -653,7 +689,7 @@ static int pin_tick(uint8_t *p, struct ms_state *s, float tk, uint32_t no)
     if (no != 99) return 0;
     MS_IFRAMES(p, 8.0f, 1);                             /* MHF: P+0x4ee = 4 ticks while pinned */
     s->pin_cd -= tk; s->pin_hold -= tk;
-    if ((FIELD(uint16_t, p, 0x13f8) & (BTN_X | BTN_A)) && s->pin_cd < 1) {
+    if ((FIELD(uint16_t, p, 0x13f8) & (PAD_U | PAD_R)) && s->pin_cd < 1) {
         s->pin_cd += 4; s->qte += 4; s->pin_hold += 4;
         if (s->pin_hold > PIN_HOLD_MAX) s->pin_hold = PIN_HOLD_MAX;
     }
@@ -697,7 +733,12 @@ static void event(uint8_t *p, struct ms_state *s, const struct ms_event *e, int 
         float n = (float)v;
         if (e->id == 8) { int l = MS_EVASION(p, 0x1f); n += l >= 2 ? 10 : l == 1 ? 5 : 0; }
         MS_IFRAMES(p, 2 * n, 0);
-        s->keep_if = 0;
+        s->keep_if = 0; s->if_given = n;
+        static int s_if;                                /* the maintainer, after test 14: "R + Y / A / X / B have no
+                                                           i-frames, unlike MHF-ZZ": MHF's are 7 ticks (+5 / +10 with
+                                                           Evasion +1 / +2: Capcom's chart's 17 = +2) */
+        if (s_if++ < 30) logf("msport: i-frames %d ticks in action %u (event %u, GU timer %d/60 s)", (int)n, s->action,
+                              e->id, (int)FIELD(float, p, 0x2b40));
         break; }
     case 9: s->keep_if = 1; break;      /* i-frames >= 2 ticks until 7 / 8 */
     case 11: MS_STAMINA(p, -150.0f, 0); break;          /* MHF 75 = a roll (GU 150) */
@@ -872,7 +913,7 @@ void ms_act(uint8_t *p)
     struct ms_state *s = ms_of(p);
     if (no == MS_RELEASE) {                     /* MHF shared 208: the charge released */
         logf("msport: Triple Strike released at f%d, A %s, charge %d/%d ticks (level %u)", (int)MS_FRAME(p),
-             (FIELD(uint16_t, p, 0x13f4) & BTN_A) ? "held" : "up", (int)s->charge, CHARGE_T, s->charge_lvl);
+             (FIELD(uint16_t, p, 0x13f4) & PAD_R) ? "held" : "up", (int)s->charge, CHARGE_T, s->charge_lvl);
         MS_SET_ACTION(p, 0x10, s->charge_lvl ? 35 : 36, 0);
         return;
     }

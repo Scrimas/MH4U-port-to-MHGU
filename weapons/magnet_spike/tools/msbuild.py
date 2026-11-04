@@ -401,10 +401,15 @@ def mode_of(a):
     return 1 if MODES.get(a) == 'I' else 0
 
 
+# MHF's evade input (0: the evade key + 75 stamina, 0x10336ad0) is a roll everywhere but in the attractions (58 / 61 / 62
+# -> 63, 68 / 71 / 72 -> 69: the approach cancels; test 14 had GU's rolls there, so A in the flight did nothing)
+APPROACH = (63, 69)
+
+
 def cancel_commands(C, a, c, mode):
     """GU command paths for one MHF cancel of action a (empty = an action with no Magnet Spike data)"""
     nxt, inp, cond = c['next'], c['input'], c['cond']
-    if inp == 0 or nxt in (202, 203):                    # roll (shared 202 / 203): GU's common evades
+    if nxt in (202, 203) or (inp == 0 and nxt not in APPROACH):    # roll (shared 202 / 203): GU's common evades
         return [C.com('plcmd_com_0x0001_013a'), C.com('plcmd_com_0x0001_014a')]
     if inp == 1:                                         # stick: GU's common drawn move
         return [C.com('plcmd_com_0x0001_006e')]
