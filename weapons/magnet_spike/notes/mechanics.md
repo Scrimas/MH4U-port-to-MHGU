@@ -135,13 +135,23 @@ scaled), GS's charge flash as the cue.
     - deviations (S): GU's marker flash every 2 ticks as the shot's look, no wall test (ground − 300 instead);
     - not done: the reticle and the aim camera.
 - Ranges (3-D distance to the marker): attract 1400 < d < 4000, repel 0 < d < 1400.
-- Attraction (58 / 61 / 62 / 68 / 71 / 72): face the marker; phases 1 ease-in along the flight direction,
-  v = 90 (0.2t)(2 - 0.2t) per tick while t <= 4 (0x10332dd0 case 1, C), 2 fly 90 / tick toward the marker until
-  300 short (re-targeted, S: 90-tick cap), y in
-  [target - 550, target + 1000], 3 fall: horizontal 90 * 0.97^t, vertical v0 - g t (g 2.3 or event 31's); the
-  action ends on landing. During the flight: tri -> 59 / 73 falling attacks (condition 9), cross -> 63 / 69 approach
-  cancel (event drives). GU: move state 2 (vt+0x300), landing 0x2a84d8(p, 0, 0); walls and ground run after the
-  action (0x2e7aa0, vt+0x368).
+- Attraction (58 / 61 / 62 / 68 / 71 / 72; 0x10331780 start, 0x10332dd0 update, 0x10332ae0 steering, C; MS block =
+  ext + 0x1c0):
+  - **Target** T (0x10331540) = the marker special's point + RotY(yaw to it) (0, 100, -200): 1 m above and 2 m short
+    (S: the frame; no marker: (0, 0, 700) ahead). MS+0x24 = T, +0x30 = the marker point.
+  - **Direction** D (MS+0xc) toward T at the start; its pitch is held off the ground: with D x 90, D.y >= -(height
+    above the ground) when within 90 of it (0x10331780). Budget B (MS+0x40) = |T - pos| - 300 (700 if not
+    positive). MS+0x3c = the hunter's start height.
+  - **Steering**, each tick of phases 1-2, when |T - pos| > 200 and 0x10331c10 allows it (not for some monster
+    states): D = normalize(0.2 D + 0.8 toward the new T) (same ground rule), B += |T new - pos| - |T old - pos|.
+  - **Phases:** 1 ease-in v = 90 (0.2 n)(2 - 0.2 n) along D for 4 ticks; 2 fly 90 / tick along D for max(0, B - 252)
+    / 90 ticks (0x10332930); 3 fall: horizontal 90 x 0.97^n along D, vertical D.y 90 0.97^n - g n (g 2.3, or event
+    31's); ends on landing. During 1-2 the height is kept in [y0 - 550, y0 + 1000] of the START height, B x 0.9 while
+    at the top. tri -> 59 / 73 falling attacks (condition 9), cross -> 63 / 69 approach cancel.
+  - Port (test 18): as above, without 0x10331c10's monster-state test (S). Tests 15-17's "too high / off": the port
+    had clamped the height around the marker's and re-aimed fully every tick at the marker itself.
+  - GU: move state 2 (vt+0x300), landing 0x2a84d8(p, 0, 0); walls and ground run after the action (0x2e7aa0,
+    vt+0x368).
 - Repulsion (66 / 67): face the marker; the motion pushes away (no drive events).
 
 ## Magnetic Pin

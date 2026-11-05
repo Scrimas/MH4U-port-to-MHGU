@@ -465,24 +465,70 @@ static void marker_blink(uint8_t *p, struct ms_state *s)
 /* MHF's converted effects (msfxposts.py -> ms_data.inc): motion rows posted once per motion run at their frame (MHF's
  * fN: the first update at or after frame N), gated by Magnetise in the current mode; event rows queued (fx_queue)
  * and posted after their delay in frames (MHF task ticks x 2) */
+static void *post_at(uint8_t *p, uint32_t id, const float *t, const float *rot_deg);
+static int joint_point(const uint8_t *u, uint32_t id, const int16_t *v, float t[3]);
+
+/* a fixed row (MHF per-motion keys 2 / 6 / 4 / 5, msfxposts.KEY_KINDS): the joint's world point (+ the offset in its
+ * frame) and rotation at the key's frame, posted there once (MHF copies the bone matrix: the effect stays); mode 2 =
+ * on the ground (MS_GROUND_Y) with the hunter's yaw (MHF 0x1099a970). Joint 0x80 | k = the drawn weapon's joint k
+ * (its model's joint records, part-0 object +0x23a0, test 6), 0xff = the hunter's own point */
+static void *fx_fixed(uint8_t *p, const struct ms_fxpost *f, uint32_t id)
+{
+    const uint8_t *u = (f->joint & 0x80) && f->joint != 0xff ? FIELD(const uint8_t *, p, 0x23a0) : p;
+    uint32_t j = f->joint == 0xff ? 0xffffffffu : f->joint & 0x7f;
+    float t[3], r[3] = {0, FIELD(uint16_t, p, 0xfec) * (360.0f / 65536.0f), 0};
+    const uint8_t *ids = u ? FIELD(const uint8_t *, u, 0x498) : 0, *js = u ? FIELD(const uint8_t *, u, 0x494) : 0;
+    const float *m = (j != 0xffffffffu && ids && js && ids[j & 0xff] != 0xff) ? (const float *)(js + 0xa0 * ids[j & 0xff] + 0x10) : 0;
+    if (m) {
+        for (int k = 0; k < 3; k++) t[k] = f->off[0] * m[k] + f->off[1] * m[4 + k] + f->off[2] * m[8 + k] + m[12 + k];
+        if (f->mode == 1) {                             /* R = Rz Ry Rx (msfx.euler_xyz) of the joint's axes */
+            float sx = root(m[0] * m[0] + m[1] * m[1] + m[2] * m[2]);
+            if (sx < 1e-6f) sx = 1.0f;
+            float s2 = -m[2] / sx;
+            if (s2 > 1.0f) s2 = 1.0f;
+            if (s2 < -1.0f) s2 = -1.0f;
+            r[0] = atan2f_gu(m[6], m[10]) * 57.29578f;
+            r[1] = atan2f_gu(s2, root(1.0f - s2 * s2)) * 57.29578f;    /* asin */
+            r[2] = atan2f_gu(m[1], m[0]) * 57.29578f;
+        }
+    } else {
+        const float *q = pos_of(p);
+        for (int k = 0; k < 3; k++) t[k] = q[k];
+    }
+    if (f->mode == 2) t[1] = MS_GROUND_Y(p);
+    return post_at(p, id, t, r);
+}
+
 static void fx_posts(uint8_t *p, struct ms_state *s)
 {
     uint32_t m = CUR_MOTION(p);
-    if (m != s->fx_mot) { s->fx_mot = m; for (int i = 0; i < 32; i++) s->fx_done[i] = 0; }
+    if (m != s->fx_mot) {
+        s->fx_mot = m;
+        for (int i = 0; i < 32; i++) s->fx_done[i] = 0;
+        int lo = 0, hi = MS_NFXPOSTS;                   /* the motion's first row (sorted by motion slot) */
+        while (lo < hi) { int mid = (lo + hi) / 2; if (ms_fxposts[mid].mot + 5000u < m) lo = mid + 1; else hi = mid; }
+        s->fx_first = (uint16_t)lo;
+    }
     if (m < 5000 || m >= 6000) return;
     m -= 5000;
     uint16_t a = s->action;
     int mag = s->mag[s->mode] == 1;
-    for (int i = 0; i < MS_NFXPOSTS && i < 256; i++) {
+    for (int k = 0; k < 256 && s->fx_first + k < MS_NFXPOSTS; k++) {
+        int i = s->fx_first + k;
         const struct ms_fxpost *f = &ms_fxposts[i];
-        if (f->mot != m || !f->n || (s->fx_done[i >> 3] & (1 << (i & 7)))) continue;
+        if (f->mot != m) break;
+        if (!f->n || (s->fx_done[k >> 3] & (1 << (k & 7)))) continue;
         if (f->action != 0xffff && f->action != a) continue;
         if ((f->gate == 1 && !mag) || (f->gate == 2 && mag)) continue;
         if (!MS_REACHED(p, (float)f->frame)) continue;
-        s->fx_done[i >> 3] |= 1 << (i & 7);
-        void *h = ms_post_n(p, f->id, f->n);
-        logf("msport: mhf effect %u x%u at motion %u f%u (action %u, gate %u): %x", f->id, f->n, m, f->frame, a,
-             f->gate, (uint32_t)(uintptr_t)h);
+        s->fx_done[k >> 3] |= 1 << (k & 7);
+        void *h = 0;
+        if (f->mode) for (uint32_t r = 0; r < f->n; r++) h = fx_fixed(p, f, f->id + r);
+        else h = ms_post_n(p, f->id, f->n);
+        static int s_log;
+        if (s_log++ < 400)
+            logf("msport: mhf effect %u x%u at motion %u f%u (action %u, gate %u, mode %u joint %x): %x", f->id, f->n,
+                 m, f->frame, a, f->gate, f->mode, f->joint, (uint32_t)(uintptr_t)h);
     }
 }
 
@@ -845,38 +891,84 @@ static void set_air(uint8_t *p, struct ms_state *s)
     MS_MOVE_STATE(p, 2);
 }
 
-/* the attraction (mechanics.md 5; MHF 0x10332dd0): 1 ease-in along the flight, v = 90 (0.2t)(2 - 0.2t) per tick
- * while t <= 4, 2 fly 90 / tick toward the marker until 300 short (re-targeted each tick; S: 90-tick cap), y kept
- * in [target - 550, target + 1000], 3 fall (below). MHF's flight budget (0x103317c6, C): |marker - hunter| - 300 =
- * the ease-in's 252 + 90 per tick, so it stops 300 short as here. Returns 1 on landing */
+/* the attraction (MHF 0x10331780 start, 0x10332dd0 update, 0x10332ae0 steering; C, mechanics.md):
+ * - target T (0x10331540) = the marker + RotY(yaw to it) (0, 100, -200): 1 m above, 2 m short of it (S: the frame);
+ * - direction D (MS+0xc) = toward T at the start, pitch held off the ground (D.y >= -h / 90 within 90 of it), then
+ *   kept: each tick of phases 1-2, while |T - pos| > 200, D = normalize(0.2 D + 0.8 toward the new T) and the budget
+ *   B (MS+0x40, start |T - pos| - 300, 700 if not positive) += the change of |T - pos|;
+ * - 1 ease-in v = 90 (0.2 n)(2 - 0.2 n) along D for 4 ticks, 2 fly 90 / tick for max(0, B - 252) / 90 ticks
+ *   (0x10332930), 3 fall (below); height kept in [y0 - 550, y0 + 1000] of the START height (MS+0x3c), B x 0.9 while
+ *   at the top (tests 15-17: "too high": ours clamped around the marker's height and re-aimed fully every tick) */
+static void att_target(uint8_t *p, const float *m, float *tg)
+{
+    float *q = pos_of(p), dx = m[0] - q[0], dz = m[2] - q[2], n = root(dx * dx + dz * dz);
+    float fx = n > 1 ? dx / n : 0, fz = n > 1 ? dz / n : 1;    /* RotY(yaw to the marker) (0, 100, -200) */
+    tg[0] = m[0] - 200 * fx; tg[1] = m[1] + 100; tg[2] = m[2] - 200 * fz;
+}
+
+static float att_dist(uint8_t *p, const float *tg)
+{
+    float *q = pos_of(p);
+    return root(sq(tg[0] - q[0]) + sq(tg[1] - q[1]) + sq(tg[2] - q[2]));
+}
+
+static void att_dir(uint8_t *p, float *v)             /* normalize, pitch held off the ground (0x10331780) */
+{
+    float h = pos_of(p)[1] - MS_GROUND_Y(p), n = root(sq(v[0]) + sq(v[1]) + sq(v[2]));
+    if (n < 1e-4f) return;
+    for (int i = 0; i < 3; i++) v[i] = v[i] / n * 90;
+    if (v[1] < 0 && h <= 90) v[1] = -(h < 0 ? 0 : h);
+    n = root(sq(v[0]) + sq(v[1]) + sq(v[2]));
+    for (int i = 0; i < 3; i++) v[i] = n > 1e-4f ? v[i] / n : 0;
+}
+
+static void att_start(uint8_t *p, struct ms_state *s, const float *m)
+{
+    float *q = pos_of(p);
+    att_target(p, m, s->att_tg);
+    for (int i = 0; i < 3; i++) s->dir[i] = s->att_tg[i] - q[i];
+    att_dir(p, s->dir);
+    s->att_b = att_dist(p, s->att_tg) - 300;
+    if (s->att_b <= 0) s->att_b = 700;
+    s->att_y0 = q[1];
+}
+
 static int attraction(uint8_t *p, struct ms_state *s, float tk)
 {
     float t[3], *q = pos_of(p);
     if (s->att < 3 && !marker(s, t)) { s->att = 3; s->att_t = 0; s->att_h = 90; }
-    if (s->att == 1) {
-        float d[3] = {t[0] - q[0], t[1] - q[1], t[2] - q[2]}, n = root(sq(d[0]) + sq(d[1]) + sq(d[2]));
-        float u = 0.2f * s->att_t, v = 90 * u * (2 - u) * tk;
-        for (int i = 0; i < 3; i++) { s->dir[i] = n > 1 ? d[i] / n : 0; q[i] += s->dir[i] * v; }
-        face(p, yaw_to(d[0], d[2]));
-        if ((s->att_t += tk) > 4) { s->att = 2; s->att_t = 0; }
+    if (s->att < 3) {
+        float tg[3];
+        att_target(p, t, tg);
+        float d1 = att_dist(p, tg);
+        if (d1 > 200) {                                 /* steering (0x10332ae0) */
+            float d0 = att_dist(p, s->att_tg), v[3];
+            for (int i = 0; i < 3; i++) v[i] = 0.2f * s->dir[i] + 0.8f * (tg[i] - q[i]) / d1;
+            att_dir(p, v);
+            for (int i = 0; i < 3; i++) { s->dir[i] = v[i]; s->att_tg[i] = tg[i]; }
+            s->att_b += d1 - d0;
+        }
+        face(p, yaw_to(s->dir[0], s->dir[2]));
+        float go;
+        if (s->att == 1) {
+            float u = 0.2f * s->att_t;
+            go = 90 * u * (2 - u) * tk;
+            if ((s->att_t += tk) > 4) { s->att = 2; s->att_t = 0; }
+        } else {
+            go = 90 * tk;
+            float ticks = s->att_b > 252 ? (s->att_b - 252) * (1.0f / 90) : 0;
+            if ((s->att_t += tk) >= ticks) {
+                s->att = 3; s->att_t = 0; s->att_h = 90; s->vy = s->dir[1] * 90;
+                logf("msport: attraction: falling (%d cm to the target, budget %d)", (int)d1, (int)s->att_b);
+            }
+        }
+        for (int i = 0; i < 3; i++) q[i] += s->dir[i] * go;
+        if (q[1] >= s->att_y0 + 1000) { s->att_b *= 1 - 0.1f * tk; q[1] = s->att_y0 + 1000; }
+        if (q[1] < s->att_y0 - 550) q[1] = s->att_y0 - 550;
         return 0;
     }
     s->att_t += tk;
-    if (s->att == 2) {
-        float d[3] = {t[0] - q[0], t[1] - q[1], t[2] - q[2]}, n = root(sq(d[0]) + sq(d[1]) + sq(d[2]));
-        float go = 90 * tk, left = n - 300;
-        if (left < go) go = left > 0 ? left : 0;
-        for (int i = 0; i < 3; i++) { s->dir[i] = n > 1 ? d[i] / n : 0; q[i] += s->dir[i] * go; }
-        if (q[1] > t[1] + 1000) q[1] = t[1] + 1000;
-        if (q[1] < t[1] - 550) q[1] = t[1] - 550;
-        face(p, yaw_to(d[0], d[2]));
-        if (left <= 90 * tk || s->att_t > 90) {
-            s->att = 3; s->att_t = 0; s->att_h = 90; s->vy = s->dir[1] * 90;
-            logf("msport: attraction: falling (%d left)", (int)left);
-        }
-        return 0;
-    }
-    /* MHF case 3 (0x103327a0, C): n fall ticks, v = 90 x 0.97^n along the flight's 3-D unit direction, plus n x g
+/* MHF case 3 (0x103327a0, C): n fall ticks, v = 90 x 0.97^n along the flight's 3-D unit direction, plus n x g
      * down (g 2.3, or event 31's with MS flag 0x80); the landing test once the step goes down */
     float g = (s->flags & 0x80) ? s->fall_g : 2.3f, n = s->att_t - tk;
     s->vy = s->dir[1] * s->att_h - g * n;
@@ -1091,6 +1183,7 @@ static void action_start(uint8_t *p, struct ms_state *s, const struct ms_action 
         if (!marker(s, t)) { logf("msport: attraction without a marker"); break; }
         face(p, yaw_to(t[0] - q[0], t[2] - q[2]));
         s->att = 1; s->att_t = 0; s->flags |= 0x1000;
+        att_start(p, s, t);
         set_air(p, s);
         break;
     case 66: case 67:                                   /* repulsion: face the marker, the motion pushes away */

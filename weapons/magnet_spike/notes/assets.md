@@ -165,6 +165,12 @@ MHF's), the attach offset on GU's weapon bone, all 40 models.
     [-pi, pi]; scale = base +0x30 + U x range +0x3c (flag 2: one U for the three axes); flags 4 / 8 random mirror
     of x / y; flag 1 = spawn F records (0x8c, second emitter kind, 0x113d0ca0 family, not decoded) instead of E.
     The MHF RNG: r = r x 0xb0 mod 0xff53 (0x1ed5f2a2).
+  - **Blend** (C, 0x113ce4d0 -> 0x10b705e0(src, dst) -> state 0x5e = table 0x1185df00[src] | 0x1185df28[dst]):
+    E draw byte +0x15: 1 = source alpha / one (additive), 0 and 2 = source alpha / inverse source alpha (2 also sets
+    state 0xd = 0x800); factor names S from use (124 sites pass dst 5, 52 dst 1). E flag 4 / 0xc00 only pick the
+    draw list (0x113cdf82). The colour key packs D3DCOLOR ARGB with R = +8 (0x113ccaf0): RGBA bytes as stored, as GU's
+    (em001_00_500 Rathian fire = 255 110 110). E +0x22 is not a colour scale: a camera-ward offset (0x113cd340,
+    unprojected toward the eye, x the curve's z = 100-200 cm).
   - **F emitter** (A flag 1; spawn 0x113d0b60 -> task update 0x113d1950 / 0x113d2700, partly read, S): F +4 id
     (= A +0x4c), +0xc life; three vec3 parameters base + U x range: +0x14 / +0x20, +0x2c / +0x38, +0x44 / +0x50
     (the third is added to particle +0x60.. each tick and clamped at 0: a growth rate; the first two S velocity /

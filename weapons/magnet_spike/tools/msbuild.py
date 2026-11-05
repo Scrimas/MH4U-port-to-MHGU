@@ -88,28 +88,37 @@ FX_POSTS, FX_QUEUE = [], []   # MHF effect posts for ms_act.c (fx_post_tables)
 POST_BASE = 3000              # PEL ids of the MHF effect posts (msfxposts.py)
 
 
-def fx_post_tables(acts, own, made, report):
-    """msfxposts rows -> (PEL code records, motion rows (slot, frame, action, gate, id, n), queue rows
-    (name, [(delay, id, n)])); one record block per (effect, bone, offset): a record per converted group (its
-    MHF base offset added), joint = msmot.BODY_MAP[bone] (bone 0 = the hunter's own frame: none)"""
+MODES_FX = {'att': 0, 'fix': 1, 'gnd': 2}     # ms_act.c fx_posts: 0 PEL on its joint, 1 / 2 at a joint's world point
+
+
+def fx_post_tables(acts, own, made, report, keys=(), wpose=None):
+    """msfxposts rows (+ the per-motion keys) -> (PEL code records, motion rows (slot, frame, action, gate, id, n, mode,
+    joint, x, y, z), queue rows (name, [(delay, id, n)])); one record block per (effect, joint, offset, rotation): a
+    record per converted group (its MHF base offset added). Joints: MHF hunter bone -> msmot.BODY_MAP (bone 0 / 1 =
+    the hunter's own frame: none); weapon bone c >= 21 (bone c - 21): 'att' rows on the holding hand (msgrip: joint 8
+    or 12) at the bone's pose in that hand's frame at the key's frame (wpose), 'fix' / 'gnd' rows on the drawn
+    weapon's own joint c - 21 (GU's weapon joints = MHF's weapon bones, test 6), placed by the module"""
     recs, blocks, nxt = [], {}, [POST_BASE]
-    def block(eff, bone, off):
-        key = (eff, bone, tuple(off))
+    def block(eff, j, off, rot=(0.0, 0.0, 0.0)):
+        key = (eff, j, tuple(off), tuple(rot))
         if key not in blocks:
             groups = made.get(eff) or []
             if not groups:
                 blocks[key] = None
                 report.append('mhf post %#x %#x: nothing converted, not posted' % eff)
             else:
-                j = msmot.BODY_MAP[bone] if bone else 0xffff
                 blocks[key] = (nxt[0], len(groups))
                 for g, (path, mask, pos) in enumerate(groups):
-                    recs.append((nxt[0] + g, tuple(o + b for o, b in zip(off, pos)), (0.0, 0.0, 0.0), 1.0,
+                    recs.append((nxt[0] + g, tuple(o + b for o, b in zip(off, pos)), tuple(rot), 1.0,
                                  msfx.FLASH_EFX['CHARGED'][4], j, path, mask))
                 nxt[0] += len(groups)
         return blocks[key]
-    mrows = []
-    for key, frame, eff, bone, off, gate in msfxposts.MOTION_POSTS:
+    def hunter_joint(bone):
+        return msmot.BODY_MAP[bone] if bone in msmot.BODY_MAP else 0xffff
+    mrows, wrows = [], 0
+    for row in list(msfxposts.MOTION_POSTS) + list(keys):
+        key, frame, eff, bone, off, gate = row[:6]
+        mode = row[6] if len(row) > 6 else 'att'
         if key[0] == 'act':
             a = key[1]; mots = [m for kind, m, *_ in (acts[a]['steps'] if a < len(acts) else []) if kind in (3, 4, 5)]
             mot = mots[0] if mots else None
@@ -117,12 +126,30 @@ def fx_post_tables(acts, own, made, report):
             mot, a = key[1], key[2] if len(key) > 2 else 0xffff
         if mot not in own:
             report.append('mhf post %s f%d: MHF motion %s not ported' % (key, frame, mot)); continue
-        b = block(eff, bone, off)
-        if b: mrows.append((own[mot], frame, a, gate) + b)
+        if mode == 'att':
+            if bone >= 21:
+                pj = wpose(mot, frame, bone - 21) if wpose else None
+                if not pj:
+                    report.append('mhf post %s f%d: no weapon pose for bone %d' % (key, frame, bone)); continue
+                j, M = pj
+                p = M @ np.array([off[0], off[1], off[2], 1.0])
+                b = block(eff, j, tuple(round(float(v), 1) for v in p[:3]),
+                          tuple(round(v, 1) for v in msfx.euler_xyz(M[:3, :3] / np.linalg.norm(M[:3, 0]))))
+                wrows += 1
+                if b: mrows.append((own[mot], frame, a, gate) + b + (0, 0xff, 0, 0, 0))
+                continue
+            b = block(eff, hunter_joint(bone) if bone > 1 else 0xffff, off)
+            if b: mrows.append((own[mot], frame, a, gate) + b + (0, 0xff, 0, 0, 0))
+        else:
+            j = (bone - 21) | 0x80 if bone >= 21 else (hunter_joint(bone) if bone > 1 else 0xff)
+            b = block(eff, 0xffff, (0, 0, 0))
+            if b: mrows.append((own[mot], frame, a, gate) + b + (MODES_FX[mode], j & 0xff) + tuple(off))
     qrows = []
     for name, rows in sorted(msfxposts.EVENT_POSTS.items()):
-        qrows.append((name, [(d,) + b for d, eff, bone, off in rows for b in [block(eff, bone, off)] if b]))
-    report.append('mhf posts: %d motion rows, %d queue sets, %d PEL records' % (len(mrows), len(qrows), len(recs)))
+        qrows.append((name, [(d,) + b for d, eff, bone, off in rows
+                             for b in [block(eff, hunter_joint(bone) if bone > 1 else 0xffff, off)] if b]))
+    report.append('mhf posts: %d motion rows (%d per-motion keys, %d on weapon bones), %d queue sets, %d PEL records'
+                  % (len(mrows), len(keys), wrows, len(qrows), len(recs)))
     return recs, sorted(mrows), qrows
 
 
@@ -588,8 +615,10 @@ def c_tables(acts, modes, own, tbl_index, hit_index, mvs):
           for n, (i, c) in sorted(FLASH_IDS.items())]
     L += ['#define MS_NFXPOSTS %d' % len(FX_POSTS),
           'static const struct ms_fxpost ms_fxposts[] = {   /* motion slot, frame, action (0xffff any), gate (1 '
-          'Magnetise on, 2 off), PEL id, records (msfxposts.py) */'] + [
-        '    {%d, %d, %d, %d, %d, %d},' % r for r in FX_POSTS] + (['    {0, 0, 0, 0, 0, 0},'] if not FX_POSTS else []) + ['};']
+          'Magnetise on, 2 off), PEL id, records, mode (0 PEL on its joint, 1 at a joint point, 2 on the ground), '
+          'joint (0x80 | weapon joint, 0xff the hunter), offset (cm, the joint frame) (msfxposts.py) */'] + [
+        '    {%d, %d, %d, %d, %d, %d, %d, %d, {%d, %d, %d}},' % r for r in FX_POSTS] + (
+        ['    {0, 0, 0, 0, 0, 0, 0, 0, {0, 0, 0}},'] if not FX_POSTS else []) + ['};']
     qa, k = [], 0
     for name in sorted(set(msfxposts.EVENT_POSTS) - {n for n, _ in FX_QUEUE}):
         L.append('#define MS_FXQ_%s 0, 0' % name)
@@ -679,10 +708,21 @@ def main(report_only=False):
     # MHF's own effects (mhffx2gu.py): every posted MHF effect's convertible particles, in the class arc; the flashes
     # with an MHF counterpart (msfx.MHF_FX) post it instead of GS's stand-in
     mfx_on = os.environ.get('MS_MHF_FX', '1') != '0'
-    mfx_list = sorted(set(mhffx2gu.MS_EFFECTS) | set(msfxposts.effects()))
+    mfx_list = sorted(set(mhffx2gu.MS_EFFECTS) | set(msfxposts.effects(dat)))
+    keys = msfxposts.motion_keys(dat)
+    w13w_, wbones_, weapon_ = wdata[0], wdata[1], wdata[2]
+    def wpose(mot, f, k):
+        """weapon bone k at frame f of MHF motion mot -> (GU hand joint, 4x4 in that hand's frame) (msgrip)"""
+        part, sl = (mot - 1000) // 100, (mot - 1000) % 100
+        mo = w13w_[part].get(sl)
+        if not mo: return None
+        W = msgrip.pose(weapon_.bones, msgrip.tracks_of(mo, weapon_.bones), f)
+        if k not in W: return None
+        hs = holders.get(mot)
+        return (8 if not hs or hs[min(f, len(hs) - 1)] == 14 else 12), W[k]
     mfx_ents, mfx_made, mfx_rep = (mhffx2gu.build_all(lambda a, p: gu_arc(a)[p][1], mfx_list)
                                    if mfx_on else ([], {}, ['mhf effects: off']))
-    post_recs, FX_POSTS[:], FX_QUEUE[:] = fx_post_tables(acts, own, mfx_made, mfx_rep) if mfx_on else ([], [], [])
+    post_recs, FX_POSTS[:], FX_QUEUE[:] = fx_post_tables(acts, own, mfx_made, mfx_rep, keys, wpose) if mfx_on else ([], [], [])
     flash = {k: [r] for k, r in msfx.FLASH_EFX.items()}
     FLASH_IDS.clear(); FLASH_IDS.update({k: (r[0], 1) for k, r in msfx.FLASH_EFX.items()})
     for j, (k, key) in enumerate(sorted(msfx.MHF_FX.items())):

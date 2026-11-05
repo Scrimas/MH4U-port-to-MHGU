@@ -113,9 +113,41 @@ EVENT_POSTS = {
 }
 
 
-def effects():
-    """every (set, id) the rows post"""
-    out = {r[2] for r in MOTION_POSTS}
+# MHF's per-motion effect keys (C: mhfdat header u32 0x618 -> per weapon type {i32 count, records*}, Magnet Spike =
+# 13; record {u16 motion, u16 count, u32 keys*} sorted by motion, binary-searched by 0x1099b180; key 16 B {u16 frame,
+# u16 kind, u16 a, u16 b, u8 c, u8 d, s16 x, y, z}, fired when the motion frame crosses it (0x1099af70) through the
+# handlers 0x11a42488[kind] (P, a, b, c, d, x, y, z). Effect kinds, a = set, b = effect id, c = bone (0-20 the
+# hunter's, 21+ = weapon bone c - 21 via 0x10999ce0 -> 0x1032bb60), d = follow mode (0x1099a720):
+#   2 (0x1099a7f0) at the bone, its matrix copied once: fixed; 3 (0x1099a890) on the bone, re-read: follows;
+#   6 (0x1099ad50) Translation(x, y, z) x the bone matrix, copied once: fixed; 7 (0x1099ae30) the offset re-applied to
+#   the bone each tick: follows; 4 / 5 (0x1099a970) the bone's position snapped to the ground (0x108cbe30), fixed
+#   (5 also tests the ground's presence, 0x108cf000, not a gate). Kinds 0 / 1 = sounds (S: 0x11413d70 / 0x114252b0),
+#   8 = the face slots (0x1099af40 -> 0x10886860: blinks), not effects.
+# Modes: 'att' = a PEL record on the joint (follows); 'fix' = posted at the joint's world point and rotation at that
+# frame (ms_act.c); 'gnd' = at the joint's point on the ground, the hunter's yaw. MHF's d (3 / 4 = position only +
+# the hunter's yaw, 5 = no update) is left out: S deviation for those rows (they follow the joint's rotation).
+KEY_KINDS = {2: 'fix', 3: 'att', 4: 'gnd', 5: 'gnd', 6: 'fix', 7: 'att'}
+
+
+def motion_keys(dat, weapon_type=13):
+    """mhfdat bytes -> rows (('mot', motion), frame, (set, id), bone, offset, gate 0, mode)"""
+    import struct
+    t = struct.unpack_from('<I', dat, 0x618)[0]
+    n, p = struct.unpack_from('<iI', dat, t + 8 * weapon_type)
+    out = []
+    for i in range(n):
+        mot, k, ptr = struct.unpack_from('<HHI', dat, p + 8 * i)
+        for j in range(k):
+            f, kind, a, b, c, d, x, y, z = struct.unpack_from('<HHHHBBhhh', dat, ptr + 16 * j)
+            if kind in KEY_KINDS:
+                off = (x, y, z) if kind in (6, 7) else (0, 0, 0)
+                out.append((('mot', mot), f, (a, b), c, off, 0, KEY_KINDS[kind]))
+    return out
+
+
+def effects(dat=None):
+    """every (set, id) the rows post (with the per-motion keys when mhfdat is given)"""
+    out = {r[2] for r in MOTION_POSTS} | ({r[2] for r in motion_keys(dat)} if dat else set())
     for rows in EVENT_POSTS.values():
         out |= {r[1] for r in rows}
     return sorted(out)

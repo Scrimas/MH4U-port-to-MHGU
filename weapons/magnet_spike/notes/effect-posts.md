@@ -152,6 +152,45 @@ in code, **S** strong inference, **G** guess. Action / motion numbers as in beha
 | 1004db04 | fc5:31 / 36 | CARRIER at the hunter bone data +0x58 | MS task kinds 7 / 8 (created by 0x101bcc00, pin code) at t = data +0x5a | L | C / S |
 | 1004da39 | fc5:15 | TASK bone 14 (0, 0, 150) | MS task kind 5 (creator not found outside 0x101bcc00), t4, ends | - | C / S |
 
+## Per-motion effect keys (mhfdat, found 2026-11-05; C unless marked)
+The effects on the RB moves, the Finishing Slash lead-in 1418 and the ground dust are not code posts: MHF's shared
+hunter update keys them per motion.
+- **Table:** mhfdat header u32 0x618 -> per weapon type {i32 count, records*} (Magnet Spike = 13: 132 motions);
+  record {u16 motion, u16 count, u32 keys*}, sorted by motion and binary-searched (0x1099b180, from 0x109a2ba0).
+- **Key** (16 B): u16 frame, u16 kind, u16 a, u16 b, u8 c, u8 d, s16 x, y, z. 0x1099af70 fires a key when the motion
+  frame crosses it and calls handler 0x11a42488[kind](P, a, b, c, d, x, y, z); for the Magnet Spike it then calls
+  0x103362e0 (the rumble helper, only for fc5 3 / 4 / 0x46 / 0x47).
+- **Kinds:** 0 / 1 = sounds (S: 0x11413d70 / 0x114252b0; MS motions use kind 1 446 times: a = id, b = 100);
+  2 / 3 / 6 / 7 = an effect (a = set, b = id) on bone c (0-20 the hunter's; 21+ = weapon bone c - 21, 0x10999ce0 ->
+  0x1032bb60), 6 / 7 with the offset (x, y, z) in the bone's frame; 2 / 6 copy the bone matrix once (fixed), 3 / 7
+  re-read it (follow); d = follow mode (0x1099a720: 3 / 4 position + the hunter's yaw (+ 90 deg), 5 no update);
+  4 / 5 (0x1099a970) = at the bone's position snapped to the ground (0x108cbe30), fixed; 8 = the face slots
+  (0x1099af40 -> 0x10886860: blinks), not effects.
+- **Magnet Spike use:** 208 effect keys on 53 motions (msfxposts.motion_keys): sets 0xfae / 0xfaf (the move flashes,
+  swooshes, sparks) and 0xfc3 ids 5-15 (ground dust: kind 5). E.g. 1493 (107 Retreat): f34 fae:23 on bone 10 +
+  (0, 10, 0), faf:0 on weapon bone 0 + (10, 50, 40); f64-f76 faf:13 on weapon bone 0 every 6 frames. The Double Slash
+  1045, Finishing Slash 1035 and lead-ins 1406 / 1446 have no keys.
+- **Port:** msbuild.fx_post_tables (modes 'att' PEL on the joint, 'fix' / 'gnd' placed by ms_act.c fx_fixed at the
+  joint's world point; weapon bones: 'att' on the holding hand at the bone's pose (msgrip), 'fix' on the drawn weapon's
+  joint). Deviation (S): MHF's follow modes 3 / 4 / 5 are treated as full follow.
+
+## More code posts found (2026-11-05)
+| site | set:id | form | when | mark |
+|---|---|---|---|---|
+| 1033af46 / 1033af82 | fc6:28 / fc6:29 | TASK-like 0x113d6620(set, id, bone 10, 3) | ext+0x684 flag 0x4000 (set by 0x1033adc0 from the hunter status queue 0x1137f350: a queued entry with bit 0x80, the hunter not in i-frames; S: a monster-zone status) starts a timer prm50 x 30 ticks | C |
+| 1033b016 | fc6:2a | the same on bone 14 | every 15 ticks (30 when not local) while that timer runs | C |
+| 1033dea2 | 0xbcb:1 | 0x113d6250 at an entity's position | 0x109f5c50 (not traced; S: a magnetised monster's spark) | S |
+Not ported: they belong to statuses triggered outside the weapon's moves.
+
+## F emitters (the A flag 1 particles; C, 0x113d0b60 / 0x113d2700 / 0x113d2190 / 0x113d11c0)
+A physics particle with its own look (mesh +8, D group +0xa, colour group +0x6e, UV mode +0x6c with +0x70 / +0x72,
+camera-offset curve +0x74 as E +0x22), not a trail: +0xc life (age units, 2 per tick); velocity +0x14 + U x +0x20
+per tick in the effect's yaw frame, multiplied each tick by curve +0xe; gravity +0x5c (vy -= g per tick; negative =
+rises: the dust); angular speed +0x2c + U x +0x38 (curve +0x10); scale growth +0x44 + U x +0x50 per tick, clamped at
+0 (curve +0x12); ground: restitution +0x60, friction +0x64, child effect +0x78 per bounce (up to +0x7c), +0x7a at the
+end, +0x7e a timeline (D-like keys (frame, effect id)) of child effects. The MS sets' F records seen so far use no
+children.
+
 ## Notes
 - **Event 17 "effect 0x312" is not an effect id** (C): 0x1004d700 writes u16 0x312 to task data +0x58, i.e. byte
   +0x58 = 0x12 (bone 18) and byte +0x59 = 3 (part count). 0x1004d410 takes 3 entries of the draw list 0x1ecde5e0

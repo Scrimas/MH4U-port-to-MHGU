@@ -18,7 +18,7 @@ enum { R0, R1, R2, R3, R4, R5, R12, LR };
 struct ms_pair { uint8_t inp, cond; };                                        /* class id k = MHF input + condition */
 struct ms_step { uint16_t kind, mot, start, blend, frame, loops, table; };   /* MHF step; mot = bank-5 slot */
 struct ms_event { uint8_t step, when; uint16_t frame, loop; uint8_t lvl, id; uint16_t prm, hit; };
-struct ms_fxpost { uint16_t mot, frame, action; uint8_t gate; uint16_t id; uint8_t n; };   /* msfxposts.py */
+struct ms_fxpost { uint16_t mot, frame, action; uint8_t gate; uint16_t id; uint8_t n, mode, joint; int16_t off[3]; };   /* msfxposts.py, msbuild.fx_post_tables */
 struct ms_fxq { uint16_t delay, id; uint8_t n; };
 #define MS_FXQ_MAX 12
 #define MS_FXH 8                    /* effect handles kept per carrier */
@@ -61,6 +61,7 @@ struct ms_state {
     float mk_t;                     /* marker lifetime */
     uint8_t att;                    /* attraction phase: 0 off, 1 lift, 2 fly, 3 fall */
     float att_t, att_h, dir[3];
+    float att_y0, att_b, att_tg[3];  /* MHF MS+0x3c start height, +0x40 flight budget, +0x24 target point */
     uint8_t *pin_mon, *pin_pending; /* the pinned monster; the one the pin attack hit (started next update) */
     float pin_hold, pin_cd, qte, pin_off[3];
     uint16_t pin_yaw_m, pin_yaw_p;
@@ -74,7 +75,8 @@ struct ms_state {
     float shock_t;                  /* its ticks */
     float mk_blink, aura_t;         /* ticks to the marker's and Magnetise's next flash */
     uint32_t fx_mot;                /* MHF effect posts (ms_act.c fx_posts): the motion they were armed for */
-    uint8_t fx_done[32];            /* rows of ms_fxposts posted in this motion run */
+    uint8_t fx_done[32];            /* rows of ms_fxposts posted in this motion run (from fx_first) */
+    uint16_t fx_first;              /* the motion's first row (ms_fxposts is sorted by motion) */
     float fxq_t[MS_FXQ_MAX];        /* queued event posts: frames left (0 = free slot) */
     uint16_t fxq_id[MS_FXQ_MAX];
     uint8_t fxq_n[MS_FXQ_MAX];

@@ -14,7 +14,10 @@ What a converted particle is (one GU entry per MHF particle; the MHF count of a 
   scale = (base + U range) x curve, U in [-1, 1); GU = value + r range, r in [0, 1) per particle, C); R = the
   sprite's half size in GU size units = cm / (cell texels / 2) (test 16: cm drew 16-64x too big; factor G);
 - colour curve (unit +0x42, C): the MHF C keys (RGBA bytes, linear, C both); no C group -> the E record's flags
-  only (white). Blend: MHF E flag 4 (render queue, S additive) -> BSBlendAddAlpha (0), else BSBlendBlendAlpha (1);
+  only (white). Blend: MHF E draw byte +0x15 (0x113ce4d0 -> 0x10b705e0(src 4, dst 1 / 5) -> state 0x5e via the
+  factor tables 0x1185df00 / 0x1185df28, C; factor names S: 4 = source alpha, 1 = one, 5 = inverse source alpha):
+  1 -> additive = BSBlendAddAlpha (0); 0 / 2 -> alpha blend = BSBlendBlendAlpha (1) (test 17: all additive washed to
+  white). E flag 4 only picks the render queue (0x113cdf82, C);
 - roll (unit +0x170 value / range, rad, C): MHF spawn rotation z +- range -> (z - range, 2 range).
 - spawn position: the base = the group's PEL record offset (one record per MHF base, posted together); the range =
   GU's box shape (element()).
@@ -257,7 +260,7 @@ class Builder:
         life = int(round(e['life'] * ls))
         tm = lambda f: D + int(round(f * ls))
         u = bytearray(self.tpl[1][1][:0x1a0])
-        u[3] = ADD_BLEND if e['flags'] & 4 else ALPHA_BLEND
+        u[3] = ADD_BLEND if e['draw'] == 1 else ALPHA_BLEND      # MHF draw byte (docstring, C)
         struct.pack_into('<f', u, 0x1c, 1.0)
         sb, sr = a['scl'][0], a['scl_r'][0]
         struct.pack_into('<4f', u, 0x28, (sb - sr) * R, 2 * sr * R, 0.0, 0.0)
