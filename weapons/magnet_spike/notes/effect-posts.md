@@ -201,7 +201,9 @@ children.
   - part 0: (0, -10, 8.5), (0.9, 0.9, 0.9), (-1.920, 0, 1.571);
   - part 1: (-13, -18, 0), (0.3, 0.8, 0.3), (0.785, 1.571, -0.785);
   - part 2: (-13, 0, -35), (2.5, 2.5, 2.0), (0, 1.571, 0).
-  This is the shot's hand piece. A port needs those three meshes as a model or sprite, not a 0xfc5 / 0xfc6 effect.
+  This is the shot's hand piece. Port: tools/msgun.py, one GU effect model of the three meshes (the effect model
+  pack's model0.fmod meshes 19 / 116 / 151, parts baked), a one-shot Model entry posted on joint 12 at f6 of 82 / 84
+  for 32 frames.
 - **The marker's look** = fc5:e attached to special #2 (C). The shot's look = fc5:b; its trail = fc5:a at 100, 300,
   600, 1000 and 1500 cm along the flight.
 - **Triple Strike** (corrects the earlier reading): fc6:11 is posted once, at level 1 (20 ticks). fc6:e is posted
@@ -221,7 +223,6 @@ children.
 
 ## Open
 - The meaning of the zero vector v in EFX, and the set flags word (0 at every MS site).
-- The model behind global 0x1ed7d6a0 (event 17's three meshes).
 - Where 0x1032bb60 (the weapon matrix used by the Magnetise carriers) points, and bone 10's place on the body.
 - The pin effects (0x101bc000..0x101be000, special #3): triggers and positions only partly read.
 - Special #10's carrier offset (0x101eb2b0) and the fc5:28 ground point's horizontal offset.

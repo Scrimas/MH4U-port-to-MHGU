@@ -121,6 +121,10 @@ scaled), GS's charge flash as the cue.
     - Free look: yaw ±0x240 and pitch ±0x160 per tick, pitch clamped to −0x12e4..+0xd1c.
     - It stays on in idle / walk / runs and in 98 / 99; it is off in the pin actions.
   - **Reticle:** HUD 0x10b87b40 → 0x10339700 draws sprite 0xb6 at the screen centre. Frame 0 = repel possible, 1 = attract possible, 2 = neither. Scale = screen height / 720. No lock-on.
+  - **Port (aim view):** GU's gunner aim view for any class (C): the player byte +0x2716 (vt+0x1c8) gates the quest
+    camera's aim (0x23ebc) and the scope HUD (0x61e1f4 -> 0x61e834); 0x1baa4(camera manager, 0x2a0520(p)) starts
+    the camera's aim. ms_act.c aim_view sets them while the aim flag is on (local hunter, not pinned). Deviations:
+    GU's offsets, look speed and crosshair (MHF's reticle frames not drawn).
   - **"Launcher":** not a model. The weapon is one mesh with no part scaling; the shot and effect 0x312 (event 17's task 0x3c, 0x1004d700) both come from bone 18, the −x hand.
 - Shot (82 / 84; 0x103333a0, 0x101e8de0 / 0x101e9070 / 0x101eb540, C):
   - **Start:** the hunter takes the camera yaw; the direction = normalize(look-at − eye), pitch included.

@@ -82,6 +82,7 @@ struct ms_state {
     uint32_t fx_mot;                /* MHF effect posts (ms_act.c fx_posts): the motion they were armed for */
     uint8_t fx_done[32];            /* rows of ms_fxposts posted in this motion run (from fx_first) */
     uint16_t fx_first;              /* the motion's first row (ms_fxposts is sorted by motion) */
+    uint8_t aim_view;               /* GU's aim view (camera + scope HUD) started by aim_view() */
     float fxq_t[MS_FXQ_MAX];        /* queued event posts: frames left (0 = free slot) */
     uint16_t fxq_id[MS_FXQ_MAX];
     uint8_t fxq_n[MS_FXQ_MAX];
@@ -152,6 +153,15 @@ typedef uint8_t *(*ms_em_t)(void *mgr, int i);
 #define MS_EM_GET FN(ms_em_t, 0x5ceb4)                /* monster slot 0..9 of the manager *(MAIN 0x1851fe0) */
 #define MS_EM_MGR (*(void **)MAIN(0x1851fe0))
 #define MS_CAM_MGR (*(uint8_t **)MAIN(0x2126504))     /* +0x54 = the camera: eye +0x40, look-at +0x60 */
+/* GU's aim view (ms_act.c aim_view, C): the player byte +0x2716 (vt+0x1c8 = 0x2a1c48) gates the quest camera's aim
+ * (0x23ebc ends it once the byte reads 0) and the scope HUD (cUIOQuestScope 0x61e1f4 -> 0x61e438 state 8 ->
+ * 0x61e834), any class; 0x1baa4(camera manager, mode) starts the camera's aim (+0xacc) as the bowguns' 0x2a039c does,
+ * mode from 0x2a0520(p); local hunter = +0x13cc bit 0 (0x27bcd0) */
+#define MS_AIM_BYTE(p) FIELD(uint8_t, (p), 0x2716)
+#define MS_IS_LOCAL(p) (FIELD(uint32_t, (p), 0x13cc) & 1)
+typedef void (*ms_camaim_t)(void *mgr, int mode);
+#define MS_CAM_AIM FN(ms_camaim_t, 0x1baa4)
+#define MS_AIM_MODE FN(ms_p_t, 0x2a0520)
 #define MS_U16_RAD 9.58738e-5f                        /* u16 angle -> radians */
 /* effects: GU's code post vt+0x39c (p, id, p + 0x2550, 1) = 0x282624 -> the +0x2634 job's slot 0x150, as GU's
  * classes call it (GS: ids 6 / 7 / 36, list 1), returned 0 for every id under class 5 (tests 3-5, GS's own flash 7

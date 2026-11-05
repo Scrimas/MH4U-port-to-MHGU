@@ -298,3 +298,33 @@ area change; none on RB moves, plain Y / B attacks or the Guard Counter follow-u
    colour, placement; no sphere left behind (also after an area change).
 2. RT + B at a monster: the marker's look on it, following it; the shot's look.
 
+
+### Test 17 results and fixes
+Log: dump/mhf/test_logs/ms_test17_Ryujinx_1.3.3_2026-11-04_16-58-35.log. The maintainer: better, but still too
+bright / the wrong colour ("ours wash to white", a different hue); plain Y / B attacks show only ground smoke in MHF,
+the Y + B finisher (as the Guard Counter follow-up) an effect on the weapon and mostly where it hits the ground; RB +
+Y / B / X / A have a swing trail (on the weapon, and on the hunter for the side moves) and an initial glow; the
+attraction and repulsion have effects too (reference video, scratchpad frame sheets).
+
+| # | issue | cause (C unless marked) | change (test 18) |
+|---|---|---|---|
+| 1 | washed to white | every unit was additive; MHF's E draw byte +0x15 picks it: 1 additive, 0 / 2 alpha blend (assets.md "Blend") | per draw byte (mhffx2gu) |
+| 2 | no RB / Y / B / finisher effects | MHF's per-motion key table (mhfdat 0x618, effect-posts.md "Per-motion keys"): 208 effect keys on 53 motions, fixed / attached / ground | all ported as motion rows (fix / att / gnd) |
+| 3 | still particles where MHF's move | position curves and F emitters were not converted | GU move kind 5 paths (gu-efl-move.md; 880 entries) |
+| 4 | attraction janky, too high | target, steering, budget and height band not MHF's (mechanics.md "Attraction") | MHF's start / update / steering / budget / band |
+| 5 | no Magnetise / attraction / repulsion looks | MS tasks 0xb-0xe posts (effect-posts.md) | magz_look, att_carriers, rep_posts |
+| 6 | no aim camera, reticle or hand piece | not ported | GU's gunner aim view (camera + scope HUD, ms.h MS_AIM_BYTE); the hand piece as a model (msgun.py) |
+
+## Test 18 (built and installed 2026-11-05)
+Deviations in this build (S): the aim view is GU's (its over-the-shoulder offsets and look speed, GU's crosshair:
+MHF's red / blue / white reticle frames are not drawn); the hand piece's part transforms are read as T R S (S); F
+particles' bounces and child effects, UV modes 1 / 7 (7 particles) and the fc5:2 beam length scale are not ported.
+1. Plain Y and B: ground smoke only. Y + B finisher: the weapon effect and the ground impact.
+2. RB + Y / B / X / A: the trails and the start glow; colours next to MHF's (no white wash).
+3. Hold RT (aim): the camera goes over the shoulder, a crosshair in the screen centre; release: back to normal.
+4. RT + B (shot): the hand piece in the left hand for about half a second, the shot and the marker.
+5. RT + Y from 14-40 m to the marker (attraction) and RT + A under 14 m (repulsion): the hunter's path and height,
+   and their effects.
+6. Magnetise: its flash, spots and pulses.
+Play, then close the game; the log answers the rest. Ask only about visuals: colours and look next to MHF's (the
+reference video), the camera and the crosshair, the hand piece's size and place.

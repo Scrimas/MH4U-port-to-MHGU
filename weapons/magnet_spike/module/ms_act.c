@@ -532,6 +532,30 @@ static void rep_posts(uint8_t *p, struct ms_state *s, float tk)
     fx_at(p, MS_FXQ_REP_CARRIER, x, rot, 0);
 }
 
+/* the aim view: MHF's aim camera 0x1033a880 (over the shoulder, free look; on in idle / walk / runs, off in the pin
+ * actions) and reticle 0x10339700 (sprite 0xb6 at the screen centre) -> GU's gunner aim view (ms.h MS_AIM_BYTE):
+ * GU's own over-the-shoulder offsets and look speed, GU's crosshair (deviations: MHF's preset offset and its reticle
+ * frames repel blue / attract red / neither white are not drawn). Local hunter only, as MHF (0x1033a270) */
+static void aim_view(uint8_t *p, struct ms_state *s)
+{
+    int want = (s->flags & 1) && !(s->flags & 0x10) && MS_IS_LOCAL(p);
+    if (want) {
+        if (!s->aim_view) {
+            uint8_t *cm = MS_CAM_MGR;
+            int mode = MS_AIM_MODE(p);
+            MS_AIM_BYTE(p) = 1;
+            if (cm) MS_CAM_AIM(cm, mode);
+            static int s_n;
+            if (s_n++ < 10) logf("msport: aim view on (camera mode %d, manager %x)", mode, (uint32_t)(uintptr_t)cm);
+        }
+        MS_AIM_BYTE(p) = 1;                             /* 0x29fb8c clears it when the camera is not a quest camera */
+        s->aim_view = 1;
+    } else if (s->aim_view) {
+        MS_AIM_BYTE(p) = 0;                             /* the camera's 0x23ebc then ends its aim */
+        s->aim_view = 0;
+    }
+}
+
 static void marker_blink(uint8_t *p, struct ms_state *s)
 {
     float t[3];
@@ -686,6 +710,7 @@ static void tick(uint8_t *p, struct ms_state *s, float tk)
         s->air = 0; s->att = 0; s->pin_mon = 0; s->pin_pending = 0;
         s->flags &= ~0x1010u;
     }
+    if (!(s->flags & 1) && s->aim_view) aim_view(p, s);   /* sheathed / ended outside ms_input */
 }
 
 void ms_input(uint8_t *p)
@@ -718,6 +743,7 @@ void ms_input(uint8_t *p)
     uint32_t combo = FIELD(uint32_t, p, 0x1444), r = R_MASK();
     uint32_t held = FIELD(uint16_t, p, 0x13f4), trig = FIELD(uint16_t, p, 0x13f8);
     if ((held & BTN_ZR) && !(held & r) && ms_drawn(p)) s->flags |= 1; else s->flags &= ~1u;
+    aim_view(p, s);
     uint32_t jst = FIELD(uint16_t, p, 0x2506), jno = FIELD(uint16_t, p, 0x250a);
     if (jst == 1 && (jno == 4 || jno == 5 || jno == 137 || jno == 140)) {
         static int s_n, s_first;                        /* test 4: "no jump attack" (tables 18 / 19, falling 59 / 73);

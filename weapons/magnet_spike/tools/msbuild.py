@@ -27,7 +27,7 @@ ROOT = os.path.dirname(os.path.dirname(WEAPON))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(ROOT, 'tools'))
 import paths, arcpack, xfs, lmt
-import aan, fskl, msact, sdt, msgrip, msmot, mshit, msfx, fmod2gu, mshud, mhffx2gu, msfxposts
+import aan, fskl, msact, sdt, msgrip, msmot, mshit, msfx, fmod2gu, mshud, mhffx2gu, msfxposts, msgun
 sys.path.append(paths.GU_PY)
 from romfs import RomFS
 from arc import arc_entries, arc_read
@@ -722,6 +722,9 @@ def main(report_only=False):
         return (8 if not hs or hs[min(f, len(hs) - 1)] == 14 else 12), W[k]
     mfx_ents, mfx_made, mfx_rep = (mhffx2gu.build_all(lambda a, p: gu_arc(a)[p][1], mfx_list)
                                    if mfx_on else ([], {}, ['mhf effects: off']))
+    if mfx_on:                                  # the shot's hand piece (msgun.py): a model of its own, posted as a key
+        g_ents, g_made, g_rep = msgun.build(lambda a, p: gu_arc(a)[p][1], rom())
+        mfx_ents += g_ents; mfx_made.update(g_made); mfx_rep += g_rep; keys = list(keys) + msgun.POSTS
     post_recs, FX_POSTS[:], FX_QUEUE[:] = fx_post_tables(acts, own, mfx_made, mfx_rep, keys, wpose) if mfx_on else ([], [], [])
     flash = {k: [r] for k, r in msfx.FLASH_EFX.items()}
     FLASH_IDS.clear(); FLASH_IDS.update({k: (r[0], 1) for k, r in msfx.FLASH_EFX.items()})
