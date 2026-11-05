@@ -110,6 +110,23 @@ EVENT_POSTS = {
     'MARKER': [(0, (0xfc5, 0xe), 0, (0, 0, 0))],
     'SHOT': [(0, (0xfc5, 0xb), 0, (0, 0, 0))],
     'TRAIL': [(0, (0xfc5, 0xa), 0, (0, 0, 0))],
+    # Magnetise on (MS task 0xd Cutting / 0xe Impact, 0x1004e3ab / 0x1004e59b / 0x1004e617, C): the flash fc6 0x10 at
+    # t 18 / 17, then spots fc5 0x57 / 0x58 in turn every 10 ticks, pulses fc5 0x55 / 0x56 every 20, while it is on,
+    # the weapon drawn and the mode the task's; offsets from MHF's weapon matrix (0x1032bb60), here in the holding
+    # hand's frame (joint 8, S: the weapon root sits on the hand) and attached (MHF: carriers at their spot)
+    'MAGZ_C': [(0, (0xfc6, 0x10), 14, (-80, 0, 40))], 'MAGZ_I': [(0, (0xfc6, 0x10), 14, (20, 0, 80))],
+    'MAGZ_SPOT_C': [(0, (0xfc5, 0x57), 14, o) for o in ((45, 0, 20), (-45, 0, 20), (0, 0, 0), (-90, 0, 30),
+                                                        (90, 0, 30))],
+    'MAGZ_SPOT_I': [(0, (0xfc5, 0x58), 14, o) for o in ((0, 0, 140), (0, 0, 30), (0, 0, 70), (0, 0, -10),
+                                                        (0, 0, 100))],
+    'MAGZ_PULSE_C': [(0, (0xfc5, 0x55), 14, (-80, 0, 40))], 'MAGZ_PULSE_I': [(0, (0xfc5, 0x56), 14, (20, 0, 80))],
+    # the attraction's world-point carriers (ms_act.c attraction, fx_at): fc5 7 at the marker (f10, 0x10335782),
+    # fc5 0 on the hunter -> marker line every 2 ticks (MS task kind 9, 0x1004dcfb), fc5 2 the beam from the hand to
+    # the marker (f30, 0x103358b9; kept aimed by 0x101ea2a0); the repulsion's fc5 0x4d at the marker (t2,
+    # 0x1004e2b2) and its carrier fc5 0x4e ahead and up (t2, 0x1004e21e)
+    'ATT_MARK': [(0, (0xfc5, 0x7), 0, (0, 0, 0))], 'ATT_RAIL': [(0, (0xfc5, 0x0), 0, (0, 0, 0))],
+    'ATT_BEAM': [(0, (0xfc5, 0x2), 0, (0, 0, 0))], 'REP_MARK': [(0, (0xfc5, 0x4d), 0, (0, 0, 0))],
+    'REP_CARRIER': [(0, (0xfc5, 0x4e), 0, (0, 0, 0))],
 }
 
 

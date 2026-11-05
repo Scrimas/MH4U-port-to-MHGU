@@ -24,8 +24,12 @@ What a converted particle is (one GU entry per MHF particle; the MHF count of a 
 - world-oriented MHF meshes (E flags & 0x203 == 0) -> cParticleGeneratorPolygon (type 2, POLY_TEMPLATE): spawn
   rotation x / y / z, width / height = the sprite with the scale curve.
 - UV animation (modes 2-6): baked frames on one looping EAN entry (uv_frames).
-Not converted yet (each reported by particles()): position curves (motion), UV modes 1 / 7, mesh flipbooks, rotation
-curves, F emitters, sets' own packs (E +6 == 1), colour flags 0x40."""
+- motion: MHF position curves (E +0xe) and F emitters (A flag 1: physics particles, their mean path simulated by
+  f_path: velocity, gravity, drag curve, growth) -> GU move kind 5 (keyed offsets over the particle age, linear, the
+  end values outside; notes/gu-efl-move.md, C on both sides); F's velocity spread = a random path turn (S); the
+  ground (bounces, child effects) left out (S).
+Not converted yet (each reported by particles()): UV modes 1 / 7, mesh flipbooks, rotation curves, sets' own packs,
+colour flags 0x40."""
 import io, math, os, struct, random
 import numpy as np
 
@@ -183,23 +187,90 @@ def uv_frames(e, ls):
 # ------------------------------------------------------------------------------------------------ plan
 
 def particles(st, eid, life_min=mhffx.LIFE_MIN):
-    """the MHF effect -> [(A, E, converted?, reasons)]"""
+    """the MHF effect -> [(A, E, converted?, reasons)]; an F emitter's records come as E-like dicts with 'F' set
+    (from_f); position curves (E) and F paths become GU kind-5 move paths (move_block)"""
     out = []
     for a in st.effect(eid):
+        ls = a['p5c'] if a['p5c'] >= life_min else 1.0
         if a['flags'] & 1:
-            out.append((a, None, False, ['F emitter']))
+            fs = st.femitters(a['part'])
+            if not fs: out.append((a, None, False, ['F emitter without F records']))
+            for f in fs:
+                e = from_f(f)
+                why = []
+                if e['uv_mode'] and not uv_frames(e, ls): why.append('UV mode %d' % e['uv_mode'])
+                if e['mesh_anim']: why.append('mesh flipbook')
+                out.append((a, e, not why, why))
             continue
         for e in st.particles(a['part']):
             why = []
-            k = st.curve(e['c_pos'])
-            if len(k) > 1 and any(v != k[0][1] for _, v, _ in k): why.append('position curve (%d keys)' % len(k))
-            ls = a['p5c'] if a['p5c'] >= life_min else 1.0
             if e['uv_mode'] and not uv_frames(e, ls): why.append('UV mode %d' % e['uv_mode'])
             if e['mesh_anim']: why.append('mesh flipbook')
             if e['pack'] == 1: why.append("set's own pack")
             if len(st.curve(e['c_rot'])) > 1: why.append('rotation curve')
             out.append((a, e, not why, why))
     return out
+
+
+def from_f(f):
+    """an F record as the E fields the unit builder reads (no scale / position / rotation curves: the path and the
+    growth are simulated, f_path)"""
+    return dict(flags=f['flags'], id=f['id'], pack=0, mesh=f['mesh'], mesh_anim=f['mesh_anim'], life=f['life'],
+                c_pos=0, c_rot=0, c_scl=0, draw=f['draw'], uv_mode=f['uv_mode'], uv_u=f['uv_u'], uv_v=f['uv_v'],
+                c_col=f['c_col'], F=f)
+
+
+def _rot(v, r):
+    """R = Rz Ry Rx (MHF's Euler order, notes/assets.md, S for effects) applied to v"""
+    x, y, z = v; cx, sx = math.cos(r[0]), math.sin(r[0]); cy, sy = math.cos(r[1]), math.sin(r[1])
+    cz, sz = math.cos(r[2]), math.sin(r[2])
+    y, z = cx * y - sx * z, sx * y + cx * z
+    x, z = cy * x + sy * z, -sy * x + cy * z
+    x, y = cz * x - sz * y, sz * x + cz * y
+    return (x, y, z)
+
+
+def f_path(st, a, f):
+    """simulate an F particle's mean path (U = 0; 0x113d2190 / 0x113d2700 order: pos += v, vy -= g, v x= the velocity
+    curve at the age; scale += growth, growth x= its curve; one update per MHF tick, age += 2) in the effect's frame
+    -> ([(age, pos)], [(age, scale x)]); the ground (bounces, children) is left out (S deviation)"""
+    p, v = [0.0, 0.0, 0.0], list(f['vel'])
+    sc, gr = a['scl'][0], f['grow'][0]
+    path, scl = [(0, tuple(p))], [(0, sc)]
+    life = max(2, f['life'])
+    for age in range(0, life, 2):
+        for k in range(3): p[k] += v[k]
+        v[1] -= f['grav']
+        if f['c_vel']:
+            m = st.curve_at(f['c_vel'], age)
+            v = [v[k] * m[k] for k in range(3)]
+        sc = max(0.0, sc + gr)
+        if f['c_grow']: gr *= st.curve_at(f['c_grow'], age)[0]
+        path.append((age + 2, tuple(p))); scl.append((age + 2, sc))
+    return path, scl
+
+
+def _thin(keys, n=24):
+    """at most n keys, the ends kept"""
+    if len(keys) <= n: return keys
+    step = (len(keys) - 1) / (n - 1)
+    return [keys[int(round(i * step))] for i in range(n)]
+
+
+def move_block(keys, rot=((0.0, 0.0), (0.0, 0.0), (0.0, 0.0)), order=0):
+    """[(GU age, (x, y, z))] -> GU move kind 5 block (w3 type 0x05; notes/gu-efl-move.md, C): 0x80 B (+0x04 Euler
+    order << 12 | axis 4 << 8, +0x10.. path rotation (value, range) per axis, +0x50.. path scale 1, +0x70 the curve
+    offset), then the curve {count | 2 << 8; keys {u32 age, x, 0, y, 0, z, 0}}: linear, the end values outside, so
+    pos(age) = E (spawn + Rp curve(age)) as MHF's offset curve"""
+    b = bytearray(0x80)
+    struct.pack_into('<II', b, 0, 0, order << 12 | 4 << 8)
+    for k in range(3): struct.pack_into('<ff', b, 0x10 + 8 * k, *rot[k])
+    struct.pack_into('<8f', b, 0x50, 1, 0, 1, 0, 1, 0, 1, 0)
+    struct.pack_into('<I', b, 0x70, 0x80)
+    c = struct.pack('<I', len(keys) | 2 << 8) + b''.join(
+        struct.pack('<I6f', t, x, 0.0, y, 0.0, z, 0.0) for t, (x, y, z) in keys)
+    blk = bytes(b) + c
+    return blk + b'\0' * (-len(blk) % 16)
 
 
 # ------------------------------------------------------------------------------------------------ GU side
@@ -266,7 +337,26 @@ class Builder:
         struct.pack_into('<4f', u, 0x28, (sb - sr) * R, 2 * sr * R, 0.0, 0.0)
         tail = b''
         # scale curve
-        sk = st.curve(e['c_scl']) or [(0, (1.0, 1.0, 1.0), 0)]
+        F = e.get('F')
+        mv = None
+        if F:                                   # F: the simulated growth as the scale curve, the path as kind 5
+            path, sc = f_path(st, a, F)
+            sk = [(f, (v / sb if sb else 0.0,) * 3, 0) for f, v in _thin(sc)]
+            vn = math.sqrt(sum(x * x for x in F['vel']))
+            spread = ((0.0, 0.0),) * 3
+            if vn > 1e-3:                       # MHF's velocity range as a random path turn (S)
+                ax = math.atan2(abs(F['vel_r'][1]) * 1.024, vn); ay = math.atan2(abs(F['vel_r'][0]) * 1.024, vn)
+                spread = ((-ax, 2 * ax), (-ay, 2 * ay), (0.0, 0.0))
+            mv = (5, move_block([(tm(f), q) for f, q in _thin(path)], spread))
+        else:
+            sk = st.curve(e['c_scl']) or [(0, (1.0, 1.0, 1.0), 0)]
+            pk = st.curve(e['c_pos'])
+            if pk and any(any(abs(x) > 1e-3 for x in v) for _, v, _ in pk):
+                # MHF's offset in the particle's spawn-rotated frame: the base rotation applied here, its random
+                # range as the path's (order 0 = X, Y, Z, S); one GU key per MHF key (exact, C)
+                r0 = a['rot']; rr = a['rot_r']
+                mv = (5, move_block([(tm(f), _rot(v, r0)) for f, v, _ in pk],
+                                    tuple((-rr[k], 2 * rr[k]) for k in range(3))))
         keys = [(tm(f), _f((sb - sr) * v[0] * R), _f(2 * sr * v[0] * R)) for f, v, _ in sk]
         if D: keys = [(0, keys[0][1], keys[0][2])] + keys
         off_s = 0x1a0 + len(tail); tail += curve(keys)
@@ -287,7 +377,8 @@ class Builder:
         u[0x70:0x130] = (ATLAS + TEX_SUFFIX).encode().ljust(0xc0, b'\0')
         u[0x130:0x170] = ATLAS.encode().ljust(0x40, b'\0')
         rz, rr = a['rot'][2], a['rot_r'][2]
-        struct.pack_into('<8f', u, 0x170, rz - rr, 2 * rr, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0)
+        w, wr = (F['ang'][2] / 2, F['ang_r'][2] / 2) if F else (0.0, 0.0)   # rad per tick -> per frame
+        struct.pack_into('<8f', u, 0x170, rz - rr, 2 * rr, w - wr, 2 * wr, 1.0, 0.0, 0.0, 0.0)
         struct.pack_into('<fII', u, 0x190, 1.0, 0, 0)
         emit = bytearray(self.tpl[2][1])
         struct.pack_into('<III', emit, 0, 0, D + life, 0)
@@ -309,8 +400,8 @@ class Builder:
             struct.pack_into('<IIII', q, 0x1a8, 0, 0, 0, 0)
             h = img.shape[0] / 2.0
             struct.pack_into('<8f', q, 0x1c0, h, 0.0, h, 0.0, 0.0, 0.0, 0.0, 0.0)
-            return (2, bytes(q) + tail), bytes(emit)
-        return (0, bytes(u) + tail), bytes(emit)
+            return (2, bytes(q) + tail), bytes(emit), mv
+        return (0, bytes(u) + tail), bytes(emit), mv
 
     def element(self, a):
         """the template element; an MHF position range -> GU's box spawn shape (element +0x78 byte 0 = 1 ->
@@ -335,8 +426,8 @@ class Builder:
                 skipped.append((e['id'] if e else a['part'], why)); continue
             key = tuple(round(x, 2) for x in a['pos'])
             for _ in range(max(1, a['count'])):
-                u, em = self.unit(a, e)
-                by_pos.setdefault(key, []).append([self.element(a), u, (self.tpl[2][0], em), self.tpl[3]])
+                u, em, mv = self.unit(a, e)
+                by_pos.setdefault(key, []).append([self.element(a), u, (self.tpl[2][0], em), mv or self.tpl[3]])
         files, groups, cur, n = [], [], [], 0
         def flush():
             if cur:

@@ -79,6 +79,39 @@ class Set:
                     anim2=struct.unpack_from('<H', r, 0x24)[0], c_26=struct.unpack_from('<H', r, 0x26)[0],
                     f28=struct.unpack_from('<f', r, 0x28)[0], rest=r[0x2c:].hex())
 
+    @staticmethod
+    def femitter(r):
+        """F record (0x8c; 0x113d0b60 spawn, 0x113d2700 / 0x113d2190 / 0x113d2600 update, 0x113d11c0 init, 0x113d3329
+        draw, C): a physics particle. +0 flags (as E), +4 id (= A +0x4c), +8 mesh, +0xa D group (mesh flipbook), +0xc
+        life (age units), curves (B ids, multipliers applied per tick): +0xe velocity, +0x10 angular speed, +0x12
+        growth; vec3 base + U x range: velocity +0x14 / +0x20 (per tick, in the effect's yaw frame), angular speed
+        +0x2c / +0x38 (rad per tick), scale growth +0x44 / +0x50 (per tick, clamped at 0); +0x5c gravity (vy -= g per
+        tick), +0x60 restitution, +0x64 ground friction, +0x6b draw byte (blend, as E +0x15), +0x6c UV mode (params
+        +0x70 / +0x72, as E +0x18 / +0x1c), +0x6e colour group, +0x74 camera-offset curve (as E +0x22), child effects:
+        +0x78 per bounce (up to +0x7c), +0x7a at the end, +0x7e a timeline group (D keys (frame, effect id))"""
+        g = lambda o, f='<f': struct.unpack_from(f, r, o)[0]
+        v3 = lambda o: struct.unpack_from('<3f', r, o)
+        return dict(flags=g(0, '<I'), id=g(4, '<H'), mesh=g(8, '<H'), mesh_anim=g(0xa, '<H'), life=g(0xc, '<H'),
+                    c_vel=g(0xe, '<H'), c_ang=g(0x10, '<H'), c_grow=g(0x12, '<H'), vel=v3(0x14), vel_r=v3(0x20),
+                    ang=v3(0x2c), ang_r=v3(0x38), grow=v3(0x44), grow_r=v3(0x50), grav=g(0x5c), bounce=g(0x60),
+                    fric=g(0x64), draw=r[0x6b], uv_mode=r[0x6c], c_col=g(0x6e, '<H'), uv_u=g(0x70, '<H'),
+                    uv_v=g(0x72, '<H'), c_cam=g(0x74, '<H'), child_bounce=g(0x78, '<h'), child_end=g(0x7a, '<h'),
+                    n_bounce=g(0x7c, '<h'), child_tl=g(0x7e, '<h'))
+
+    def femitters(self, pid):
+        return [self.femitter(r) for r in self.sec['F'] if struct.unpack_from('<H', r, 4)[0] == pid]
+
+    def curve_at(self, cid, f):
+        """the B curve cid at age f (linear, the end values outside; loop flag not handled) -> vec3"""
+        k = self.curve(cid)
+        if not k: return (1.0, 1.0, 1.0)
+        if f <= k[0][0]: return k[0][1]
+        for (f0, v0, _), (f1, v1, _) in zip(k, k[1:]):
+            if f <= f1:
+                t = (f - f0) / (f1 - f0) if f1 > f0 else 1.0
+                return tuple(a + (b - a) * t for a, b in zip(v0, v1))
+        return k[-1][1]
+
     def curve(self, cid):
         """B keys of curve cid (byte +0x12), in record order: (frame +0xc, vec3 +0, flags +0x10 (bit 0 of the first
         key = loop)); linear between keys, the first / last value outside them (0x113ccd90, C)."""

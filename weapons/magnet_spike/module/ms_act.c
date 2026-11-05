@@ -442,12 +442,94 @@ static void fx_follow(uint8_t *p, uint32_t k, uint32_t n, const float *t, const 
     fx_at(p, k, n, t, rot, h);
 }
 
-static void shot_dir_deg(const struct ms_state *s, float r[3])   /* S: (pitch, yaw, 0) of the shot, GU's beam order */
+static void dir_deg(const float *v, float r[3])  /* S: (pitch, yaw, 0) of a direction, GU's beam order */
 {
-    const float *v = s->shot_v;
     r[0] = -atan2f_gu(v[1], root(v[0] * v[0] + v[2] * v[2])) * 57.29578f;
     r[1] = atan2f_gu(v[0], v[2]) * 57.29578f;
     r[2] = 0.0f;
+}
+
+static void shot_dir_deg(const struct ms_state *s, float r[3]) { dir_deg(s->shot_v, r); }
+
+static void fx_row(uint8_t *p, int k, int n, int i)  /* one row (PEL records on its joint) of an ms_fxq set */
+{
+    if (i < n) ms_post_n(p, ms_fxq[k + i].id, ms_fxq[k + i].n);
+}
+
+/* Magnetise's look (MHF MS task 0xd / 0xe, 0x1004e3ab / 0x1004e59b / 0x1004e617, C; msfxposts 'MAGZ_*'): the flash at
+ * tick 18 (Cutting) / 17 (Impact), then a spot every 10 ticks (5 in turn) and a pulse every 20 while Magnetise is on
+ * in the task's mode, the weapon drawn and that mode current; the task ends with Magnetise */
+static void magz_look(uint8_t *p, struct ms_state *s, float tk)
+{
+    if (!s->mz_on) return;
+    int m = s->mz_mode;
+    if (s->mag[m] != 1) { s->mz_on = 0; return; }
+    float t0 = m ? 17.0f : 18.0f, t = s->mz_t;
+    s->mz_t += tk;
+    if (t < t0 && s->mz_t >= t0) {
+        if (m) fx_row(p, MS_FXQ_MAGZ_I, 0); else fx_row(p, MS_FXQ_MAGZ_C, 0);
+        s->mz_spot = 10; s->mz_pulse = 20;
+        logf("msport: Magnetise look on (%s)", m ? "Impact" : "Cutting");
+    }
+    if (s->mz_t < t0 || !ms_drawn(p) || s->mode != m) return;
+    if ((s->mz_spot -= tk) <= 0) {
+        s->mz_spot += 10;
+        if (m) fx_row(p, MS_FXQ_MAGZ_SPOT_I, s->mz_k % 5); else fx_row(p, MS_FXQ_MAGZ_SPOT_C, s->mz_k % 5);
+        s->mz_k++;
+    }
+    if ((s->mz_pulse -= tk) <= 0) {
+        s->mz_pulse += 20;
+        if (m) fx_row(p, MS_FXQ_MAGZ_PULSE_I, 0); else fx_row(p, MS_FXQ_MAGZ_PULSE_C, 0);
+    }
+}
+
+/* the attraction's carriers (msfxposts 'ATT_*', C for the moments, S for following): the rail = fc5 0 on the hunter ->
+ * marker line, a point every 2 ticks from tick 8 (motion f24) at 300 + 220 n while the budget > 500 (MS task kind 9,
+ * 0x1004dcfb); the beam fc5 2 from the hand toward the marker from tick 11 (f30), re-posted every 8 ticks (its
+ * particles live 16 frames; MHF keeps the carrier aimed, 0x101ea2a0; its length scale d / 4000 not ported) */
+static void att_carriers(uint8_t *p, struct ms_state *s, float tk)
+{
+    float t[3], *q = pos_of(p);
+    if (!MS_FXQ_ON || s->att < 1 || s->att > 2 || !marker(s, t)) return;
+    float d[3] = {t[0] - q[0], t[1] - q[1], t[2] - q[2]}, n = root(dot3(d, d));
+    if (n < 1) return;
+    for (int k = 0; k < 3; k++) d[k] /= n;
+    s->att_all += tk;
+    if (s->att_all >= 8 && (s->rail_t -= tk) <= 0 && s->att_b > 500) {
+        s->rail_t += 2;
+        float r = 300 + 220 * s->rail_n;
+        if (r < n - 300) {
+            float x[3] = {q[0] + d[0] * r, q[1] + d[1] * r, q[2] + d[2] * r}, rot[3];
+            dir_deg(d, rot);
+            fx_at(p, MS_FXQ_ATT_RAIL, x, rot, 0);
+            s->rail_n++;
+        }
+    }
+    if (s->att_all >= 11 && (s->beam_t -= tk) <= 0) {
+        s->beam_t += 8;
+        const float *h = joint_mat(p, 8);
+        float x[3], rot[3];
+        for (int k = 0; k < 3; k++) x[k] = h ? h[12 + k] : q[k];
+        float b[3] = {t[0] - x[0], t[1] - x[1], t[2] - x[2]};
+        dir_deg(b, rot);
+        fx_at(p, MS_FXQ_ATT_BEAM, x, rot, 0);
+    }
+}
+
+/* the repulsion's t2 posts (MS task 0xb / 0xc, C): fc5 0x4d at the marker, the carrier fc5 0x4e at the hunter + 150 up
+ * + 100 / 200 / 300 toward the marker (d <= 500 / <= 1000 / more; its scale bands 0.8 / 1 / 1.3 not ported) */
+static void rep_posts(uint8_t *p, struct ms_state *s, float tk)
+{
+    float t[3], *q = pos_of(p);
+    if (s->rep_t <= 0 || (s->rep_t -= tk) > 0 || !MS_FXQ_ON || !marker(s, t)) return;
+    float d[3] = {t[0] - q[0], t[1] - (q[1] + 150), t[2] - q[2]}, n = root(dot3(d, d));
+    if (n < 1) return;
+    float r = n <= 500 ? 100 : n <= 1000 ? 200 : 300, x[3], rot[3];
+    for (int k = 0; k < 3; k++) x[k] = q[k] + d[k] / n * r;
+    x[1] += 150;
+    dir_deg(d, rot);
+    fx_at(p, MS_FXQ_REP_MARK, t, 0, 0);
+    fx_at(p, MS_FXQ_REP_CARRIER, x, rot, 0);
 }
 
 static void marker_blink(uint8_t *p, struct ms_state *s)
@@ -579,7 +661,8 @@ static void tick(uint8_t *p, struct ms_state *s, float tk)
         if (marker(s, t)) fx_follow(p, MS_FXQ_MARKER, t, 0, s->mk_fx);
     }
     else if (s->mk_mon && (s->mk_blink -= tk) <= 0) { s->mk_blink = MARKER_BLINK; marker_blink(p, s); }
-    if (s->mag[s->mode] == 1 && ms_drawn(p) && (s->aura_t -= tk) <= 0) {
+    if (MS_FXQ_ON) { magz_look(p, s, tk); att_carriers(p, s, tk); rep_posts(p, s, tk); }
+    else if (s->mag[s->mode] == 1 && ms_drawn(p) && (s->aura_t -= tk) <= 0) {
         s->aura_t = AURA_EVERY;
         MS_EFFECT(p, MS_EFX_AURA);
     }
@@ -1184,10 +1267,13 @@ static void action_start(uint8_t *p, struct ms_state *s, const struct ms_action 
         face(p, yaw_to(t[0] - q[0], t[2] - q[2]));
         s->att = 1; s->att_t = 0; s->flags |= 0x1000;
         att_start(p, s, t);
+        s->att_all = 0; s->rail_t = 0; s->beam_t = 0; s->rail_n = 0;
+        if (MS_FXQ_ON) fx_at(p, MS_FXQ_ATT_MARK, t, 0, 0);   /* fc5 7 at the marker (f10, 0x10335782) */
         set_air(p, s);
         break;
     case 66: case 67:                                   /* repulsion: face the marker, the motion pushes away */
         if (marker(s, t)) face(p, yaw_to(t[0] - q[0], t[2] - q[2]));
+        s->rep_t = 2;                                   /* rep_posts at t2 */
         break;
     case 82: case 84: {                                 /* the shot: MHF's action start 0x103333a0 (C): the hunter
                                                            takes the camera's yaw, the shot its 3-D view direction */
@@ -1205,7 +1291,9 @@ static void action_start(uint8_t *p, struct ms_state *s, const struct ms_action 
     case 163: case 164:
         if (s->mag[s->mode] == 0 && s->mag_v[s->mode] >= MAG_READY) {
             s->mag[s->mode] = 1; s->mag_v[s->mode] = MAG_TIME;
-            void *h = MS_EFFECT(p, MS_EFX_MAGNETISE);   /* MHF: task 0xd3c / 0xe3c (S: a GS charge flash) */
+            void *h = 0;
+            if (MS_FXQ_ON) { s->mz_on = 1; s->mz_mode = s->mode; s->mz_t = 0; s->mz_k = 0; }   /* magz_look */
+            else h = MS_EFFECT(p, MS_EFX_MAGNETISE);    /* GS's charge flash as the stand-in */
             logf("msport: %s Magnetise on (effect %x)", s->mode ? "Impact" : "Cutting", (uint32_t)(uintptr_t)h);
         }
         break;

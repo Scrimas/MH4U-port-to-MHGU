@@ -62,6 +62,11 @@ struct ms_state {
     uint8_t att;                    /* attraction phase: 0 off, 1 lift, 2 fly, 3 fall */
     float att_t, att_h, dir[3];
     float att_y0, att_b, att_tg[3];  /* MHF MS+0x3c start height, +0x40 flight budget, +0x24 target point */
+    float att_all, rail_t, beam_t, rep_t;   /* ticks since the attraction's start; its rail / beam timers; the
+                                               repulsion's t2 posts */
+    uint8_t rail_n;
+    uint8_t mz_on, mz_mode, mz_k;   /* Magnetise's look (MHF MS task 0xd / 0xe): on, its mode, the next spot */
+    float mz_t, mz_spot, mz_pulse;
     uint8_t *pin_mon, *pin_pending; /* the pinned monster; the one the pin attack hit (started next update) */
     float pin_hold, pin_cd, qte, pin_off[3];
     uint16_t pin_yaw_m, pin_yaw_p;
