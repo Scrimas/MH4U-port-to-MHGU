@@ -11,6 +11,7 @@ GU side (C unless marked):
   (msgun test 18 wrote (0, 0, 0, 255), efl4u2gu's rule for a different material: the gun did not show.)
 - UV: fmod.py flips v (MHF's GL-style origin); GU samples top-down as mhffx2gu.bake does -> (u, 1 - v).
   (msgun test 18 wrote the flipped v: the wrong half of the atlas.)
+- Texture: BC3 (GU effect textures; test 19 RGBA8 overflowed the class arc, mhffx2gu TEX_FMT).
 - MRL: w00's own cm010_000 material 0 (BSBlendAlpha, DSZTestWrite, RSMeshCN, tAlbedoMap): the material of 328 of
   the 429 GU effect-model materials in w00-w04 / em001 / em024; every GU effect material is BSBlendAlpha, the unit's
   blend byte picks add / blend for effect models as for billboards (S)."""
@@ -131,7 +132,7 @@ class Models:
 
     def entries(self):
         import tex
-        out = [(p, T_TEX, tex.encode_gu(np.ascontiguousarray(self.src.images[i]), 'rgba8', mips=1))
+        out = [(p, T_TEX, tex.encode_gu(np.ascontiguousarray(self.src.images[i]), 'bc3', mips=1))
                for i, p in sorted(self.tex.items())]
         for path, mrl, mod in self.mods.values():
             out += [(path, T_MRL, mrl), (path, T_MOD, mod)]

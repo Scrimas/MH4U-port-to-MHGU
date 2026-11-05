@@ -357,3 +357,18 @@ the beam length scale).
 5. RT + Y from 14-40 m (attraction), RT + A under 14 m (repulsion): their effects; Magnetise: flash, spots, pulses.
 Play, then close the game; the log answers the rest. Ask only about visuals: which effects show, their shape, size,
 orientation and colour next to MHF's (the reference video).
+
+### Test 19 results and fixes
+Log: dump/mhf/test_logs/test19.log. The maintainer: no effect at all, old ones included (Guard Counter, attraction,
+repulsion). Every post returned a handle; billboard-only effects failed too (3096 = ms_fc5_014, 7 Billboards,
+unchanged since test 18 but for its atlas index), so not the Model units. The build's global change: the atlas grew to
+1024 x 2048 RGBA8 = 8 MB (86 sprites), plus 8 RGBA8 model textures; w05.arc unpacked 27.0 MB (test 18 about 20.7 MB,
+GU's largest weapon arc w13 18.7 MB, GU's largest weapon-arc file 1.2 MB). S: the class resource budget is not traced.
+
+| # | issue | cause | change (test 20) |
+|---|---|---|---|
+| 1 | no effect at all | the 8 MB atlas / 27 MB arc (S) | the atlas and the model textures in BC3 (2 MB + 64 KB each, GU's effect format): w05.arc 19.7 MB unpacked, largest file the motions (2.3 MB) |
+
+## Test 20 (built and installed 2026-11-05)
+Test 19's checklist and deviations unchanged; the sprites are BC3 (4 x 4 blocks: soft edges on the smallest
+sprites, S).

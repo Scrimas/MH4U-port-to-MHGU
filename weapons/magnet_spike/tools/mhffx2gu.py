@@ -50,6 +50,9 @@ T_EFL, T_TEX, T_EAN = 0x6D5AE854, 0x241F5DEB, 0x4E397417
 EFL_DIR = 'effect\\pl\\w05'               # GU's EFL names carry no 'efl' folder (w00.arc: effect\\pl\\w00\\w00_000)
 ATLAS = 'effect\\base\\ms_mhf_000'          # EAN path; the texture = ATLAS + TEX_SUFFIX (GU's effect textures)
 TEX_SUFFIX = '_HQ_NOMIP'
+# BC3, not RGBA8 (test 19: the 1024 x 2048 RGBA8 atlas = 8 MB, w05.arc 27 MB unpacked against GU's largest weapon
+# arc w13 at 18.7 MB / largest file 1.2 MB: no effect drew at all, old ones included; S, the class heap not traced)
+TEX_FMT = 'bc3'
 CELL_MIN, CELL_MAX, ATLAS_W = 32, 128, 1024   # one 1024 x 1024 RGBA8 atlas (4 MB) for every effect
 CELL_MAX_ANIM, SCROLL_FRAMES = 64, 8     # animated sprites: smaller cells; a UV scroll cycle in this many frames
 ADD_BLEND, ALPHA_BLEND = 0, 1
@@ -634,7 +637,7 @@ def build_all(gu_read, effects=MS_EFFECTS, src=SRC, rom=None):
         A, ean = b.atlas()
         # the atlas first: an arc's resources resolve the paths they name while they load (GU's arcs hold every
         # texture / EAN before the EFLs naming it, every EFL before its PEL: msbuild puts these before the PEL)
-        ents = [(ATLAS + TEX_SUFFIX, T_TEX, tex.encode_gu(A, 'rgba8', mips=1)), (ATLAS, T_EAN, ean)] + ents
+        ents = [(ATLAS + TEX_SUFFIX, T_TEX, tex.encode_gu(A, TEX_FMT, mips=1)), (ATLAS, T_EAN, ean)] + ents
         rep.append('mhf effect atlas %dx%d, %d sprites' % (A.shape[1], A.shape[0], len(b.cells)))
     if b.models.mods:                          # the 3-D meshes' textures / MRLs / MODs before the EFLs naming them
         k = next(i for i, (p, t, d) in enumerate(ents) if t == T_EFL)
