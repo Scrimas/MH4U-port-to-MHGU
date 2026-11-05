@@ -61,7 +61,10 @@ def build_efl(gu_read):
     """GU's one-shot Model unit (mhffx2gu.MODEL_TEMPLATE, whole: no dangling offsets) on our model: scale 1, no
     spin / growth / curves, white, MHF's alpha blend, 32 frames"""
     t = mhffx2gu.MODEL_TEMPLATE
-    d = gu_read(t[0], t[1])
+    # the EFL head and group tails from em001_00_500 (as mhffx2gu's files): cm123_041's 14 tails hold offsets into
+    # its own blocks (test 20: copied, they pointed past our file)
+    tt = mhffx2gu.TEMPLATE
+    d = gu_read(tt[0], tt[1])
     head = d[:0x30]
     n, n2 = struct.unpack_from('<HH', d, 0x10)
     tail = struct.unpack_from('<%dI' % n2, d, 0x30 + 16 * n)

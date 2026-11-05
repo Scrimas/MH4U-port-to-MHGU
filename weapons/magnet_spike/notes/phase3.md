@@ -372,3 +372,22 @@ GU's largest weapon arc w13 18.7 MB, GU's largest weapon-arc file 1.2 MB). S: th
 ## Test 20 (built and installed 2026-11-05)
 Test 19's checklist and deviations unchanged; the sprites are BC3 (4 x 4 blocks: soft edges on the smallest
 sprites, S).
+
+### Test 20 results and fixes
+Log: dump/mhf/test_logs/test20.log. The maintainer: the old effects are back (Guard Counter, attraction, repulsion),
+still the wrong hue; nothing new (test 17's state): no Model unit shows. Ruled out statically: our MODs parse like
+Capcom's cm010_000 (tools/mod.py) and match efl4u2gu's in-game-proven effect MODs; the element ground masks are -1;
+the colour keys are RGBA (the RB-move keys read 17-22 degrees = MHF's orange in the reference video, swapped they
+would be blue); the MHF images and vertex colours decode full-range; GU's 208 effect textures are RGBA8 (no sRGB).
+Found (C): an effect's build (0x9bda64) fails whole when one generator's ready check fails (the Model's, 0xa94b48:
+its model at runtime record +0x18, every material checked); the gun's EFL tails (copied from cm123_041) held offsets
+into cm123_041's blocks.
+
+| # | issue | change (test 21) |
+|---|---|---|
+| 1 | no Model unit shows | the model material = efl4u2gu's efx_blend (em024 cm101_000), the one its converted effect models drew with (S); a log of the first 30 motion-row effects' build state (ms_act.c fxw_*: flags, each generator's class, draw mode, model / EAN, live particles) |
+| 2 | gun | its EFL head / tails from em001_00_500 (no foreign offsets) |
+| 3 | hue | not found statically: needs a screenshot next to the video |
+
+## Test 21 (built and installed 2026-11-05)
+Test 19's steps. The log now shows whether each posted effect built and whether its models resolved.

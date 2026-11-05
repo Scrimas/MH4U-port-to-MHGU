@@ -12,9 +12,10 @@ GU side (C unless marked):
 - UV: fmod.py flips v (MHF's GL-style origin); GU samples top-down as mhffx2gu.bake does -> (u, 1 - v).
   (msgun test 18 wrote the flipped v: the wrong half of the atlas.)
 - Texture: BC3 (GU effect textures; test 19 RGBA8 overflowed the class arc, mhffx2gu TEX_FMT).
-- MRL: w00's own cm010_000 material 0 (BSBlendAlpha, DSZTestWrite, RSMeshCN, tAlbedoMap): the material of 328 of
-  the 429 GU effect-model materials in w00-w04 / em001 / em024; every GU effect material is BSBlendAlpha, the unit's
-  blend byte picks add / blend for effect models as for billboards (S)."""
+- MRL: em024 cm101_000 material 0 = efl4u2gu's efx_blend (BSBlendAlpha, tAlbedoMap), the one its converted effect
+  models drew with in the monster ports; test 19 / 20 used w00 cm010_000's (the material of 328 / 429 GU
+  effect-model materials) and no model showed (S). Every GU effect material is BSBlendAlpha; the unit's blend byte
+  picks add / blend (S)."""
 import os, struct, sys
 import numpy as np
 
@@ -26,13 +27,14 @@ import fmod
 EFX_GU, STRIDE = 0x207D603B, 24
 T_TEX, T_MRL, T_MOD = 0x241f5deb, 0x2749c8a8, 0x58a15856
 MAT = 'XfBAW_0__m00_'                                  # the material name of cm010_000's MOD
-MAT_TEMPLATE = ('/nativeNX/arc/player/quest/w00.arc', 'effect\\base\\cm010_000', 0)
+MAT_TEMPLATE = ('/nativeNX/arc/enemy/em024_00.arc', 'effect\\base\\cm101_000', 0)   # efl4u2gu's efx_blend: the
+# material its converted effect models drew with in the monster ports (test 20: w00 cm010_000's showed nothing, S)
 NEUTRAL = 127.0
 
 
 def _mrl_templates():
     import mrl_build
-    mrl_build.TEMPLATES.setdefault('efx_w00', MAT_TEMPLATE)
+    mrl_build.TEMPLATES['efx_ms'] = MAT_TEMPLATE
     return mrl_build
 
 
@@ -122,7 +124,7 @@ class Models:
             mrl_build = _mrl_templates()
             path = path or '%s%03d' % (self.prefix, len(self.mods))
             t = self.texture(img)
-            mrl = mrl_build.build(self.rom, [(MAT, 'efx_w00', {'tAlbedoMap': 1})], [t])
+            mrl = mrl_build.build(self.rom, [(MAT, 'efx_ms', {'tAlbedoMap': 1})], [t])
             self.mods[key] = (path, mrl, mod_bytes(parts))
         return self.mods[key][0]
 

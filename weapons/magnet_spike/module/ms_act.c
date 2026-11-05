@@ -605,6 +605,47 @@ static void *fx_fixed(uint8_t *p, const struct ms_fxpost *f, uint32_t id)
     return post_at(p, id, t, r);
 }
 
+/* Test 21 diagnostic (the 3-D Model units never showed; C for the layout): an effect's build (0x9bda64) walks its
+ * generators (effect +0x1f0, next = generator +0xc), calls each one's setup and ready check (vt +0x20 / +0x3c) and
+ * marks the effect failed (+0xf0 bit 0x2000000) when one fails; a generator's runtime record = +0x28 (resource +0x70
+ * + entry x 0x44: +0x14 EAN, +0x18 the Model's model, 0xa94b48), +0x46 its draw mode (0x1e / 5 Model draws,
+ * 0xa956d8), +0xb0 its first live particle, +0x34 its unit. Model vtable 0x17907fc, Billboard 0x179017c, Polygon
+ * 0x17908fc. Logged 2 and 12 ticks after the first 30 motion-row posts; pointers checked before every read. */
+#define FXW_N 6
+static struct { void *h; uint16_t id; uint8_t t, used; } s_fxw[FXW_N];
+static int fxw_ok(uint32_t v) { return v >= 0x10000000u && v < 0x80000000u && !(v & 3); }
+static void fxw_add(void *h, uint32_t id)
+{
+    static int n;
+    if (!h || n >= 30) return;
+    for (int i = 0; i < FXW_N; i++)
+        if (!s_fxw[i].used) { s_fxw[i].h = h; s_fxw[i].id = (uint16_t)id; s_fxw[i].t = 0; s_fxw[i].used = 1; n++; return; }
+}
+static void fxw_dump(int i)
+{
+    uint32_t e = (uint32_t)(uintptr_t)s_fxw[i].h;
+    if (!fxw_ok(e)) return;
+    uint32_t g = FIELD(uint32_t, e, 0x1f0);
+    logf("msport: fxwatch %u t%u eff %x flags %x res %x gens %x", s_fxw[i].id, s_fxw[i].t, e, FIELD(uint32_t, e, 0xf0),
+         FIELD(uint32_t, e, 0xf4), g);
+    for (int k = 0; k < 24 && fxw_ok(g); k++) {
+        uint32_t vt = FIELD(uint32_t, g, 0), rec = FIELD(uint32_t, g, 0x28);
+        uint32_t ean = fxw_ok(rec) ? FIELD(uint32_t, rec, 0x14) : 0, mdl = fxw_ok(rec) ? FIELD(uint32_t, rec, 0x18) : 0;
+        logf("msport: fxwatch %u  gen %d vt %x mode %x ed %x rec %x ean %x model %x part %x", s_fxw[i].id, k,
+             vt - MAIN_BASE, FIELD(uint8_t, g, 0x46), FIELD(uint8_t, g, 0xed), rec, ean, mdl, FIELD(uint32_t, g, 0xb0));
+        g = FIELD(uint32_t, g, 0xc);
+    }
+}
+static void fxw_tick(void)
+{
+    for (int i = 0; i < FXW_N; i++) {
+        if (!s_fxw[i].used) continue;
+        s_fxw[i].t++;
+        if (s_fxw[i].t == 2 || s_fxw[i].t == 12) fxw_dump(i);
+        if (s_fxw[i].t >= 12) s_fxw[i].used = 0;
+    }
+}
+
 static void fx_posts(uint8_t *p, struct ms_state *s)
 {
     uint32_t m = CUR_MOTION(p);
@@ -631,6 +672,7 @@ static void fx_posts(uint8_t *p, struct ms_state *s)
         void *h = 0;
         if (f->mode) for (uint32_t r = 0; r < f->n; r++) h = fx_fixed(p, f, f->id + r);
         else h = ms_post_n(p, f->id, f->n);
+        fxw_add(h, f->id);
         static int s_log;
         if (s_log++ < 400)
             logf("msport: mhf effect %u x%u at motion %u f%u (action %u, gate %u, mode %u joint %x): %x", f->id, f->n,
@@ -658,6 +700,7 @@ static void fx_queue_tick(uint8_t *p, struct ms_state *s, float tk)
 static void tick(uint8_t *p, struct ms_state *s, float tk)
 {
     fx_posts(p, s);
+    fxw_tick();
     fx_queue_tick(p, s, tk);
     shock_tick(p, s, tk);
     if (s->shot_on) {                                   /* the marker shot (S: GU's marker flash as its look) */
