@@ -720,7 +720,7 @@ def main(report_only=False):
         if k not in W: return None
         hs = holders.get(mot)
         return (8 if not hs or hs[min(f, len(hs) - 1)] == 14 else 12), W[k]
-    mfx_ents, mfx_made, mfx_rep = (mhffx2gu.build_all(lambda a, p: gu_arc(a)[p][1], mfx_list)
+    mfx_ents, mfx_made, mfx_rep = (mhffx2gu.build_all(lambda a, p: gu_arc(a)[p][1], mfx_list, rom=rom())
                                    if mfx_on else ([], {}, ['mhf effects: off']))
     if mfx_on:                                  # the shot's hand piece (msgun.py): a model of its own, posted as a key
         g_ents, g_made, g_rep = msgun.build(lambda a, p: gu_arc(a)[p][1], rom())

@@ -328,3 +328,32 @@ particles' bounces and child effects, UV modes 1 / 7 (7 particles) and the fc5:2
 6. Magnetise: its flash, spots and pulses.
 Play, then close the game; the log answers the rest. Ask only about visuals: colours and look next to MHF's (the
 reference video), the camera and the crosshair, the hand piece's size and place.
+
+### Test 18 results and fixes
+Log: dump/mhf/test_logs/test18.log. The maintainer: exactly as test 17, no regression but no progression: none of
+the new effects drew (the old ones unchanged). Every post that should fire fired with a handle (the log); the arc
+order, the PEL (561 / 512 records, no count cap in GU's loader 0x322fd4, records well formed) and the blend table
+(AppShaderPackage.mfx: 0 BSBlendAddAlpha, 1 BSBlendBlendAlpha) were ruled out.
+
+| # | issue | cause (C unless marked) | change (test 19) |
+|---|---|---|---|
+| 1 | no new effect drew | mhffx2gu baked every particle mesh into a sprite by its x / y projection, assuming MHF's meshes are flat there. 404 / 942 particles are not: XZ / YZ planes (93, 121, 42, 401, 335, 334: empty cells) and 3-D arcs, rings, domes (291, 337, 340, 53, 379, 61, 143, 329: slivers). 14 of the 81 effects had no flat particle; the new per-motion keys are mostly these | world-oriented 3-D meshes (266) -> GU Model units on the mesh as a model (mhfmodel.py: MOD + w00 cm010_000 material + its texture; mhffx2gu.model_unit from w04 cm123_041 entry 0, whole). Camera-facing ones (138 + the flat ones): the spawn rotation x / y and the scale y / z relative to x baked before the front view, as MHF's matrix order (0x113ce4d0: scale x rotation, then the camera) |
+| 2 | no hand piece | the unit was em001_00_500 entry 1 cut at 0x140, its +0x134 value-block offset (0x170, 0xa6b824 via 0xa99f40) pointing past the cut; vertex colour (0, 0, 0, 255) where GU's weapon-effect models store 7f grey + alpha; v unflipped | msgun on mhfmodel and the whole Model template |
+| 3 | plain Y / B: little | MHF has few keys there: action 1's motion 1405 two (f40 posted in the log), action 3's 1401 one at f58 (the log's attack was cancelled at f13), 4 / 48 none | none (MHF's) |
+
+Still near-empty sprites (10 / 86), as MHF draws them: camera-facing meshes seen edge-on (93 / 42 in the XZ plane
+with no rotation, 26 turned 90 degrees about y) and thin-line textures (379, 31).
+
+## Test 19 (built and installed 2026-11-05)
+Deviations in this build (S): the 3-D meshes' UV scroll (MHF modes 2-6 on the swing arcs) is not animated (GU's
+model UV layers, unit +0x136 / +0x138, not decoded far enough); GU's Euler order for the Model rotation is assumed
+X, Y, Z as MHF's; camera-facing sprites bake the base rotation x / y (their random range not); the effect-model
+vertex neutral 0x7f is Capcom's convention (S); plus test 18's (aim view, reticle frames, F bounces, UV modes 1 / 7,
+the beam length scale).
+1. RB + Y / B / X / A: the swing trails (weapon and, on the side moves, the hunter) and the start glow.
+2. Y + B finisher (and the Guard Counter's follow-up): the weapon effect and the ground impact.
+3. Plain Y / B (let a Y combo play out): the ground smoke.
+4. RT + B: the hand piece in the left hand for about half a second, the shot and the marker.
+5. RT + Y from 14-40 m (attraction), RT + A under 14 m (repulsion): their effects; Magnetise: flash, spots, pulses.
+Play, then close the game; the log answers the rest. Ask only about visuals: which effects show, their shape, size,
+orientation and colour next to MHF's (the reference video).

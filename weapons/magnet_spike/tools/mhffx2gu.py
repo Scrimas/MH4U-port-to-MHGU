@@ -2,7 +2,10 @@
 Formats: notes/assets.md "## Effects" (MHF) and notes/gu-efl-units.md (GU). C / S / G marks as there.
 
 What a converted particle is (one GU entry per MHF particle; the MHF count of a burst = that many entries):
-- the MHF mesh baked into a sprite: every MHF particle mesh is flat (z = 0); its triangles are rasterised with their
+- a world-oriented 3-D mesh (not flat in x / y: nonflat) -> a GU Model unit on the mesh as an effect model
+  (mhfmodel.py, Builder.model_unit; test 18: 404 / 942 particles use such meshes and their sprites were empty);
+- else the MHF mesh baked into a sprite (camera-facing ones after their spawn rotation x / y and relative scale,
+  bake view); its triangles are rasterised with their
   atlas texture x vertex colour into a square cell centred on the mesh origin (the particle position), so a GU
   Billboard of that cell covers what MHF's billboarded mesh covers (shaped meshes too: 13-84-vertex glows, rays);
 - unit = cParticleGeneratorBillboard (type 0) from GU's em001_00_500 entry 0 (one particle, once: emit type 0x11,
@@ -50,6 +53,27 @@ TEX_SUFFIX = '_HQ_NOMIP'
 CELL_MIN, CELL_MAX, ATLAS_W = 32, 128, 1024   # one 1024 x 1024 RGBA8 atlas (4 MB) for every effect
 CELL_MAX_ANIM, SCROLL_FRAMES = 64, 8     # animated sprites: smaller cells; a UV scroll cycle in this many frames
 ADD_BLEND, ALPHA_BLEND = 0, 1
+# GU's simplest one-shot Model unit (type 5, emit 17, move 0, no curves / UV layers / animation block, 0x140 B; w04
+# cm123_041 entry 0, size 1): the 3-D world-oriented MHF meshes (Builder.model_unit). Model unit fields (init
+# 0xa9958c, C): +0x28 size (x the scale), +0x42 colour curve, +0x48 colours, +0x50 model path, +0x90 scale x / y / z
+# (value, range) and +0xa8 rates (0xa6b59c; with the curve +0x132 the scale = the curve's three (value, range)
+# keys, flag 0x800000), +0xd0 rotation (value, range) x / y / z and +0xe8 angular speeds (0xa6adac, curve +0x130),
+# +0x134 a value block (0xa6b824, only when non-zero), +0x136 / +0x138 UV layers (count = +0x13b & 0xf, 0x30 B each:
+# scroll values / speeds, 0xa99f40) and an animation block (+0x138 lo16, 0xa99a38); 0 = none.
+MODEL_TEMPLATE = ('player/quest/w04.arc', 'effect\\cm\\cm123_041', 0)
+MODEL_SIZE = 0x140
+FLAT = 0.05                  # a mesh is flat when its z extent <= 5 % of its x / y extent
+
+
+def nonflat(src, mi, _c={}):
+    """mhffx's sprites need a mesh flat in its x / y plane (z = 0); 404 / 942 test-18 particles were not (XZ / YZ
+    planes, rings, arcs, domes)"""
+    k = (id(src), mi)
+    if k not in _c:
+        P = np.array(src.meshes[mi]['pos'], float)
+        e = P.max(0) - P.min(0) if len(P) else np.zeros(3)
+        _c[k] = bool(e[2] > FLAT * max(e[0], e[1], 1e-6))
+    return _c[k]
 
 
 # ------------------------------------------------------------------------------------------------ MHF side
@@ -113,11 +137,18 @@ def _vertex_colours(b):
     return out
 
 
-def bake(src, mi, du=0.0, dv=0.0, cap=CELL_MAX):
+def bake(src, mi, du=0.0, dv=0.0, cap=CELL_MAX, view=None):
     """mesh mi (its UVs + (du, dv): MHF's UV animation offset) -> (RGBA cell (S, S, 4) uint8, half size R in cm);
-    the cell centre = the mesh origin, +y up"""
+    the cell centre = the mesh origin, +y up. view = (rx, ry, sy, sz): a camera-facing particle's spawn rotation x /
+    y and its scale y / z relative to x, applied before the front view (MHF 0x113ce4d0: scale x rotation, then the
+    camera matrix, C; the z roll stays the unit's roll, the x scale its size; test 18: XZ / YZ / 3-D meshes seen
+    front-on without them baked to empty or sliver cells)"""
     m = src.meshes[mi]
     P = np.array(m['pos'], float)
+    if view:
+        rx, ry, sy, sz = view
+        P = P * (1.0, sy, sz)
+        P = np.array([_rot(v, (rx, ry, 0.0)) for v in P]) if len(P) else P
     UV = np.array([(u + du, 1.0 - v + dv) for u, v in m['uv']], float)   # fmod.py flips v; images top-down
     tris = fmod.triangles(m)
     img = src.images[src.tex_img[src.mat_tex[m['material_list'][0]]]].astype(np.float32)
@@ -289,9 +320,13 @@ def rgba(c):
 
 
 class Builder:
-    def __init__(self, src, gu_read):
-        """gu_read(arc, path) -> bytes of a GU file (the EFL template)"""
+    def __init__(self, src, gu_read, rom=None):
+        """gu_read(arc, path) -> bytes of a GU file (the EFL template); rom (RomFS) for the models' MRLs"""
         self.src = src
+        self.mtpl = _template(gu_read, MODEL_TEMPLATE)
+        assert self.mtpl[1][0] == 5 and self.mtpl[2][0] == 17 and len(self.mtpl[1][1]) >= MODEL_SIZE, 'model template'
+        import mhfmodel
+        self.models = mhfmodel.Models(src, rom)
         self.poly = _template(gu_read, POLY_TEMPLATE)
         assert self.poly[1][0] == 2 and len(self.poly[1][1]) >= POLY_SIZE, 'polygon template'
         d = gu_read(TEMPLATE[0], TEMPLATE[1])
@@ -308,35 +343,17 @@ class Builder:
         self.cells = {}          # mesh -> (index, cell rgba, R)
         self.report = []
 
-    def cell(self, mi, frames=((0.0, 0.0),)):
-        """-> (EAN entry index, [frame images], R): one entry per (mesh, UV frames)"""
-        key = (mi, tuple(frames))
+    def cell(self, mi, frames=((0.0, 0.0),), view=None):
+        """-> (EAN entry index, [frame images], R): one entry per (mesh, UV frames, view)"""
+        key = (mi, tuple(frames), view)
         if key not in self.cells:
             cap = CELL_MAX if len(frames) == 1 else CELL_MAX_ANIM
-            imgs = [bake(self.src, mi, du, dv, cap) for du, dv in frames]
+            imgs = [bake(self.src, mi, du, dv, cap, view) for du, dv in frames]
             self.cells[key] = (len(self.cells), [i for i, _ in imgs], imgs[0][1])
         return self.cells[key]
 
-    def unit(self, a, e):
-        st = self.cur_set
-        ls = a['p5c'] if a['p5c'] >= mhffx.LIFE_MIN else 1.0
-        anim = uv_frames(e, ls) if e['uv_mode'] else None
-        idx, imgs, R = self.cell(e['mesh'], anim[0] if anim else ((0.0, 0.0),))
-        img = imgs[0]
-        # GU sizes count the sprite's texels (0xa7e768 builds the quad from the EAN frame's w / h; GU's own hunter
-        # billboards: size 0.2-1.25 on 256-px frames; test 16: cm sizes drew 16-64x too big): size 1 = one cm per
-        # texel from the pivot (G: the exact factor is not traced), so the MHF half size R cm = R / (S / 2)
-        R = R / (img.shape[0] / 2.0)
-        D = a['frame']
-        life = int(round(e['life'] * ls))
-        tm = lambda f: D + int(round(f * ls))
-        u = bytearray(self.tpl[1][1][:0x1a0])
-        u[3] = ADD_BLEND if e['draw'] == 1 else ALPHA_BLEND      # MHF draw byte (docstring, C)
-        struct.pack_into('<f', u, 0x1c, 1.0)
-        sb, sr = a['scl'][0], a['scl_r'][0]
-        struct.pack_into('<4f', u, 0x28, (sb - sr) * R, 2 * sr * R, 0.0, 0.0)
-        tail = b''
-        # scale curve
+    def motion(self, st, a, e, tm, sb):
+        """-> (scale keys [(MHF frame, (x, y, z) factors, _)], GU move (5, block) or None): F paths, position curves"""
         F = e.get('F')
         mv = None
         if F:                                   # F: the simulated growth as the scale curve, the path as kind 5
@@ -357,6 +374,39 @@ class Builder:
                 r0 = a['rot']; rr = a['rot_r']
                 mv = (5, move_block([(tm(f), _rot(v, r0)) for f, v, _ in pk],
                                     tuple((-rr[k], 2 * rr[k]) for k in range(3))))
+        return sk, mv
+
+    def unit(self, a, e):
+        st = self.cur_set
+        ls = a['p5c'] if a['p5c'] >= mhffx.LIFE_MIN else 1.0
+        world = not e['flags'] & 0x203
+        if world and nonflat(self.src, e['mesh']):
+            return self.model_unit(st, a, e, ls)
+        anim = uv_frames(e, ls) if e['uv_mode'] else None
+        view = None
+        if not world:                           # camera-facing: the spawn rotation x / y and relative scale baked
+            sb0 = a['scl'][0] or 1.0
+            v = (round(a['rot'][0], 2), round(a['rot'][1], 2), round(a['scl'][1] / sb0, 2), round(a['scl'][2] / sb0, 2))
+            if v != (0.0, 0.0, 1.0, 1.0) and (v[:3] != (0.0, 0.0, 1.0) or nonflat(self.src, e['mesh'])):
+                view = v
+        idx, imgs, R = self.cell(e['mesh'], anim[0] if anim else ((0.0, 0.0),), view)
+        img = imgs[0]
+        # GU sizes count the sprite's texels (0xa7e768 builds the quad from the EAN frame's w / h; GU's own hunter
+        # billboards: size 0.2-1.25 on 256-px frames; test 16: cm sizes drew 16-64x too big): size 1 = one cm per
+        # texel from the pivot (G: the exact factor is not traced), so the MHF half size R cm = R / (S / 2)
+        R = R / (img.shape[0] / 2.0)
+        D = a['frame']
+        life = int(round(e['life'] * ls))
+        tm = lambda f: D + int(round(f * ls))
+        u = bytearray(self.tpl[1][1][:0x1a0])
+        u[3] = ADD_BLEND if e['draw'] == 1 else ALPHA_BLEND      # MHF draw byte (docstring, C)
+        struct.pack_into('<f', u, 0x1c, 1.0)
+        sb, sr = a['scl'][0], a['scl_r'][0]
+        struct.pack_into('<4f', u, 0x28, (sb - sr) * R, 2 * sr * R, 0.0, 0.0)
+        tail = b''
+        # scale curve
+        sk, mv = self.motion(st, a, e, tm, sb)
+        F = e.get('F')
         keys = [(tm(f), _f((sb - sr) * v[0] * R), _f(2 * sr * v[0] * R)) for f, v, _ in sk]
         if D: keys = [(0, keys[0][1], keys[0][2])] + keys
         off_s = 0x1a0 + len(tail); tail += curve(keys)
@@ -402,6 +452,51 @@ class Builder:
             struct.pack_into('<8f', q, 0x1c0, h, 0.0, h, 0.0, 0.0, 0.0, 0.0, 0.0)
             return (2, bytes(q) + tail), bytes(emit), mv
         return (0, bytes(u) + tail), bytes(emit), mv
+
+    def model_unit(self, st, a, e, ls):
+        """a world-oriented 3-D MHF mesh -> a GU Model unit on the mesh as a model (mhfmodel): MHF's local transform
+        scale x rotation (0x113ce4d0, C) = the unit's scale x / y / z (base - range, 2 range) x the scale curve
+        and rotation x / y / z (value - range, 2 range, rad; GU's Euler order G); colour curve, life, motion and
+        blend as the Billboard's; no UV animation (MHF modes 2-6 on these: GU's model UV layers not decoded far
+        enough, S deviation)"""
+        D = a['frame']
+        life = int(round(e['life'] * ls))
+        tm = lambda f: D + int(round(f * ls))
+        u = bytearray(self.mtpl[1][1][:MODEL_SIZE])
+        u[3] = ADD_BLEND if e['draw'] == 1 else ALPHA_BLEND
+        struct.pack_into('<f', u, 0x1c, 1.0)
+        struct.pack_into('<4f', u, 0x28, 1.0, 0.0, 0.0, 0.0)
+        sb = a['scl'][0]
+        sk, mv = self.motion(st, a, e, tm, sb)
+        F = e.get('F')
+        base, rng = a['scl'], a['scl_r']
+        keys = [(tm(f), tuple(x for k in range(3) for x in ((base[k] - rng[k]) * v[k], 2 * rng[k] * v[k])))
+                for f, v, _ in sk]
+        if D: keys = [(0, keys[0][1])] + keys
+        tail = b''
+        off_s = MODEL_SIZE + len(tail)
+        tail += struct.pack('<I', len(keys) | 2 << 8) + b''.join(struct.pack('<I6f', t, *v) for t, v in keys)
+        ck = st.colours(e['c_col'])
+        cols = [(tm(f), bytes.fromhex(c)) for f, c, _ in ck] or [(tm(0), b'\xff\xff\xff\xff')]
+        ckeys = [(t, c, c) for t, c in cols]
+        if D:
+            z = cols[0][1][:3] + b'\0'
+            ckeys = [(0, z, z), (max(D - 1, 0), z, z)] + ckeys
+        off_c = MODEL_SIZE + len(tail); tail += curve(ckeys)
+        struct.pack_into('<HHHHHHHH', u, 0x38, 0, 0, 0, 0, 0, off_c, 0, 0)
+        struct.pack_into('<4s4s', u, 0x48, cols[0][1], cols[0][1])
+        u[0x50:0x90] = self.models.mesh(e['mesh']).encode().ljust(0x40, b'\0')
+        struct.pack_into('<6f', u, 0x90, *[x for k in range(3) for x in (base[k] - rng[k], 2 * rng[k])])
+        struct.pack_into('<6f', u, 0xa8, *([0.0] * 6))
+        r, rr = a['rot'], a['rot_r']
+        struct.pack_into('<6f', u, 0xd0, *[x for k in range(3) for x in (r[k] - rr[k], 2 * rr[k])])
+        w, wr = (F['ang'][2] / 2, F['ang_r'][2] / 2) if F else (0.0, 0.0)
+        struct.pack_into('<6f', u, 0xe8, 0.0, 0.0, 0.0, 0.0, w - wr, 2 * wr)
+        struct.pack_into('<HHHHI', u, 0x130, 0, off_s, 0, 0, 0)
+        emit = bytearray(self.tpl[2][1])
+        struct.pack_into('<III', emit, 0, 0, D + life, 0)
+        self.n_models = getattr(self, 'n_models', 0) + 1
+        return (5, bytes(u) + tail), bytes(emit), mv
 
     def element(self, a):
         """the template element; an MHF position range -> GU's box spawn shape (element +0x78 byte 0 = 1 ->
@@ -523,10 +618,11 @@ MS_EFFECTS = [(0xfc5, e) for e in (0x1, 0x3, 0x4, 0x14, 0x15, 0x16, 0x1a, 0x22, 
              [(0xfc6, e) for e in (0xe, 0xf, 0x11, 0x2d, 0x2e, 0x2f, 0x30, 0x32, 0x33, 0x34)]
 
 
-def build_all(gu_read, effects=MS_EFFECTS, src=SRC):
-    """-> (arc entries [(path, type, bytes)], {(set, effect): [(EFL path, element mask, position)]}, report)"""
+def build_all(gu_read, effects=MS_EFFECTS, src=SRC, rom=None):
+    """-> (arc entries [(path, type, bytes)], {(set, effect): [(EFL path, element mask, position)]}, report);
+    rom (RomFS) for the 3-D meshes' MRLs (mhfmodel)"""
     import tex
-    b = Builder(Source(src), gu_read)
+    b = Builder(Source(src), gu_read, rom)
     ents, made, rep = [], {}, []
     for sid, eid in effects:
         files, groups, n, skipped = b.efl(sid, eid)
@@ -540,4 +636,9 @@ def build_all(gu_read, effects=MS_EFFECTS, src=SRC):
         # texture / EAN before the EFLs naming it, every EFL before its PEL: msbuild puts these before the PEL)
         ents = [(ATLAS + TEX_SUFFIX, T_TEX, tex.encode_gu(A, 'rgba8', mips=1)), (ATLAS, T_EAN, ean)] + ents
         rep.append('mhf effect atlas %dx%d, %d sprites' % (A.shape[1], A.shape[0], len(b.cells)))
+    if b.models.mods:                          # the 3-D meshes' textures / MRLs / MODs before the EFLs naming them
+        k = next(i for i, (p, t, d) in enumerate(ents) if t == T_EFL)
+        ents[k:k] = b.models.entries()
+        rep.append('mhf effect models: %d meshes, %d textures, %d Model units' % (
+            len(b.models.mods), len(b.models.tex), getattr(b, 'n_models', 0)))
     return ents, made, rep

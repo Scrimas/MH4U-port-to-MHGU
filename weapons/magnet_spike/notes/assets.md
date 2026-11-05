@@ -178,6 +178,11 @@ MHF's), the attach offset on GU's weapon bone, all 40 models.
     its set (0x113d35a0), and along its life the effects keyed in a D-like group (0x113cc970 -> 0x113d34f0 /
     0x113d47e0): a moving emitter that drops other effects (sparks with trails). GU: a particle unit with speed
     and child units.
+  - **Mesh shapes** (2026-11-05, test 18, C from model0.fmod): the particle meshes are not all flat in x / y. Of
+    the 942 converted particles (posted effects + per-motion keys) 538 use x / y-flat meshes, 131 meshes in the XZ
+    or YZ plane (93, 121, 42, 401, 335, 334) and 273 3-D ones (arcs, rings, domes: 291, 337, 340, 53, 379, 61, 143,
+    329). E flags & 0x203 == 0 (world-oriented): the mesh in the effect frame; otherwise the particle matrix
+    (scale x rotation) times the camera matrix (0x113ce4d0). Port: mhffx2gu.model_unit / mhfmodel.py, bake view.
   - **The Magnet Spike's 35 posted effects** (sets 0xfc5 / 0xfc6): 513 particles. 431 have no position curve
     (they stay where they spawn, with the random spread, and only scale, turn, recolour). 52 move on one straight
     segment (2 keys = constant speed). 15 move on two segments (3 keys). 15 are F emitters. 0xfc6 0xf has no A
