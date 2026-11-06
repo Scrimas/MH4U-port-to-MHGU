@@ -2,7 +2,9 @@
 object inside the emulated game (GU loader -> edit -> GU writer, tools/guemu.py). Run with .venv/bin/python (unicorn, requirements.txt).
 
   dt_convert.py validate                 rebuild GU Teostra and Rathian from 4U data with Kushala as donor, diff
-  dt_convert.py build EMNNN DONOR OUTDIR [--sensor]    (--sensor: also the RECORDS tables, the 4U sensor)
+  dt_convert.py build EMNNN DONOR OUTDIR [--sensor] [--keep-ranges]
+      --sensor: also the RECORDS tables, the 4U sensor; --keep-ranges: the donor's AI distance ranges stay (RANGES not
+      converted: a 4U monster that runs the donor's GU AI table, whose distance checks name the donor's rows)
 
 Only mappings that a vote over the 40 monsters present in both games supports (tools/dt_vote.py, dump/dtmap/)
 are applied; everything else stays the donor's. Rules: (object field, 4U file, header word or offset, size rule).
@@ -129,7 +131,7 @@ def ptr_fields(kind):
     return range(0x68, 0xB8, 4) if kind == 'dtbase' else range(0x68, 0xE0, 4)
 
 
-def convert(kind, donor_bytes, d4, log=None, records=False):
+def convert(kind, donor_bytes, d4, log=None, records=False, keep_ranges=False):
     loader, vt, reset = gu_schema.KINDS[kind]
     applied = []
 
@@ -232,7 +234,9 @@ def convert(kind, donor_bytes, d4, log=None, records=False):
             uc.mem_write(obj + off, struct.pack('<I', new))
             applied.append('block +%#x <- %s word %d (%d bytes%s)' % (off, fk, w, n,
                                                                       ', count +%#x = %d' % (cnt, n // esz) if cnt is not None else ''))
-        if kind == 'dttune':
+        if kind == 'dttune' and keep_ranges:
+            applied.append('ranges +%#x / +%#x kept (the donor\'s: --keep-ranges)' % (RANGES[0], RANGES[3]))
+        elif kind == 'dttune':
             ranges(uc, st, u32)
         if records:
             modify_records(uc, st)
@@ -292,6 +296,7 @@ if __name__ == '__main__':
         d4 = emdata4u.load_4u(sys.argv[2]); os.makedirs(sys.argv[4], exist_ok=True)
         for kind in ('dtbase', 'dttune'):
             log = []
-            out = convert(kind, gu_file(rom, sys.argv[3], kind), d4, log, records='--sensor' in sys.argv[5:])
+            out = convert(kind, gu_file(rom, sys.argv[3], kind), d4, log, records='--sensor' in sys.argv[5:],
+                          keep_ranges='--keep-ranges' in sys.argv[5:])
             open(os.path.join(sys.argv[4], kind + '.bin'), 'wb').write(out)
             print(kind, len(out), 'bytes'); [print('   ', l) for l in log]

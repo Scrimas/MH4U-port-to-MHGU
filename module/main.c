@@ -155,20 +155,22 @@ int em_record_c(uint32_t *regs)
 /* 0x3a75c8(obj, id, kind, r3): quest-end tally into the quest's 137-entry array (obj+0x110 + index*8: size,
  * hunts +0x114, captures +0x116; index = 0x50b64(id), no bound). At the end the writer 0x38da40 walks all 137
  * indexes, turns each back into an ID (0x50bdc) and adds it to the save (0x526d94 hunts, 0x526e00 captures,
- * 0x526eb0 / 0x526ef8 size records). A ported index would overflow, so each monster is counted in its save slot
- * (allocations.toml save_index: an unused 'dummy' registry index, e.g. 105 for Gogmazios), which no game screen
- * lists (large-monster list 0x162bf0c, Guild Card log table) and the save editor can show.
+ * 0x526eb0 / 0x526ef8 size records). A ported index would overflow, so each monster is counted in a save slot (an
+ * unused 'dummy' registry index 105..111), which no game screen lists (large-monster list 0x162bf0c, Guild Card log
+ * table) and the save editor can show: its own (allocations.toml save_index, e.g. 105 for Gogmazios), or one it
+ * borrows for the quest (save = "lease": save.c save_slot_tally, whose hooks keep its numbers in the mod's store).
  * Hook 0x3a75fc, right after `bl 0x50b64`: only the index (r0) is remapped. The ID (r4) must stay the monster's:
  * the objective loop of the same function compares it with each objective's target (obj+0xf0, 0x3a7960) and marks
- * the hunt done there. Test 2026-10-20 10:24: remapping the ID at the entry tallied the kill, quest never ended. */
+ * the hunt done there. Test 2026-10-20 10:24: remapping the ID at the entry tallied the kill, quest never ended.
+ * r5 = obj (0x3a75d0), the quest whose entries save_slot_tally checks. */
 int stats_add_c(uint32_t *regs)
 {
     int m = port_by_index(regs[R0]);
     if (m < 0) return 0;
-    regs[R0] = port_monsters[m].save_index;
+    regs[R0] = save_slot_tally(m, (uint8_t *)regs[R5]);
     /* kind = r2 at the entry, spilled to [sp+0x3c]; the caller's sp is just above the 8 saved registers */
-    logf("mh4uport: %s quest-end tally kind %u -> save slot %x (index %u)", port_monsters[m].name,
-         FIELD(uint32_t, regs, 32 + 0x3c), port_monsters[m].save_id, port_monsters[m].save_index);
+    logf("mh4uport: %s quest-end tally kind %u -> save slot %u%s", port_monsters[m].name,
+         FIELD(uint32_t, regs, 32 + 0x3c), regs[R0], port_lease(m) ? " (leased)" : "");
     /* the quest clears when its rule's objectives are done (quest+0xe8 from questData +0x1d; check 0x3a027c): a
      * one-hunt quest needs +0x1d = 0 (Tigerstripe test 2026-10-21, monsters/tigerstripe_zamtrios/notes/plan.md) */
     return 0;
@@ -176,32 +178,19 @@ int stats_add_c(uint32_t *regs)
 
 /* 0x55bda4(mgr, id) -> monsterName GMD entry, = 0x50b64(id) (entry k = registry index k). Entry 137 already
  * starts the GMD's second list (Rathian), so a ported index reads its name_entry (an unused 'dummy' entry that
- * items.c renames in the loaded GMD). Replacement hook (build.py REPLACE_HOOKS). */
+ * items.c renames in the loaded GMD), and a save slot leased for a quest its lessee's (the quest result names the
+ * size record by the slot's ID, save.c). Replacement hook (build.py REPLACE_HOOKS). */
 typedef int (*em_index_t)(uint32_t id);
 #define em_index FN(em_index_t, 0x50b64)
 int name_index_c(uint32_t *regs)
 {
     int idx = em_index(regs[R1] & 0xffff), m = idx >= 0 ? port_by_index((uint32_t)idx) : -1;
+    if (m < 0 && idx >= 0) m = save_lessee_of_index((uint32_t)idx);
     regs[R0] = (uint32_t)(m >= 0 ? (int)port_monsters[m].name_entry : idx);
     return 1;
 }
 
-/* 0x3a3930(obj, id): "hunted or captured?" from the same array -> a ported monster's entry is its save slot's */
-int stats_hunted_c(uint32_t *regs)
-{
-    int m = port_by_em(regs[R1] & 0xffff);
-    if (m >= 0) regs[R1] = (regs[R1] & ~0xffffu) | port_monsters[m].save_id;
-    return 0;
-}
-
-/* 0x523104(save tallies, id) -> hunts + captures from the save (index from 0x50b64, > 136 answers 0): the Hunter's
- * Notes page (0x560058) and 8 other callers. A ported monster's tally is its save slot's (stats_add). */
-int save_hunts_c(uint32_t *regs)
-{
-    int m = port_by_em(regs[R1] & 0xffff);
-    if (m >= 0) regs[R1] = (regs[R1] & ~0xffffu) | port_monsters[m].save_id;
-    return 0;
-}
+/* stats_hunted (0x3a3930) and save_hunts (0x523104) moved to save.c with the other save readers */
 
 /* 0x687b0(mgr) caches the enemy resident tables (file IDs 0xde1a..0xde1f) in mgr+0x257c..0x2590 (C); hook 0x6880c,
  * r0 = em_size_scale_data (file 0xde1e): count +0x64, element k = 0x51904(res, k) = {+4 u32 registry index, +8 f32
@@ -210,34 +199,70 @@ int save_hunts_c(uint32_t *regs)
  * GU element (a dummy) is all zero: the quest result showed a wrong size (user 2026-10-26). The slot's element =
  * the donor's with the 4U base size and crowns (package.toml [size]). 0x67310: mini if size % <= mini x 100, gold
  * if >= gold x 100, silver if >= silver x 100, so zeros would make every size gold: a monster without crowns in 4U
- * gets thresholds out of reach. */
+ * gets thresholds out of reach. A slot leased for a quest (save.c) shows its lessee's (size_slot_dress). */
 typedef uint8_t *(*size_elem_t)(void *res, uint32_t k);
 #define size_elem FN(size_elem_t, 0x51904)
+#define ENEMY_MGR 0x1851fe0u    /* the manager 0x687b0 caches the resident tables in (boot, 0xb6f0): size data +0x2584 */
+#define SLOT_FIRST 105u
+static void *s_size_res;                 /* the size data the slots' as-built values were taken from */
+static uint32_t s_size_built[7][6];      /* +8..+28 of the elements of slots 105..111 as built (owners' data in) */
+
+static uint8_t *size_find(void *res, uint32_t index)   /* the (last) element of registry index `index`, 0 = none */
+{
+    uint8_t *found = 0;
+    for (uint32_t k = 0, n = FIELD(uint32_t, res, 0x64); k < n; k++) {
+        uint8_t *e = size_elem(res, k);
+        if (FIELD(uint32_t, e, 4) == index) found = e;
+    }
+    return found;
+}
+
+static void size_set(uint8_t *slot, const uint8_t *donor, const struct port_monster *p)
+{
+    if (donor)
+        for (uint32_t o = 12; o < 32; o += 4) FIELD(float, slot, o) = FIELD(float, donor, o);
+    FIELD(float, slot, 8) = p->size[0];
+    FIELD(float, slot, 12) = p->size[1];
+    FIELD(float, slot, 16) = p->size[1] > 0.0f ? p->size[2] : 100.0f;
+    FIELD(float, slot, 20) = p->size[1] > 0.0f ? p->size[3] : 100.0f;
+}
+
 int size_data_c(uint32_t *regs)
 {
     static uint32_t s_n;
     void *res = (void *)regs[R0];
     if (!res) return 0;
-    uint32_t n = FIELD(uint32_t, res, 0x64);
     for (int m = 0; m < PORT_N; m++) {
         const struct port_monster *p = &port_monsters[m];
-        if (p->owner >= 0 || p->size[0] <= 0.0f) continue;
-        uint8_t *slot = 0, *donor = 0;
-        for (uint32_t k = 0; k < n; k++) {
-            uint8_t *e = size_elem(res, k);
-            if (FIELD(uint32_t, e, 4) == p->save_index) slot = e;
-            if (FIELD(uint32_t, e, 4) == p->donor_index) donor = e;
-        }
+        if (p->owner >= 0 || p->size[0] <= 0.0f || port_lease(m)) continue;   /* a lessee has no slot of its own */
+        uint8_t *slot = size_find(res, p->save_index), *donor = size_find(res, p->donor_index);
         if (!slot) continue;
-        if (donor)
-            for (uint32_t o = 12; o < 32; o += 4) FIELD(float, slot, o) = FIELD(float, donor, o);
-        FIELD(float, slot, 8) = p->size[0];
-        FIELD(float, slot, 12) = p->size[1];
-        FIELD(float, slot, 16) = p->size[1] > 0.0f ? p->size[2] : 100.0f;
-        FIELD(float, slot, 20) = p->size[1] > 0.0f ? p->size[3] : 100.0f;
+        size_set(slot, donor, p);
         if (++s_n <= 8)
             logf("mh4uport: %s size record: slot %u = base %d cm, crowns %d / %d / %d %%", p->name, p->save_index,
                  (int)p->size[0], (int)(p->size[1] * 100.0f), (int)(p->size[2] * 100.0f), (int)(p->size[3] * 100.0f));
     }
+    s_size_res = res;
+    for (uint32_t k = 0; k < 7; k++) {
+        uint8_t *e = size_find(res, SLOT_FIRST + k);
+        for (uint32_t w = 0; w < 6; w++) s_size_built[k][w] = e ? FIELD(uint32_t, e, 8 + 4 * w) : 0;
+    }
     return 0;
+}
+
+/* save.c: slot `slot`'s size record shows lessee m's size data (m < 0: as built). Only on the size data the as-built
+ * values came from, read again from its manager (a reload would have run size_data first). */
+void size_slot_dress(uint32_t slot, int m)
+{
+    uint8_t *mgr = *(uint8_t **)MAIN(ENEMY_MGR), *e;
+    void *res = mgr ? FIELD(void *, mgr, 0x2584) : 0;
+    if (!res || res != s_size_res || slot < SLOT_FIRST || slot >= SLOT_FIRST + 7 || !(e = size_find(res, slot)))
+        return;
+    if (m < 0) {
+        for (uint32_t w = 0; w < 6; w++) FIELD(uint32_t, e, 8 + 4 * w) = s_size_built[slot - SLOT_FIRST][w];
+        return;
+    }
+    const struct port_monster *p = &port_monsters[m];
+    if (p->size[0] > 0.0f) size_set(e, size_find(res, p->donor_index), p);
+    else FIELD(float, e, 8) = -1.0f;     /* no size data: a negative base shows no size (0x67310) */
 }

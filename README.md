@@ -23,7 +23,7 @@ as they are.
 | **Black Gravios**                  | 8 · HR★7, G★4, Village★10  | –              |
 
 Quests are on the Hub quest board (Village quests on the village board). Ranks follow MH4U: each quest sits where its
-monster's MH4U rank falls among MHGU's quests of the same species. Black Gravios has no Hunter's Notes entry yet.
+monster's MH4U rank falls among MHGU's quests of the same species.
 
 <details>
 <summary><b>All quest names</b></summary>
