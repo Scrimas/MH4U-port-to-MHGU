@@ -1,0 +1,514 @@
+{
+ "monster": "em007_01 (Monoblos)",
+ "id": "0x107",
+ "registry_index": 145,
+ "file_id_base": "0x10940",
+ "file_count": 21,
+ "manifest": [
+  {
+   "field": 0,
+   "file_id": "0x10940",
+   "path": "enemy\\em007\\em007_01\\mod\\em007_01",
+   "type": "0x58a15856",
+   "source": "converted (4U em101)"
+  },
+  {
+   "field": 1,
+   "file_id": "0x10941",
+   "path": "enemy\\em007\\em007_01\\mod\\em007_01_tail",
+   "type": "0x58a15856",
+   "source": "converted (4U em101)"
+  },
+  {
+   "field": 2,
+   "file_id": -1
+  },
+  {
+   "field": 3,
+   "file_id": "0x10942",
+   "path": "enemy\\em007\\em007_01\\mod\\em007_01",
+   "type": "0x7cd0e77e",
+   "source": "converted (4U em101)"
+  },
+  {
+   "field": 4,
+   "file_id": "0x10943",
+   "path": "enemy\\em007\\em007_01\\mot\\em007_01_0",
+   "type": "0x76820d81",
+   "source": "converted (4U em101)"
+  },
+  {
+   "field": 5,
+   "file_id": "0x8454",
+   "path": "enemy\\em007\\em007_00\\mot\\em007_00_1",
+   "type": "0x76820d81",
+   "source": "shared (GU em007_00, its file ID)"
+  },
+  {
+   "field": 6,
+   "file_id": "0x8455",
+   "path": "enemy\\em007\\em007_00\\mot\\em007_00_2",
+   "type": "0x76820d81",
+   "source": "shared (GU em007_00, its file ID)"
+  },
+  {
+   "field": 7,
+   "file_id": "0x8456",
+   "path": "enemy\\em007\\em007_00\\mot\\em007_00_3",
+   "type": "0x76820d81",
+   "source": "shared (GU em007_00, its file ID)"
+  },
+  {
+   "field": 8,
+   "file_id": "0x10944",
+   "path": "enemy\\em007\\em007_01\\mot\\em007_01_4",
+   "type": "0x76820d81",
+   "source": "converted (4U em101)"
+  },
+  {
+   "field": 9,
+   "file_id": -1
+  },
+  {
+   "field": 10,
+   "file_id": -1
+  },
+  {
+   "field": 11,
+   "file_id": "0x8457",
+   "path": "enemy\\em007\\em007_00\\mot\\em007_00_cam",
+   "type": "0x39c52040",
+   "source": "shared (GU em007_00, its file ID)"
+  },
+  {
+   "field": 12,
+   "file_id": "0x8458",
+   "path": "sound\\call\\em\\em007",
+   "type": "0x10ebe843",
+   "source": "shared (GU em007_00, its file ID)"
+  },
+  {
+   "field": 13,
+   "file_id": "0x8459",
+   "path": "sound\\se\\em\\em007_00\\snd_em007_00",
+   "type": "0x1bcc4966",
+   "source": "shared (GU em007_00, its file ID)"
+  },
+  {
+   "field": 14,
+   "file_id": "0x8460",
+   "path": "sound\\pts\\em\\em007_00c",
+   "type": "0x4541367c",
+   "source": "shared (GU em007_00, its file ID)"
+  },
+  {
+   "field": 15,
+   "file_id": "0x8461",
+   "path": "sound\\pts\\em\\em007_00u",
+   "type": "0x4541367c",
+   "source": "shared (GU em007_00, its file ID)"
+  },
+  {
+   "field": 16,
+   "file_id": "0x845a",
+   "path": "effect\\pel\\em\\em007_00c",
+   "type": "0x5a525c16",
+   "source": "shared (GU em007_00, its file ID)"
+  },
+  {
+   "field": 17,
+   "file_id": "0x10951",
+   "path": "effect\\pel\\em\\em007_01u",
+   "type": "0x5a525c16",
+   "source": "converted (4U em101)"
+  },
+  {
+   "field": 18,
+   "file_id": "0x845c",
+   "path": "effect\\psl\\enemy\\em007\\em007_00\\mot\\em007_00_0",
+   "type": "0x254309c9",
+   "source": "shared (GU em007_00, its file ID)"
+  },
+  {
+   "field": 19,
+   "file_id": "0x845d",
+   "path": "effect\\psl\\enemy\\em007\\em007_00\\mot\\em007_00_1",
+   "type": "0x254309c9",
+   "source": "shared (GU em007_00, its file ID)"
+  },
+  {
+   "field": 20,
+   "file_id": "0x845e",
+   "path": "effect\\psl\\enemy\\em007\\em007_00\\mot\\em007_00_2",
+   "type": "0x254309c9",
+   "source": "shared (GU em007_00, its file ID)"
+  },
+  {
+   "field": 21,
+   "file_id": "0x845f",
+   "path": "effect\\psl\\enemy\\em007\\em007_00\\mot\\em007_00_3",
+   "type": "0x254309c9",
+   "source": "shared (GU em007_00, its file ID)"
+  },
+  {
+   "field": 22,
+   "file_id": "0x10952",
+   "path": "effect\\psl\\enemy\\em007\\em007_01\\mot\\em007_01_4",
+   "type": "0x254309c9",
+   "source": "converted (4U em101)"
+  },
+  {
+   "field": 23,
+   "file_id": -1
+  },
+  {
+   "field": 24,
+   "file_id": -1
+  },
+  {
+   "field": 25,
+   "file_id": "0x8462",
+   "path": "arc\\shell\\em\\em007_00_shell",
+   "type": "0x73850d05",
+   "source": "shared (GU em007_00, its file ID)"
+  },
+  {
+   "field": 26,
+   "file_id": "0x8463",
+   "path": "enemy\\hit_data\\em007_00_attackdata",
+   "type": "0x70bb64ba",
+   "source": "shared (GU em007_00, its file ID)"
+  },
+  {
+   "field": 27,
+   "file_id": "0x1094f",
+   "path": "enemy\\hit_data\\em007_01_attackdata",
+   "type": "0x70bb64ba",
+   "source": "converted (4U em101)"
+  },
+  {
+   "field": 28,
+   "file_id": "0x8464",
+   "path": "enemy\\hit_data\\em007_00_hitsize",
+   "type": "0x5653c1b0",
+   "source": "shared (GU em007_00, its file ID)"
+  },
+  {
+   "field": 29,
+   "file_id": "0x10950",
+   "path": "enemy\\hit_data\\em007_01_hitsize",
+   "type": "0x5653c1b0",
+   "source": "converted (4U em101)"
+  },
+  {
+   "field": 30,
+   "file_id": "0x10953",
+   "path": "enemy\\body_data\\em007_01_bodydata",
+   "type": "0x1ac7b52d",
+   "source": "converted (4U em101)"
+  },
+  {
+   "field": 31,
+   "file_id": "0x10954",
+   "path": "enemy\\cam_body_data\\em007_01_cambodydata",
+   "type": "0x1ac7b52d",
+   "source": "converted (4U em101)"
+  },
+  {
+   "field": 32,
+   "file_id": "0x8467",
+   "path": "enemy\\dt_base\\em007_00_dtbase",
+   "type": "0x59d9c3da",
+   "source": "shared (GU em007_00, its file ID)"
+  },
+  {
+   "field": 33,
+   "file_id": "0x10945",
+   "path": "enemy\\dt_tune\\em007_01_dttune",
+   "type": "0x48e8ac29",
+   "source": "converted (4U em101)"
+  },
+  {
+   "field": 34,
+   "file_id": "0x8469",
+   "path": "enemy\\dt_base\\em007_00_dtbparts",
+   "type": "0x1bbc291e",
+   "source": "shared (GU em007_00, its file ID)"
+  },
+  {
+   "field": 35,
+   "file_id": -1
+  },
+  {
+   "field": 36,
+   "file_id": -1
+  },
+  {
+   "field": 37,
+   "file_id": "0x1094e",
+   "path": "enemy\\cmd_tbl\\em007_01_cmdtbl",
+   "type": "0x3aabba02",
+   "source": "converted (4U em101)"
+  },
+  {
+   "field": 38,
+   "file_id": "0x846b",
+   "path": "enemy\\dou_mou_ka\\em007_00_doumouka",
+   "type": "0x1f149aec",
+   "source": "shared (GU em007_00, its file ID)"
+  },
+  {
+   "field": 39,
+   "file_id": "0x846c",
+   "path": "enemy\\dou_mou_ka\\em007_00_doumouka_G",
+   "type": "0x1f149aec",
+   "source": "shared (GU em007_00, its file ID)"
+  },
+  {
+   "field": 40,
+   "file_id": "0x10946",
+   "path": "enemy\\area_link\\em007_01",
+   "type": "0x4bf84f6f",
+   "source": "converted (4U em101)"
+  },
+  {
+   "field": 41,
+   "file_id": "0x846e",
+   "path": "enemy\\area_eat\\em007_00",
+   "type": "0x56d892d0",
+   "source": "shared (GU em007_00, its file ID)"
+  },
+  {
+   "field": 42,
+   "file_id": "0x10947",
+   "path": "enemy\\map_info\\em007_01",
+   "type": "0x197e4d7a",
+   "source": "converted (4U em101)"
+  },
+  {
+   "field": 43,
+   "file_id": "0x10948",
+   "path": "enemy\\area_select\\em007_01",
+   "type": "0x15e98d21",
+   "source": "converted (4U em101)"
+  },
+  {
+   "field": 44,
+   "file_id": "0x8471",
+   "path": "enemy\\area_patrol\\em007_00",
+   "type": "0x0947f3c8",
+   "source": "shared (GU em007_00, its file ID)"
+  },
+  {
+   "field": 45,
+   "file_id": "0x77ed",
+   "path": "enemy\\em_option\\mot\\em001_00_option",
+   "type": "0x76820d81",
+   "source": "shared (GU em007_00, its file ID)"
+  },
+  {
+   "field": 46,
+   "file_id": "0x10949",
+   "path": "enemy\\hagi\\hagi_s0_em007_01",
+   "type": "0x33a84e14",
+   "source": "converted (4U em101)"
+  },
+  {
+   "field": 47,
+   "file_id": "0x1094a",
+   "path": "enemy\\hagi\\hagi_s1_em007_01",
+   "type": "0x33a84e14",
+   "source": "converted (4U em101)"
+  },
+  {
+   "field": 48,
+   "file_id": "0x1094b",
+   "path": "enemy\\hagi\\hagi_s2_em007_01",
+   "type": "0x33a84e14",
+   "source": "converted (4U em101)"
+  },
+  {
+   "field": 49,
+   "file_id": "0x1094c",
+   "path": "enemy\\hagi\\hagi_s3_em007_01",
+   "type": "0x33a84e14",
+   "source": "converted (4U em101)"
+  },
+  {
+   "field": 50,
+   "file_id": "0x1094d",
+   "path": "enemy\\hagi\\hagi_s4_em007_01",
+   "type": "0x33a84e14",
+   "source": "converted (4U em101)"
+  }
+ ],
+ "files": [
+  {
+   "file_id": "0x10940",
+   "path": "enemy\\em007\\em007_01\\mod\\em007_01",
+   "type": "0x58a15856",
+   "path_hash": "0xa65260d7"
+  },
+  {
+   "file_id": "0x10941",
+   "path": "enemy\\em007\\em007_01\\mod\\em007_01_tail",
+   "type": "0x58a15856",
+   "path_hash": "0x70a686a0"
+  },
+  {
+   "file_id": "0x10942",
+   "path": "enemy\\em007\\em007_01\\mod\\em007_01",
+   "type": "0x7cd0e77e",
+   "path_hash": "0xa65260d7"
+  },
+  {
+   "file_id": "0x10943",
+   "path": "enemy\\em007\\em007_01\\mot\\em007_01_0",
+   "type": "0x76820d81",
+   "path_hash": "0x94290819"
+  },
+  {
+   "file_id": "0x10944",
+   "path": "enemy\\em007\\em007_01\\mot\\em007_01_4",
+   "type": "0x76820d81",
+   "path_hash": "0x9344cc00"
+  },
+  {
+   "file_id": "0x10945",
+   "path": "enemy\\dt_tune\\em007_01_dttune",
+   "type": "0x48e8ac29",
+   "path_hash": "0x16a4c92f"
+  },
+  {
+   "file_id": "0x10946",
+   "path": "enemy\\area_link\\em007_01",
+   "type": "0x4bf84f6f",
+   "path_hash": "0x7181c835"
+  },
+  {
+   "file_id": "0x10947",
+   "path": "enemy\\map_info\\em007_01",
+   "type": "0x197e4d7a",
+   "path_hash": "0x57d308f1"
+  },
+  {
+   "file_id": "0x10948",
+   "path": "enemy\\area_select\\em007_01",
+   "type": "0x15e98d21",
+   "path_hash": "0xc6ed9e29"
+  },
+  {
+   "file_id": "0x10949",
+   "path": "enemy\\hagi\\hagi_s0_em007_01",
+   "type": "0x33a84e14",
+   "path_hash": "0xfa89f536"
+  },
+  {
+   "file_id": "0x1094a",
+   "path": "enemy\\hagi\\hagi_s1_em007_01",
+   "type": "0x33a84e14",
+   "path_hash": "0x154b9e08"
+  },
+  {
+   "file_id": "0x1094b",
+   "path": "enemy\\hagi\\hagi_s2_em007_01",
+   "type": "0x33a84e14",
+   "path_hash": "0xfe7c250b"
+  },
+  {
+   "file_id": "0x1094c",
+   "path": "enemy\\hagi\\hagi_s3_em007_01",
+   "type": "0x33a84e14",
+   "path_hash": "0x11be4e35"
+  },
+  {
+   "file_id": "0x1094d",
+   "path": "enemy\\hagi\\hagi_s4_em007_01",
+   "type": "0x33a84e14",
+   "path_hash": "0xf362554c"
+  },
+  {
+   "file_id": "0x1094e",
+   "path": "enemy\\cmd_tbl\\em007_01_cmdtbl",
+   "type": "0x3aabba02",
+   "path_hash": "0x93255c16"
+  },
+  {
+   "file_id": "0x1094f",
+   "path": "enemy\\hit_data\\em007_01_attackdata",
+   "type": "0x70bb64ba",
+   "path_hash": "0x4f03bee0"
+  },
+  {
+   "file_id": "0x10950",
+   "path": "enemy\\hit_data\\em007_01_hitsize",
+   "type": "0x5653c1b0",
+   "path_hash": "0xf937b132"
+  },
+  {
+   "file_id": "0x10951",
+   "path": "effect\\pel\\em\\em007_01u",
+   "type": "0x5a525c16",
+   "path_hash": "0xc59b59ad"
+  },
+  {
+   "file_id": "0x10952",
+   "path": "effect\\psl\\enemy\\em007\\em007_01\\mot\\em007_01_4",
+   "type": "0x254309c9",
+   "path_hash": "0xf7646f72"
+  },
+  {
+   "file_id": "0x10953",
+   "path": "enemy\\body_data\\em007_01_bodydata",
+   "type": "0x1ac7b52d",
+   "path_hash": "0x55cd9707"
+  },
+  {
+   "file_id": "0x10954",
+   "path": "enemy\\cam_body_data\\em007_01_cambodydata",
+   "type": "0x1ac7b52d",
+   "path_hash": "0x180faa6b"
+  }
+ ],
+ "notes": [
+  "em007_01 material XfB_N__E_m00_body01: template solid_nm, type 0, ['em007_01_01_BM', 'em007_01_01_BM+A', 'em007_01_01_NM_MIRROR'], 4U specular mask type 2, 2 4U animations",
+  "em007_01 material XfBA1__m01_eye: template blend, type 1, ['em007_01_04_BM', 'em007_01_04_BM+A'], 4U specular mask type 0",
+  "em007_01 material XfB_N__E_m00_body02: template solid_nm, type 0, ['em007_01_02_BM', 'em007_01_02_BM+A', 'em007_01_02_NM_MIRROR'], 4U specular mask type 2, 2 4U animations",
+  "em007_01 material XfBA1__m02_angry: template blend, type 2, ['em007_01_04_BM', 'em007_01_04_BM+A'], 4U specular mask type 0, 3 4U animations, 4U states ['RSMeshBias5', 'RSMeshCNBias8'] -> ['RSMeshBias5']",
+  "em007_01 material XfBAN__E0__m50_wing: template tar, type 50, ['em007_01_03_BM', 'em007_01_03_BM+A', 'em007_01_03_NM_MIRROR'], 4U specular mask type 2, 2 4U animations",
+  "skeleton: 40 bones, ids and parent ids equal to GU em007_00's (file order differs); largest bind position difference 19.3 (bone 4)",
+  "em007_01_tail material XfB_N__E_m00_tail: template solid_nm, type 0, ['em007_01_02_BM', 'em007_01_02_BM+A', 'em007_01_02_NM_MIRROR'], 4U specular mask type 2",
+  "parts states: 11 (GU layout), from his 4U rows; groups [0, 1, 2, 3, 4, 6, 50, 51, 100, 101, 102, 103]",
+  "motions bank 0: GU em007_00_0 with slots [4, 14] = 4U em101_4 [4, 14] (frames [293, 343])",
+  "motions bank 4: 4U em101_4 (13 animations) in field 8",
+  "dttune +0x38: his 4U 4000 x GU 4500 / 4U Diablos 4300 = 4186",
+  "dttune +0x370: his 4U 50 x GU 100 / 4U Diablos 120 = 42",
+  "dttune +0x5ec: his 4U 600.0 x GU 680.0 / 4U Diablos 780.0 = 523.076904296875",
+  "dttune +0x3ac part record (type, sub): GU (22, 2) (4U Diablos (4, 0), his 4U (4, 4))",
+  "dttune +0x3c4 part record (type, sub): GU (22, 2) (4U Diablos (4, 0), his 4U (4, 4))",
+  "dttune +0x3dc part record (type, sub): GU (22, 2) (4U Diablos (4, 0), his 4U (4, 4))",
+  "dttune: 4U em101 + GU's retunes (10 bytes) on GU's balance; 121 of 1536 bytes differ from GU's",
+  "dttune: his 4U AI distance rows (range block 0x140..0x186 of 1536 bytes, his conversion -56 bytes); the retuned fields moved with it",
+  "AI table: 4U em101_cmd (case 101), GU's g0 s0 area step / s1 patrol / s8 area move, g7, g20 s0, empty g16; group 1 = his 65 + GU 65..140 empty but area_act_tbl [121, 122, 123, 124, 125, 126, 127] (+ calls imported at [141, 142, 143])",
+  "AI table: his scripts no script reaches (picked by 4U code; nothing in GU picks them): ['g1 s0', 'g1 s4', 'g1 s5', 'g1 s12', 'g1 s18', 'g1 s21', 'g1 s22', 'g1 s23', 'g1 s24', 'g1 s25', 'g1 s26', 'g1 s27', 'g1 s28', 'g1 s29', 'g1 s31', 'g1 s32', 'g1 s33', 'g1 s34', 'g1 s35', 'g1 s36', 'g1 s37', 'g1 s38', 'g1 s40', 'g1 s42', 'g1 s43', 'g1 s44', 'g1 s45', 'g1 s46', 'g1 s55', 'g1 s58', 'g1 s65', 'g1 s66', 'g1 s67', 'g1 s68', 'g1 s69', 'g1 s70', 'g1 s71', 'g1 s72', 'g1 s73', 'g1 s74', 'g1 s75', 'g1 s76', 'g1 s77', 'g1 s78', 'g1 s79', 'g1 s80', 'g1 s81', 'g1 s82', 'g1 s83', 'g1 s84', 'g1 s85', 'g1 s86', 'g1 s87', 'g1 s88', 'g1 s89', 'g1 s90', 'g1 s91', 'g1 s92', 'g1 s93', 'g1 s94', 'g1 s95', 'g1 s96', 'g1 s97', 'g1 s98', 'g1 s99', 'g1 s100', 'g1 s101', 'g1 s102', 'g1 s103', 'g1 s104', 'g1 s105', 'g1 s106', 'g1 s107', 'g1 s108', 'g1 s109', 'g1 s110', 'g1 s111', 'g1 s112', 'g1 s113', 'g1 s114', 'g1 s115', 'g1 s116', 'g1 s117', 'g1 s118', 'g1 s119', 'g1 s120', 'g1 s128', 'g1 s129', 'g1 s130', 'g1 s131', 'g1 s132', 'g1 s133', 'g1 s134', 'g1 s135', 'g1 s136', 'g1 s137', 'g1 s138', 'g1 s139', 'g1 s140']",
+  "AI table natives: keep [(0, 255), (11, 38)]; twins 0/2->0/2 3/0->3/3 (approximate: []); ported as (c, 208 + n): 1/1 1/4 1/6 1/10 1/19 1/20 1/21 1/28 1/29 1/31 1/32 1/33 2/0 2/2 2/3 2/5 2/6 2/7 2/10 2/12 2/13 2/14 2/15 2/16 2/17 2/18 2/19 2/20 2/21 2/22 2/23 2/24 2/25 2/26 3/1 3/2 3/3 3/4 6/0 6/2 6/3 6/4 6/7 6/8 6/9 6/11 6/12 6/13 6/15 6/16 6/17 6/18 6/19 6/20 7/0 7/1 7/2 7/3 7/4 7/5 7/6 7/7 7/8 7/9 7/10 7/13 7/18 7/19 7/20 7/21 7/22 7/24 7/28 7/31 7/32 7/33 7/34",
+  "AI table: ported actions without a C handler yet (module/em007_01_moves.c ends them at once, logged): none",
+  "attack data: GU's retunes of 4U Diablos records on his equal ones (but bytes (25, 28, 31)): M16<-D5 +4 55->70, M57<-D5 +4 55->70, M41<-D6 +4 40->55, M30<-D7 +4 55->65, M35<-D9 +4 60->70 +6 3->2, M42<-D24 +4 40->55, M48<-D52 +30 0->5, M49<-D52 +30 0->5, M51<-D52 +30 0->5",
+  "attack data: his 4U em101 attackdata (61 records) / hitsize (32 groups) in fields 27 / 29 (GU's second table: his index i -> 1000 + i)",
+  "hurt volumes: his 4U em101 bodydata, 32 records (GU Diablos: 30)",
+  "effect area colour: Dunes soil median (211, 165, 117, 255) (areas 1..11: [[214, 165, 132, 255], [236, 151, 85, 255], [217, 154, 104, 255], [207, 155, 113, 255], [185, 143, 110, 255], [204, 150, 102, 255], [226, 186, 139, 255], [211, 168, 117, 255], [211, 168, 117, 255], [207, 171, 134, 255], [232, 181, 140, 255]])",
+  "roar: bank-4 motion 4: his 4U slots [(1, 4)] + GU's air (cm202_050, PEL c 90) in slot 0, frames 109..151",
+  "effects: PEL u = GU em007_00u (list 1: 20, list 2: 16) + his 4U em101_0 records (66); PSL bank 4 from 4U em101_4; banks 0..3 GU's; 57 converted 4U files",
+  "  MODEL effect\\base\\cm\\cm000\\cm000_000: 1 materials",
+  "  MODEL effect\\base\\em\\em101\\ef_em101: 1 materials",
+  "  MODEL effect\\base\\qe\\qe000\\qe000_001: 1 materials",
+  "  MODEL effect\\base\\qe\\qe001\\qe001_000: 2 materials",
+  "  PSL anim 4 slot 3: MEF id 1100 has no PEL record (not in the MEF)",
+  "  PEL effect\\pel\\em\\em007_01u: 66 records (list 1) + 16 GU records (list 2); PSL x1 from LMT event group 2",
+  "area_link map 5: kind 1 = his 4U hop table (neighbours {1: [3, 4], 2: [7], 3: [1, 4], 4: [1, 3, 5, 10], 5: [4], 7: [2, 10], 10: [4, 7]}); kinds 2 / 4 GU's",
+  "map_info block 5: areas [1, 2, 3, 4, 5, 7, 10], eat [7], sleep [5] (= GU Diablos'), stay timers his 4U (s) {1: (120, 90, 180), 2: (180, 150, 240), 3: (90, 60, 180), 4: (120, 90, 180), 5: (120, 120, 180), 7: (180, 150, 240), 10: (60, 30, 90)} (GU Diablos {1: (90, 30, 180), 2: (90, 40, 240), 3: (90, 30, 180), 4: (90, 30, 240), 5: (90, 30, 180), 7: (90, 30, 300), 10: (90, 30, 180)})",
+  "area_select map 5 from his 4U routing (g0 s8): {1: [(2, 3, [(3, 70), (4, 30)]), (2, 4, [(4, 70), (3, 30)]), (4, 255, [(4, 100)]), (0, 255, [(3, 70), (4, 30)])], 2: [(2, 7, [(7, 100)]), (4, 255, [(7, 100)]), (0, 255, [(7, 100)])], 3: [(2, 1, [(4, 70), (1, 30)]), (2, 4, [(1, 70), (4, 30)]), (4, 255, [(4, 100)]), (0, 255, [(1, 70), (4, 30)])], 4: [(2, 1, [(5, 50), (10, 19), (1, 16), (3, 15)]), (2, 3, [(5, 50), (10, 19), (1, 16), (3, 15)]), (2, 5, [(5, 50), (10, 19), (1, 16), (3, 15)]), (2, 10, [(5, 50), (10, 19), (1, 16), (3, 15)]), (4, 255, [(5, 100)]), (0, 255, [(5, 50), (10, 19), (1, 16), (3, 15)])], 5: [(2, 4, [(4, 100)]), (0, 255, [(4, 100)])], 7: [(2, 2, [(10, 70), (2, 30)]), (2, 10, [(2, 70), (10, 30)]), (4, 255, [(10, 100)]), (0, 255, [(2, 70), (10, 30)])], 10: [(2, 4, [(7, 70), (4, 30)]), (2, 7, [(4, 70), (7, 30)]), (4, 255, [(4, 100)]), (0, 255, [(4, 70), (7, 30)])]}",
+  "carves: 4U em101 High / G tables in hagi s2 / s4 (tools/hagi_em007_01.py)",
+  "shared from em007_00: 427 files kept, 25 dropped (replaced or its model)"
+ ]
+}
