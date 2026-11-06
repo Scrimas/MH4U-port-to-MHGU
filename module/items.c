@@ -180,7 +180,8 @@ int item_text_loaded_c(uint32_t *regs)
  * count[18], +0x2a entries {u8 chance, u8 count, u16 item}, each group closed by chance 255 (group lookup 0x354484).
  * cond = table 0x162a736 {10, 20, .., 60}[break group] (list adder 0x3a6f54; tail sever = 10). No GU record has a
  * ported monster's ID: the hook answers with the monster's own record, also for its save-slot ID (main.c stats_add
- * counts it under it) and for its quests' stand-in ID while they run. The rank: GU's file is bui_s<rank>, file ID
+ * counts it under it: its own slot, or the one it leased for the quest, save.c save_slot_user) and for its quests'
+ * stand-in ID while they run. The rank: GU's file is bui_s<rank>, file ID
  * 0xf05f + s8 [[quest + 0xa4] + 44] (C, 0x3a3884..0x3a38cc; GU's data: s1 Low, s2 High, s4 G, e.g. Kushala's Daora
  * Horn / Horn+ / Hardhorn). The record is the monster's BUI<rank> section ('BUI2' = High ...), else its BUI section
  * (every rank: Gogmazios, Tigerstripe). */
@@ -213,12 +214,12 @@ static int bui_build(int m, int rank)
 int bui_record_c(uint32_t *regs)
 {
     uint32_t id = regs[R1] & 0xffff;
-    int k = -1, q = port_running_quest(&k);
+    int k = -1, q = port_running_quest(&k), slot_user = save_slot_user(id);
     const uint8_t *info = (const uint8_t *)FIELD(uint32_t, (void *)regs[R0], 0xa4);
     int rank = info ? (int8_t)info[44] : -1;      /* GU returns no record without it */
     for (int m = 0; m < PORT_N; m++) {
         const struct port_monster *p = &port_monsters[m];
-        if (id != p->em_id && id != p->save_id && !(q == m && port_standin(m, k) && id == port_standin(m, k)))
+        if (id != p->em_id && slot_user != m && !(q == m && port_standin(m, k) && id == port_standin(m, k)))
             continue;
         if ((!FIELD(uint16_t, s_bui[m], 4) || s_bui_rank[m] != rank + 1) && !bui_build(m, rank)) return 0;
         regs[R0] = (uint32_t)s_bui[m];

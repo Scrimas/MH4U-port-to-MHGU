@@ -40,6 +40,9 @@ struct port_monster {
     uint16_t stage_name;                  /* allocations.toml [monster.append] stage_name: questMessage index of the
                                              alias's name (its TXTA string), shown for its quests on stage_from
                                              (module/stage_alias.c); 0 = GU's name */
+    uint8_t lease;                        /* allocations.toml save = "lease": no fixed save slot (save_index /
+                                             save_id 0), it borrows one per quest and its numbers go to the store
+                                             (module/save.c) */
 };
 #define PORT_OWNER(m) (port_monsters[m].owner >= 0 ? port_monsters[m].owner : (m))
 extern const struct port_monster port_monsters[];   /* out/port_monsters.c */
@@ -67,6 +70,18 @@ int port_running_quest(int *which);       /* owner of the current quest if insta
 uint16_t port_standin(int m, int k);
 
 void notes_data_loaded(int m);            /* notes.c: the monster's Notes entry, after its data loaded */
+
+/* save.c: the mod's save store and per-quest leases of the save slots 105..111 (notes/save-store.md) */
+int port_lease(int m);                    /* 1 = no fixed save slot (save = "lease", or the TEST_LEASE build's) */
+uint32_t save_slot_tally(int m, uint8_t *quest);   /* the slot index monster m's quest tally counts in */
+int save_slot_user(uint32_t id);          /* the monster a slot ID (0x1064..0x106a) stands for, -1 = none */
+int save_lessee_of_index(uint32_t idx);   /* the lessee slot index idx stands for, -1 = none */
+void size_slot_dress(uint32_t slot, int m);   /* main.c: the slot's size record shows m's (-1 = as built) */
+int save_loaded_c(uint32_t *regs), save_writing_c(uint32_t *regs);   /* hooks, also run by tools/test_save.c */
+int stats_hunted_c(uint32_t *regs), save_hunts_c(uint32_t *regs), save_hunts_id_c(uint32_t *regs),
+    save_captures_id_c(uint32_t *regs), save_size_read_c(uint32_t *regs), save_add_hunts_c(uint32_t *regs),
+    save_add_captures_c(uint32_t *regs), save_size_max_c(uint32_t *regs), save_size_min_c(uint32_t *regs),
+    size_lookup_c(uint32_t *regs);
 
 /* bgm.c: a monster's own battle theme (2 sequences of its own STQR), registered from its class registration */
 struct port_bgm {

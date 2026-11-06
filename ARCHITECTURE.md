@@ -41,6 +41,7 @@ module/               Core C module (the shared engine of the port):
   gear.c gear_hooks.txt   armor, weapons, skills
   items.c                 items appended to GU's tables
   bgm.c icons.c notes.c   music, UI icons, Hunter's Notes
+  save.c                  the mod's save store and per-quest leases of the save slots (notes/save-store.md)
   stage_alias.c           maps 4U stages onto GU stage slots
   game.h util.c util.h    GU structures and helpers
   core.toml               core version and build config
@@ -191,7 +192,8 @@ release builds use none of the test switches.
 
 1. **Identify**: find the 4U class, its em number, files and quests; reserve IDs in `allocations.toml`.
 2. **Assets**: convert models, textures, animations, collision, effects, sounds into GU arcs.
-3. **Register**: add the class to the relocated registry (`module/port.c`), name, icon, save slots.
+3. **Register**: add the class to the relocated registry (`module/port.c`), name, icon, save slot (a new monster:
+   `save = "lease"`, `module/save.c`).
 4. **Behaviour**: reimplement the 4U AI / actions / shells in C under `monsters/<name>/module/`, mapping 4U engine
    calls to GU's (`tools/apimap*`).
 5. **Content**: quests (at the rank matching 4U), arena / stage, music, items, armor, weapons, skills, Hunter's

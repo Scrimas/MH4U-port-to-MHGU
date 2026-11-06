@@ -135,6 +135,8 @@ full release into `dump/release/`.
 - **CI** (`.github/workflows/ci.yml`, every PR and push to `main`, no game files needed): the same check on every
   tracked file, `tools/alloc.py` (IDs), every Python file compiles, and every C file of the module compiles
   (`tools/ci_compile.py`; it cannot link, which needs GU's `main`). Run them locally before a PR.
+- **Save code**: a change to `module/save.c` (the mod's save store and slot leases) runs `python3 tools/test_save.py`
+  too: it runs that file as ARM code under unicorn on a fake character, no game files needed.
 
 ## Using an AI coding assistant
 

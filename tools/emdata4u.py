@@ -80,14 +80,19 @@ def attackdata(etd):
 
 # ---------------------------------------------------------------- hitsize
 
-def hitsize(etd):
+def hitsize(etd, off2_gu=False):
+    """off2_gu: GU's records are 48 B with the far end of a capsule at +32 (4U: 40 B, at +28), C: 4U vs GU records equal
+    with it moved, Teostra 83 of 83 (50 as copied), Kushala 58 of 60 (35), Diablos 53 of 55 (20), Rathian 35 of 38 (8).
+    As copied, GU reads (y, z, 0) for that end, and the capsule points the wrong way. False keeps the bytes the shipped
+    monsters were built with: a change of their attack volumes, not to be made silently."""
     a, b = hw(etd, 27), hw(etd, 28)
     groups = []
     for i in range((b - a) // 4):
         p = hw(etd, 0) and struct.unpack_from('<I', etd, a + 4 * i)[0]
         recs = []
         while p and struct.unpack_from('<H', etd, p)[0] != 0xFFFF:
-            recs.append(etd[p:p + 40] + bytes(8)); p += 40
+            r = etd[p:p + 40]
+            recs.append(r[:28] + bytes(4) + r[28:] + bytes(4) if off2_gu else r + bytes(8)); p += 40
         groups.append(recs)
     groups.append([])
     n = len(groups)

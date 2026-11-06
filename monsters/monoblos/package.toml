@@ -1,0 +1,44 @@
+# Monoblos package: what the installer shows and installs, and the version written into its data file.
+name = "monoblos"
+title = "Monoblos"
+version = "0.4.6"       # bump on every published change of this monster's files (data, assets or code); 0.4.6:
+                        # his mesh groups follow his 4U rows: amber eye, no frenzy eye and veins, the horn, back and tail
+                        # really change when broken / cut (GU's slot 132 skips variant 1; em007_01_mat.c); 0.4.5:
+                        # his attacks tied to motions (4U 0x8df784: walking, turning, tail, the burrowed travel and the
+                        # burst now hit; em007_01_mv_j.c), his own 4U hurt and camera volumes (fields 30 / 31), the far end
+                        # of his attack capsules (hitsize off2), the rage veins start hidden and blend as in 4U instead of
+                        # glowing pink all the time (em007_01_mat.c), no more teleport after a sonic bomb while he lies
+                        # burrowed, Hunter's Notes entry 129 (Black Gravios takes 128); 0.4.4:
+                        # GU's Diablos ground trail (common effect 2) instead of 4U's mound and dust when burrowed
+                        # (records 4100 / 4101 and their EFLs gone), a Hunter's Notes entry (128, no save bit: core
+                        # notes.c), sonic bomb logs and a second test after GU's (em007_01_moves.c); 0.4.3:
+                        # hub HR7 hunt no longer an urgent quest (template q10728), hub boxes = GU's (4 Maps), every
+                        # box starts with the Map(s) only, 1058's Hot Drinks -> Cool Drinks (day Dunes), GU's retunes
+                        # of 4U Diablos attack records on his equal ones (6 power, 3 byte 30), his icon = 4U cell 110
+                        # (111 was White Monoblos), the mound guard without an address range (all platforms); 0.4.2:
+                        # quest ranks as in 4U (village ★10 High 1057 / 1058, G 1059) with GU's rows there (his 4U ratio
+                        # to Diablos at the same tier), and the three as hub quests (HR7 10784 / 10785, G4 11452) with
+                        # GU's hub (multiplayer) rows; 0.4.1:
+                        # his 4U effects (PEL u + bank-4 PSL from 4U em101_0 / em101_4, 57 converted files), the burrow
+                        # mound / dust trail posted from code (PEL list 2: 4100 / 4101), GU's roar air on his bank-4
+                        # roar, his roar and idle back on his bank-4 motions 0x404 / 0x40e (their sounds sit in GU's
+                        # em007 sound call); 0.4.0:
+                        # his 4U AI table (em101_cmd in GU's language), his 4U distance rows, his 4U attackdata /
+                        # hitsize in GU's second attack table (fields 27 / 29), his 4U handlers ported in C (module
+                        # em007_01_mv_a..i.c: every action his table starts but 0/2 and 3/0, which stay on GU's
+                        # Diablos handlers; notes/actions.md); 0.3.0:
+                        # his 7 materials (appended 3041..3047), carves (s2 / s4), break rewards (GU Diablos' conds
+                        # 10 / 20 / 30), his materials in the quest rewards, armor Mono S / Mono X (20 pieces, models
+                        # 368..371), 14 weapons in 5 lines (GS, SnS, Lance, HBG, LS; models + sounds); 0.2.0:
+                        # his values on GU's balance (GU's retunes of 4U Diablos carried over: HP 4000 -> 4186, ...),
+                        # his 4U routes on the Dunes (hop table, next-area shares, stay timers); 0.1.0:
+                        # stage 1 (notes/plan.md "Stages"): his model, own motions, dttune, name, icon, size, lease save
+                        # and his three 4U quests; GU Diablos' AI and handlers (a deviation until stage 2)
+requires_core = "1.8.0"    # oldest core module (exefs) that runs this version: plus the save store (save = "lease")
+code = "em007_01"          # C prefix of its module code (hooks gated on GU variant 1)
+gu_class = "uEm007_00"     # GU's Diablos class runs it as variant 1 (module/build.py: registry DTI = donor's; built
+                           # with that name at GU 0x50410, the class tools/apialign2.py pairs with 4U uEm099)
+
+[size]                     # quest-result size record (module/main.c size_data): 4U table 0xf32008 + 16 x em {f32 base
+                           # cm, mini, silver, gold}; em101 (Diablos em099: 2041.2, 0.9, 1.15, 1.23)
+monoblos = [2163.6, 0.9, 1.15, 1.23]

@@ -49,6 +49,43 @@ static int path_ends(void *res, const char *suffix)
     return ls <= lp && str_eq(p + lp - ls, suffix);
 }
 
+/* Each create table's array and how many of its records are GU's: the smithy's order below tells ported records by it.
+ * One row per table load (gear_tables_loaded handles one table per call): a later monster's block only moves the array.
+ * A table loaded again gets a new row; the lookup goes newest first, older rows only hold addresses, never followed. */
+#define APPENDED_ROWS 64
+static struct { const uint8_t *arr; uint32_t gu_count; } s_appended[APPENDED_ROWS];
+static uint32_t s_appended_next;
+static int s_appended_cur = -1;                 /* the row of the table being loaded */
+
+static int has_create(const char *s)
+{
+    for (; *s; s++)
+        if (s[0] == 'C' && s[1] == 'r' && s[2] == 'e' && s[3] == 'a' && s[4] == 't' && s[5] == 'e') return 1;
+    return 0;
+}
+
+static void appended_note(const char *what, const uint8_t *arr, uint32_t count)
+{
+    if (!has_create(what)) return;
+    if (s_appended_cur < 0) {
+        s_appended_cur = (int)(s_appended_next++ % APPENDED_ROWS);
+        s_appended[s_appended_cur].gu_count = count;
+    }
+    s_appended[s_appended_cur].arr = arr;
+}
+
+static const uint8_t *appended_find(const uint8_t *arr, uint32_t *gu_count)
+{
+    for (uint32_t j = 1; j <= APPENDED_ROWS; j++) {
+        uint32_t i = (s_appended_next + APPENDED_ROWS - j) % APPENDED_ROWS;
+        if (arr && s_appended[i].arr == arr) {
+            *gu_count = s_appended[i].gu_count;
+            return arr;
+        }
+    }
+    return 0;
+}
+
 static int tbl_append(void *res, const struct tbl_cls *c, const uint8_t *recs, uint32_t n, uint32_t rec_bytes,
                       uint32_t expect, const char *what)
 {
@@ -80,8 +117,123 @@ static int tbl_append(void *res, const struct tbl_cls *c, const uint8_t *recs, u
     FN(tbl_free_t, c->free)(old - 8);
     FIELD(uint8_t *, res, 0x6c) = arr;
     FIELD(uint32_t, res, 0x64) = count + n;
+    appended_note(what, arr, count);
     logf("mh4uport: gear %s: %u -> %u records", what, count, count + n);
     return 1;
+}
+
+/* The smithy's list order. GU's builder 0x6f9438 (categories 1..5 armor parts, 6 decorations, 7..21 weapon classes)
+ * walks the create records in table order and lists the ones the player may see at this+204: 1280 entries of 6 bytes
+ * {u16 record, u8 sub (armor: Blademaster / Gunner ...), u8 0xff, u16}, count this+98; appended records therefore come
+ * last. At its exit this moves ported entries to their rarity among GU's, in the list only: every reader goes through
+ * the entry's record number (0x6f5494, 0x6f9a70), and the "listed" save bits (0x524980 / 0x52484c, keyed by record) are
+ * set in the builder's loop before this runs, so nothing in the save changes, with the mod or after removing it. GU's
+ * own entries keep their order. Every GU armor and weapon list runs by ascending rarity up to the highest, then a tail
+ * of low event gear (table order, armor and weapons, C). So an entry goes before the first GU entry of a higher rarity
+ * outside the tail; with none, before the tail; without a tail, last. Rarity: the record's vt+0x18(sub) = gear ID,
+ * 0x13c208(sEquip, category, ID) = its object (both as the builder's check 0x6f9798), slot 7 (vt+0x1c, as GU's 0x6f92ac)
+ * = rarity - 1 (armor 0xcf280 record +0x73, weapons 0xf6d08.. +0xf: every property "mRare" of these classes, C). 0.4.4
+ * called slot 3 (a function returning 1): every entry had the same rarity, and the ported ones stayed last. */
+#define SMITHY_LIST    204
+#define SMITHY_CAT     92
+#define SMITHY_COUNT   98
+#define SMITHY_MAX     1280u
+#define SMITHY_ENTRY   6u
+#define SMITHY_DECO    6u
+#define SMITHY_CATS    21u
+#define SMITHY_SUBS    4u                       /* a create record's gear IDs (armor: 4, weapons: index 0 only) */
+#define GEAR_RARITY_SLOT 7                      /* vt+0x1c */
+typedef void *(*smithy_rec_t)(void *self, uint32_t cat, uint32_t index);
+#define smithyRecord FN(smithy_rec_t, 0x6f9658)
+typedef void *(*gear_object_t)(void *equip, uint32_t cat, uint32_t id);
+#define gearObject   FN(gear_object_t, 0x13c208)
+#define EQUIP_MGR    (*(void **)MAIN(0x1856b18))
+typedef uint32_t (*rec_gear_id_t)(void *rec, uint32_t sub);
+typedef uint32_t (*gear_rarity_t)(void *obj);
+
+static uint32_t record_rarity(void *self, uint32_t cat, uint32_t index, uint32_t sub)
+{
+    void *rec = smithyRecord(self, cat, index), *obj;
+    uint32_t id;
+    if (!rec) return 0xff;
+    id = ((rec_gear_id_t)(*(uint32_t **)rec)[6])(rec, sub);
+    if (!id) return 0xff;
+    obj = gearObject(EQUIP_MGR, cat, id);
+    return obj ? ((gear_rarity_t)(*(uint32_t **)obj)[GEAR_RARITY_SLOT])(obj) & 0xff : 0xff;
+}
+
+/* the first GU record after the table's last record of its highest rarity: the event tail starts there. Scanned once per
+ * loaded table (the rarity of a record: its first gear ID that has one) */
+static uint32_t smithy_tail(void *self, uint32_t cat, const uint8_t *arr, uint32_t gu)
+{
+    static const uint8_t *s_arr[SMITHY_CATS + 1];
+    static uint16_t s_tail[SMITHY_CATS + 1];
+    uint32_t top = 0, tail = gu, subs = cat < SMITHY_DECO ? SMITHY_SUBS : 1;
+    if (s_arr[cat] == arr) return s_tail[cat];
+    for (uint32_t k = 0; k < gu; k++) {
+        uint32_t r = 0xff;
+        for (uint32_t s = 0; s < subs && r == 0xff; s++) r = record_rarity(self, cat, k, s);
+        if (r != 0xff && r >= top) {
+            top = r;
+            tail = k + 1;
+        }
+    }
+    s_arr[cat] = arr;
+    s_tail[cat] = (uint16_t)tail;
+    return tail;
+}
+
+int smithy_list_c(uint32_t *regs)
+{
+    static uint8_t s_rare[SMITHY_MAX], s_out[SMITHY_MAX * SMITHY_ENTRY];
+    static uint16_t s_mine[SMITHY_MAX];
+    static uint32_t s_lines;
+    uint8_t *self = (uint8_t *)regs[R4], *list = self + SMITHY_LIST, *to = s_out;
+    uint32_t cat = FIELD(uint16_t, self, SMITHY_CAT), n = FIELD(uint16_t, self, SMITHY_COUNT), gu = 0, mine = 0, i, k;
+    uint32_t tail, tail_at = n;
+    const uint8_t *arr;
+    if (cat == 0 || cat == SMITHY_DECO || cat > SMITHY_CATS || n < 2 || n > SMITHY_MAX) return 0;
+    arr = appended_find(smithyRecord(self, cat, 0), &gu);
+    if (!arr) return 0;                         /* nothing appended to this table */
+    tail = smithy_tail(self, cat, arr, gu);
+    for (i = 0; i < n; i++) {
+        uint32_t rec = FIELD(uint16_t, list, SMITHY_ENTRY * i);
+        s_rare[i] = (uint8_t)record_rarity(self, cat, rec, list[SMITHY_ENTRY * i + 2]);
+        if (rec >= gu) s_mine[mine++] = (uint16_t)i;
+        else if (rec >= tail && tail_at == n) tail_at = i;
+    }
+    if (!mine || mine == n) return 0;
+    for (k = 1; k < mine; k++) {                /* ported entries by rarity, record order within one (stable) */
+        uint16_t e = s_mine[k];
+        for (i = k; i > 0 && s_rare[s_mine[i - 1]] > s_rare[e]; i--) s_mine[i] = s_mine[i - 1];
+        s_mine[i] = e;
+    }
+    /* s_mine[k] -> the GU entry (list position) it goes before; n = at the end */
+    static uint16_t s_before[SMITHY_MAX];
+    for (k = 0; k < mine; k++) {
+        uint32_t r = s_rare[s_mine[k]], first = tail_at;    /* no GU entry above it: before the tail (or last) */
+        for (i = 0; i < tail_at; i++) {
+            if (FIELD(uint16_t, list, SMITHY_ENTRY * i) >= gu) continue;
+            if (s_rare[i] > r && s_rare[i] != 0xff) { first = i; break; }
+        }
+        s_before[k] = (uint16_t)first;
+    }
+    for (i = 0; i <= n; i++) {
+        for (k = 0; k < mine; k++)
+            if (s_before[k] == i) {
+                for (uint32_t b = 0; b < SMITHY_ENTRY; b++) *to++ = list[SMITHY_ENTRY * s_mine[k] + b];
+            }
+        if (i < n && FIELD(uint16_t, list, SMITHY_ENTRY * i) < gu)
+            for (uint32_t b = 0; b < SMITHY_ENTRY; b++) *to++ = list[SMITHY_ENTRY * i + b];
+    }
+    if ((uint32_t)(to - s_out) != n * SMITHY_ENTRY) return 0;   /* cannot happen: keep GU's list if it ever does */
+    for (i = 0; i < n * SMITHY_ENTRY; i++) list[i] = s_out[i];
+    if (s_lines < 24) {
+        s_lines++;
+        logf("mh4uport: smithy category %u: %u entries, %u ported by rarity, first at %u (rarity %u), tail at %u",
+             cat, n, mine, s_before[0], s_rare[s_mine[0]] + 1, tail_at);
+    }
+    return 0;
 }
 
 /* TBLA entry (40 B): path, flags, alloc, free, ctor, parse, u16 mem size, u16 record bytes, base, count, records */
@@ -91,6 +243,7 @@ static int s_kire[PORT_N];      /* 0 not loaded, 1 appended, -1 refused */
 
 void gear_tables_loaded(void *res)        /* also items.c: the item table's TBLA blocks (appended items) */
 {
+    s_appended_cur = -1;
     for (int m = 0; m < PORT_N; m++) {
         const uint8_t *s;
         for (int k = 0; (s = port_section(m, "TBLA", k, 0)) != 0; k++) {
