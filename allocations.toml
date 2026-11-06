@@ -12,14 +12,16 @@ registry_index = [137, 160]             # GU uses 0..136; the relocated registry
 em_number = [89, 255]                   # GU large monsters are ems 1..88 (registry pairs 0x1597ea4); a new variant
                                         # of a GU em is fine too when that (variant << 8 | em) ID is free
 file_ids = [0x10700, 0x1ffff]           # past the game's file-ID table (IDs up to 0x106d0, file_id hook 0x152960)
-save_index = [105, 111]                 # unused registry slots dummy1..7 (IDs 0x1064..0x106a): save hunt / size arrays
+save_index = [105, 111]                 # unused registry slots dummy1..7 (IDs 0x1064..0x106a): save hunt / size arrays;
+                                        # all taken: a new monster takes save = "lease" instead (module/save.c)
 name_entry = [105, 111]                 # monsterName GMD entries 'dummy1'..'dummy7'
 ui_icon = [197, 244]                    # cells 1..48 of our own atlas (UI index 196 + cell, tools/ui_icons.py; cell
                                         # 0 = 4U's '?'): GU's micon00 / 01 end at 195, both full in HD UI v4
-notes_entry = [123, 127]                # Hunter's Notes save map S+0x35b0: bits 123..127 unused
+notes_entry = [123, 159]                # Hunter's Notes: 123..127 = free bits of the save map S+0x35b0; 128.. have no
+                                        # bit, their state comes from their cleared quests (module/notes.c)
 quests = [11491, 11492, 11493, 11494, 10790, 10791, 10792, 11495, 11496,   # checked free (no file, no list
           10775, 10776, 10777, 10778, 10779, 11426, 11427, 11428, 11429, 1023, 1024, 10780, 11430, 10781, 1025,
-          1056, 10782, 10783, 11451]
+          1056, 10782, 10783, 11451, 1057, 1058, 1059, 10784, 10785, 11452]
                                         # entry; v1.0 RomFS); 107NN = Hub HR 7, 114NN = Hub G4 (the ID's digits decide
                                         # which hub loads it, the questData bytes the rank: plan.md Dalamadur 6.),
                                         # 10NN = village ★10 (Stygian Zinogre, 2026-10-28); 10780 / 11430 / 10781 /
@@ -27,7 +29,8 @@ quests = [11491, 11492, 11493, 11494, 10790, 10791, 10792, 11495, 11496,   # che
                                         # checked free runs 10775..10789 / 11426..11430 / 1023..1025); 1056 / 10782 /
                                         # 10783 / 11451 (Black Gravios, 2026-11-01, PR #12 review: in the checked free
                                         # runs 1056..1099 / 10775..10789 / 11451..11453 of stygian_zinogre/notes/
-                                        # quests.md 3.)
+                                        # quests.md 3.); 10784 / 10785 / 11452 (Monoblos' hub quests, 2026-11-05: no
+                                        # q%07d.arc in the v1.4 RomFS, no quest_group entry, C)
 quest_slots = [1011009, 1011003, 1011048, 1011049, 1010007, 1010177, 1110009, 1110114, 1110115]
                                         # quest_group group-127 entries renamed in memory. 1010007 / 1010177 / 1110009 /
                                         # 1110114 / 1110115 (indexes 1307 / 1329 / 1314 / 1393 / 1394, 2026-10-21):
@@ -371,7 +374,9 @@ name_entry = 111
 ui_icon = 204
 icon_4u = 43                            # its quests' board icon (4U m00902 / m10601 / m10923 +0xE8 list 43; Gravios'
                                         # m00505 lists 42)
-notes = false                           # no Hunter's Notes entry: save bits 123..127 are all taken (tools/alloc.py)
+notes_entry = 128                       # the first entry past the save map: no save bit (module/notes.c). Monoblos, the
+                                        # next one, moved to 129 with it: unreleased, and these entries leave no trace
+                                        # in a save (2026-11-05)
 quests = [10780, 11430, 10781, 1025, 1056, 10782, 10783, 11451]
                                         # 4U m10611 Advanced: Armor Amore (Hub HR6 -> GU Hub HR7, as Stygian's), m10923
                                         # Hollow Promise (Hub G2 -> GU Hub G4), m10601 Ore D'oeuvre (Hub HR6 -> HR7),
@@ -403,6 +408,7 @@ armor_series = 4                        # Gravios U, Gravios Z (Blademaster + Gu
 armor_create = 2
 armor_process = 14                      # the templates' level rows (tools/gear_em005_01.py checks)
 kireaji = 14                            # the weapons' 4U sharpness entries (tools/gear_weapons_em005_01.py)
+notes_text = 1                          # description only (4U emExp[41]; tools/notes_em005_01.py)
 
 [monster.append.weapons]                # BaseData / MsgData / LevelData rows per class: one line each
 w01 = 2                                 # (tools/gear_weapons_em005_01.py)
@@ -411,3 +417,52 @@ w03 = 3
 w04 = 3
 w09 = 3
 w11 = 4
+
+[[monster]]
+name = "monoblos"                       # folder monsters/monoblos (4U em101, its own 4U class uEm101: notes/plan.md)
+title = "Monoblos"
+em_id = 0x107                           # Diablos (em 7) variant 1: GU's own class uEm007_00 runs it (package.toml
+                                        # gu_class); GU ships em007_00 (Diablos) and em007_04 (Bloodbath) only
+registry_index = 145
+donor_index = 114                       # Diablos em007_00 (GU pair 0x7 -> 114)
+standin_id = 0x7                        # its quests name Diablos (loader-visible), swapped to 0x107 at spawn
+file_ids = [0x10940, 0x1097f]
+save = "lease"                          # no free save slot: it borrows one per quest (module/save.c)
+name_entry = 109                        # 'dummy5', the last free monsterName entry
+ui_icon = 205
+icon_4u = 110                           # its quests' board icon: 4U m00801 / m00818 / m01018 +0xE8 list 111 = index + 1
+                                        # (right block, as Tigerstripe's; Diablos' m01024 / m01025 list 109 = cell
+                                        # 108). Cell 111 is White Monoblos (m01021 lists 112): 0.4.2 showed it (user
+                                        # 2026-11-05), C: cells 108..111 = Diablos, Black Diablos, Monoblos, White
+notes_entry = 129                       # past the save map: no save bit (module/notes.c)
+quests = [1057, 1058, 1059, 10784, 10785, 11452]
+                                        # 4U m00801 (caravan ★8 HR), m00818 (caravan ★8 HR, night Dunes -> GU's Dunes),
+                                        # m01018 (caravan ★10 G) -> GU village ★10 HR / HR / G (single player; in the
+                                        # checked free run 1056..1099 of stygian_zinogre/notes/quests.md 3.), and the
+                                        # same three as hub quests HR7 / HR7 / G4 (multiplayer, the user 2026-11-05)
+quest_append = true                     # new quest list entries after GU's (module/quest.c), no quest_slots
+items = [3041, 3047]                    # appended after Black Gravios': his 7 materials, 4U 1545..1551
+                                        # (monsters/monoblos/tools/items_em007_01.py)
+armor_models = [368, 369, 370, 371]     # 4U Mono S / Mono X, Blademaster / Gunner (unused in GU, C)
+
+[monster.weapon_models]                 # per weapon class (GU model numbers = 4U's, unused in GU, checked by
+w00 = 114                               # tools/gear_weapons_em007_01.py)
+w01 = 115
+w03 = 97
+w04 = 62
+w07 = 97
+
+[monster.append]
+items = 7
+armor_series = 4                        # Mono S, Mono X (Blademaster + Gunner each)
+armor_create = 2
+armor_process = 14                      # the templates' level rows (GU Diablos 9 + Diablos X 5; tools/gear_em007_01.py)
+kireaji = 10                            # the weapons' 4U sharpness entries (tools/gear_weapons_em007_01.py)
+notes_text = 1                          # description only (4U emExp[101]; tools/notes_em007_01.py)
+
+[monster.append.weapons]                # BaseData / MsgData / LevelData rows per class: one line each
+w00 = 2                                 # (tools/gear_weapons_em007_01.py)
+w01 = 3
+w03 = 4
+w04 = 2
+w07 = 3
