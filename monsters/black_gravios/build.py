@@ -45,6 +45,7 @@ STEPS = [
     ('armor', 'armor model arcs (40)', lambda: armor(ROMFS, ARMOR)),
     ('weapons', 'weapon model + sound arcs', weapons),
     ('gearw', 'weapon table records (6 lines, 18)', lambda: [py(os.path.join(T, 'gear_weapons_em005_01.py'))]),
+    ('notes', "Hunter's Notes entry 128", lambda: [py(os.path.join(T, 'notes_em005_01.py'), flags=('-B',))]),
     ('quest', '10780 11430 10781 1025 1056 10782 10783 11451 (4U m10611 m10923 m10601 m00911 m00902 m10606 m10615 '
               'm10927)', lambda: [py(os.path.join(T, 'build_em005_01_quest.py'), flags=('-I', '-B'))]),
     ('pack', 'gen/*.sec -> gen/black_gravios.bin', lambda: [py('tools/portdata.py', 'pack', 'black_gravios')]),
