@@ -14,7 +14,9 @@ em_number = [89, 255]                   # GU large monsters are ems 1..88 (regis
 file_ids = [0x10700, 0x1ffff]           # past the game's file-ID table (IDs up to 0x106d0, file_id hook 0x152960)
 save_index = [105, 111]                 # unused registry slots dummy1..7 (IDs 0x1064..0x106a): save hunt / size arrays;
                                         # all taken: a new monster takes save = "lease" instead (module/save.c)
-name_entry = [105, 111]                 # monsterName GMD entries 'dummy1'..'dummy7'
+name_entry = [105, 227]                 # monsterName GMD entries 'dummy1'..'dummy7': 105..111, then the same names in the
+                                        # GMD's second list, 221..227 (tools/alloc.py checks: nothing between). Not past
+                                        # 255: the Notes detail page reads the entry as a byte (0x5b2298, C)
 ui_icon = [197, 244]                    # cells 1..48 of our own atlas (UI index 196 + cell, tools/ui_icons.py; cell
                                         # 0 = 4U's '?'): GU's micon00 / 01 end at 195, both full in HD UI v4
 notes_entry = [123, 159]                # Hunter's Notes: 123..127 = free bits of the save map S+0x35b0; 128.. have no
@@ -428,7 +430,10 @@ donor_index = 114                       # Diablos em007_00 (GU pair 0x7 -> 114)
 standin_id = 0x7                        # its quests name Diablos (loader-visible), swapped to 0x107 at spawn
 file_ids = [0x10940, 0x1097f]
 save = "lease"                          # no free save slot: it borrows one per quest (module/save.c)
-name_entry = 109                        # 'dummy5', the last free monsterName entry
+name_entry = 221                        # 'dummy1' of monsterName's second list. 0.4.6 had 109 ('dummy5' of the
+                                        # first list), which GU also reads for save slot 109, the Dalamadur tails' (the
+                                        # maintainer, PR #17); the second list's other entries name GU's own monsters by
+                                        # their own numbers, no save slot reaches 221 (C)
 ui_icon = 205
 icon_4u = 110                           # its quests' board icon: 4U m00801 / m00818 / m01018 +0xE8 list 111 = index + 1
                                         # (right block, as Tigerstripe's; Diablos' m01024 / m01025 list 109 = cell

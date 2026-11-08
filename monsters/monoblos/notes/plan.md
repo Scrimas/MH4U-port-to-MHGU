@@ -7,7 +7,7 @@ in the Everwood (stage 13), a map GU does not have (user, issue #16). Maintainer
 bigger project is already working on the Everwood, so it stays out of this port. Confidence: **C** confirmed in code /
 data, **S** strong, **G** guess.
 
-**Status (2026-11-06):** 0.4.6 on the save store core (the user's go, 2026-11-05: "build Monoblos in, with his 4U AI and
+**Status (2026-11-07):** 0.4.7 (the PR #17 review, below) on the save store core (the user's go, 2026-11-05: "build Monoblos in, with his 4U AI and
 attacks, like Black Gravios"). Played solo on Ryujinx: quests 10784, 10785, 11452 (logs of 2026-11-05 and 11-06), two real
 hunts of 10784 through the store. yuzu / Eden and the PC recomp not run. Not in a saved log yet: the village quests 1057..1059,
 a broken horn, sleeping and eating, a kill in a capture quest. Test log lines: "mbport: em007_01 ..." (actions / motions),
@@ -80,6 +80,79 @@ asked for): 4U text, spawns and rewards of the same 4U quest. IDs 10784 / 10785 
 - Platforms (Ryujinx, yuzu / Eden, PC recomp; only Ryujinx tested): no new hooks; all GU addresses through MAIN / FN;
   the mound guard has no address range (the heap differs per platform).
 - Open: Black Gravios' ptr_ok has the same address range (its author's code; not changed here).
+
+## 0.4.8 (2026-11-08, after the user's long hunts on 0.4.7: log 13-52-00, quests 11452 and 10784 to the end; 13-39-17, 11452)
+- **What the logs show (C).** 37 of his 4U actions ran (plus GU's engine actions below), among them 6/0 6/3 6/4 6/8 6/16 7/13 7/31
+  1/20 1/21 1/28, which the maintainer had not seen; no "has no port yet" line. `mbport: parts`: horn broken, back broken, tail cut
+  (the horn for the first time in a log). Name entry 221 (`monster name entry 221 = Monoblos`). He slept for the first time: at 6 %
+  in 10784 he went to area 5 and ran s123 (2/2, 1/5) there. His area moves while burrowed and tired (tm 4) run GU's engine scripts
+  g1 s126 / s127 with GU Diablos' handlers 6/18, 6/42, 6/45 (area_act_tbl, as s123 / s124 for sleeping and eating): GU's engine
+  replaced 4U's rest group 16 (see 0.4.6, "Eating and sleeping"), so these stay GU's, a DEVIATION as 0/2 3/0 3/7 6/14.
+- **Fixed: his ways to eat and to sleep (C).** At 6 % in 10784 he went 7 -> 3 -> 5, but his 4U hops are 7: 2 / 10, 3: 1 / 4, 5: 4.
+  routes_em007_01 had kept area_link kinds 2 (hunger, 0xb82cc) and 4 (weakened, reason 1, 0xb870c) as GU Diablos' rows. Now
+  kinds 1 and 2 are his 4U hop table and kind 4 his way to area 5 in GU's sparse form (each row names only the areas on
+  that way): 7 -> 10 -> 4 -> 5, 2 -> 7 -> 10 -> 4 -> 5, 1 / 3 -> 4 -> 5. Only enemy\area_link\em007_01 in his arc and his
+  data file's version byte change. Not played yet.
+
+## 0.4.7 (2026-11-07, the maintainer's test of PR #17; static checks only, not played yet)
+The review: 29 of 79 actions seen (unseen: all of category 3, most of 6, 7/1 7/8 7/10 7/13 7/21 7/24 7/31..34, 1/1 1/4 1/10
+1/19..21 1/28 1/29 1/31, several 2/x), slow idle turns in the fight, rage maybe too fast, name entry 109 = save slot 109.
+- **Fixed: g0 s0's two natives (C).** cmdtbl() counted g0 s0 as GU-made (only its area step is GU's), so its `00 06 08` (lying
+  burrowed, when op 0x0c = 4 at a think's start) and `00 01 23` (1/35, op 0x68) stayed raw GU numbers: GU's base rest 0xd37270
+  ran for 6/8 and GU Diablos' dig-in 0xd3c3c8 (motion 0x425) for 1/35, with GU's fields, where his 6/216 / 1/243 belong. Every
+  think starts in g0 s0, so each burrowed phase began on GU's rest. Now converted; the built table differs in these two tokens.
+- **Not his normal table's (C).** 7/10 7/33 1/31 sit only in g1 s47 / s50 / s59, called only from g0 s12 s15 s20, which only
+  White Monoblos' case 102 of g0 s4 reaches (0.4.6 section). 7/8 (g1 s25 s27), 7/21 (s55), 7/24 (s58), 1/1 (s5) sit in scripts
+  no script of any group calls, and no uEm101 code sets the think fields (4U setThink 0x93d584 and every W+0xb0c / 0xb0d writer
+  are base code: 0x9184c0 0x936100 0x9412f0 0x944540 0x945d40 0x946130 0x950b4c 0x954460): 4U's Monoblos never runs them either.
+- **Event lists (S).** 7/1 1/10 (g8), 1/19 (g9), 1/20 1/21 7/31 7/32 (g13), 1/4 3/x 6/2 6/7 6/15 6/20 (g2..g6, g11, g12, g18)
+  run only from the engine's think lists. GU 0x8282c picks the same group numbers on the same tests as 4U 0x945e60 (13: a
+  timer > 0, 8: rec+0x59c / 0x5a4 > 0, 14: category 16, ...) and GU's Diablos table fills the same groups: not his code. The
+  action log names the group / script of every action (`mbport: em007_01 action ... script gN sM`): the next log shows whether they come.
+- **Burrowed actions (C).** 6/3 6/4 6/8 6/9 6/12 6/16 run only when op 0x0c (state rec+0x1ba, 4U W+0x1c8: the same handler in
+  both) is 4, set by the burrowing 6/0 / 6/17 end (slot 250) through g1 s62; the selectors reach that from g0 s17 (op 0x87),
+  s24 (cond 4 case 3) and s10 / s11 / s14 (target class 0x4110). With the g0 s0 fix the phase runs his handlers from its start.
+- **AI ops compared (C).** 4U interpreter 0x94f488 vs GU 0x837ac: 0x0b (distance row) and 0x0c (state) read the same; 0x24 =
+  tired (4U 0x92e998: W+0x51c in {2, 3}; GU 0x816f0 also takes rec+0x505 = 1, not when enraged), 0x1c = enraged (4U 0x954e48
+  W+0x530 = 1, GU 0x81744 rec+0x518 = 1); slot 133 (cond) = 4U slot 51 0x8e0804 case by case (2 motion 0x20f, 3 target, 4 stage
+  object, 11 counter; 5..10 answer 0 in both).
+- **Turns: 4U as it is (C).** His 2/3 (the turn of nearly every attack script after the op 0x1d angle test) is 4U 0x8dda24 case
+  3: record 0xe0e090 (motions 0x09 / 0x0a, window 0..90) with flags 1. 4U Diablos' 2/3 (0x8d1594 case 3) takes 0xe0e034 (0x0b
+  / 0x0c, window 2..20) and GU's Diablos the same (0x16a2d50, d36ca8). So 4U's Monoblos turns slower than Diablos; not changed.
+- **Rage: 4U as it is (C).** 4U etd word 14: Monoblos 600 / 3600 frames, x1.3 / x1.5; Diablos 500 / 5400, x1.25 / x1.4 (GU's
+  Diablos = 4U's). His values stand.
+- **Name entry 221** (allocations.toml): 109 = 'dummy5' is also what GU reads for save slot 109 (the Dalamadur tails' tally
+  slot); the second list's 'dummy1' is no save slot. tools/alloc.py NAME_DUMMY as in the later ports.
+- **GS line "(4U)"** after every name of his GS line (gear_weapons_em007_01.py LABEL_4U), all languages (the maintainer's
+  choice). Black Gravios' ptr_ok lost its address range (1.0.1).
+
+- **The log of 0.4.7 (2026-11-07 20-15-35, quest 10784 = HR, a 7-minute hunt; C for the log and the table).** The user: "gräbt glaube
+  ich immer noch viel zu wenig ein". He dug in 4 times by the dig-in attack (g1 s49: 7/236 1/241 7/238, every time s49 was picked, so
+  cond 11 answered 1) and lay down burrowed 4 times (g1 s62 from s14 / s15 / s16: 6/208 6/211 6/212 6/216, then 7/217 or a sonic bomb),
+  8 of 52 picks = 15 %. His 4U table picks the selector by quest rank (g0 s4: op 0x79 case 0x1041, mode 0, op 0x6a case 5 -> g0 s14, else
+  g0 s11; GU 0x3a8d68 gives 3 for HR, 5 for G, as 4U's quest byte): g0 s11 (HR) gives a burrowing script 16..24 % per pick by distance row,
+  g0 s14 (G) 29..51 % (g1 s57 only there). So the HR rate is 4U's; at G rank (1059, 11452) he burrows about twice as often. The
+  log reached 29 of his table's actions, no "has no port", 6/216 runs his handler. Not changed.
+- **How often he burrows, HR against G (2026-11-08; C for the table, the logs as counted).** The maintainer's review says he burrows
+  too little; this is what 4U's own table gives. A pick = one script of group 1 started by the selector (g1 s41, called by s52..s56,
+  and g1 s62, called by s14..s18, are not picks of their own; nor the unaware phase g4 / g5 / g1 s121 / s122). Burrowing scripts:
+  the dig-in attacks g1 s48 / s49 / s57 and every script that starts with the lie-down g1 s62 (s14..s18, s21, s26, s28..s30, s37,
+  s38, s61). Their share of the weights of each row (his 4U cmdtbl as built, op 0x24 = tired, op 0x1c = enraged, op 0x0b rows
+  0..3 and default):
+
+  | state    | row 0 | row 1 | row 2 | row 3 | default |
+  |----------|-------|-------|-------|-------|---------|
+  | HR (g0 s11), normal  | 20 % | 16 % | 17 % | 24 % | 20 % |
+  | G (g0 s14), normal   | 29 % | 40 % | 44 % | 51 % | 49 % |
+  | HR, enraged          | 23 % | 17 % | 24 % | 19 % | 17 % |
+  | G, enraged           | 32 % | 39 % | 51 % | 48 % | 47 % |
+  | tired (both ranks)   | 24 % | 16 % | 21 % | 21 % | 33 % |
+
+  About 20 % of the picks at HR and 45 % at G: 2.2 times as many. The tired rows are the same in both selectors. In the logs:
+  quest 10784 (HR, log 2026-11-07 20-15-35): 8 burrows in 52 picks = 15 % over 405 s, 1.2 a minute; quest 11452 (G, log 2026-11-08
+  08-38-41): 5 in 13 picks = 38 % over 109 s, 2.8 a minute (a short hunt, few picks). Both match the table. So he burrows as often
+  as in 4U at each rank; GU's own Diablos family is not a measure for him. Nothing changed. If the maintainer wants him to burrow
+  more at HR, that is a deviation from 4U and their call.
 
 ## 0.4.6 (2026-11-06, after the user's test of 0.4.5: log 11-02-46 and a screenshot)
 The user's test: smithy order, his hit shapes and Black Gravios' Notes page are fine; red eye and pink veins from the start of
@@ -288,7 +361,7 @@ traps, death, area moves) until the variant map of those categories is done.
   stay areas, timers, routing script g0 s8 vs g0 s1; C), and 4U slot 66 (uEm101 0x8e0bd4 = uEm099 0x8d65e0): sleep 5,
   eat 7 on stages 17 / 18 (C). GU em007_00's map 5 differs (C): its hop table links 1 <-> 2, its next-area shares and
   stay timers are its own (e.g. area 1 90 / 30 / 180 s vs 4U 120 / 90 / 180). Built: area_link kind 1 = his 4U hop
-  table (kinds 2 / 4 GU's, inside his areas), area_select from his 4U routing (Status 2 per origin, 4 = first step
+  table (kinds 2 / 4 GU's until 0.4.7, since 0.4.8 his 4U hops and his way to 5), area_select from his 4U routing (Status 2 per origin, 4 = first step
   toward sleep area 5, 0 = default), map_info block 5 = his areas / eat 7 / sleep 5 / prey 0 / his 4U timers. Other
   maps byte-identical to GU's (C, checked).
 - Next (order to agree with the user): his AI table + handlers (route B); materials / carves / BUI / rewards / armor /

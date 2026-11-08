@@ -1,7 +1,12 @@
 # Monoblos package: what the installer shows and installs, and the version written into its data file.
 name = "monoblos"
 title = "Monoblos"
-version = "0.4.6"       # bump on every published change of this monster's files (data, assets or code); 0.4.6:
+version = "0.4.8"       # bump on every published change of this monster's files (data, assets or code); 0.4.8:
+                        # his ways to eat and to sleep follow his 4U hops (area_link kinds 2 / 4 were GU Diablos'); 0.4.7:
+                        # the two actions of his AI's first script run his own handlers (6/8 lying burrowed, 1/35 idle;
+                        # 0.4.6 ran GU Diablos' rest and dig-in there), his name in monsterName's second list (entry 221;
+                        # 109 is also read for save slot 109, the Dalamadur tails'), his GS line named "... (4U)" (GU's
+                        # GS 41 is "Executioner" too) (the maintainer's test, PR #17); 0.4.6:
                         # his mesh groups follow his 4U rows: amber eye, no frenzy eye and veins, the horn, back and tail
                         # really change when broken / cut (GU's slot 132 skips variant 1; em007_01_mat.c); 0.4.5:
                         # his attacks tied to motions (4U 0x8df784: walking, turning, tail, the burrowed travel and the

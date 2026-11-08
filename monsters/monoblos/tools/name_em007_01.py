@@ -3,9 +3,10 @@
   name_em007_01.py           write the section
 
 monsterName_<lang>.gmd entry k = registry index k, but entry 137 already starts the GMD's second list, so ported
-indexes take an unused 'dummyN' entry (allocations.toml name_entry: 109 = 'dummy5'), which module/items.c renames in
-the loaded GMD and the name_index hook returns for index 145 (and for a save slot it leases, module/save.c). Names =
-4U emName[101] per language.
+indexes take an unused 'dummyN' entry (allocations.toml name_entry: 221 = the second list's 'dummy1'; 0.4.6 took 109,
+the first list's 'dummy5', which GU also reads for save slot 109, the Dalamadur tails'), which module/items.c renames
+in the loaded GMD and the name_index hook returns for index 145 (and for a save slot it leases, module/save.c).
+Names = 4U emName[101] per language.
 """
 import os, sys
 
@@ -28,7 +29,7 @@ def main():
     names = []
     for lang in LANGS:
         s0 = gmd.gmd_strings(rom.read('/nativeNX/%s/GUI/06_msg/monsterName_%s.gmd' % (lang, lang)))
-        assert s0[entry] == 'dummy%d' % (entry - 104), (lang, s0[entry])
+        assert s0[entry] == 'dummy%d' % (entry - (220 if entry > 111 else 104)), (lang, s0[entry])
         n = msg4u(lang)['emName'][EM4U]
         assert n and '\0' not in n and '\n' not in n, (lang, n)
         names.append(n)

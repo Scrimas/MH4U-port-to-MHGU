@@ -190,23 +190,30 @@ def mask(areas):
 
 
 def area_link_file(data, P, notes):
-    """kind-1 rows of map 5 = his 4U hop table (-1 -> 255, self 0); kinds 2 / 4 (GU's other travel kinds, no 4U
-    table: Diablos' GU rows) stay GU's, cut to his areas (they hold no others, asserted)"""
+    """map-5 rows of his three travel kinds from his 4U hops: kind 1 (normal) and kind 2 (hunger, to eat area 7) = his 4U hop
+    table (-1 -> 255, self 0), kind 4 (weakened, reason 1 0xb870c) = his way to sleep area 5 in GU's sparser form: each row
+    names only the areas on that way (index along it).
+    0.4.8 (the user's long hunt of 10784, log 2026-11-08 13-52-00, and "Ja, umstellen"): kinds 2 / 4 were GU Diablos' rows
+    until 0.4.7, so at 6 % he went 7 -> 3 -> 5, while his 4U hops are 7: 2 / 10, 3: 1 / 4, 5: 4 (C); now 7 -> 10 -> 4 -> 5."""
     root = xfs.parse(data)
     arr = root['RouteFindDataResource']['mpArray']
     arr = arr if isinstance(arr, list) else [arr]
     mine = [o for o in arr if o['mMapNo'] == MAP_GU]
     assert sorted(o['mKind'] for o in mine) == [1, 2, 4], [o['mKind'] for o in mine]
+    weak = {a: _path(P['adj'], a, SLEEP[0]) for a in P['areas']}
+    assert all(weak.values()), ('an area of his has no way to his sleep area', weak)
     for o in mine:
         rows = o['mAreaSelDataArray']['mpArray']
         for r, row in enumerate(rows):
             for c in range(1, 13):
-                if o['mKind'] == 1:
+                if o['mKind'] == 4 and r in weak:
+                    way = {x: i for i, x in enumerate(weak[r])}
+                    row['A%02d' % c] = way.get(c, 255)
+                else:
                     v = P['dist'][r][c] if r in P['dist'] and c < N_AREAS else (0 if c == r else -1)
                     row['A%02d' % c] = 255 if v < 0 else v
-                elif row['A%02d' % c] != 255 and c != r:
-                    assert r in P['areas'] and c in P['areas'], ('GU kind %d leaves his areas' % o['mKind'], r, c)
-    notes.append('area_link map %d: kind 1 = his 4U hop table (neighbours %s); kinds 2 / 4 GU\'s' % (MAP_GU, P['adj']))
+    notes.append('area_link map %d: kinds 1, 2 = his 4U hop table (neighbours %s); kind 4 = his way to area %d: %s'
+                 % (MAP_GU, P['adj'], SLEEP[0], weak))
     return xfs.build(data, root)
 
 

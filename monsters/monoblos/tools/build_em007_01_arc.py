@@ -316,7 +316,9 @@ def dttune_ai(out_keep, c101_keep, c101_ai, notes):
 # built from 0xb4e58's entry; no uEm007_00 code writes the think fields). His em101_cmd has its own layout (group 0 28
 # scripts, group 1 65; GU's Diablos table 27 / 141), so:
 # - groups 0..20 = his (op-0x46 blocks reduced to his case 101; 4U case 102 = White Monoblos);
-# - g0 s0: 4U's area-move step `14 0c` (his 4U g1 s12) -> GU's `9e 00 00`; g0 s8 (his area move: s0's `3f` branch) =
+# - g0 s0: 4U's area-move step `14 0c` (his 4U g1 s12) -> GU's `9e 00 00`, the rest his, natives too (0.4.7: 0.4.0..
+#   0.4.6 left its two, 6/8 when he lies burrowed and 1/35 under op 0x68, as raw GU numbers, so GU Diablos' handlers ran
+#   them: 6/8 = GU's base rest 0xd37270, 1/35 = Diablos' dig-in 0xd3c3c8, C); g0 s8 (his area move: s0's `3f` branch) =
 #   GU's g0 s1; g0 s1 (his patrol: s0's default) = GU's g0 s2; g20 s0 = GU's (ops 0xa0 / 0xa1); group 7 = GU's (none in
 #   4U); group 16 = GU's (empty: 4U's rest group, which GU never selects, Black Gravios' check);
 # - group 1 = his 65 scripts, then GU's numbers 65..140 empty (`a6 ff`, GU's own empty form) except the scripts
@@ -442,7 +444,7 @@ def cmdtbl(d4, gu, img, aat, notes):
         if gi in (7, 20): groups.append([imported(s) for s in gv[gi]])
         elif gi == 16: groups.append([])
         else: groups.append(list(m[gi]))
-    gu_made = {(0, 0), (0, 1), (0, 8)} | {(7, k) for k in range(len(gv[7]))} | {(20, 0)}
+    gu_made = {(0, 1), (0, 8)} | {(7, k) for k in range(len(gv[7]))} | {(20, 0)}     # g0 s0 is his but one token
     gu_made |= {(1, k) for k in placed.values()}
     # what his own scripts reach (roots: group 0 and groups 2..20; 0x14 calls into group 1, 0x20 gotos in group 0)
     reach, todo = set(), [(0, k) for k in range(len(g0))] + [(gi, k) for gi in range(2, 21) for k in

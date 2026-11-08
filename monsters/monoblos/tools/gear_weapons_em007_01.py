@@ -18,8 +18,8 @@ are left out the same way:
   LS     Crimson Scythe -> Crimson Scythe+ -> Monoblos Scythe (127 128 129)
 Left out as not his (one Monoblos part in another line): Daimyo's Warbow II, Great Purple Emperor II, Shell Intoner+,
 Enduring Surrender, Chum Scarecrows; White Monoblos' (Bamboo Dragonsbane, Ceramic Blos Lance, White Mantis, ...).
-GU has its own GS named "Executioner" (41, the bone line, model 159): his 4U Executioner keeps its 4U name (two
-smithy entries of that name: a known name clash, listed for review).
+GU has its own GS named "Executioner" (41, the bone line, model 159): his GS line carries the label " (4U)" after its
+4U names in every language (LABEL_4U; the maintainer's choice, PR #17), so the smithy lists no two entries of one name.
 Data: raw, element, affinity, defense, slots, rarity, price, sharpness, bowgun ammo = the 4U records'.
 Stand-ins (records copied, then every 4U field set): GU Diablos' weapon of each class where GU has one (C: their recipes
 are Diablos materials): GS 124 Quarrel Hornsword, SnS 115 Studded Club, Lance 115 Diablos Lance, HBG 97 Dual Threat
@@ -60,6 +60,7 @@ OTHER_CHILDREN = {(0, 164): 167,    # Cera Cigil (Diablos / Black Diablos materi
                   (3, 131): 134,    # Ceramic Blos Lance (White Monoblos materials)
                   (4, 118): 119,    # Monodevilblaster (White Monoblos materials)
                   (7, 127): 130}    # White Mantis (White Monoblos materials)
+LABEL_4U = {0: ' (4U)'}                  # GU class -> label after the line's names (GU GS 41 is "Executioner" too)
 SRQR_MODEL = {}                          # every 4U arc holds its own model's sound set (checked)
 PWL_FIX = []                             # every model's GU motion set has its gNN arc (check_pwl)
 GEAR_SRC = os.path.join(ROOT, 'dump/gear_src/weapons/4u/data')
@@ -117,11 +118,24 @@ def spec(R):
                 pwl_fix=PWL_FIX, substitutes=SUBSTITUTES)
 
 
+def label_4u(text):
+    """weapons4u's MsgData strings of a class (per language: name, description, three times per weapon) with LABEL_4U
+    after every name of that class"""
+    table, entry, strs = text
+    m = re.fullmatch(r'weapon(\d\d)MsgData', table)
+    lab = LABEL_4U.get(int(m.group(1))) if m else None
+    if not lab: return text
+    n = len(next(ids for nn, sid, ids in LINES if nn == int(m.group(1))))
+    assert all(len(ss) == 6 * n for ss in strs), (table, [len(ss) for ss in strs])
+    return table, entry, [[s + lab if i % 2 == 0 else s for i, s in enumerate(ss)] for ss in strs]
+
+
 def main():
     R = RomFS(gear4u.GU_ROMFS)
     check_pwl(R, open(EXE, 'rb').read())
     s = spec(R)
     tables, texts, hooks, summary, log, kire = weapons4u.build(s)
+    texts = [label_4u(t) for t in texts]
     secs, hk = weapons4u.sections(tables, texts, hooks, s['pwl_fix'])
     have = set(open(weapons4u.OUT_HOOKS, encoding='utf-8').read().split())
     missing = [l for l in hk.splitlines() if not set(l.split()) <= have]

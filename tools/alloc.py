@@ -83,6 +83,7 @@ def offset(name, table, sub=None, reg=None):
 
 
 GU_ITEMS = 2991                          # GU's item records (IDs 0..2990), notes/items-append.md
+NAME_DUMMY = ((105, 111), (221, 227))    # monsterName's entries 'dummy1'..'dummy7': first list, second list
 
 
 def item_count(reg=None):
@@ -186,6 +187,9 @@ def check(reg=None, gu_main=paths.GU_MAIN):
             errs.append('%s: one quest_slot per quest' % m['name'])
         if len(m.get('quests', [])) > QUESTS_PER_ENTRY:
             errs.append('%s: more than %d quests' % (m['name'], QUESTS_PER_ENTRY))
+        ne = m.get('name_entry', 0)                     # one of monsterName's dummy entries, first or second list
+        if not any(a <= ne <= b for a, b in NAME_DUMMY):
+            errs.append('%s: name_entry %d is no dummy entry %s' % (m['name'], ne, NAME_DUMMY))
         n_app = m.get('append', {}).get('items', 0)     # appended items: IDs right after GU's and the earlier ones
         if n_app:
             first = GU_ITEMS + offset(m['name'], 'items', reg=reg)
