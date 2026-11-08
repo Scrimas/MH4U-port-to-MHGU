@@ -39,6 +39,10 @@ TEMPLATES = {
     # unlit/emissive (4U emission 1, diffuse 0: em089's eye material)
     'unlit':    ('/nativeNX/arc/enemy/em004_00.arc', 'enemy\\em004\\em004_00\\mod\\em004_00', 0),  # tAlbedo, tSpecular
     'add':      ('/nativeNX/arc/enemy/em037_00.arc', 'enemy\\em037\\em037_00\\mod\\em037_00', 3),  # BSAddAlpha: tAlbedo, tSpecular
+    # 4U BSBlendAlpha (alpha = albedo.a * fTransparency, painted over what is behind it, not added to it): GU em009_00
+    # mat 4 'XfBA0__m03_eye_add' (BSBlendAlpha, DSZTestWrite, RSMeshBias7, IASkinTB2wt). The parameter list is 'add''s
+    # word for word except the texture indices and fSpecularColor 0.1 (C, 2026-11-05), and no animation block.
+    'blend':    ('/nativeNX/arc/enemy/em009_00.arc', 'enemy\\em009\\em009_00\\mod\\em009_00', 4),  # tAlbedo, tSpecular
     # em089's tar (4U 'XfBAN__EW_1__m0N_liquid_*': alpha-tested overlay, w7 alpha test ref 75; tar-look agent
     # 2026-10-18). GU em082_04 mat 4 'XfBAN__EW_1__m52_far' = the same Capcom 'XfBAN__EW_1' overlay preset: BSSolid,
     # FTransparencyAlpha (alpha = albedo.a * fTransparency, alpha test), FAlbedoMap (alpha used), FBumpNormalMap,

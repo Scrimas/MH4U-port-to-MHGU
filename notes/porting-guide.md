@@ -219,12 +219,16 @@ pairs where possible (tools/dt_vote.py, dt_map.py, snd4u2gu.py selftest), then a
 Order that worked: save slot -> materials -> carves / rewards -> second quest + subquests -> armor data on a GU
 stand-in model -> weapon data -> descriptions / decorations / Notes -> gear models. Each step builds clean and is
 testable alone (the maintainer checks the smithy or one quest).
-- **Save slot.** The save arrays (hunts, captures, sizes) hold registry indexes 0..136 only and every accessor
-  bounds-checks, so a new index is silently not counted. Use an unused registry slot (dummy1..7 = indexes 105..111,
-  ids 0x1064..0x106a; Gogmazios = 105). Remap at the right place: the quest-end tally 0x3a75c8 compares the
-  monster ID with the hunt objective, so remap only the INDEX after `bl 0x50b64` (hook 0x3a75fc), never the ID at the
-  entry (test 10:24: kill tallied, quest never completed). Readers: stats_hunted 0x3a3930, save_hunts 0x523104
-  (Notes page, 8 more callers). Size records 0x526f48 index a pointer table without a bound: keep them off.
+- **Save slot.** The save arrays (hunts, captures, size records) and a quest's tally hold registry indexes 0..136,
+  and the quest-end tally 0x3a75c8 and the size reader 0x526f48 have no bound check (maintainer, issue #16): every
+  ported index is counted under one of GU's unused registry slots (dummy1..7 = indexes 105..111, ids
+  0x1064..0x106a). The monsters up to v1.8.0 own all 7 (allocations.toml save_index; they never move). A new monster
+  takes `save = "lease"` instead (module/save.c, notes/save-store.md): it borrows a free slot for its quest, and its
+  hunts, captures and size records go to the mod's store in the character's reserved save block; the slot owner's
+  GU record is never written. Remap at the right place: the quest-end tally 0x3a75c8 compares the monster ID with
+  the hunt objective, so remap only the INDEX after `bl 0x50b64` (hook 0x3a75fc), never the ID at the entry (test
+  10:24: kill tallied, quest never completed). The readers by ID (0x523104, 0x526dd4, 0x526e44, 0x526f48, 0x3a3930)
+  are hooked in save.c; `python3 tools/test_save.py` tests that file without the game.
 - **Items.** Free item IDs: the "DUMMY" materials 2977..2990 and DUMMY decorations 2889..2899 (type 3). Appending
   past 2990 needs ~24 code patches. items_em089.py -> section ITEM -> items.c patches the loaded rItemData
   (0x19237c) and the itemData_<lang> GMD strings (0xb83c48, every rGUIMessage load passes there: the TXTA text
@@ -267,8 +271,30 @@ testable alone (the maintainer checks the smithy or one quest).
   conditions 0x162d1f8, display order 0x1631ef4) copied from GU's at module_init with one entry per monster
   (notes_entry = 123 + registry position), 7 loop bounds patched (build.py WORD_PATCHES; two loops are unrolled by
   two and read one record past the end: a padding record follows; an odd total needs the unrolled 0x55FF3C
-  re-checked, build.py asserts), save bits 123..127 free (5 monsters at most). Texts: description = 4U emExp[em
-  number], tips page = 4U HunterNote tip under its title.
+  re-checked, build.py asserts), save bits 123..127 (all taken since Stygian Zinogre). Entries from 128 (Black Gravios,
+  Monoblos) have no bit: the talk loops stop at 128, the list screen and 0x524728 get the state from the monster's cleared quests
+  (notes.c, end of file), the NEW mark stays off and nothing is written. Texts: description = 4U emExp[em number], tips
+  page = 4U HunterNote tip under its title.
+- **Smithy order.** A ported record comes after GU's in its create table, so GU's list builder 0x6f9438 would list it
+  last. gear.c smithy_list_c, on the builder's exit, moves ported entries to their rarity among GU's (before GU's event
+  tail), in the list only: record numbers and the save's "listed" bits stay. Nothing to do per monster; see
+  monsters/monoblos/notes/plan.md. Check a vtable slot against a call GU itself makes (0x6f92ac): the first version took
+  the slot number from a table walk that stopped early and got a function returning 1 for everything.
+- **Attacks tied to motions.** A 4U class can start attacks per frame by motion, outside its action handlers (uEm101 slot
+  48: 24 calls). Porting the handlers misses them, and GU's twin slot may keep only some (Diablos' slot 130: 3 motions).
+  List every attack call in the class, not only those in the handlers: a monster that walks through a hunter is the sign.
+- **Blended materials.** A 4U BSBlendAlpha material is not additive: template 'blend' (mrl_build), with the 4U material's
+  own emission / diffuse / specular. A material whose animations the class starts (rage veins) needs that class code ported
+  and should start in the first frame of its resting animation, or it shows all the time. Look at the texture and the
+  animation list of every BA material. Among the shipped ports only Stygian's 'XfBAN__IW_0__m00_effect_' is one (shipped
+  additive through 'add'; not re-checked, scan of 2026-11-05).
+- **Shiny drops.** Same mechanic in both games, by single moments per monster, not by damage: monsters/monoblos/notes/
+  plan.md "Shiny drops". The table comes with the hagi tool; the triggers do not come by themselves when a handler is
+  ported (grep the 4U class for 0x911f58 and for op 24 in its reaction tables).
+- **Every data file must fit the module's pool.** module/port.c loads all `<name>.bin` into one pool in registry order. A file past
+  its end is refused with only a log line, and a monster without its data keeps its donor's manifest: it spawns as the donor, with
+  no items, gear or Notes of its own, while its hooks still run. The size lives in tools/alloc.py DATA_POOL and module/build.py refuses
+  a build that does not fit. "Looks like the donor" = read the `data ... loaded` lines first.
 - **Gear models.** tools/armor4u2gu.py (player bones 0-19 identical in both games, 20+ = cloth bones driven by the
   CTC; MRL templates from Capcom's own 4U -> GU pairs) and tools/weapon4u2gu.py (same pipeline + material
   animations). Converted arcs go to monsters/<name>/romfs/nativeNX/arc/player/com/{m,f}/<model>/ and
@@ -379,6 +405,12 @@ Notes: monsters/tigerstripe_zamtrios/notes/ (plan, phase1-variant-map, missing-a
 - **Missing actions:** GU's dispatcher ends unknown actions through the base thunks 0xca118 / 0xca10c (slot 247).
   Hooking them works only with a return-address filter (the dispatcher's own no-case path): other callers use the
   same thunks to END actions, and running a move there left the AI with a null script pointer (crash).
+- **Mesh groups of a hosted variant:** every group starts drawn, only the class switches them (0xba258, slot 132), and a class
+  may do that for its own variants only: uEm007_00's slot 132 leaves every variant but 0 and 4 at once. Read the slot's
+  `#0xb5f5` tests before relying on a state, and read which states GU's 0x6f5a4 was given at slot 118. Numbers in a state
+  are not transferable either: Monoblos' eye is group 2, Diablos' 5. Take the roles from the species' own 4U rows
+  (`emdata4u.part_rows`). A red eye or a stump on a healthy monster means this (Monoblos 0.4.6; Stygian's issue #8 had the
+  same symptom when its slot 132 was skipped).
 - **Command table (EMC):** GU's AI interpreter reads 4U tables, but GU changed the language around them. Area moves
   are engine opcodes (0x94 setup, 0x95 start, 0x9e advance) that 4U tables never contain (4U's 0x03 / 0x06 / 0x36 /
   0x4d are no-ops in GU); map cases (`2a`) use GU stage ids (4U 17 Dunes -> 5, 4 -> 14); GU class code picks

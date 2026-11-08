@@ -76,7 +76,15 @@ HOOKS = [
     ('stats_add', 0x3A75FC),   # quest-end tally: index from 0x50b64 (obj+0x114/0x116+index*8, no bound)
     ('stats_hunted', 0x3A3930),  # reads the same array (lost in a comment by 0815499, restored 2026-10-26)
     ('size_data', 0x6880C),    # em_size_scale_data cached (r0): the save slots' size records = the monsters' (main.c)
-    ('save_hunts', 0x523104),    # save hunts + captures by ID (bound 136): 0x59 -> its save slot 0x1064
+    ('save_hunts', 0x523104),    # save hunts + captures by ID (bound 136): 0x59 -> its save slot 0x1064 (save.c)
+    ('save_hunts_id', 0x526DD4),     # save hunts by ID (bound 136; 0x560418 and 5 more callers) (save.c)
+    ('save_captures_id', 0x526E44),  # save captures by ID (bound 136; the Hunter's Notes page's "captured") (save.c)
+    ('save_size_read', 0x526F48),    # save size record by ID, NO bound: a ported ID -> its slot or the store (save.c)
+    ('size_lookup', 0x67310),        # a size record's crown and cm by ID: a ported ID has no element of its own (save.c)
+    ('save_add_hunts', 0x526D94), ('save_add_captures', 0x526E00),  # quest-end writer 0x38d990 (one caller each): a
+    ('save_size_max', 0x526EB0), ('save_size_min', 0x526EF8),       # leased slot's numbers go to the store (save.c)
+    ('save_loaded', 0x3E77F0),   # after the character load 0x51dbb4 (caller 0x3e77b0): leases end, log (save.c)
+    ('save_writing', 0x3E7630),  # before the character save 0x51d0a0 (caller 0x3e75f8): log (save.c)
     ('set_action', 0x76154),   # enemy setAction(this, cat, num, mode): diagnostic log of em089 action changes
     ('set_target', 0xC6E14),   # enemy setTarget(this, kind, sub, param, slot): em089 arena points -> emd stage-19 table
     ('stage_path', 0x15339C),  # stage arc path builder: alias stage -> its folder while the quest runs (stage_alias.c)
@@ -89,6 +97,9 @@ HOOKS = [
     ('quest_clear_fix', 0x388D40),  # results-scene clear write: rename the freshly loaded quest list first
     ('quest_group_append', 0x39BB6C),  # quest_group parser exit (r4 = the list): append the quest_append quests
     ('notes_unlock_check', 0x554DA4),  # Hunter's Notes unlock condition (talk action 6 / condition 44): log entry 123
+    ('notes_list_visible', 0x5B0BD4), ('notes_list_new', 0x5B0A44),      # Notes list screen: an entry past the save map
+    ('notes_new_clear', 0x5B0AD4), ('notes_em_unlocked', 0x524770),      # has no bit (notes.c; MID_EXIT below)
+    ('smithy_list', 0x6F9644),  # smithy list builder 0x6f9438's exit: ported entries by rarity, display only (gear.c)
     ('utf8_null_guard', 0x7CA340),  # (out, s, n) UTF-8 helper: s = NULL -> "" (abandon crash safety net, stage.c)
     ('stage_gimmicks', 0x50249C),   # stage gimmick shell spawner (Fortress st003/004/006/007/008): log only (stage.c)
     ('dmg_sub', 0x98AF4),      # diagnostic: enemy HP -= pending damage (main.c)
@@ -159,6 +170,12 @@ HOOKS = [
                                    # em005_01_diag.c)
     ('em005_01_eat_pre', 0xD27D58),   # uEm004_00 1/18 (d27c8c) around its 0x9cf7c(this, 1) call: Black Gravios'
     ('em005_01_eat_post', 0xD27D64),  # 4U eating cost (em005_01_fx.c)
+    ('em007_01_act', 0xD35E58),    # uEm007_00 slot 125 action dispatcher: Monoblos (variant 1) action / motion log
+                                   # (monsters/monoblos/module/em007_01_diag.c)
+    ('em007_01_motion', 0xD38C0C), # uEm007_00 slot 130, every frame: his attacks tied to motions (em007_01_mv_j.c)
+    ('em007_01_parts', 0xD39FC8),  # uEm007_00 slot 132, every frame: GU's parts states, which skip variant 1: his mesh
+                                   # groups by his 4U rows (monsters/monoblos/module/em007_01_mat.c)
+    ('enemy_drop_log', 0xAC0EC),   # the item drop (shiny), entry: log only, ported monsters (port.c)
     ('dala_dmg_end', 0x98E44),     # enemy damage update 0x97ddc, after the rage add, before the reaction dispatcher
                                    # (r0 = this): Dalamadur tail rage -> head, shared reactions (dala_react.c)
     ('dala_heat_zone', 0x6A160),   # (mgr, area, pos) heat-aura zone test (Teostra only): 1 inside the Dalamadur
@@ -196,6 +213,8 @@ REPLACE_HOOKS = {'name_index'}
 MID_EXIT = {
     'quest_unlocked': 0x3B219C,  # ldrb r0, [sp, #7]: returns the result byte quest_unlocked_c wrote
     'tex_bind': 0xA4FB34,        # pop {r4, pc}: the bind is skipped, the sprite keeps its texture
+    'notes_new_clear': 0x5B0AF4, # cmp r5, #7: the NEW mark of an entry past the save map is not written
+    'notes_em_unlocked': 0x524794,  # bx lr: returns the r0 notes_em_unlocked_c wrote
     'em005_01_pslgate': 0x7016C, # mov r0, #0; return: the PSL slot posts nothing (GU's own no-post path)
     'em005_01_laser': 0xD2DFE8,  # b 0xd2e03c: GU's laser shell not posted (4U's capsule instead, em005_01_shell016.c)
 }
@@ -260,6 +279,8 @@ NOTES_COUNT = 123 + sum('notes_entry' in m for m in alloc.monsters())
 # 0x55FF3C: entry 0, then pairs (i + 1, i + 2) until i == bound, so entries 0..bound and the bound must be even:
 # GU 123 entries -> 122; an even count -> the count (entries 0..count: the last is the padding record notes.c keeps)
 NOTES_PAIR_BOUND = NOTES_COUNT - NOTES_COUNT % 2
+# the two talk loops write and test the save map S+0x35b0 (128 bits, S+0x35c0 follows): entries past it have no bit
+NOTES_SAVE_COUNT = min(NOTES_COUNT, 128)
 
 
 def cmp_imm(word, imm):
@@ -272,8 +293,8 @@ WORD_PATCHES = [
     (0x50B94, 0xE3530089, cmp_imm(0xE3530089, REG_COUNT)),    # id -> index search: cmp r3, #137 -> #REG_COUNT
     (0x50C10, 0xE3510089, cmp_imm(0xE3510089, REG_COUNT)),    # index -> id search: cmp r1, #137 -> #REG_COUNT
     # Hunter's Notes list loops, 123 -> NOTES_COUNT entries (notes.c)
-    (0x24588C, 0xE354007B, cmp_imm(0xE354007B, NOTES_COUNT)),  # talk condition 44: an entry is due
-    (0x247B2C, 0xE354007B, cmp_imm(0xE354007B, NOTES_COUNT)),  # talk action 6: unlock every due entry
+    (0x24588C, 0xE354007B, cmp_imm(0xE354007B, NOTES_SAVE_COUNT)),  # talk condition 44: an entry is due
+    (0x247B2C, 0xE354007B, cmp_imm(0xE354007B, NOTES_SAVE_COUNT)),  # talk action 6: unlock every due entry
     (0x5246BC, 0xE352007B, cmp_imm(0xE352007B, NOTES_COUNT)),  # em ID -> unlocked? (unrolled by 2: an even count reads the padding)
     (0x524750, 0xE35C007B, cmp_imm(0xE35C007B, NOTES_COUNT)),  # em ID -> unlocked? (0x524728, same shape)
     (0x55FF3C, 0xE352007A, cmp_imm(0xE352007A, NOTES_PAIR_BOUND)),  # count by type (unrolled by two, see above)
@@ -377,7 +398,7 @@ def reg_tables_asm(img):
                     vals.append(str(m['ui_icon']))     # own icon cell (tools/ui_icons.py), else the donor's
                 else:
                     vals.append(vals[donor])
-                if sym == 'reg_icon' and 'companion_of' not in m:
+                if sym == 'reg_icon' and 'companion_of' not in m and 'save_index' in m:   # (a lessee: save.c)
                     # the save slot (an unused 'dummy' index, main.c stats_add) shows the monster's icon: the quest
                     # result's size records name the slot's ID (icon accessor 0x560ca4(mgr, id) = table[index of id]),
                     # GU's dummies have the filler cell 109 (user 2026-10-26: "the icons are all rocks")
@@ -414,17 +435,19 @@ def monsters_c():
         sn = m.get('append', {}).get('stage_name', 0)   # the alias's board name (port.h stage_name)
         assert sn in (0, 1) and (not sn or 'stage_alias' in m), (m['name'], sn)
         sn = GU_QUEST_MESSAGE + alloc.offset(m['name'], 'stage_name') if sn else 0
+        si = m.get('save_index', 0)             # 0: save = "lease" (module/save.c)
         out.append('    {"%s", 0x%x, %d, %d, 0x%x, %d, 0x%x, %d, %d, {%s}, {%s}, %s, %d, '
-                   '%d, %d, 0x%x, 0x%x, %d, {%s}, {%s}, {%s}, %sf, {%s}, %d, 0x%x, 0x%x, %d},' % (
-            m['name'], m['em_id'], m['registry_index'], m['donor_index'], m.get('standin_id', 0), m['save_index'],
-            0x1064 + m['save_index'] - 105, m['name_entry'], m.get('notes_entry', 0),
+                   '%d, %d, 0x%x, 0x%x, %d, {%s}, {%s}, {%s}, %sf, {%s}, %d, 0x%x, 0x%x, %d, %d},' % (
+            m['name'], m['em_id'], m['registry_index'], m['donor_index'], m.get('standin_id', 0), si,
+            0x1064 + si - 105 if si else 0, m['name_entry'], m.get('notes_entry', 0),
             ', '.join('%d' % v for v in q), ', '.join('%d' % v for v in s),
             '%s_register_class' % package(m)['code'] if m in own else '0', port.get(m.get('companion_of'), -1),
             sa[0], sa[1], sum(1 << a for a in st.get('hold_kobj_areas', [])),
             sum(1 << (k - 48) for k in st.get('kinds', [])), len(st.get('maprec', [])),
             ', '.join('%rf' % float(r[0]) for r in mr), ', '.join('%d' % r[1] for r in mr),
             ', '.join('%d' % r[2] for r in mr), repr(float(st.get('wholemap_k', 0))),
-            ', '.join('%rf' % float(v) for v in sz), int(m.get('quest_append', False)), alt[0], alt_mask, sn))
+            ', '.join('%rf' % float(v) for v in sz), int(m.get('quest_append', False)), alt[0], alt_mask, sn,
+            int(m.get('save') == 'lease')))
     return '\n'.join(out + ['};']) + '\n'
 
 
@@ -554,6 +577,19 @@ def hookwin_asm(entries, windows):
     return '\n'.join(out) + '\n'
 
 
+def check_data_pool():
+    """every monster's data file must fit the module's pool (port.c load: each rounded up to 16 B). One that does not is refused
+    at run time with only a log line, and its monster then runs on its donor's manifest. A file not built yet counts 0:
+    tools/release.py and the install step ask for all of them"""
+    used = 0
+    for m in MONSTERS:
+        p = os.path.join(paths.gen(m['name']), m['name'] + '.bin')
+        used += (os.path.getsize(p) + 15) & ~15 if os.path.exists(p) else 0
+    if used > alloc.DATA_POOL:
+        sys.exit('data files: %d bytes do not fit the module\'s pool of %d: raise tools/alloc.py DATA_POOL' % (used, alloc.DATA_POOL))
+    print('data files: %d of %d bytes' % (used, alloc.DATA_POOL))
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     img = open(MAIN_IMG, 'rb').read()
@@ -571,6 +607,7 @@ def main():
     open(os.path.join(OUT, 'tables.S'), 'w').write(reg_tables_asm(img))
     errs = alloc.check()
     if errs: sys.exit('allocations.toml:\n  ' + '\n  '.join(errs))
+    check_data_pool()
     open(os.path.join(OUT, 'alloc.h'), 'w').write(alloc.header())
     open(os.path.join(OUT, 'port_monsters.c'), 'w').write(monsters_c())
     open(os.path.join(OUT, 'gear_hooks.inc'), 'w').write(           # gear.c: one wrapper per table class hook
@@ -580,7 +617,7 @@ def main():
     mods = [os.path.join(paths.monster(p), 'module') for p in alloc.packages()]   # once per package
     incs = ['-I', OUT, '-I', HERE] + [a for d in mods for a in ('-I', d)]
     srcs = [os.path.join(HERE, f) for f in ('crt0.S', 'main.c', 'util.c', 'port.c', 'quest.c', 'items.c', 'gear.c',
-                                            'notes.c', 'stage_alias.c', 'bgm.c', 'icons.c')]
+                                            'notes.c', 'stage_alias.c', 'bgm.c', 'icons.c', 'save.c')]
     for d in mods:                                     # every registered monster's code, registry order
         srcs += sorted(glob.glob(os.path.join(d, '*.c')))
     srcs += [os.path.join(OUT, 'port_monsters.c'), os.path.join(OUT, 'tables.S')]

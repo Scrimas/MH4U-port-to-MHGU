@@ -117,8 +117,10 @@ static int efx_alive(void *eff) { return eff && (FIELD(uint32_t, eff, 0xc) & 7) 
 /* Our handles are raw pointers: GU can free an effect (and reuse its memory) without telling us. Test 2026-11-03
  * crashed in efx_set_pos (0x32a45c) on the 8th laser: the handle's +0x150 held a float (0xc39750..). So an element
  * is used only while its object keeps the vtable it had at the post, is in state 1 / 2 and keeps the same transform
- * pointers (plausible heap addresses) it had on its first alive frame; otherwise the handle is dropped untouched. */
-static int ptr_ok(uint32_t p) { return !(p & 3) && p >= 0x01000000u && p < 0x80000000u; }
+ * pointers (0 or word-aligned, only compared, never followed) it had on its first alive frame; otherwise the handle is
+ * dropped untouched. No address range (1.0.1, the maintainer, PR #17): where Ryujinx, yuzu / Eden or the PC recomp put
+ * the heap differs (game.h MAIN_BASE); 1.0.0 also asked for 0x01000000 <= p < 0x80000000. */
+static int ptr_ok(uint32_t p) { return !(p & 3); }
 static int beam_ok(beam_t *b, int k)
 {
     void *eff = b->eff[k];

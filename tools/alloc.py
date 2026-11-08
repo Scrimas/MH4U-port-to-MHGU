@@ -13,8 +13,10 @@ several entries can share one package), `companion_of` (a second enemy spawned w
 half: registry index, em ID, donor and files of its own; its owner's name entry; a save tally slot that companions may
 share with each other, never with a monster; no Notes entry, quests, items or gear), `quest_append = true` (its quests
 are new quest list entries after GU's, module/quest.c quest_group_append, instead of renaming `quest_slots`),
-`notes = false` (no Hunter's Notes entry, as a companion: module/notes.c skips notes_entry 0; for when the Notes save
-bits run out, so a forgotten notes_entry still fails).
+`notes = false` (no Hunter's Notes entry, as a companion: module/notes.c skips notes_entry 0; a forgotten notes_entry
+still fails; entries from 128 have no save bit, module/notes.c), `save = "lease"` (no save_index: the monster borrows a free
+save slot for each quest and its hunts, captures and size records go to the mod's store, module/save.c; every
+save_index is taken since Black Gravios, and a monster that has one keeps it).
 """
 import os, struct, sys, tomllib
 
@@ -32,6 +34,8 @@ QUESTS_PER_ENTRY = 12                                   # module/port.h PORT_QUE
 QUEST_PLACEHOLDER = 1111010      # module/quest.c QG_PLACEHOLDER: an appended quest not installed (never renamed)
 ICON_PAGE2 = 196            # UI index of our atlas' cell 0 = 4U's '?' (tools/ui_icons.py, module/icons.c ICON_PAGE2)
 BOARD_FIRST = 200           # quest board icon byte of that cell (module/icons.c BOARD_FIRST)
+DATA_POOL = 512 * 1024      # the module's memory for every monster's data file (module/port.c POOL_SIZE; checked by
+                            # module/build.py). 256 KB until Monoblos, which left 864 bytes of it free
 
 
 def board_byte(ui_index):
@@ -79,6 +83,7 @@ def offset(name, table, sub=None, reg=None):
 
 
 GU_ITEMS = 2991                          # GU's item records (IDs 0..2990), notes/items-append.md
+NAME_DUMMY = ((105, 111), (221, 227))    # monsterName's entries 'dummy1'..'dummy7': first list, second list
 
 
 def item_count(reg=None):
@@ -104,7 +109,10 @@ def check(reg=None, gu_main=paths.GU_MAIN):
     order = {'registry_index': 0, 'notes_entry': 0}     # next position of each ORDERED key
     for k, m in enumerate(ms):
         comp = m.get('companion_of')
-        need = ('name', 'em_id', 'registry_index', 'donor_index', 'save_index', 'name_entry')
+        lease = m.get('save') == 'lease'
+        need = ('name', 'em_id', 'registry_index', 'donor_index', 'name_entry') + (() if lease else ('save_index',))
+        if m.get('save', 'lease') != 'lease' or (lease and 'save_index' in m):
+            errs.append('%s: save is "lease" (then no save_index) or absent' % m.get('name', k))
         no_notes = m.get('notes', True) is False
         for key in need + (() if comp or no_notes else ('notes_entry',)):
             if key not in m: errs.append('%s: missing %s' % (m.get('name', k), key))   # module/build.py needs them
@@ -179,6 +187,9 @@ def check(reg=None, gu_main=paths.GU_MAIN):
             errs.append('%s: one quest_slot per quest' % m['name'])
         if len(m.get('quests', [])) > QUESTS_PER_ENTRY:
             errs.append('%s: more than %d quests' % (m['name'], QUESTS_PER_ENTRY))
+        ne = m.get('name_entry', 0)                     # one of monsterName's dummy entries, first or second list
+        if not any(a <= ne <= b for a, b in NAME_DUMMY):
+            errs.append('%s: name_entry %d is no dummy entry %s' % (m['name'], ne, NAME_DUMMY))
         n_app = m.get('append', {}).get('items', 0)     # appended items: IDs right after GU's and the earlier ones
         if n_app:
             first = GU_ITEMS + offset(m['name'], 'items', reg=reg)
@@ -205,7 +216,8 @@ def header(reg=None):
            '#define PORT_MONSTER_COUNT %du' % len(reg['monster']),
            '#define PORT_NOTES_COUNT %du' % sum('notes_entry' in m for m in reg['monster']),
            '#define PORT_ITEM_COUNT %du' % item_count(reg),
-           '#define PORT_FILE_ID_MIN 0x%xu' % reg['pools']['file_ids'][0]]
+           '#define PORT_FILE_ID_MIN 0x%xu' % reg['pools']['file_ids'][0],
+           '#define PORT_DATA_POOL %du' % DATA_POOL]
     for k, m in enumerate(reg['monster']):
         p = m['name'].upper()
         d = [('PORT', '%d' % k), ('EM_ID', '0x%xu' % m['em_id']), ('INDEX', '%du' % m['registry_index'])]

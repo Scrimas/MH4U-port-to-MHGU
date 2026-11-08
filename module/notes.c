@@ -7,7 +7,11 @@
  * WORD_PATCHES; two loops are unrolled by two and read one record past the end: a padding record follows).
  * Save bits 123..127 of S+0x35b0 are free. Until its data file is read, a monster's entry is a padding record
  * (em 0xffff, type 0xff: no lookup matches it) listed last; notes_data_loaded fills it and moves it after its anchor
- * entry. The data applies whether the monster is installed or not (port.h): its quest unlocks the entry. */
+ * entry. The data applies whether the monster is installed or not (port.h): its quest unlocks the entry.
+ *
+ * Entries past the save map (notes_entry >= 128, end of this file): no save bit at all. Their state is computed from
+ * what the save already holds (a quest of the monster cleared), so nothing is written for them and a save that loses
+ * the mod holds no trace of them. */
 #include <stdint.h>
 #include "util.h"
 #include "game.h"
@@ -82,4 +86,55 @@ int notes_unlock_check_c(uint32_t *regs)
     logf("mh4uport: hunter's notes: unlock check of entry %u (lr %x), quest %u cleared %d", regs[R0],
          regs[LR] - MAIN_BASE, q, save ? questCleared(save + 0x42c, q) : -1);
     return 0;
+}
+
+/* Entries past the 128 bits of S+0x35b0. Every use of an entry's bit, C (all 13 code sites loading 0x35b0, 7 of 0x35c0):
+ * - S+0x35b0 unlocked, S+0x35c0 NEW, 16 bytes each, then S+0x35d0 (another list's map): an entry >= 128 would read and
+ *   write those. The two talk loops (condition 44 0x245848, action 6 0x247ae4, the only writers of S+0x35b0) stop at
+ *   128 (build.py WORD_PATCHES), so such an entry is never "due" and never set.
+ * - list screen 0x5b0b48: visible 0x5b0bbc (hook below), its NEW mark 0x5b0a38 (below), the mark cleared on selection
+ *   0x5b0ad4 (below, the write is skipped).
+ * - 0x524728(S, em ID), one caller 0x161e28: below. 0x524660 stops at em IDs above 56, ours are higher. The other
+ *   readers (0x5565xx, 0x55686c) take fixed GU entries.
+ * Unlocked = any quest of the monster cleared (the cleared map S+0x42c, written by GU for every quest), as the entry
+ * would be after talking to the NPC; no NEW mark. Nothing here writes. */
+#define NOTES_SAVE_BITS 128u
+#define NOTES_ZERO_WORD 49u                /* (S+0x3684 - S+0x35c0) / 4: the reserved block's start, never written
+                                            * (notes/save-store.md); read as "no NEW mark" */
+
+static int notes_live(uint32_t e)
+{
+    uint8_t *save = *(uint8_t **)MAIN(0x1897f78);
+    if (!save) return 0;
+    for (int m = 0; m < PORT_N; m++) {
+        if (port_monsters[m].notes_entry != e) continue;
+        for (int k = 0; k < PORT_QUESTS; k++)
+            if (port_monsters[m].quests[k] && questCleared(save + 0x42c, port_monsters[m].quests[k])) return 1;
+    }
+    return 0;
+}
+
+int notes_list_visible_c(uint32_t *regs)   /* 0x5b0bd4: r0 = the map word, r5 = position in the display order */
+{
+    uint32_t e = notes_order[regs[R5]];
+    if (e >= NOTES_SAVE_BITS) regs[R0] = notes_live(e) ? ~0u : 0u;
+    return 0;
+}
+
+int notes_list_new_c(uint32_t *regs)       /* 0x5b0a44: r0 = entry, r1 = its word index in S+0x35c0 */
+{
+    if (regs[R0] >= NOTES_SAVE_BITS) regs[R1] = NOTES_ZERO_WORD;
+    return 0;
+}
+
+int notes_new_clear_c(uint32_t *regs)      /* 0x5b0ad4: r0 = entry; nonzero: past the write (MID_EXIT 0x5b0af4) */
+{
+    return regs[R0] >= NOTES_SAVE_BITS;
+}
+
+int notes_em_unlocked_c(uint32_t *regs)    /* 0x524770: r12 = entry; nonzero: returns regs[R0] (MID_EXIT bx lr) */
+{
+    if (regs[R12] < NOTES_SAVE_BITS) return 0;
+    regs[R0] = (uint32_t)notes_live(regs[R12]);
+    return 1;
 }

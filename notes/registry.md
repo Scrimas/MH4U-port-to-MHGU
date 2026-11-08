@@ -66,10 +66,13 @@ Consumers: 0x4a858 (load, caller 0x7079c), 0x4acc4, 0x4afe4, 0x4b0e0, 0x4b1d8, 0
 
 ## Index consumers that are SAFE for index 137 (bounds-checked or data-driven)
 - Save-side arrays of 137 entries (hunt tallies, captures 0x112 B apart, size records): 0x52308c, 0x523104,
-  0x526d94, 0x526dd4, 0x526e00, 0x526e44 (`cmp r0, #136; bhi -> 0`); 0x526eb0/0x526ef8/0x526f48 (runtime count
-  check); bitset 0x551dd0 (`cmp #136`). Gogmazios just won't be counted. C
+  0x526d94, 0x526dd4, 0x526e00, 0x526e44 (`cmp r0, #136; bhi -> 0`); 0x526eb0/0x526ef8 (runtime count check);
+  bitset 0x551dd0 (`cmp #136`). Gogmazios just won't be counted. C. Correction (2026-11-04, notes/save-store.md):
+  the size reader 0x526f48 has NO bound (`ldr r0, [[T+0x224], index, lsl #3]`, the vector holds 137 entries):
+  module/save.c answers it for every ported ID.
 - 0x672a4 / 0x67310 (uEnemy, UI): search a loaded list ([obj+0x2584]+0x64/0x6c, 32-B entries, +4 = index,
-  +28 = float), default 1.0 / 0xff when absent. C
+  +28 = float), default 1.0 / 0xff when absent. C. Correction (2026-11-06, notes/save-store.md): absent, 0x67310 writes no cm, and the
+  Hunter's Notes page shows 0 next to the record: module/save.c answers it for every ported ID.
 - 0x69c258 (from 0x70a6c via +0xb5f6): runtime array, `count at +0x68` checked. C
 - 0x5bb24: special-cases indices 105-111, 77-78, 132 only. C
 - 0x68a70, 0x3c5b50 (aResult), 0x3c7034 / 0x3c7134 (uUIResult): only test -1 / pass the index on. G (not traced deeper)

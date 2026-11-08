@@ -21,7 +21,7 @@ Confidence: **C** confirmed in code / data, **S** strong, **G** guess.
 | GU ID | 0x105 | em 5, variant 1 |
 | registry index | 144 | after Stygian Zinogre 143 |
 | save slot / name entry | 111 / 111 | `dummy7`, the last free slot |
-| Notes entry | none | save bits 123..127 all taken: `notes = false` (tools/alloc.py); a Notes page needs new save bits (open) |
+| Notes entry | 128 | past the save map, no save bit (module/notes.c; since 1.0.1, core with the entries past the map) |
 | UI icon | 204 | 4U icon 43 (its quests' board icon; Gravios' is 42) |
 | file IDs | 0x10900..0x1093f | |
 | quests | 10780 11430 10781 1025 1056 10782 10783 11451 | 4U m10611 m10923 m10601 m00911 m00902 m10606 m10615 m10927 |
@@ -364,7 +364,7 @@ the em number, G). GU's uEm004_00 reads only the em number, 5 for Gravios and hi
 - Quests: 4U ranks moved to GU's (Hub HR6 -> HR7, G2 -> G4, caravan ★9 -> village ★10, as Stygian's); frenzy spawn
   bytes dropped (GU has no frenzy); Brute Tigrex in m10606 -> GU Tigrex; arena m21006 not ported.
 - Rewards: 4U Gravios Shell has no same-name GU item; break groups 1 / 7 (frenzy) and 6 (Deviljho items) left out.
-- Armor: 4U Flame Aura has no GU tree (dropped). No Hunter's Notes entry (save bits 123..127 are taken).
+- Armor: 4U Flame Aura has no GU tree (dropped). Hunter's Notes entry since 1.0.1 (128, no save bit).
 
 ## Open
 1. Test log of 0.4.6 (user plays, the log is read): his own 7/58 7/71 7/79 7/80 and 7/28 7/31..33 7/42..45 have not

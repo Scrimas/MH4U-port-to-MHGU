@@ -10,7 +10,8 @@ GU 1.4 main (tools/gu.py), C unless noted:
     lookup), tested by talk condition 44 and set by talk action 6 (0x245848 / 0x247ae4).
   - display order 0x1631ef4, 123 x u32 entry numbers (0x5b0b48), grouped by type; Elder Dragons last.
   - save: 128-bit map S+0x35b0 (+ NEW copy S+0x35c0), bits 123..127 unused -> entries 123.. = the ported monsters
-    (allocations.toml notes_entry, registry order).
+    (allocations.toml notes_entry, registry order); entries from 128 have no bit: module/notes.c computes their state
+    from the monster's cleared quests and writes nothing.
   Every loop over the list is bounded by an immediate (module/build.py WORD_PATCHES); two of them are unrolled by two
   and read one record past the end, so the copy carries a padding record (em 0xffff, type 0xff).
 Text: the monster's HN_MonsterListMsg strings (description, tips page if any; allocations.toml [monster.append]

@@ -24,7 +24,9 @@ typedef void (*fs_close_t)(fs_file f);
 #define fs_close FN(fs_close_t, 0x13f046c)             /* nn::fs::CloseFile */
 
 #define DATA_DIR "app:/nativeNX/mh4uport/"
-#define POOL_SIZE (256u * 1024u)       /* every monster's data file (Gogmazios: 37.6 KB) */
+#define POOL_SIZE PORT_DATA_POOL       /* every monster's data file, each rounded up to 16 B (tools/alloc.py DATA_POOL; module/build.py
+                                          refuses a build that does not fit: a file that doesn't is not loaded here, and its monster
+                                          then runs on its donor's manifest) */
 #define FORMAT 1u
 static uint8_t s_pool[POOL_SIZE] __attribute__((aligned(16)));
 static uint32_t s_pool_used;
@@ -106,7 +108,8 @@ static int load(int m)
     }
     fs_close(f);
     if (!ok || !valid(m, s_pool + base, (uint32_t)size)) {
-        logf("mh4uport: %s: data file %s unreadable (size %u, read %u)", p->name, path, (uint32_t)size, got);
+        logf("mh4uport: %s: data file %s unreadable (size %u, read %u, pool %u of %u)", p->name, path, (uint32_t)size, got,
+             s_pool_used, POOL_SIZE);
         return 0;
     }
     s_data[m] = s_pool + base;
@@ -183,6 +186,21 @@ int port_by_em(uint32_t em_id)
     for (int m = 0; m < PORT_N; m++)
         if (port_monsters[m].em_id == em_id) return m;
     return -1;
+}
+
+/* 0xac0ec(enemy, pos, chance %, 0), the item drop [4U 0x911f58], entry: log only (the first 40 calls), so a test log shows
+ * whether a ported monster's shiny triggers run. rec+0x5d54 = the drops it has left. */
+int enemy_drop_log_c(uint32_t *regs)
+{
+    static uint32_t s_n;
+    void *self = (void *)regs[0];
+    int m;
+    if (s_n >= 40 || (m = port_by_em(FIELD(uint16_t, self, EN_ID))) < 0) return 0;
+    s_n++;
+    logf("mh4uport: item drop call: %s, action %u/%u, chance %u, drops left %d", port_monsters[m].name,
+         FIELD(uint8_t, self, EN_ACT_CAT), FIELD(uint8_t, self, EN_ACT_NUM), regs[2],
+         (int)FIELD(int8_t, FIELD(uint8_t *, self, EN_RECORD), 0x5d54));
+    return 0;
 }
 
 int port_by_index(uint32_t index)
