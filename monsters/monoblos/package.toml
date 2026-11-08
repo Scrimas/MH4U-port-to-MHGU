@@ -1,7 +1,9 @@
 # Monoblos package: what the installer shows and installs, and the version written into its data file.
 name = "monoblos"
 title = "Monoblos"
-version = "0.4.8"       # bump on every published change of this monster's files (data, assets or code); 0.4.8:
+version = "0.4.9"       # bump on every published change of this monster's files (data, assets or code); 0.4.9:
+                        # every turn of his (unaware, engaged, enraged) is the quick turn, the maintainer confirmed after
+                        # viewing 4U footage (4U's code: the slow one; a deviation); 0.4.8:
                         # his ways to eat and to sleep follow his 4U hops (area_link kinds 2 / 4 were GU Diablos'); 0.4.7:
                         # the two actions of his AI's first script run his own handlers (6/8 lying burrowed, 1/35 idle;
                         # 0.4.6 ran GU Diablos' rest and dig-in there), his name in monsterName's second list (entry 221;

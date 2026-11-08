@@ -7,7 +7,7 @@ in the Everwood (stage 13), a map GU does not have (user, issue #16). Maintainer
 bigger project is already working on the Everwood, so it stays out of this port. Confidence: **C** confirmed in code /
 data, **S** strong, **G** guess.
 
-**Status (2026-11-07):** 0.4.7 (the PR #17 review, below) on the save store core (the user's go, 2026-11-05: "build Monoblos in, with his 4U AI and
+**Status (2026-11-08):** 0.4.9 (the PR #17 review, below; his turns as the maintainer confirmed from 4U footage) on the save store core (the user's go, 2026-11-05: "build Monoblos in, with his 4U AI and
 attacks, like Black Gravios"). Played solo on Ryujinx: quests 10784, 10785, 11452 (logs of 2026-11-05 and 11-06), two real
 hunts of 10784 through the store. yuzu / Eden and the PC recomp not run. Not in a saved log yet: the village quests 1057..1059,
 a broken horn, sleeping and eating, a kill in a capture quest. Test log lines: "mbport: em007_01 ..." (actions / motions),
@@ -81,6 +81,24 @@ asked for): 4U text, spawns and rewards of the same 4U quest. IDs 10784 / 10785 
   the mound guard has no address range (the heap differs per platform).
 - Open: Black Gravios' ptr_ok has the same address range (its author's code; not changed here).
 
+## 0.4.9 (2026-11-08, the maintainer's test of 0.4.8: log 19-26-13, quest to a kill, horn and back broken)
+- **Turns: the quick turn in every state (DEVIATION, maintainer confirmed after viewing 4U footage).** The maintainer: his
+  idle turns were wrong (before he notices the hunter he turned with GU Diablos' quick turn, in fights with his slow one),
+  and after viewing 4U footage: unaware, engaged and enraged he makes the same quick turn, enraged only faster by his rage
+  speed. 4U's code gives him the slow one (C): his 2/3 and 2/24 (uEm101 slot 44 0x8df448 -> 0x8dda24 cases 3 / 24) take
+  record 0xe0e090 (motions 9 / a, 90 deg in 90 frames, 4U 0x93cbf8: 0x4000 / window), the quick record 0xe0e0d0 (motions
+  b / c, 90 deg in 18 frames) only in 2/5 / 2/17 (before 7/6, the dig-ins, 2/19 / 2/20); GU em007_00_0's slots 9..d are
+  4U em101_0's (same per-track keyframe bounds). The log showed the two turns apart: GU's wander script g1 s122 ran GU 2/3
+  (motions c / d), his scripts 2/211 (9 / a). Now (a) 2/3 and 2/24 run record 0xe0e0d0 with flags 0, as his 2/5
+  (module/em007_01_moves.c), and (b) GU 2/3 in the imported GU scripts (g1 s122, GU g7 s1) runs his 2/3
+  (build_em007_01_arc.py GU_TO_HIS), so every turn is his one handler. Not changed: the records inside his attacks (7/0
+  7/5 ..., the turn while the attack plays) and his burrowed turns (6/x, underground).
+- **Burrow rate (C, checked again by the maintainer's request).** The selector weights above rebuilt from the raw 4U
+  em101_cmd: the same numbers. The selector switch (g0 s4, op 0x6a, 4U 0x952d04) reads the current quest's byte +0x8b
+  (0x69ae70); case 5 -> g0 s14 (G), else g0 s11.
+- **The log of 0.4.8 (C).** 28 of his table's actions (new against the 0.4.7 list: 6/0 6/3 6/4 6/8 6/16, the burrowed
+  phase); no "has no port" line; horn and back broken.
+
 ## 0.4.8 (2026-11-08, after the user's long hunts on 0.4.7: log 13-52-00, quests 11452 and 10784 to the end; 13-39-17, 11452)
 - **What the logs show (C).** 37 of his 4U actions ran (plus GU's engine actions below), among them 6/0 6/3 6/4 6/8 6/16 7/13 7/31
   1/20 1/21 1/28, which the maintainer had not seen; no "has no port yet" line. `mbport: parts`: horn broken, back broken, tail cut
@@ -116,7 +134,7 @@ The review: 29 of 79 actions seen (unseen: all of category 3, most of 6, 7/1 7/8
   tired (4U 0x92e998: W+0x51c in {2, 3}; GU 0x816f0 also takes rec+0x505 = 1, not when enraged), 0x1c = enraged (4U 0x954e48
   W+0x530 = 1, GU 0x81744 rec+0x518 = 1); slot 133 (cond) = 4U slot 51 0x8e0804 case by case (2 motion 0x20f, 3 target, 4 stage
   object, 11 counter; 5..10 answer 0 in both).
-- **Turns: 4U as it is (C).** His 2/3 (the turn of nearly every attack script after the op 0x1d angle test) is 4U 0x8dda24 case
+- **Turns: 4U as it is (C; replaced in 0.4.9 by the quick turn, the maintainer's call from 4U footage).** His 2/3 (the turn of nearly every attack script after the op 0x1d angle test) is 4U 0x8dda24 case
   3: record 0xe0e090 (motions 0x09 / 0x0a, window 0..90) with flags 1. 4U Diablos' 2/3 (0x8d1594 case 3) takes 0xe0e034 (0x0b
   / 0x0c, window 2..20) and GU's Diablos the same (0x16a2d50, d36ca8). So 4U's Monoblos turns slower than Diablos; not changed.
 - **Rage: 4U as it is (C).** 4U etd word 14: Monoblos 600 / 3600 frames, x1.3 / x1.5; Diablos 500 / 5400, x1.25 / x1.4 (GU's

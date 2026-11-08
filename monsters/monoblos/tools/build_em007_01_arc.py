@@ -336,6 +336,14 @@ KEEP = {(0, 255), (11, 38)}              # GU 0/255 = END (0xca10c), 11/38 = bas
 # 4U action: GU action (the handler pairs of scratch twins.py: equal motion sets, 0x404 / 0x40e = GU 0x004 / 0x00e;
 # same side parameter r1); APPROX = his r1 = 1 variant on GU's only one
 TWINS = {(0, 2): (0, 2), (1, 25): (1, 3), (3, 0): (3, 3), (3, 7): (3, 7), (6, 14): (6, 26)}
+# GU actions in the scripts imported from GU (area_act_tbl 121..127 with their calls, g0 s1 / s8, g7, g20) that become
+# his: GU 2/3 (GU Diablos' turn = 4U Diablos' 2/3, 0x8d1594 case 3: record 0xe0e034) -> his 2/3, so every turn of his,
+# unaware ones in GU's wander script g1 s122 included, runs one handler (module/em007_01_moves.c). His 4U 2/3 (uEm101
+# slot 44 0x8df448 -> 0x8dda24 case 3) takes record 0xe0e090 (motions 9 / a, 90 deg in 90 frames; C, GU em007_00_0 slots
+# 9..d = 4U em101_0 9..d by per-track keyframe bounds); the port plays the quick record 0xe0e0d0 (motions b / c, 90 deg in
+# 18 frames) for 2/3 and 2/24: a DEVIATION from 4U's code, confirmed by the maintainer after viewing 4U footage
+# (2026-11-08): unaware, engaged and enraged he makes the same quick turn, enraged only faster by his rage speed
+GU_TO_HIS = {(2, 3): (2, 3 + PORT_BASE)}
 APPROX = set()                           # his attack twins (7/0 5 6 7 9 18 20 22) are ported: GU's attack with Diablos'
 # records
 EMC_4U_ONLY = {0x03, 0x06, 0x07, 0x22, 0x2a, 0x36, 0x40, 0x41, 0x46, 0x49, 0x4a, 0x4d, 0x63, 0x8b, 0x91}
@@ -421,10 +429,18 @@ def cmdtbl(d4, gu, img, aat, notes):
         g1[placed[k]] = imported(gv[1][k])
         return placed[k]
 
+    gu_turns = []
+
     def imported(s):
         out = []
         for t in emc_tokens(s, lens):
-            out.append(bytes([0x14, gu_script(t[1])]) if t[0] == 0x14 else t)
+            if t[0] == 0x14:
+                out.append(bytes([0x14, gu_script(t[1])]))
+            elif t[0] == 0x00 and len(t) == 3 and (t[1], t[2]) in GU_TO_HIS:
+                out.append(bytes([0x00, *GU_TO_HIS[(t[1], t[2])]]))
+                gu_turns.append((t[1], t[2]))
+            else:
+                out.append(t)
         return b''.join(out)
 
     assert aat and all(n1 <= k < len(g[1]) for k in aat), ('area_act_tbl scripts inside his range', aat)
@@ -474,6 +490,9 @@ def cmdtbl(d4, gu, img, aat, notes):
     notes.append('AI table: 4U em101_cmd (case 101), GU\'s g0 s0 area step / s1 patrol / s8 area move, g7, g20 s0, '
                  'empty g16; group 1 = his %d + GU %d..%d empty but area_act_tbl %s (+ calls imported at %s)' % (
                      n1, n1, len(g[1]) - 1, aat, sorted(v for v in placed.values() if v >= len(g[1]))))
+    assert gu_turns, 'no GU 2/3 in the imported scripts: GU_TO_HIS has nothing to do'
+    notes.append('AI table: GU actions in the imported GU scripts that run his 4U handler: %s' % ' '.join(
+        '%d/%d->%d/%d x%d' % (k + GU_TO_HIS[k] + (gu_turns.count(k),)) for k in sorted(set(gu_turns))))
     notes.append('AI table: his scripts no script reaches (picked by 4U code; nothing in GU picks them): %s' % [
         'g%d s%d' % x for x in his if x not in reach])
     twins = ' '.join('%d/%d->%d/%d' % (k + TWINS[k]) for k in sorted(used & set(TWINS)))

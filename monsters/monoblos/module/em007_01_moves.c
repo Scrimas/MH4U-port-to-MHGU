@@ -151,10 +151,14 @@ static const struct move s_moves[] = {
     MV(2, 19, mbmv_8d93c4, 0, 2, 0, 0, 0x8d93c4),
     MV(2, 20, mbmv_8d93c4, 1, 2, 0, 0, 0x8d93c4),
     MV(2, 23, mbmv_8d93c4, 2, 2, 0, 0, 0x8d93c4),
-    MV(2, 3, mbmv_2_turn, 1, 1, 0, 0, 0x8ddad4),          /* p = (record 0xe0e090?, flags, sleepFlagA) */
+    /* p = (record 0xe0e090?, flags, sleepFlagA). 4U 0x8ddad4 (2/3) and 0x8ddd10 (2/24) take record 0xe0e090
+     * (motions 9 / a, 90 deg in 90 frames, flags 1); here both take 0xe0e0d0 (motions b / c, 90 deg in 18 frames, flags
+     * 0, as his 2/5 / 2/17): a DEVIATION from 4U's code. The maintainer confirmed it after viewing 4U footage
+     * (2026-11-08): unaware, engaged and enraged he makes the same quick turn, enraged only faster by his rage speed */
+    MV(2, 3, mbmv_2_turn, 0, 0, 0, 0, 0x8ddad4),
     MV(2, 5, mbmv_2_turn, 0, 0, 0, 0, 0x8ddb38),
     MV(2, 17, mbmv_2_turn, 0, 0, 0, 0, 0x8ddc90),
-    MV(2, 24, mbmv_2_turn, 1, 1, 1, 0, 0x8ddd10),
+    MV(2, 24, mbmv_2_turn, 0, 0, 1, 0, 0x8ddd10),
     MV(2, 2, mbmv_8d7f08, 2, 2, 0, 0, 0x8d7f08),
     MV(2, 10, mbmv_8d8518, 10, 2, 0, 0, 0x8d8518),
     MV(1, 1, mbmv_1_1, 0, 0, 0, 0, 0x8de00c),
