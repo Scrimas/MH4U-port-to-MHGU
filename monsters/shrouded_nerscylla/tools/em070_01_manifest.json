@@ -1,0 +1,526 @@
+{
+ "monster": "em070_01 (Shrouded Nerscylla)",
+ "id": "0x146",
+ "registry_index": 147,
+ "file_id_base": "0x109c0",
+ "file_count": 24,
+ "manifest": [
+  {
+   "field": 0,
+   "file_id": "0x109c0",
+   "path": "enemy\\em070\\em070_01\\mod\\em070_01",
+   "type": "0x58a15856",
+   "source": "converted (4U em096)"
+  },
+  {
+   "field": 1,
+   "file_id": -1
+  },
+  {
+   "field": 2,
+   "file_id": -1
+  },
+  {
+   "field": 3,
+   "file_id": "0x109c1",
+   "path": "enemy\\em070\\em070_01\\mod\\em070_01",
+   "type": "0x7cd0e77e",
+   "source": "converted (4U em096)"
+  },
+  {
+   "field": 4,
+   "file_id": "0x109c2",
+   "path": "enemy\\em070\\em070_01\\mot\\em070_01_0",
+   "type": "0x76820d81",
+   "source": "converted (4U em096)"
+  },
+  {
+   "field": 5,
+   "file_id": -1
+  },
+  {
+   "field": 6,
+   "file_id": "0x109c3",
+   "path": "enemy\\em070\\em070_01\\mot\\em070_01_2",
+   "type": "0x76820d81",
+   "source": "converted (4U em096)"
+  },
+  {
+   "field": 7,
+   "file_id": "0x109c4",
+   "path": "enemy\\em070\\em070_01\\mot\\em070_01_3",
+   "type": "0x76820d81",
+   "source": "converted (4U em096)"
+  },
+  {
+   "field": 8,
+   "file_id": "0x109c5",
+   "path": "enemy\\em070\\em070_01\\mot\\em070_01_4",
+   "type": "0x76820d81",
+   "source": "converted (4U em096)"
+  },
+  {
+   "field": 9,
+   "file_id": -1
+  },
+  {
+   "field": 10,
+   "file_id": -1
+  },
+  {
+   "field": 11,
+   "file_id": "0x8597",
+   "path": "enemy\\em070\\em070_00\\mot\\em070_00_cam",
+   "type": "0x39c52040",
+   "source": "shared (GU em070_00, its file ID)"
+  },
+  {
+   "field": 12,
+   "file_id": "0x109cc",
+   "path": "sound\\call\\em\\em070_01",
+   "type": "0x10ebe843",
+   "source": "converted (4U em096)"
+  },
+  {
+   "field": 13,
+   "file_id": "0x109cd",
+   "path": "sound\\se\\em\\em070_01\\snd_em070_01",
+   "type": "0x1bcc4966",
+   "source": "converted (4U em096)"
+  },
+  {
+   "field": 14,
+   "file_id": "0x85a0",
+   "path": "sound\\pts\\em\\em070_00c",
+   "type": "0x4541367c",
+   "source": "shared (GU em070_00, its file ID)"
+  },
+  {
+   "field": 15,
+   "file_id": "0x85a1",
+   "path": "sound\\pts\\em\\em070_00u",
+   "type": "0x4541367c",
+   "source": "shared (GU em070_00, its file ID)"
+  },
+  {
+   "field": 16,
+   "file_id": "0x859a",
+   "path": "effect\\pel\\em\\em070_00c",
+   "type": "0x5a525c16",
+   "source": "shared (GU em070_00, its file ID)"
+  },
+  {
+   "field": 17,
+   "file_id": "0x109c7",
+   "path": "effect\\pel\\em\\em070_01u",
+   "type": "0x5a525c16",
+   "source": "converted (4U em096)"
+  },
+  {
+   "field": 18,
+   "file_id": "0x109c8",
+   "path": "effect\\psl\\enemy\\em070\\em070_01\\mot\\em070_01_0",
+   "type": "0x254309c9",
+   "source": "converted (4U em096)"
+  },
+  {
+   "field": 19,
+   "file_id": -1
+  },
+  {
+   "field": 20,
+   "file_id": "0x109c9",
+   "path": "effect\\psl\\enemy\\em070\\em070_01\\mot\\em070_01_2",
+   "type": "0x254309c9",
+   "source": "converted (4U em096)"
+  },
+  {
+   "field": 21,
+   "file_id": "0x109ca",
+   "path": "effect\\psl\\enemy\\em070\\em070_01\\mot\\em070_01_3",
+   "type": "0x254309c9",
+   "source": "converted (4U em096)"
+  },
+  {
+   "field": 22,
+   "file_id": "0x109cb",
+   "path": "effect\\psl\\enemy\\em070\\em070_01\\mot\\em070_01_4",
+   "type": "0x254309c9",
+   "source": "converted (4U em096)"
+  },
+  {
+   "field": 23,
+   "file_id": -1
+  },
+  {
+   "field": 24,
+   "file_id": -1
+  },
+  {
+   "field": 25,
+   "file_id": "0x85a2",
+   "path": "arc\\shell\\em\\em070_00_shell",
+   "type": "0x73850d05",
+   "source": "shared (GU em070_00, its file ID)"
+  },
+  {
+   "field": 26,
+   "file_id": "0x85a3",
+   "path": "enemy\\hit_data\\em070_00_attackdata",
+   "type": "0x70bb64ba",
+   "source": "shared (GU em070_00, its file ID)"
+  },
+  {
+   "field": 27,
+   "file_id": -1
+  },
+  {
+   "field": 28,
+   "file_id": "0x85a4",
+   "path": "enemy\\hit_data\\em070_00_hitsize",
+   "type": "0x5653c1b0",
+   "source": "shared (GU em070_00, its file ID)"
+  },
+  {
+   "field": 29,
+   "file_id": -1
+  },
+  {
+   "field": 30,
+   "file_id": "0x85a5",
+   "path": "enemy\\body_data\\em070_00_bodydata",
+   "type": "0x1ac7b52d",
+   "source": "shared (GU em070_00, its file ID)"
+  },
+  {
+   "field": 31,
+   "file_id": "0x85a6",
+   "path": "enemy\\cam_body_data\\em070_00_cambodydata",
+   "type": "0x1ac7b52d",
+   "source": "shared (GU em070_00, its file ID)"
+  },
+  {
+   "field": 32,
+   "file_id": "0x85a7",
+   "path": "enemy\\dt_base\\em070_00_dtbase",
+   "type": "0x59d9c3da",
+   "source": "shared (GU em070_00, its file ID)"
+  },
+  {
+   "field": 33,
+   "file_id": "0x109ce",
+   "path": "enemy\\dt_tune\\em070_01_dttune",
+   "type": "0x48e8ac29",
+   "source": "converted (4U em096)"
+  },
+  {
+   "field": 34,
+   "file_id": "0x85a9",
+   "path": "enemy\\dt_base\\em070_00_dtbparts",
+   "type": "0x1bbc291e",
+   "source": "shared (GU em070_00, its file ID)"
+  },
+  {
+   "field": 35,
+   "file_id": -1
+  },
+  {
+   "field": 36,
+   "file_id": -1
+  },
+  {
+   "field": 37,
+   "file_id": "0x109c6",
+   "path": "enemy\\cmd_tbl\\em070_01_cmdtbl",
+   "type": "0x3aabba02",
+   "source": "converted (4U em096)"
+  },
+  {
+   "field": 38,
+   "file_id": "0x85ab",
+   "path": "enemy\\dou_mou_ka\\em070_00_doumouka",
+   "type": "0x1f149aec",
+   "source": "shared (GU em070_00, its file ID)"
+  },
+  {
+   "field": 39,
+   "file_id": "0x85ac",
+   "path": "enemy\\dou_mou_ka\\em070_00_doumouka_G",
+   "type": "0x1f149aec",
+   "source": "shared (GU em070_00, its file ID)"
+  },
+  {
+   "field": 40,
+   "file_id": "0x109d4",
+   "path": "enemy\\area_link\\em070_01",
+   "type": "0x4bf84f6f",
+   "source": "converted (4U em096)"
+  },
+  {
+   "field": 41,
+   "file_id": "0x109d7",
+   "path": "enemy\\area_eat\\em070_01",
+   "type": "0x56d892d0",
+   "source": "converted (4U em096)"
+  },
+  {
+   "field": 42,
+   "file_id": "0x109d5",
+   "path": "enemy\\map_info\\em070_01",
+   "type": "0x197e4d7a",
+   "source": "converted (4U em096)"
+  },
+  {
+   "field": 43,
+   "file_id": "0x109d6",
+   "path": "enemy\\area_select\\em070_01",
+   "type": "0x15e98d21",
+   "source": "converted (4U em096)"
+  },
+  {
+   "field": 44,
+   "file_id": "0x85b1",
+   "path": "enemy\\area_patrol\\em070_00",
+   "type": "0x0947f3c8",
+   "source": "shared (GU em070_00, its file ID)"
+  },
+  {
+   "field": 45,
+   "file_id": -1
+  },
+  {
+   "field": 46,
+   "file_id": "0x109cf",
+   "path": "enemy\\hagi\\hagi_s0_em070_01",
+   "type": "0x33a84e14",
+   "source": "converted (4U em096)"
+  },
+  {
+   "field": 47,
+   "file_id": "0x109d0",
+   "path": "enemy\\hagi\\hagi_s1_em070_01",
+   "type": "0x33a84e14",
+   "source": "converted (4U em096)"
+  },
+  {
+   "field": 48,
+   "file_id": "0x109d1",
+   "path": "enemy\\hagi\\hagi_s2_em070_01",
+   "type": "0x33a84e14",
+   "source": "converted (4U em096)"
+  },
+  {
+   "field": 49,
+   "file_id": "0x109d2",
+   "path": "enemy\\hagi\\hagi_s3_em070_01",
+   "type": "0x33a84e14",
+   "source": "converted (4U em096)"
+  },
+  {
+   "field": 50,
+   "file_id": "0x109d3",
+   "path": "enemy\\hagi\\hagi_s4_em070_01",
+   "type": "0x33a84e14",
+   "source": "converted (4U em096)"
+  }
+ ],
+ "files": [
+  {
+   "file_id": "0x109c0",
+   "path": "enemy\\em070\\em070_01\\mod\\em070_01",
+   "type": "0x58a15856",
+   "path_hash": "0x0fb85d88"
+  },
+  {
+   "file_id": "0x109c1",
+   "path": "enemy\\em070\\em070_01\\mod\\em070_01",
+   "type": "0x7cd0e77e",
+   "path_hash": "0x0fb85d88"
+  },
+  {
+   "file_id": "0x109c2",
+   "path": "enemy\\em070\\em070_01\\mot\\em070_01_0",
+   "type": "0x76820d81",
+   "path_hash": "0xf162ac79"
+  },
+  {
+   "file_id": "0x109c3",
+   "path": "enemy\\em070\\em070_01\\mot\\em070_01_2",
+   "type": "0x76820d81",
+   "path_hash": "0x1f6ccd55"
+  },
+  {
+   "file_id": "0x109c4",
+   "path": "enemy\\em070\\em070_01\\mot\\em070_01_3",
+   "type": "0x76820d81",
+   "path_hash": "0x686bfdc3"
+  },
+  {
+   "file_id": "0x109c5",
+   "path": "enemy\\em070\\em070_01\\mot\\em070_01_4",
+   "type": "0x76820d81",
+   "path_hash": "0xf60f6860"
+  },
+  {
+   "file_id": "0x109c6",
+   "path": "enemy\\cmd_tbl\\em070_01_cmdtbl",
+   "type": "0x3aabba02",
+   "path_hash": "0xce86a01a"
+  },
+  {
+   "file_id": "0x109c7",
+   "path": "effect\\pel\\em\\em070_01u",
+   "type": "0x5a525c16",
+   "path_hash": "0x6abeb505"
+  },
+  {
+   "file_id": "0x109c8",
+   "path": "effect\\psl\\enemy\\em070\\em070_01\\mot\\em070_01_0",
+   "type": "0x254309c9",
+   "path_hash": "0x95420f0b"
+  },
+  {
+   "file_id": "0x109c9",
+   "path": "effect\\psl\\enemy\\em070\\em070_01\\mot\\em070_01_2",
+   "type": "0x254309c9",
+   "path_hash": "0x7b4c6e27"
+  },
+  {
+   "file_id": "0x109ca",
+   "path": "effect\\psl\\enemy\\em070\\em070_01\\mot\\em070_01_3",
+   "type": "0x254309c9",
+   "path_hash": "0x0c4b5eb1"
+  },
+  {
+   "file_id": "0x109cb",
+   "path": "effect\\psl\\enemy\\em070\\em070_01\\mot\\em070_01_4",
+   "type": "0x254309c9",
+   "path_hash": "0x922fcb12"
+  },
+  {
+   "file_id": "0x109cc",
+   "path": "sound\\call\\em\\em070_01",
+   "type": "0x10ebe843",
+   "path_hash": "0x8f83feb0"
+  },
+  {
+   "file_id": "0x109cd",
+   "path": "sound\\se\\em\\em070_01\\snd_em070_01",
+   "type": "0x1bcc4966",
+   "path_hash": "0x4e1db6da"
+  },
+  {
+   "file_id": "0x109ce",
+   "path": "enemy\\dt_tune\\em070_01_dttune",
+   "type": "0x48e8ac29",
+   "path_hash": "0x4b073523"
+  },
+  {
+   "file_id": "0x109cf",
+   "path": "enemy\\hagi\\hagi_s0_em070_01",
+   "type": "0x33a84e14",
+   "path_hash": "0xd57e119f"
+  },
+  {
+   "file_id": "0x109d0",
+   "path": "enemy\\hagi\\hagi_s1_em070_01",
+   "type": "0x33a84e14",
+   "path_hash": "0x3abc7aa1"
+  },
+  {
+   "file_id": "0x109d1",
+   "path": "enemy\\hagi\\hagi_s2_em070_01",
+   "type": "0x33a84e14",
+   "path_hash": "0xd18bc1a2"
+  },
+  {
+   "file_id": "0x109d2",
+   "path": "enemy\\hagi\\hagi_s3_em070_01",
+   "type": "0x33a84e14",
+   "path_hash": "0x3e49aa9c"
+  },
+  {
+   "file_id": "0x109d3",
+   "path": "enemy\\hagi\\hagi_s4_em070_01",
+   "type": "0x33a84e14",
+   "path_hash": "0xdc95b1e5"
+  },
+  {
+   "file_id": "0x109d4",
+   "path": "enemy\\area_link\\em070_01",
+   "type": "0x4bf84f6f",
+   "path_hash": "0x5e762c9c"
+  },
+  {
+   "file_id": "0x109d5",
+   "path": "enemy\\map_info\\em070_01",
+   "type": "0x197e4d7a",
+   "path_hash": "0x7824ec58"
+  },
+  {
+   "file_id": "0x109d6",
+   "path": "enemy\\area_select\\em070_01",
+   "type": "0x15e98d21",
+   "path_hash": "0xe91a7a80"
+  },
+  {
+   "file_id": "0x109d7",
+   "path": "enemy\\area_eat\\em070_01",
+   "type": "0x56d892d0",
+   "path_hash": "0x1500c7f5"
+  }
+ ],
+ "notes": [
+  "shell01 HDS entry 2: byte +6 61 -> 56 (4U uShell003 record 216, hers at G rank)",
+  "shell families: 4 defs name her PEL",
+  "material XfB__m01_add: template add, type 1, ['em070_01_01_BM', 'em070_01_01_BM+A'], 4U params ['tAlbedoMap']",
+  "material XfB__m00_eye: template unlit, type 0, ['em070_01_01_BM', 'em070_01_01_BM+A'], 4U params ['tAlbedoMap', 'tLutShininess', 'tLutFresnel']",
+  "material XfB__E__m00_body: template solid_sphere, type 0, ['em070_01_01_BM', 'em070_01_01_BM+A'], 2 4U animations, 4U params ['tAlbedoMap', 'tExtendMap', 'tLutShininess', 'tLutFresnel']",
+  "material XfBA_E__m00_hair: template solid_at, type 0, ['em070_01_01_BM', 'em070_01_01_BM+A'], 4U params ['tAlbedoMap', 'tLutShininess', 'tLutFresnel']",
+  "material XfBAN__E1__m50_skin: template solid_at, type 50, ['em070_01_02_BM', 'em070_01_02_BM+A'], 4U params ['tAlbedoMap', 'tNormalMap', 'tLutShininess', 'tLutFresnel']",
+  "material XfB__E__m00_poison: template solid_sphere, type 0, ['em070_01_01_BM', 'em070_01_01_BM+A'], 4U params ['tAlbedoMap', 'tExtendMap', 'tLutShininess', 'tLutFresnel']",
+  "skeleton: 42 bones equal to GU em070_00's; largest bind position difference 0.0 (bone 146)",
+  "parts states: 18 (GU layout), groups dropped (not in em096): []",
+  "motions bank 0: GU's tracks in 40 slots, her event blocks kept; 0 slots stay 4U's; file 629272 B -> 844800 B",
+  "motions bank 2: GU's tracks in 32 slots, her event blocks kept; 0 slots stay 4U's; file 699540 B -> 909328 B",
+  "motions bank 2: her 4U list + GU's animations in the slots she lacks [11, 12, 13, 26, 40, 41, 48, 50, 53, 78, 79]",
+  "motions bank 3: GU's tracks in 38 slots, her event blocks kept; 0 slots stay 4U's; file 892584 B -> 1145424 B",
+  "motions bank 4: GU's tracks in 16 slots, her event blocks kept; 0 slots stay 4U's; file 220968 B -> 263744 B",
+  "motions bank 4: her 4U list + GU's animations in the slots she lacks [7, 8]",
+  "AI table: 4U em027_cmd for em 96; GU's [(0, 0), (0, 1), (0, 12), (0, 17), (1, 83), (1, 84), (20, 0)]; GU's group [16]; GU extra entries appended (['g0 s24..s24', 'g1 s107..s126']); 112 scripts equal to GU's, her own bodies in [(0, 2), (0, 3), (0, 6), (0, 18), (0, 19), (0, 20), (0, 21), (0, 22), (0, 23), (1, 7), (1, 44), (1, 53), (1, 65), (1, 68), (1, 75), (1, 76), (1, 78), (1, 80), (1, 81), (1, 82), (1, 85), (1, 86), (1, 89), (1, 90), (1, 94), (1, 95), (1, 98), (1, 99), (1, 100), (1, 101), (1, 102), (1, 103), (1, 104), (1, 105), (1, 106), (4, 0), (12, 0), (13, 0)]; frenzy branches cut in [(0, 2)]",
+  "effect area colour: Dunes soil median (211, 165, 117, 255) (11 areas)",
+  "effects: 5 records on her ground [50, 500, 501, 503, 504] (world posts, module/em070_01_fx.c), 3 records end with their event range",
+  "effects bank 0: GU's common effects in 11 motions; GU's forest debris not taken (slot, id): [(6, 151)]",
+  "effects bank 0 slot 6: out [(4, 50)], GU Diablos' []",
+  "effects bank 0 slot 8: out [(4, 50)], GU Diablos' []",
+  "effects bank 0 slot 61: out [(3, 30), (3, 31)], GU Diablos' []",
+  "effects bank 0 slot 62: out [(3, 30), (3, 31)], GU Diablos' []",
+  "effects bank 2: GU's common effects in 11 motions; GU's forest debris not taken (slot, id): [(25, 150), (26, 150)]",
+  "effects bank 3: GU's common effects in 17 motions; GU's forest debris not taken (slot, id): []",
+  "effects bank 4: GU's common effects in 2 motions; GU's forest debris not taken (slot, id): [(8, 150), (9, 150), (12, 150)]",
+  "effects bank 4 slot 33: out [(3, 250)], GU Diablos' []",
+  "effects bank 4 slot 34: out [(3, 250)], GU Diablos' []",
+  "effects bank 0: 4U ground-flag records left in her motions: {}",
+  "effects bank 2: 4U ground-flag records left in her motions: {}",
+  "effects bank 3: 4U ground-flag records left in her motions: {501: [4]}",
+  "effects bank 4: 4U ground-flag records left in her motions: {504: [9, 12, 33], 503: [34]}",
+  "effects: 78 entries (tools/efl4u2gu.py effect_set)",
+  "  MEF id 1007: group 3 file 6 has no 4U EFL -> no PEL record",
+  "  MODEL effect\\base\\cm\\cm000\\cm000_000: 1 materials",
+  "  MODEL effect\\base\\em\\em096\\ef_em096: 2 materials",
+  "  MODEL effect\\base\\qe\\qe000\\qe000_001: 1 materials",
+  "  MODEL effect\\base\\qe\\qe001\\qe001_000: 2 materials",
+  "  PSL anim 19 slot 0: MEF id 1100 has no PEL record (not in the MEF)",
+  "  PSL anim 37 slot 0: MEF id 1100 has no PEL record (not in the MEF)",
+  "  PEL effect\\pel\\em\\em070_01u: 63 records (list 1) + 26 GU records (list 2); PSL x4 from LMT event group 2",
+  "em096 sound: 54 waves (54 used by the bank), bank 10 groups / 145 entries, request 270 entries (20 common-bank entries from GU em070_00, 0 converted), sound call 51845 B",
+  "dttune: GU em070_00 + 42 bytes of 4U em027 -> em096 differences at 0x8e..0x11d (GU retuned 7 other bytes); base HP 3900 (Nerscylla 3900)",
+  "area_link map 5: kinds 1, 2 = her 4U hops over the links {4: [5, 10], 5: [4], 7: [10], 10: [4, 7]}; kind 4 = her way to area 5: {4: [4, 5], 5: [5], 7: [7, 10, 4, 5], 10: [10, 4, 5]}",
+  "area_eat map 5: GU Nerscylla's eating row (of 2)",
+  "map_info block 5: areas [4, 5, 7, 10], eat [4], sleep [5], stay timers her 4U (s) {4: (120, 120, 240), 5: (120, 120, 300), 7: (120, 120, 360), 10: (30, 30, 60)}",
+  "area_select map 5 from her 4U routing (g0 s12), sleep [5]: {4: [(2, 5, [(5, 83), (10, 17)]), (2, 10, [(5, 83), (10, 17)]), (4, 255, [(5, 100)]), (0, 255, [(5, 83), (10, 17)])], 5: [(2, 4, [(4, 100)]), (0, 255, [(4, 100)])], 7: [(2, 10, [(10, 100)]), (4, 255, [(10, 100)]), (0, 255, [(10, 100)])], 10: [(2, 4, [(7, 100)]), (2, 7, [(4, 100)]), (4, 255, [(4, 100)]), (0, 255, [(7, 80), (4, 20)])]}",
+  "shared from em070_00: 576 files kept, 33 dropped (replaced or its model)",
+  "effects: GU Diablos' records () in her PEL u (GU em007_00) + 1401 (1400 placed once), 0 files added: []",
+  "effects: 48 files moved before her PEL u"
+ ]
+}
