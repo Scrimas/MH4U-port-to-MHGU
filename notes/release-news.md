@@ -4,6 +4,16 @@ tools/release.py puts the section of the core version being packaged into the re
 groups, **New** (something added) and **Fixed** (what works now, not what was broken), one short plain line each,
 written for players; write the section before `release.py package`.
 
+## v1.9.0
+**New**
+- Monoblos, ported by @Rukasu1609, with his MH4U AI and attacks, 6 quests from MH4U (High and G rank, village and
+  hub), his Mono S / Mono X armor, 14 weapons in 5 lines and a Hunter's Notes page.
+- Black Gravios now has his Hunter's Notes page.
+- Ported monsters that MHGU has no record slot for keep their own hunt and capture counts and crown sizes in your save.
+
+**Fixed**
+- Ported weapons and armor are listed in the smithy among MHGU's gear of the same rarity.
+
 ## v1.8.0
 **New**
 - Black Gravios, ported by @Rukasu1609, with his 8 quests from MH4U, his Gravios U / Gravios Z armor and 6 weapon

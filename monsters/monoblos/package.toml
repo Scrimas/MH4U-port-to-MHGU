@@ -1,7 +1,8 @@
 # Monoblos package: what the installer shows and installs, and the version written into its data file.
 name = "monoblos"
 title = "Monoblos"
-version = "0.4.9"       # bump on every published change of this monster's files (data, assets or code); 0.4.9:
+version = "1.0.0"       # bump on every published change of this monster's files (data, assets or code); 1.0.0:
+                        # first release (core 1.9.0); 0.4.9:
                         # every turn of his (unaware, engaged, enraged) is the quick turn, the maintainer confirmed after
                         # viewing 4U footage (4U's code: the slow one; a deviation); 0.4.8:
                         # his ways to eat and to sleep follow his 4U hops (area_link kinds 2 / 4 were GU Diablos'); 0.4.7:
@@ -41,7 +42,7 @@ version = "0.4.9"       # bump on every published change of this monster's files
                         # his 4U routes on the Dunes (hop table, next-area shares, stay timers); 0.1.0:
                         # stage 1 (notes/plan.md "Stages"): his model, own motions, dttune, name, icon, size, lease save
                         # and his three 4U quests; GU Diablos' AI and handlers (a deviation until stage 2)
-requires_core = "1.8.0"    # oldest core module (exefs) that runs this version: plus the save store (save = "lease")
+requires_core = "1.9.0"    # oldest core module (exefs) that runs this version: the save store (save = "lease")
 code = "em007_01"          # C prefix of its module code (hooks gated on GU variant 1)
 gu_class = "uEm007_00"     # GU's Diablos class runs it as variant 1 (module/build.py: registry DTI = donor's; built
                            # with that name at GU 0x50410, the class tools/apialign2.py pairs with 4U uEm099)

@@ -3,7 +3,10 @@
 # (tools/release.py). Bump on every published change of the module or of any data file.
 name = "core"
 title = "MH4U Port core"
-version = "1.8.0"          # 1.8.0: Black Gravios (PR #12, Gravios variant 1), hooks off Damage Numbers' checked
+version = "1.9.0"          # 1.9.0: Monoblos (PR #17, Diablos variant 1), the save store for monsters past GU's
+                           #        slots (hunts, captures, sizes; slot leases), Hunter's Notes past entry 127
+                           #        (Black Gravios 128, Monoblos 129), ported gear in the smithy by rarity;
+                           # 1.8.0: Black Gravios (PR #12, Gravios variant 1), hooks off Damage Numbers' checked
                            #        bytes (issue #13), Gogmazios tar HUD icon / rage roar (#5), Dalamadur meteor
                            #        scales, the build on Windows and Linux;
                            # 1.7.3: hooks off Forge-checked bytes (issue #10), Stygian sound / aura / kill cam (#8),
