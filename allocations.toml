@@ -23,7 +23,8 @@ notes_entry = [123, 159]                # Hunter's Notes: 123..127 = free bits o
                                         # bit, their state comes from their cleared quests (module/notes.c)
 quests = [11491, 11492, 11493, 11494, 10790, 10791, 10792, 11495, 11496,   # checked free (no file, no list
           10775, 10776, 10777, 10778, 10779, 11426, 11427, 11428, 11429, 1023, 1024, 10780, 11430, 10781, 1025,
-          1056, 10782, 10783, 11451, 1057, 1058, 1059, 10784, 10785, 11452]
+          1056, 10782, 10783, 11451, 1057, 1058, 1059, 10784, 10785, 11452, 11368, 11453,
+          1062, 11370, 11371]
                                         # entry; v1.0 RomFS); 107NN = Hub HR 7, 114NN = Hub G4 (the ID's digits decide
                                         # which hub loads it, the questData bytes the rank: plan.md Dalamadur 6.),
                                         # 10NN = village ★10 (Stygian Zinogre, 2026-10-28); 10780 / 11430 / 10781 /
@@ -32,7 +33,12 @@ quests = [11491, 11492, 11493, 11494, 10790, 10791, 10792, 11495, 11496,   # che
                                         # 10783 / 11451 (Black Gravios, 2026-11-01, PR #12 review: in the checked free
                                         # runs 1056..1099 / 10775..10789 / 11451..11453 of stygian_zinogre/notes/
                                         # quests.md 3.); 10784 / 10785 / 11452 (Monoblos' hub quests, 2026-11-05: no
-                                        # q%07d.arc in the v1.4 RomFS, no quest_group entry, C)
+                                        # q%07d.arc in the v1.4 RomFS, no quest_group entry, C); 11368 / 11453
+                                        # (Tidal Najarala's, 2026-11-06, the same check); 1062 / 11370 / 11371
+                                        # (Shrouded Nerscylla's, 2026-11-06, the same check). Only the quests 4U has: 4U's
+                                        # caravan quests go to the village, its guild quests to the hub (the user,
+                                        # 2026-11-08; Monoblos' hub copies were the exception: 4U has no multiplayer quest
+                                        # of his), and no Arena quests (the user, 2026-11-08: Tidal's 11497 = 4U m11016 gone)
 quest_slots = [1011009, 1011003, 1011048, 1011049, 1010007, 1010177, 1110009, 1110114, 1110115]
                                         # quest_group group-127 entries renamed in memory. 1010007 / 1010177 / 1110009 /
                                         # 1110114 / 1110115 (indexes 1307 / 1329 / 1314 / 1393 / 1394, 2026-10-21):
@@ -471,3 +477,115 @@ w01 = 3
 w03 = 4
 w04 = 2
 w07 = 3
+
+[[monster]]
+name = "tidal_najarala"                 # folder monsters/tidal_najarala (4U em093, run by 4U's uEm023 with Najarala and
+                                        # Apex Tidal Najarala: notes/plan.md)
+title = "Tidal Najarala"
+em_id = 0x144                           # Najarala (em 68) variant 1: GU's own class runs it (package.toml gu_class); GU
+                                        # ships em068_00 only and its class keeps 4U's tests for her as variant tests
+registry_index = 146
+donor_index = 57                        # Najarala em068_00 (GU pair 0x44 -> 57)
+standin_id = 0x44                       # her quests name Najarala (loader-visible), swapped to 0x144 at spawn
+file_ids = [0x10980, 0x109bf]
+save = "lease"                          # no free save slot: she borrows one per quest (module/save.c)
+name_entry = 227                        # 'dummy7' of monsterName's second list (first list 105..111 all taken); the
+                                        # second list's other uses name GU's own monsters by their own numbers, C:
+                                        # notes/plan.md "Name"
+ui_icon = 206
+icon_4u = 102                           # her quests' board icon: 4U m10822 / m11016 / m22002 +0xE8 list 103 = index + 1
+                                        # (right block; cell 102 = Tidal Najarala, C by its art, allocations Tigerstripe)
+notes_entry = 130                       # past the save map: no save bit (module/notes.c)
+quests = [11368, 11453]                 # 4U m10822 / m11022: guild quests only, so hub only; no Arena quest (m11016 out) (the user, 2026-11-08)
+                                        # 4U m10822 (hub G1) -> GU hub G3 11368, m11022 (hub G3, Apex there) -> hub G4 11453
+                                        # (11368 = the next free G3 ID; both: no q%07d.arc in the v1.4 RomFS, no quest_group
+                                        # entry, C). Not ported: m11016 (hub G3, Arena, with Zinogre, Tigrex, Gravios) and
+                                        # m22002 (arena, fixed gear): notes/plan.md
+quest_append = true                     # new quest list entries after GU's (module/quest.c), no quest_slots
+items = [3048, 3050]                    # appended after Monoblos': her 3 materials, 4U 1366..1368
+                                        # (monsters/tidal_najarala/tools/items_em068_01.py)
+armor_models = [432, 433]               # 4U Najarala Z, Blademaster / Gunner (unused in GU, C)
+
+[monster.weapon_models]                 # per weapon class (GU model numbers = 4U's, unused in GU, checked by
+w01 = 102                               # tools/gear_weapons_em068_01.py)
+w03 = 88
+w04 = 45
+w07 = 85
+w08 = 81
+w12 = 76
+w13 = 34
+
+[monster.append]
+items = 3
+armor_series = 2                        # Najarala Z (Blademaster + Gunner)
+armor_create = 1                        # the last record the 576 "listed" bits of a head allow (notes/plan.md)
+armor_process = 6                       # the template's level rows (GU Najarala X's; tools/gear_em068_01.py)
+kireaji = 4                             # the last 4 rows mKireType (a byte) can name; 5 more of her 4U sharpness entries:
+                                        # mKireType the nearest GU row (tools/gear_weapons_em068_01.py KIRE_NEAR), her bars
+                                        # the 4U rows from her data file (KIRX, module/gear.c gear_kire_slash)
+notes_text = 1                          # description only (4U emExp[93]; tools/notes_em068_01.py)
+
+[monster.append.weapons]                # BaseData / MsgData / LevelData rows per class: one line each
+w01 = 2                                 # (tools/gear_weapons_em068_01.py)
+w03 = 3
+w04 = 2
+w07 = 3
+w08 = 2
+w12 = 2
+w13 = 3
+
+[[monster]]
+name = "shrouded_nerscylla"             # folder monsters/shrouded_nerscylla (4U em096, run by 4U's uEm027 with Nerscylla: notes/plan.md)
+title = "Shrouded Nerscylla"
+em_id = 0x146                           # Nerscylla (em 70) variant 1: GU's own class runs it (package.toml gu_class); GU
+                                        # ships em070_00 only and dropped 4U's tests of her (module/em070_01.c)
+registry_index = 147
+donor_index = 126                       # Nerscylla em070_00 (GU pair 0x46 -> 126)
+standin_id = 0x46                       # her quests name Nerscylla (loader-visible), swapped to 0x146 at spawn; no 4U quest of
+                                        # hers has a real Nerscylla next to her (C)
+file_ids = [0x109c0, 0x109ff]
+save = "lease"                          # no free save slot: she borrows one per quest (module/save.c)
+name_entry = 226                        # 'dummy6' of monsterName's second list (Tidal Najarala took 227)
+ui_icon = 207
+icon_4u = 105                           # her quests' board icon: 4U m01014 / m10902 / m10914 +0xE8 list 106 = index + 1 (right block)
+notes_entry = 131                       # past the save map: no save bit (module/notes.c)
+quests = [1062, 11370, 11371]           # 4U m01014 caravan -> village; m10902 / m10914 guild -> hub (the user, 2026-11-08)
+                                        # 4U m01014 (caravan ★10) -> GU village ★10 G 1062 (the free run 1056..1099 of
+                                        # stygian_zinogre/notes/quests.md 3.); m10902 and m10914 (hub G2) -> hub G3 11370 / 11371
+                                        # (GU's rank of its solo Nerscylla hunt q11332; free: no q%07d.arc in the v1.4 RomFS, no
+                                        # quest_group entry, C). All on 4U's night Dunes, all G rank. m22003 (arena, fixed gear):
+                                        # not ported, as the earlier ports' preset-gear Arena quests
+quest_append = true                     # new quest list entries after GU's (module/quest.c), no quest_slots
+items = [3051, 3054]                    # appended after Tidal Najarala's: her 4 materials, 4U 1406..1409
+                                        # (monsters/shrouded_nerscylla/tools/items_em070_01.py)
+armor_models = [434, 435]               # 4U Nerscylla Z, Blademaster / Gunner (unused in GU, C)
+
+[monster.weapon_models]                 # per weapon class (GU model numbers = 4U's, unused in GU, checked by
+w00 = 106                               # tools/gear_weapons_em070_01.py)
+w01 = 106
+w02 = 108
+w04 = 49
+w07 = 90
+w09 = 92
+w10 = 85
+w13 = 42
+w14 = 36
+
+[monster.append]
+items = 4
+armor_series = 2                        # Nerscylla Z (Blademaster + Gunner)
+armor_create = 1                        # the head's record is number 576: past the save's 576 "listed" bits, its bit lives in the mod's store (module/gear.c)
+armor_process = 6                       # the template's level rows (GU Nerscylla X's; tools/gear_em070_01.py)
+notes_text = 1                          # description only (4U emExp[96]; tools/notes_em070_01.py)
+
+[monster.append.weapons]                # BaseData / MsgData / LevelData rows per class: one line each
+w00 = 2                                 # (tools/gear_weapons_em070_01.py); no sharpness row of her own (the table is full):
+                                        # mKireType GU's nearest rows, her bars the 4U rows from her data file (KIRX)
+w01 = 2
+w02 = 2
+w04 = 2
+w07 = 2
+w09 = 2
+w10 = 2
+w13 = 3
+w14 = 3
