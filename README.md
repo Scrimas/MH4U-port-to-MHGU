@@ -1,7 +1,7 @@
 <h1 align="center" style="text-align: center">MH4U Port</h1>
 <p align="center" style="text-align: center"><b>Monster Hunter 4 Ultimate monsters in Monster Hunter Generations Ultimate (Switch, v1.4)</b></p>
 <p align="center" style="text-align: center"><a href="../../releases/latest"><img src="https://img.shields.io/github/v/release/Scrimas/MH4U-port-to-MHGU?label=release" alt="Release"></a> <a href="../../releases"><img src="https://img.shields.io/github/downloads/Scrimas/MH4U-port-to-MHGU/total" alt="Downloads"></a> <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue" alt="License: GPL-3.0-or-later"></a> <img src="https://img.shields.io/badge/MHGU-Switch%20v1.4-c0392b" alt="MHGU v1.4"> <img src="https://img.shields.io/badge/runs%20on-Ryujinx%20%7C%20yuzu%20%7C%20Eden-555" alt="Runs on Ryujinx, yuzu, Eden"></p>
-<p align="center" style="text-align: center"><a href="#monsters-and-quests"><img src=".github/icons/Gogmazios.png" width="72" alt="Gogmazios" title="Gogmazios"></a> <a href="#monsters-and-quests"><img src=".github/icons/Dalamadur.png" width="72" alt="Dalamadur" title="Dalamadur"></a> <a href="#monsters-and-quests"><img src=".github/icons/Dalamadur_Tail.png" width="72" alt="Dalamadur (tail)" title="Dalamadur (tail)"></a> <a href="#monsters-and-quests"><img src=".github/icons/Shah_Dalamadur.png" width="72" alt="Shah Dalamadur" title="Shah Dalamadur"></a> <a href="#monsters-and-quests"><img src=".github/icons/Shah_Dalamadur_Tail.png" width="72" alt="Shah Dalamadur (tail)" title="Shah Dalamadur (tail)"></a> <a href="#monsters-and-quests"><img src=".github/icons/Tigerstripe_Zamtrios.png" width="72" alt="Tigerstripe Zamtrios" title="Tigerstripe Zamtrios"></a> <a href="#monsters-and-quests"><img src=".github/icons/Stygian_Zinogre.png" width="72" alt="Stygian Zinogre" title="Stygian Zinogre"></a> <a href="#monsters-and-quests"><img src=".github/icons/Black_Gravios.png" width="72" alt="Black Gravios" title="Black Gravios"></a></p>
+<p align="center" style="text-align: center"><a href="#monsters-and-quests"><img src=".github/icons/Gogmazios.png" width="72" alt="Gogmazios" title="Gogmazios"></a> <a href="#monsters-and-quests"><img src=".github/icons/Dalamadur.png" width="72" alt="Dalamadur" title="Dalamadur"></a> <a href="#monsters-and-quests"><img src=".github/icons/Dalamadur_Tail.png" width="72" alt="Dalamadur (tail)" title="Dalamadur (tail)"></a> <a href="#monsters-and-quests"><img src=".github/icons/Shah_Dalamadur.png" width="72" alt="Shah Dalamadur" title="Shah Dalamadur"></a> <a href="#monsters-and-quests"><img src=".github/icons/Shah_Dalamadur_Tail.png" width="72" alt="Shah Dalamadur (tail)" title="Shah Dalamadur (tail)"></a> <a href="#monsters-and-quests"><img src=".github/icons/Tigerstripe_Zamtrios.png" width="72" alt="Tigerstripe Zamtrios" title="Tigerstripe Zamtrios"></a> <a href="#monsters-and-quests"><img src=".github/icons/Stygian_Zinogre.png" width="72" alt="Stygian Zinogre" title="Stygian Zinogre"></a> <a href="#monsters-and-quests"><img src=".github/icons/Black_Gravios.png" width="72" alt="Black Gravios" title="Black Gravios"></a> <a href="#monsters-and-quests"><img src=".github/icons/Monoblos.png" width="72" alt="Monoblos" title="Monoblos"></a></p>
 <p align="center" style="text-align: center"><a href="#monsters-and-quests">Monsters</a> · <a href="#install">Install</a> · <a href="#how-it-works">How it works</a> · <a href="#contributing">Contributing</a> · <a href="#roadmap">Roadmap</a></p>
 
 This is not a reskin. The mod injects its own code into MHGU, so each ported monster runs its MH4U behaviour, traced
@@ -21,6 +21,7 @@ as they are.
 | **Tigerstripe Zamtrios**           | 1 · G★3                     | –              |
 | **Stygian Zinogre**                | 11 · HR★7, G★4, Village★10 | Heaven's Mount |
 | **Black Gravios**                  | 8 · HR★7, G★4, Village★10  | –              |
+| **Monoblos**                       | 6 · HR★7, G★4, Village★10  | –              |
 
 Quests are on the Hub quest board (Village quests on the village board). Ranks follow MH4U: each quest sits where its
 monster's MH4U rank falls among MHGU's quests of the same species.
@@ -39,6 +40,8 @@ monster's MH4U rank falls among MHGU's quests of the same species.
 - **Black Gravios:** HR★7 *Advanced: Armor Amore* · *Ore D'oeuvre* · *Advanced: Dance with Dragons* ·
   *Advanced: Gravios Fortunes* · G★4 *Hollow Promise* · *Advanced: A Black Day* · Village★10 *Black Rock Down* ·
   *Advanced: Whale of a Hammer*
+- **Monoblos:** HR★7 *Skiff Competition* · *The Hero and the Sandy Spear* · G★4 *Bad Hair Day: Monoblos* ·
+  Village★10 *Skiff Competition* · *The Hero and the Sandy Spear* · *Bad Hair Day: Monoblos*
 
 </details>
 
@@ -108,17 +111,19 @@ Subject to change, not ordered
 - [x] Tigerstripe Zamtrios
 - [x] Stygian Zinogre
 - [x] Black Gravios
+- [x] Monoblos
 - [ ] Magnet Spike (MHF-ZZ weapon class), in progress as of Oct 29, 2026
 - [ ] Tidal Najarala
 - [ ] Shrouded Nerscylla
 - [ ] Desert Seltas Queen & Desert Selta
 - [ ] G-rank Crimson Fatalis
-- [ ] Monoblos & White Monoblos
+- [ ] White Monoblos
 
 ## Credits
 
 - [@jM5557](https://github.com/jM5557), for adding support to Yuzu, Eden and other Yuzu-based emulators
-- [@Rukasu1609](https://github.com/Rukasu1609), for the Black Gravios port ([PR #12](https://github.com/Scrimas/MH4U-port-to-MHGU/pull/12))
+- [@Rukasu1609](https://github.com/Rukasu1609), for the Black Gravios ([PR #12](https://github.com/Scrimas/MH4U-port-to-MHGU/pull/12))
+  and Monoblos ([PR #17](https://github.com/Scrimas/MH4U-port-to-MHGU/pull/17)) ports
 
 ## License
 
