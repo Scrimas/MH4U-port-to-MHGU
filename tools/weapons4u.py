@@ -6,6 +6,8 @@ PWLF, tools/portdata.py; read by module/gear.c) and module/gear_hooks.txt, share
   import weapons4u
   tables, texts, hooks, summary, log, kire = weapons4u.build(spec)
   secs, hooks_txt = weapons4u.sections(tables, texts, hooks, spec['pwl_fix'])
+  # or, the 4U rows of the kire_near weapons as their own sharpness (section KIRX, module/gear.c gear_kire_slash):
+  exact = []; ... = weapons4u.build(spec, exact); ... = weapons4u.sections(tables, texts, hooks, spec['pwl_fix'], exact)
 
 spec = dict(name=allocations.toml name, materials=items4u.Materials, classes=[class spec], status={4U status: GU
 mElement}, kire_4u=[4U sharpness entries, in append order], pwl_fix=[(path suffix, model, GU value, ours)],
@@ -15,7 +17,8 @@ ammo={4U id: ammo string} (bowguns, optional: default the 4U record's, a given s
 bow=dict(kyoku, tame, bottles, cshot={4U id: expected charge shots}; each optional: kyoku None / absent = the
 stand-in's (not in the 4U record), bottles default the 4U record's coatings, tame / cshot given = checked against the
 record), hh=(4U note set, GU fueMusicData) (optional: default the 4U set's own index, the two tables being equal),
-insect=GU mInsectType, srqr=sound set (default the model number: the 4U arc's own sounds converted by
+insect=GU mInsectType, insect_4u=the 4U kinsect kind it stands for (optional: default 0 Cutting, checked against the
+4U record; 1 = Impact), srqr=sound set (default the model number: the 4U arc's own sounds converted by
 tools/wsnd4u2gu.py; a 4U arc holding another weapon's set uses GU's arc of that number), first_upgrade=True (the
 first weapon has no 4U create recipe: it is forged from its own 4U upgrade recipe's materials, the parent left out)).
 
@@ -51,7 +54,10 @@ Rules (notes section 8; port choices made for Gogmazios, kept for every monster)
   - Element / status (melee and bows): the 4U value (value / 10 in both games), hidden (negative, needs Awaken)
     made visible (GU has no Awaken); statuses through spec status, a weapon with both: refused. DB: mElement1 = the
     record's, mElement2 = its DB2_4U entry's (S: the GU same-name dual DBs keep that order).
-  - Sharpness: the monster's 4U entries appended to kireajiData; mKireLevel = 2 x the 4U level.
+  - Sharpness: the monster's 4U entries appended to kireajiData; mKireLevel = 2 x the 4U level. The table is full
+    (mKireType is a byte, 256 rows): spec kire_reuse takes GU's row where it holds the same values, kire_near the
+    nearest GU row; with build(spec, exact) those weapons also get the 4U row itself (KIRX: the core answers GU's
+    sharpness getter with it, the GU row in mKireType stays the fallback for a core without that hook).
   - Recipes: the 4U exe's, items by English name in GU itemData_eng (our materials included; spec substitutes for 4U
     items GU lacks); create: mLv 1, mKey[0] 2, no provision, no scraps; process: one level-1 record per weapon,
     all-zero for a create weapon, no provision, no scraps.
@@ -196,6 +202,30 @@ def weapon_4u(exe, nn, ptab, i):
                 status=r[14], value=s8(r, 15), slots=r[16], extra=r[17], rare=r[19] + 1)
 
 
+def gu_scale(nn, res, lres, t4, exe):
+    """(raw, element) ratio of class nn, GU's final level / the 4U value over the weapons both games have by name at 4U G rarity (8..10), medians: what a one-level weapon needs to stand on GU's balance
+    (class spec raw_scale, elem_scale). 4U's G weapons end where GU's first levels do, GU's level them on (C, Shrouded Nerscylla 2026-11-06: all classes 1.16 raw, 1.11 element)"""
+    short, txt, ptab, ctype = CLASS_INFO[nn]
+    n, base = table(res['table\\weapon%02dBaseData' % nn], base_layout(nn))
+    _, lv = table(res['table\\weapon%02dLevelData' % nn], level_layout(nn))
+    g = gmd(lres['eng\\table\\weapon%02dMsgData_eng' % nn])
+    names = {g[6 * i]: i for i in range(n)}
+    final = {}
+    for r in lv: final[r['mNo']] = r
+    raw, elem = [], []
+    for i, nm in enumerate(t4[txt + 'Name']):
+        if not nm or nm not in names or names[nm] not in final: continue
+        w = weapon_4u(exe, nn, ptab, i)
+        if not 8 <= w['rare'] <= 10 or not w['raw']: continue
+        r = final[names[nm]]
+        raw.append(r['mAttack'] / w['raw'])
+        v4, vg = abs(w.get('value') or w.get('elem_value') or 0), r.get('mElementValue')
+        if v4 and vg: elem.append(vg / v4)
+    assert len(raw) >= 3, (nn, raw)
+    med = lambda x: sorted(x)[len(x) // 2]
+    return med(raw), med(elem) if elem else 1.0
+
+
 def elem_status(w, status):
     """(GU mElement, value / 10) of a 4U record: its element, else its status (spec status: 4U -> GU), else none"""
     if w['elem'] and w['status']:
@@ -245,8 +275,11 @@ def recipes_4u(exe, t4, ctype, ids4u, nn, first_upgrade=False):
     out = []
     hits = [a for a in range(CREATE_4U[0], CREATE_4U[1], 24) if struct.unpack_from('<HH', exe, a + 4 - EXE_BASE) ==
             (ctype, ids4u[0])]
-    if first_upgrade:
-        assert not hits and nn != 13, (ctype, ids4u[0], hits)
+    if first_upgrade and nn == 13:      # the IG upgrade row (ID and level 0 on a G weapon upgraded from an HR one, C)
+        assert not hits, (ctype, ids4u[0], hits)
+        v = struct.unpack_from('<6H', exe, IG_UPGRADE_4U + 12 * ids4u[0] - EXE_BASE)[2:]
+    elif first_upgrade:
+        assert not hits, (ctype, ids4u[0], hits)
         v = struct.unpack_from('<8H', exe, u32(exe, UPGRADE_4U + 4 * (ctype - 7)) + 24 * ids4u[0] - EXE_BASE)
     else:
         assert len(hits) == 1, (ctype, ids4u[0], hits)
@@ -321,7 +354,9 @@ def gu_class(name, version):
     return dict(load=load, alloc=alloc_, free=free, ctor=ctor, parse=parse, size=sz[0], site=load + 0x3c)
 
 
-def build(spec):
+def build(spec, exact=None):
+    """exact = a list: each weapon whose 4U entry has a kire_near row gets (class, weapon ID, level, that GU row,
+    the 4U entry's 7 mSlash) appended, its own sharpness for sections(..., exact)"""
     name, classes, status = spec['name'], spec['classes'], spec['status']
     kire_4u, subst = list(spec['kire_4u']), spec.get('substitutes', {})
     m_alloc = alloc.monster(name)
@@ -345,8 +380,27 @@ def build(spec):
         return ids[0] if len(ids) == 1 else 0
 
     kd = res['table\\kireajiData']
-    kn, _ = table(kd, KIRE)
+    kn, kire_gu = table(kd, KIRE)
     kn += alloc.offset(name, 'kireaji')
+    # mKireType is a byte, and the ports up to Monoblos filled the table close to 256 rows: spec kire_reuse = True gives a 4U
+    # entry with the values of a GU row that row instead of an appended one
+    kire_row = {}
+    if spec.get('kire_reuse'):
+        for i in list(kire_4u):
+            v = KIRE.dec(exe[KIRE_4U + 14 * i - EXE_BASE:][:14])
+            if v in kire_gu:
+                kire_row[i] = kire_gu.index(v)
+                kire_4u.remove(i)
+                log.append('sharpness 4U entry %d = GU row %d' % (i, kire_row[i]))
+    near = spec.get('kire_near', {})
+    for i, row in near.items():    # a listed deviation of the monster: the GU row nearest the 4U entry
+        kire_row[i] = row
+        kire_4u.remove(i)
+        log.append('sharpness 4U entry %s -> GU row %d %s (%s)' % (
+            tuple(KIRE.dec(exe[KIRE_4U + 14 * i - EXE_BASE:][:14]).values()), row, tuple(kire_gu[row].values()),
+            'no row left: the 4U row itself in KIRX, this GU row the fallback' if exact is not None else
+            'deviation: no row left'))
+    assert kn + len(kire_4u) <= 256, ('sharpness rows past 255: mKireType is a byte', kn, kire_4u)
     assert m_alloc['append'].get('kireaji', 0) == len(kire_4u), 'allocations.toml kireaji != the spec\'s entries'
     def cls(name, version, hook):
         c = gu_class(name, version)
@@ -384,8 +438,8 @@ def build(spec):
             if k + 1 < len(ids):
                 b['mDeriveLv[0]'], b['mDeriveID[0]'] = 1, ids[k + 1]
             r = dict(rows[-1])
-            r.update(mIndex=ln + off + len(lout), mNo=ids[k], mLevel=1, mAttack=w['raw'], mDefense=w['defense'],
-                     mAffinity=w['aff'] & 0xff, mSlotCount=w['slots'])
+            r.update(mIndex=ln + off + len(lout), mNo=ids[k], mLevel=1, mDefense=w['defense'], mAffinity=w['aff'] & 0xff, mSlotCount=w['slots'],
+                     mAttack=w['raw'] if 'raw_scale' not in cs else 10 * round(w['raw'] * cs['raw_scale'] / 10))     # optional class spec raw_scale, elem_scale: gu_scale
             if nn in (4, 6):
                 ammo, no_slot = ammo_4u(w)
                 if i4 in cs.get('ammo', {}) and cs['ammo'][i4] != ammo:
@@ -410,6 +464,7 @@ def build(spec):
             elif nn == 10:
                 bow = cs['bow']
                 b['mElement'], val = elem_status(w, status)
+                if 'elem_scale' in cs: val = round(val * cs['elem_scale'])
                 cshot = tuple(c + 1 for c in w['charges'])      # 4U Rapid n = n - 1, Spread n + 4, Pierce n + 9 -> GU + 1 (S)
                 assert i4 not in bow.get('cshot', {}) or cshot == bow['cshot'][i4], (i4, cshot)
                 assert bow.get('tame', w['tame']) == w['tame'], (i4, w['tame'])
@@ -427,7 +482,27 @@ def build(spec):
                 for j in range(12): r['mLoadEnableBottle[%d]' % j] = bottles[j]
             else:
                 elem, val = elem_status(w, status)               # 4U hidden (negative) -> visible
-                r.update(mKireType=kn + kire_4u.index(w['sharp']), mKireLevel=2 * w['kire'])
+                if 'elem_scale' in cs: val = round(val * cs['elem_scale'])
+                r.update(mKireType=kire_row[w['sharp']] if w['sharp'] in kire_row else kn + kire_4u.index(w['sharp']),
+                         mKireLevel=2 * w['kire'])
+                if exact is not None and w['sharp'] in near:
+                    slash = tuple(KIRE.dec(exe[KIRE_4U + 14 * w['sharp'] - EXE_BASE:][:14]).values())
+                    gu_row = tuple(kire_gu[r['mKireType']].values())
+                    assert all(a <= b for a, b in zip(slash, slash[1:])) and r['mLevel'] == 1, (short, ids[k], slash)
+                    if slash[6] < 450:
+                        # 4U's HR entries 0..47 end at 400, every GU row at 450 (C), and GU's colour at a sharpness
+                        # (0xf4794) answers 7 past the row's end. GU's rows 0..47 are those entries (C: the first four
+                        # values of all 48 equal, 47 equal up to 400, 42 lost its purple): where the GU row equals the
+                        # 4U entry up to its end, every bar 4U shows is GU's already, and the weapon keeps that row
+                        if tuple(min(v, slash[6]) for v in gu_row) != slash:
+                            sys.exit('%s %d: 4U sharpness %s ends below 450 and GU row %d %s differs below that end' % (
+                                short, ids[k], slash, r['mKireType'], gu_row))
+                        note = 'sharpness 4U entry %d %s ends at %d: GU row %d %s equals it up to there%s, no KIRX row' % (
+                            w['sharp'], slash, slash[6], r['mKireType'], gu_row,
+                            ' (the same index: GU\'s copy of that entry)' if r['mKireType'] == w['sharp'] else '')
+                        if note not in log: log.append(note)
+                    else:
+                        exact.append((nn, ids[k], r['mLevel'], r['mKireType'], slash))
                 if nn == 11:
                     elem2, val2 = db_second_4u(exe, w, status)
                     b.update(mElement1=elem, mElement2=elem2)
@@ -448,7 +523,7 @@ def build(spec):
                     assert exe[NOTES_4U - EXE_BASE:][:len(fue) - 8] == fue[8:] and w['extra'] < (len(fue) - 8) // 3
                     r['mFueMusicType'] = w['extra']
                 elif nn == 13:
-                    assert w['extra'] == 0, w                    # Cutting
+                    assert w['extra'] == cs.get('insect_4u', 0), w   # 0 Cutting (default), 1 Impact
                     b['mInsectType'] = cs['insect']
             bout.append(bl.enc(b))
             lout.append(ll.enc(r))
@@ -510,17 +585,19 @@ def build(spec):
             tables[k] = (t[0], cc if 'Create' in t[0] else pc) + t[2:]
     kire = [KIRE.dec(exe[KIRE_4U + 14 * i - EXE_BASE:][:14]) for i in kire_4u]
     assert all(k['mSlash[6]'] <= 450 for k in kire)
-    tables.append(('table\\kireajiData', cls('rKireajiData', kd[:4], 'gear_kireaji'), KIRE.size, kn,
-                   [KIRE.enc(k) for k in kire]))
+    if kire:
+        tables.append(('table\\kireajiData', cls('rKireajiData', kd[:4], 'gear_kireaji'), KIRE.size, kn,
+                       [KIRE.enc(k) for k in kire]))
     for lang in LANGS:
         for nn in [c['nn'] for c in classes]:                    # every language: the same versions as eng
             assert lres[lang]['%s\\table\\weapon%02dMsgData' % (lang, nn)][:4] == lres['eng']['eng\\table\\weapon%02dMsgData' % nn][:4]
     return tables, texts, hooks, summary, log, kire
 
 
-def sections(tables, texts, hooks, pwl_fix):
+def sections(tables, texts, hooks, pwl_fix, exact=()):
     """TBLA (a resource path is matched as a suffix of the path at res+0x8, so the per-language
-    "eng\\table\\weapon00MsgData" is matched by "table\\weapon00MsgData"), TXTA, PWLF; and the hook lines"""
+    "eng\\table\\weapon00MsgData" is matched by "table\\weapon00MsgData"), TXTA, PWLF, KIRX (exact: build's list);
+    and the hook lines"""
     tbl = []
     for path, c, rb, expect, recs in tables:
         flags = portdata.TBL_KIREAJI if path.endswith('kireajiData') else \
@@ -535,6 +612,13 @@ def sections(tables, texts, hooks, pwl_fix):
             pwl.str(path)
             pwl.raw(struct.pack('<HBB', model, frm, to))
         secs.append(pwl)
+    if exact:
+        assert len({e[:3] for e in exact}) == len(exact), 'a weapon twice in KIRX'
+        kx = portdata.Section('KIRX')
+        kx.u32(len(exact))
+        for nn, wid, level, row, slash in exact:
+            kx.raw(struct.pack('<4B7HH', nn, wid, level, row, *slash, 0))
+        secs.append(kx)
     return secs, ''.join('%s 0x%X\n' % (h, s) for h, s, _ in hooks)
 
 
