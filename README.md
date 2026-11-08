@@ -115,9 +115,23 @@ Subject to change, not ordered
 - [ ] Magnet Spike (MHF-ZZ weapon class), in progress as of Oct 29, 2026
 - [ ] Tidal Najarala
 - [ ] Shrouded Nerscylla
-- [ ] Desert Seltas Queen & Desert Selta
+- [ ] Desert Seltas Queen & Desert Seltas
 - [ ] G-rank Crimson Fatalis
 - [ ] White Monoblos
+- [ ] Pink Rathian
+- [ ] Azure Rathalos
+- [ ] Blue Yian Kut-Ku
+- [ ] Purple Gypceros
+- [ ] Red Khezu
+- [ ] Ruby Basarios
+- [ ] Black Diablos
+- [ ] Emerald Congalala
+- [ ] Ash Kecha Wacha
+- [ ] Berserk Tetsucabra
+- [ ] Plum Daimyo Hermitaur
+- [ ] Oroshi Kirin
+- [ ] Rusted Kushala Daora
+- [ ] Dah'ren Mohran
 
 ## Credits
 
