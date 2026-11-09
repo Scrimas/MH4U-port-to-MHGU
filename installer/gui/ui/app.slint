@@ -1,0 +1,813 @@
+// MH4U Port Installer: one window (design "B2 compact", 1066 x 600): the install places and the action on the left,
+// the release's monsters with the maps they bring on the right, dialogs over both. Fluent style (follows the
+// system's light / dark), colours as MHGU_Editor's (app/gui/ui/common.slint Tok). The Rust side (src/main.rs) fills
+// the models and answers the callbacks; nothing here decides what gets installed.
+
+import { Button, ScrollView, ComboBox, Palette, AboutSlint } from "std-widgets.slint";
+
+export struct PlaceRow {
+    id: string,
+    name: string,
+    sub: string,
+    ticked: bool,
+    enabled: bool,
+    warn: bool,
+}
+
+export struct PkgRow {
+    title: string,
+    sub: string,
+    // 0 muted, 1 accent, 2 warning, 3 ok
+    sub-tone: int,
+    size: string,
+    version: string,
+    version-tone: int,
+    on: bool,
+    locked: bool,
+    dep: bool,
+    icon: image,
+    has-icon: bool,
+    monogram: string,
+    // below 0: no bar
+    progress: float,
+}
+
+// a line of a dialog: head = a place's name, tone as PkgRow's
+export struct Line {
+    text: string,
+    tone: int,
+    head: bool,
+}
+
+global Tok {
+    out property <bool> dark: Palette.background.to-hsv().value < 0.5;
+    out property <color> page: dark ? #1c1c1c : #f3f3f3;
+    out property <color> side: dark ? #262626 : #ebebeb;
+    out property <color> card: dark ? #2c2c2c : #fdfdfd;
+    out property <color> raised: dark ? #2f2f2f : #ffffff;
+    out property <color> dep: dark ? #232323 : #f6f6f6;
+    out property <color> line: dark ? #ffffff17 : #00000014;
+    out property <color> track: dark ? #ffffff1f : #0000001a;
+    out property <color> muted: dark ? #ffffffb0 : #0000009c;
+    out property <color> accent: Palette.accent-background;
+    out property <color> accent-soft: Palette.accent-background.transparentize(0.82);
+    out property <color> accent-text: dark ? #60cdff : #005fb8;
+    out property <color> ok: dark ? #6ccb5f : #0f7b0f;
+    out property <color> warn: dark ? #fce100 : #9d5d00;
+    out property <color> bad: dark ? #ff99a4 : #c42b1c;
+    // monster icons were drawn for a dark UI: they sit on a dark tile in both schemes
+    out property <color> tile: #2b2b2b;
+    out property <color> map-tile: dark ? #3a4a3a : #5b6e5b;
+    public pure function tone(t: int) -> color {
+        return t == 1 ? accent-text : t == 2 ? warn : t == 3 ? ok : muted;
+    }
+}
+
+component Tile inherits Rectangle {
+    in property <string> text;
+    in property <image> img;
+    in property <bool> has-img;
+    in property <bool> map;
+    in property <length> size: 32px;
+    width: size;
+    height: size;
+    border-radius: 4px;
+    background: map ? Tok.map-tile : Tok.tile;
+    if has-img: Image {
+        source: root.img;
+        width: root.size;
+        height: root.size;
+        image-rendering: pixelated;
+    }
+    if !has-img: Text {
+        text: root.text;
+        color: #ffffffd8;
+        font-weight: 700;
+        font-size: root.size * 0.38;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+component Link inherits Text {
+    callback clicked;
+    color: Tok.accent-text;
+    TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+component Check inherits Rectangle {
+    in property <bool> on;
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    background: on ? Tok.accent : transparent;
+    border-width: on ? 0px : 1.5px;
+    border-color: Tok.muted;
+    if on: Text {
+        text: "✓";
+        color: Palette.accent-foreground;
+        font-size: 13px;
+        font-weight: 700;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+component Toggle inherits Rectangle {
+    in property <bool> on;
+    in property <bool> locked;
+    callback clicked;
+    width: 40px;
+    height: 20px;
+    border-radius: 10px;
+    background: on ? (locked ? Tok.accent.transparentize(0.45) : Tok.accent) : transparent;
+    border-width: on ? 0px : 1px;
+    border-color: Tok.muted;
+    knob := Rectangle {
+        width: 12px;
+        height: 12px;
+        y: 4px;
+        x: root.on ? root.width - 16px : 4px;
+        border-radius: 6px;
+        background: root.on ? Palette.accent-foreground : Tok.muted;
+        animate x { duration: 120ms; }
+    }
+    TouchArea {
+        enabled: !root.locked;
+        mouse-cursor: root.locked ? MouseCursor.default : MouseCursor.pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+component Bar inherits Rectangle {
+    in property <float> value;
+    height: 4px;
+    border-radius: 2px;
+    background: Tok.track;
+    Rectangle {
+        x: 0;
+        width: parent.width * clamp(root.value, 0, 1);
+        border-radius: 2px;
+        background: Tok.accent;
+    }
+}
+
+component PlaceCard inherits Rectangle {
+    in property <PlaceRow> item;
+    callback toggled;
+    border-radius: 6px;
+    background: Tok.card;
+    border-width: root.item.ticked ? 2px : 1px;
+    border-color: root.item.ticked ? Tok.accent : Tok.line;
+    opacity: root.item.enabled ? 1 : 0.55;
+    TouchArea {
+        enabled: root.item.enabled;
+        mouse-cursor: root.item.enabled ? MouseCursor.pointer : MouseCursor.default;
+        clicked => { root.toggled(); }
+    }
+    HorizontalLayout {
+        padding: 8px;
+        padding-left: 10px;
+        spacing: 10px;
+        Check {
+            on: root.item.ticked;
+            y: (parent.height - self.height) / 2;
+        }
+        VerticalLayout {
+            alignment: center;
+            Text {
+                text: root.item.name;
+                font-weight: 600;
+                overflow: elide;
+            }
+            Text {
+                text: root.item.sub;
+                font-size: 12px;
+                color: root.item.warn ? Tok.warn : Tok.muted;
+                overflow: elide;
+            }
+        }
+    }
+}
+
+component PkgLine inherits Rectangle {
+    in property <PkgRow> item;
+    callback toggled;
+    height: root.item.dep ? 38px : 52px;
+    background: root.item.dep ? Tok.dep : transparent;
+    HorizontalLayout {
+        padding-left: root.item.dep ? 56px : 12px;
+        padding-right: 12px;
+        spacing: 12px;
+        Rectangle {
+            width: root.item.dep ? 24px : 32px;
+            Tile {
+                size: parent.width;
+                text: root.item.monogram;
+                img: root.item.icon;
+                has-img: root.item.has-icon;
+                map: root.item.dep;
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 1;
+            Text {
+                text: root.item.title;
+                font-weight: root.item.dep ? 400 : 600;
+                overflow: elide;
+            }
+            if root.item.sub != "": Text {
+                text: root.item.sub;
+                font-size: 12px;
+                color: Tok.tone(root.item.sub-tone);
+                overflow: elide;
+            }
+        }
+        Text {
+            width: 64px;
+            text: root.item.size;
+            font-size: 12.5px;
+            color: Tok.muted;
+            horizontal-alignment: right;
+            vertical-alignment: center;
+        }
+        Text {
+            width: 120px;
+            text: root.item.version;
+            font-size: 12.5px;
+            color: Tok.tone(root.item.version-tone);
+            horizontal-alignment: right;
+            vertical-alignment: center;
+        }
+        Rectangle {
+            width: 44px;
+            if !root.item.dep: Toggle {
+                on: root.item.on;
+                locked: root.item.locked;
+                clicked => { root.toggled(); }
+            }
+        }
+    }
+    if root.item.progress >= 0: Rectangle {
+        x: 56px;
+        y: root.height - 3px;
+        width: root.width - 68px;
+        height: 3px;
+        background: Tok.track;
+        Rectangle {
+            x: 0;
+            width: parent.width * clamp(root.item.progress, 0, 1);
+            background: Tok.accent;
+        }
+    }
+    Rectangle {
+        y: root.height - 1px;
+        height: 1px;
+        background: Tok.line;
+    }
+}
+
+// a dialog over the window: a click outside does nothing (it closes through its buttons)
+component Dialog inherits Rectangle {
+    in property <string> title;
+    in property <length> box-width: 540px;
+    background: #00000070;
+    TouchArea { }
+    Rectangle {
+        width: root.box-width;
+        height: box.preferred-height;
+        border-radius: 8px;
+        background: Tok.raised;
+        border-width: 1px;
+        border-color: Tok.line;
+        drop-shadow-blur: 24px;
+        drop-shadow-color: #00000060;
+        box := VerticalLayout {
+            padding: 20px;
+            spacing: 12px;
+            Text {
+                text: root.title;
+                font-size: 18px;
+                font-weight: 600;
+                wrap: word-wrap;
+            }
+            @children
+        }
+    }
+}
+
+component Lines inherits ScrollView {
+    in property <[Line]> lines;
+    height: min(root.lines.length * 28px + 16px, 360px);
+    VerticalLayout {
+        spacing: 4px;
+        for l in root.lines: Text {
+            text: l.text;
+            wrap: word-wrap;
+            font-weight: l.head ? 600 : 400;
+            color: l.head ? Palette.foreground : Tok.tone(l.tone);
+            font-size: l.head ? 14px : 13px;
+        }
+    }
+}
+
+component SettingRow inherits Rectangle {
+    in property <string> title;
+    in property <string> sub;
+    in property <bool> on;
+    callback clicked;
+    height: lay.preferred-height;
+    lay := HorizontalLayout {
+        spacing: 12px;
+        VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: center;
+            Text {
+                text: root.title;
+                wrap: word-wrap;
+            }
+            if root.sub != "": Text {
+                text: root.sub;
+                font-size: 12px;
+                color: Tok.muted;
+                wrap: word-wrap;
+            }
+        }
+        Rectangle {
+            width: 44px;
+            Toggle {
+                on: root.on;
+                clicked => { root.clicked(); }
+            }
+        }
+    }
+}
+
+export component AppWindow inherits Window {
+    title: @tr("MH4U Port Installer");
+    icon: @image-url("../assets/icon-256.png");
+    preferred-width: 1066px;
+    preferred-height: 600px;
+    min-width: 1066px;
+    min-height: 600px;
+    background: Tok.page;
+
+    // header
+    in property <string> release-line;
+    in property <bool> has-release;
+    in property <string> version;
+    // the places (left) and the release's packages (right)
+    in property <[PlaceRow]> places;
+    in property <[PkgRow]> rows;
+    in property <string> list-sub;
+    // shown instead of the list while there is no release (loading, offline...)
+    in property <string> status;
+    in property <bool> status-error;
+    // the action: 0 choosing, 1 installing, 2 done
+    in property <int> phase;
+    in property <string> summary;
+    in property <string> summary-sub;
+    in property <string> action;
+    in property <bool> action-enabled;
+    in property <float> progress;
+    in property <string> progress-text;
+    in property <string> done-sub;
+    // the installer's own update card
+    in property <bool> update-shown;
+    in property <string> update-title;
+    in property <string> update-sub;
+    in property <bool> update-busy;
+    in property <float> update-progress;
+    // dialogs: 0 none, 1 confirm (lines + confirm button), 2 message, 3 settings, 4 about
+    in property <int> dialog;
+    in property <string> dialog-title;
+    in property <[Line]> dialog-lines;
+    in property <string> confirm-label;
+    in property <bool> confirm-danger;
+    // settings
+    in property <bool> set-prereleases;
+    in property <bool> set-check-updates;
+    in property <[string]> languages;
+    in property <int> language-index;
+    in property <[PlaceRow]> custom-places;
+
+    callback toggle-place(int);
+    callback add-folder();
+    callback toggle-package(int);
+    callback act();
+    callback cancel();
+    callback finish();
+    callback whats-new();
+    callback open-settings();
+    callback confirm();
+    callback close-dialog();
+    callback update-now();
+    callback toggle-prereleases();
+    callback toggle-check-updates();
+    callback set-language(int);
+    callback remove-custom(int);
+    callback remove-everything();
+    callback open-about();
+
+    HorizontalLayout {
+        // ---------------------------------------------------------------- left: where, and the action
+        Rectangle {
+            width: 330px;
+            background: Tok.side;
+            Rectangle {
+                x: parent.width - 1px;
+                width: 1px;
+                background: Tok.line;
+            }
+            VerticalLayout {
+                padding: 16px;
+                spacing: 12px;
+                HorizontalLayout {
+                    spacing: 10px;
+                    Rectangle {
+                        width: 36px;
+                        Tile {
+                            size: 36px;
+                            y: (parent.height - self.height) / 2;
+                            text: "4U";
+                            background: Tok.accent;
+                        }
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        horizontal-stretch: 1;
+                        Text {
+                            text: "MH4U Port";
+                            font-size: 18px;
+                            font-weight: 600;
+                        }
+                        HorizontalLayout {
+                            spacing: 6px;
+                            alignment: start;
+                            Text {
+                                text: root.release-line;
+                                font-size: 12px;
+                                color: Tok.muted;
+                            }
+                            if root.has-release: Link {
+                                text: @tr("What's new");
+                                font-size: 12px;
+                                clicked => { root.whats-new(); }
+                            }
+                        }
+                    }
+                    Rectangle {
+                        width: 32px;
+                        Rectangle {
+                            width: 32px;
+                            height: 32px;
+                            border-radius: 4px;
+                            background: gear.has-hover ? Tok.track : transparent;
+                            Text {
+                                text: "⚙";
+                                font-size: 18px;
+                                color: Tok.muted;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                            gear := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => { root.open-settings(); }
+                            }
+                        }
+                    }
+                }
+                Text {
+                    text: @tr("Install into");
+                    font-size: 12.5px;
+                    font-weight: 600;
+                    color: Tok.muted;
+                }
+                ScrollView {
+                    vertical-stretch: 1;
+                    VerticalLayout {
+                        spacing: 6px;
+                        for p[i] in root.places: PlaceCard {
+                            item: p;
+                            toggled => { root.toggle-place(i); }
+                        }
+                        Link {
+                            text: @tr("Add a folder…");
+                            font-size: 12.5px;
+                            clicked => { root.add-folder(); }
+                        }
+                    }
+                }
+                if root.update-shown: Rectangle {
+                    border-radius: 6px;
+                    background: Tok.accent-soft;
+                    height: up.preferred-height;
+                    up := HorizontalLayout {
+                        padding: 10px;
+                        spacing: 10px;
+                        VerticalLayout {
+                            horizontal-stretch: 1;
+                            alignment: center;
+                            Text {
+                                text: root.update-title;
+                                font-weight: 600;
+                            }
+                            Text {
+                                text: root.update-sub;
+                                font-size: 12px;
+                                color: Tok.muted;
+                                wrap: word-wrap;
+                            }
+                            if root.update-busy: Bar { value: root.update-progress; }
+                        }
+                        if !root.update-busy: Button {
+                            text: @tr("Update");
+                            primary: true;
+                            clicked => { root.update-now(); }
+                        }
+                    }
+                }
+                Rectangle {
+                    height: 1px;
+                    background: Tok.line;
+                }
+                VerticalLayout {
+                    spacing: 8px;
+                    if root.phase == 0: HorizontalLayout {
+                        spacing: 4px;
+                        Text {
+                            text: root.summary;
+                            font-weight: 600;
+                        }
+                        Text {
+                            text: root.summary-sub;
+                            color: Tok.muted;
+                            horizontal-stretch: 1;
+                            overflow: elide;
+                        }
+                    }
+                    if root.phase == 1: VerticalLayout {
+                        spacing: 6px;
+                        Text {
+                            text: root.progress-text;
+                            font-weight: 600;
+                            overflow: elide;
+                        }
+                        Bar { value: root.progress; }
+                    }
+                    if root.phase == 2: VerticalLayout {
+                        Text {
+                            text: @tr("✓ Ready to play");
+                            font-weight: 600;
+                            color: Tok.ok;
+                        }
+                        Text {
+                            text: root.done-sub;
+                            font-size: 12px;
+                            color: Tok.muted;
+                            wrap: word-wrap;
+                        }
+                    }
+                    if root.phase == 0: Button {
+                        text: root.action;
+                        primary: true;
+                        enabled: root.action-enabled;
+                        clicked => { root.act(); }
+                    }
+                    if root.phase == 1: Button {
+                        text: @tr("Cancel");
+                        clicked => { root.cancel(); }
+                    }
+                    if root.phase == 2: Button {
+                        text: @tr("OK");
+                        clicked => { root.finish(); }
+                    }
+                }
+            }
+        }
+        // ---------------------------------------------------------------- right: the monsters and their maps
+        VerticalLayout {
+            horizontal-stretch: 1;
+            padding-top: 16px;
+            padding-bottom: 16px;
+            spacing: 10px;
+            HorizontalLayout {
+                padding-left: 20px;
+                padding-right: 20px;
+                VerticalLayout {
+                    Text {
+                        text: @tr("Monsters");
+                        font-size: 18px;
+                        font-weight: 600;
+                    }
+                    Text {
+                        text: root.list-sub;
+                        font-size: 12px;
+                        color: Tok.muted;
+                    }
+                }
+            }
+            if root.status != "": Rectangle {
+                vertical-stretch: 1;
+                Text {
+                    width: parent.width - 80px;
+                    text: root.status;
+                    wrap: word-wrap;
+                    horizontal-alignment: center;
+                    color: root.status-error ? Tok.bad : Tok.muted;
+                }
+            }
+            if root.status == "": HorizontalLayout {
+                vertical-stretch: 1;
+                padding-left: 20px;
+                padding-right: 20px;
+                Rectangle {
+                    border-radius: 6px;
+                    border-width: 1px;
+                    border-color: Tok.line;
+                    background: Tok.card;
+                    clip: true;
+                    VerticalLayout {
+                        Rectangle {
+                            height: 30px;
+                            HorizontalLayout {
+                                padding-left: 56px;
+                                padding-right: 12px;
+                                spacing: 12px;
+                                Text {
+                                    text: @tr("Monster");
+                                    font-size: 12px;
+                                    color: Tok.muted;
+                                    vertical-alignment: center;
+                                    horizontal-stretch: 1;
+                                }
+                                Text {
+                                    width: 64px;
+                                    text: @tr("Size");
+                                    font-size: 12px;
+                                    color: Tok.muted;
+                                    horizontal-alignment: right;
+                                    vertical-alignment: center;
+                                }
+                                Text {
+                                    width: 120px;
+                                    text: @tr("Version");
+                                    font-size: 12px;
+                                    color: Tok.muted;
+                                    horizontal-alignment: right;
+                                    vertical-alignment: center;
+                                }
+                                Rectangle { width: 44px; }
+                            }
+                            Rectangle {
+                                y: parent.height - 1px;
+                                height: 1px;
+                                background: Tok.line;
+                            }
+                        }
+                        ScrollView {
+                            vertical-stretch: 1;
+                            VerticalLayout {
+                                for r[i] in root.rows: PkgLine {
+                                    item: r;
+                                    toggled => { root.toggle-package(i); }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------------ dialogs
+    if root.dialog == 1: Dialog {
+        width: root.width;
+        height: root.height;
+        title: root.dialog-title;
+        Lines { lines: root.dialog-lines; }
+        HorizontalLayout {
+            alignment: end;
+            spacing: 8px;
+            Button {
+                text: @tr("Cancel");
+                clicked => { root.close-dialog(); }
+            }
+            Button {
+                text: root.confirm-label;
+                primary: true;
+                clicked => { root.confirm(); }
+            }
+        }
+    }
+    if root.dialog == 2: Dialog {
+        width: root.width;
+        height: root.height;
+        title: root.dialog-title;
+        Lines { lines: root.dialog-lines; }
+        HorizontalLayout {
+            alignment: end;
+            Button {
+                text: @tr("Close");
+                primary: true;
+                clicked => { root.close-dialog(); }
+            }
+        }
+    }
+    if root.dialog == 3: Dialog {
+        width: root.width;
+        height: root.height;
+        title: @tr("Settings");
+        box-width: 560px;
+        SettingRow {
+            title: @tr("Offer pre-releases");
+            sub: @tr("Test builds of the next release: they may contain bugs.");
+            on: root.set-prereleases;
+            clicked => { root.toggle-prereleases(); }
+        }
+        SettingRow {
+            title: @tr("Look for a new installer at start");
+            on: root.set-check-updates;
+            clicked => { root.toggle-check-updates(); }
+        }
+        HorizontalLayout {
+            spacing: 12px;
+            Text {
+                text: @tr("Language");
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+            }
+            ComboBox {
+                width: 200px;
+                model: root.languages;
+                current-index: root.language-index;
+                selected => { root.set-language(self.current-index); }
+            }
+        }
+        if root.custom-places.length > 0: Text {
+            text: @tr("Folders you added");
+            font-weight: 600;
+        }
+        for p[i] in root.custom-places: HorizontalLayout {
+            spacing: 8px;
+            VerticalLayout {
+                horizontal-stretch: 1;
+                Text {
+                    text: p.name;
+                    overflow: elide;
+                }
+                Text {
+                    text: p.sub;
+                    font-size: 12px;
+                    color: Tok.muted;
+                    overflow: elide;
+                }
+            }
+            Button {
+                text: @tr("Remove");
+                clicked => { root.remove-custom(i); }
+            }
+        }
+        HorizontalLayout {
+            spacing: 8px;
+            Button {
+                text: @tr("Remove the mod from the ticked places…");
+                clicked => { root.remove-everything(); }
+            }
+            Rectangle { horizontal-stretch: 1; }
+            Button {
+                text: @tr("About");
+                clicked => { root.open-about(); }
+            }
+            Button {
+                text: @tr("Close");
+                primary: true;
+                clicked => { root.close-dialog(); }
+            }
+        }
+    }
+    if root.dialog == 4: Dialog {
+        width: root.width;
+        height: root.height;
+        title: @tr("MH4U Port Installer {}", root.version);
+        Text {
+            text: @tr("Installs the MH4U Port mod for Monster Hunter Generations Ultimate from its GitHub releases. Free software under the GNU GPL v3 or later.");
+            wrap: word-wrap;
+        }
+        AboutSlint {
+            height: 120px;
+        }
+        HorizontalLayout {
+            alignment: end;
+            Button {
+                text: @tr("Close");
+                primary: true;
+                clicked => { root.close-dialog(); }
+            }
+        }
+    }
+}

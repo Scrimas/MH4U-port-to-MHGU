@@ -1,0 +1,21 @@
+[package]
+name = "mh4uport-core"
+description = "MH4U Port Installer without its window: releases, manifest, install places, planner, install, self-update"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+ureq = "3"
+dirs = "6"
+sysinfo = { version = "0.37", default-features = false, features = ["system"] }
+# zip entries (the release zips are tools/release.py's: deflate or stored, no zip64)
+miniz_oxide = "0.8"
+
+[[bin]]
+# the command-line installer: tests (installer/tests/cli_test.py) and scripts
+name = "mh4uport-cli"
+path = "src/bin/cli.rs"
