@@ -1,0 +1,16 @@
+# Save migrations, applied by the MH4U Port Installer to every save of the places it installs into
+# (installer/core/src/saves.rs; tools/release.py copies them into the release's manifest.json).
+#
+# Only for the exception: shipped IDs never move (allocations.toml). When one really has to, add a step here in the
+# same release, with the next number; a step, once released, never changes. tools/release.py check refuses a release
+# whose allocations moved a shipped ID without a step of this release.
+#
+# [[step]]
+# step = 1
+# release = "1.11.0"            # the first release that ships it
+# items = [[3041, 3050]]        # old item ID, new (box, pouch, loadouts, items obtained, decorations in gear)
+# decorations = []              # decoration items, as items
+# armor = [[500, 510]]          # armor series IDs (every part of the series, and layered looks)
+# weapons = [[5, 41, 60]]       # weapon class, old ID, new
+# quests = []                   # quest IDs: installer 1.0 cannot apply them (it then blocks the migration)
+# save_slots = []               # save slots (hunt tallies): the same

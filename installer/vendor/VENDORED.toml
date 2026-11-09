@@ -1,0 +1,10 @@
+# installer/vendor: copies of other projects, refreshed by installer/tools/vendor_save.py
+[mhgu-save]
+from = "https://github.com/Scrimas/MHGU-Save-editor app/core/src"
+commit = "c91b479b0028a9fd4060602d24db03fded3d2a8e"
+files = [
+    ["save.rs", "ded625a2723f8bb103d035ce6d43b8b481078d84820671677ffe6d8b6e26bbef"],
+    ["items.rs", "8faf9adea1e57447810ccd4e20d8b88ff9a96b7656dd30239646ff4e4e33fb8b"],
+    ["equipment.rs", "8986fb48407b0950826ff778366904c1157ce0b4b742b317b377e3e802d5ffcd"],
+    ["store.rs", "22823b3eced674a9977d99fd11952c38bfeed7d22fcfe3fba9390a973ef1b3ad"],
+]

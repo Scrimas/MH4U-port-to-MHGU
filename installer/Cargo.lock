@@ -2546,6 +2546,7 @@ name = "mh4uport-core"
 version = "1.0.0"
 dependencies = [
  "dirs",
+ "mhgu-save",
  "miniz_oxide 0.8.9",
  "serde",
  "serde_json",
@@ -2568,6 +2569,10 @@ dependencies = [
  "sys-locale",
  "winresource",
 ]
+
+[[package]]
+name = "mhgu-save"
+version = "0.0.0"
 
 [[package]]
 name = "minimal-lexical"

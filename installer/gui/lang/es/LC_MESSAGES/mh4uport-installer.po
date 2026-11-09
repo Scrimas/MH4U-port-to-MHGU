@@ -60,6 +60,10 @@ msgid "Version"
 msgstr ""
 
 #: gui/ui/app.slint
+msgid "Gear of the monsters that leave:"
+msgstr ""
+
+#: gui/ui/app.slint
 msgid "Close"
 msgstr ""
 
@@ -128,8 +132,8 @@ msgid "The download of {} does not match the release's checksum"
 msgstr ""
 
 #. placeholders: {} in order, {0} {1} by position
-#: core/src/apply.rs core/src/record.rs core/src/selfupdate.rs
-#: core/src/source.rs
+#: core/src/apply.rs core/src/record.rs core/src/saves.rs
+#: core/src/selfupdate.rs core/src/source.rs
 msgid "Could not write {} ({})"
 msgstr ""
 
@@ -191,7 +195,7 @@ msgid "This release needs a newer installer: update the installer first"
 msgstr ""
 
 #. placeholders: {} in order, {0} {1} by position
-#: core/src/manifest.rs
+#: core/src/manifest.rs core/src/saves.rs
 msgid "Invalid manifest: {}"
 msgstr ""
 
@@ -221,6 +225,44 @@ msgstr ""
 #. placeholders: {} in order, {0} {1} by position
 #: core/src/record.rs
 msgid "{} is damaged ({})"
+msgstr ""
+
+#: core/src/saves.rs
+msgid "The hunter holds a weapon that leaves, and the box has no other weapon"
+msgstr ""
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/saves.rs
+msgid "{} cannot be read ({})"
+msgstr ""
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/saves.rs
+msgid "character {} holds another tool's data where the mod keeps its own"
+msgstr ""
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/saves.rs
+msgid "character {} was migrated by a newer release"
+msgstr ""
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/saves.rs
+msgid "step {} needs a newer installer"
+msgstr ""
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/saves.rs
+msgid "character {}: {}"
+msgstr ""
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/saves.rs
+msgid "Could not back up {} ({})"
+msgstr ""
+
+#: core/src/saves.rs
+msgid "The backup folder has no parent folder"
 msgstr ""
 
 #. placeholders: {} in order, {0} {1} by position
@@ -430,6 +472,51 @@ msgid "Moves to release {} (nothing to download)"
 msgstr ""
 
 #: gui/src/main.rs
+msgid "Saves"
+msgstr ""
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{}: moved to this release's IDs"
+msgstr ""
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{}: the gear of the monsters that leave is cleaned"
+msgstr ""
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{}: moved to this release's IDs, the gear of the monsters that leave cleaned"
+msgstr ""
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{} cannot be migrated: {}"
+msgstr ""
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "Every save is backed up first, into {}"
+msgstr ""
+
+#: gui/src/main.rs
+msgid "Unequip only (nothing deleted)"
+msgstr ""
+
+#: gui/src/main.rs
+msgid "Remove the worn pieces (data loss)"
+msgstr ""
+
+#: gui/src/main.rs
+msgid "Remove all their items and gear (data loss)"
+msgstr ""
+
+#: gui/src/main.rs
+msgid "Leave the saves as they are"
+msgstr ""
+
+#: gui/src/main.rs
 msgid "Before you go on"
 msgstr ""
 
@@ -473,6 +560,23 @@ msgid "{} is running: close it, then install again."
 msgstr ""
 
 #: gui/src/main.rs
+msgid "The install failed"
+msgstr ""
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{}: {}"
+msgstr ""
+
+#: gui/src/main.rs
+msgid "Installing anyway leaves these saves as they are, which may break their ported items and gear. Close this, check them (another tool's data, a newer release, the game running), then install again to go on without them."
+msgstr ""
+
+#: gui/src/main.rs
+msgid "Some saves cannot be migrated"
+msgstr ""
+
+#: gui/src/main.rs
 msgid "Starting…"
 msgstr ""
 
@@ -493,7 +597,7 @@ msgstr ""
 
 #. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
-msgid "{}: {}"
+msgid "Updating the save {}"
 msgstr ""
 
 #: gui/src/main.rs
@@ -505,8 +609,13 @@ msgstr ""
 msgid "Start MHGU in {}"
 msgstr ""
 
+#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
-msgid "The install failed"
+msgid "The mod is installed; these saves were left as they were. Backups: {}"
+msgstr ""
+
+#: gui/src/main.rs
+msgid "Some saves could not be updated"
 msgstr ""
 
 #: gui/src/main.rs
@@ -588,4 +697,14 @@ msgstr ""
 #. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
 msgid "Install {} changes"
+msgstr ""
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{} save updated (backed up first)"
+msgstr ""
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{} saves updated (backed up first)"
 msgstr ""

@@ -14,6 +14,8 @@ dirs = "6"
 sysinfo = { version = "0.37", default-features = false, features = ["system"] }
 # zip entries (the release zips are tools/release.py's: deflate or stored, no zip64)
 miniz_oxide = "0.8"
+# MHGU_Editor's save parser, the part without game tables (installer/vendor, installer/tools/vendor_save.py)
+mhgu-save = { path = "../vendor/mhgu-save" }
 
 [[bin]]
 # the command-line installer: tests (installer/tests/cli_test.py) and scripts

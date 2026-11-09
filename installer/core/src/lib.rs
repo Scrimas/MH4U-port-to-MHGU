@@ -10,6 +10,7 @@ pub mod manifest;
 pub mod places;
 pub mod plan;
 pub mod record;
+pub mod saves;
 pub mod selfupdate;
 pub mod settings;
 pub mod source;

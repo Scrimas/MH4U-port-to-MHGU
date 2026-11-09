@@ -5,9 +5,11 @@ made as tools/release.py makes them, a manifest of schema 1) installed by mh4upo
 
 Checks: the files land where each place wants them (Ryujinx, the yuzu family, the recomp, an SD card, a folder), maps
 come and go with their monsters, a hand-extracted install is replaced only when asked, an update to a newer release,
-a pre-release only when asked, the removal leaves other mods alone. Exit 1 at the first failure.
+a pre-release only when asked, a save migrated by a release's step (backed up, every copy), the gear of a removed
+monster taken off, a save that cannot be migrated stopping the install, the removal leaves other mods alone. The saves
+are synthetic (zeros with valid slot pointers). Exit 1 at the first failure.
 """
-import hashlib, json, os, shutil, subprocess, sys, tempfile, zipfile
+import hashlib, json, os, shutil, struct, subprocess, sys, tempfile, zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 EXE = '.exe' if os.name == 'nt' else ''
@@ -29,7 +31,37 @@ def sha(b):
     return hashlib.sha256(b).hexdigest()
 
 
-def make_release(root, tag, version, pre=False, change=()):
+# a synthetic save (MHGU_Editor docs/11-save-map.md offsets): slot 1 in use, character base SLOT1
+SAVE_SIZE, SLOT1 = 5_159_100, 0x18CC9C
+ITEM_BOX, EQ_BOX, WORN, STORE = 0x278, 0x62EE, 0x23B39, 0x533A
+
+
+def blank_save():
+    b = bytearray(SAVE_SIZE)
+    for k, base in enumerate((0x18CC9C, 0x2AC560, 0x3CBE24)):
+        struct.pack_into('<I', b, 0x34 + 4 * k, base - 0x24)
+    b[0x28] = 1
+    return b
+
+
+def set_bits(b, at, pos, width, v):
+    for k in range(width):
+        o, m = at + (pos + k) // 8, 1 << ((pos + k) % 8)
+        b[o] = b[o] | m if v >> k & 1 else b[o] & ~m
+
+
+def get_bits(b, at, pos, width):
+    return sum(((b[at + (pos + k) // 8] >> ((pos + k) % 8)) & 1) << k for k in range(width))
+
+
+def write_save(d, b):
+    for c in ('0', '1'):
+        os.makedirs(os.path.join(d, c), exist_ok=True)
+        for f in ('system', 'system_backup'):
+            open(os.path.join(d, c, f), 'wb').write(b)
+
+
+def make_release(root, tag, version, pre=False, change=(), migrations=(), cleaning=None):
     """a release folder root/<tag>/ with the zips + manifest.json; `change`: packages whose files differ"""
     d = os.path.join(root, tag)
     os.makedirs(d)
@@ -51,7 +83,7 @@ def make_release(root, tag, version, pre=False, change=()):
         if kind == 'map': p['folder'] = 28
         pkgs.append(p)
     m = dict(schema=1, release=version, prerelease=pre, installer_min='1.0.0', title_id=TID, mod_folder=MOD,
-             packages=pkgs, migrations=[], cleaning={}, warnings=[])
+             packages=pkgs, migrations=list(migrations), cleaning=cleaning or {}, warnings=[])
     json.dump(m, open(os.path.join(d, 'manifest.json'), 'w'), indent=1)
     for f in sorted(os.listdir(d)):
         assets.append(dict(name=f, browser_download_url='%s/%s' % (tag, f), size=os.path.getsize(os.path.join(d, f))))
@@ -156,8 +188,48 @@ def main():
         r = cli('install', '--place', 'folder:' + folder, '--monsters', 'gamma,beta', '--yes', ok=(1,))
         check('checksum' in r.stderr and not os.path.exists(os.path.join(mods['folder'], 'romfs/nativeNX/arc/enemy/em101_00.arc')),
               'a download that does not match the manifest is refused')
+        # saves: a release with a migration step, then the gear of a monster that leaves
+        sd_ = os.path.join(ryu, 'bis/user/save/0000000000000002')
+        b = blank_save()
+        set_bits(b, SLOT1 + ITEM_BOX, 0, 12, 2977); set_bits(b, SLOT1 + ITEM_BOX, 12, 7, 4)
+        struct.pack_into('<HH', b, SLOT1 + EQ_BOX, 1, 1287)               # entry 0: alpha's head (armor series 1287)
+        struct.pack_into('<HH', b, SLOT1 + EQ_BOX + 36, 7 + 5, 7)        # entry 1: a GU weapon, class 5
+        struct.pack_into('<7H', b, SLOT1 + WORN, 1, 0, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF)
+        write_save(sd_, bytes(b))
+        clean = {'alpha': dict(items=[[2977, 2985]], armor=[1287], weapons=[])}
+        step1 = dict(step=1, release='1.14.0', items=[[2977, 3050]], decorations=[], armor=[], weapons=[], quests=[], save_slots=[])
+        v114 = make_release(rel, 'v1.14.0', '1.14.0', migrations=[step1], cleaning=clean)
+        publish(rel, [v110, v111, pre, v114])
+        ry = ('--place', 'ryujinx:' + ryu)
+        os.environ['MH4UPORT_BACKUPS'] = os.path.join(tmp, 'backups')
+        r = cli('install', *ry, '--monsters', 'alpha', '--yes')
+        check('save Ryujinx' not in r.stderr and 'migrate [(1, [1])]' in r.stdout, 'a save to migrate is listed')
+        for c in ('0/system', '0/system_backup', '1/system', '1/system_backup'):
+            s2 = open(os.path.join(sd_, c), 'rb').read()
+            check(get_bits(s2, SLOT1 + ITEM_BOX, 0, 12) == 3050 and struct.unpack_from('<HHHHI', s2, SLOT1 + STORE + 4)[0] == 2
+                  and struct.unpack_from('<I', s2, SLOT1 + STORE + 12)[0] == 1, 'migrated: item 2977 -> 3050, store v2 level 1 (%s)' % c)
+        backups = [os.path.join(dp, f) for dp, _, fs in os.walk(os.environ['MH4UPORT_BACKUPS']) for f in fs]
+        check(len(backups) == 4 and all(get_bits(open(f, 'rb').read(), SLOT1 + ITEM_BOX, 0, 12) == 2977 for f in backups),
+              'the four copies backed up before the write')
+        r = cli('install', *ry, '--monsters', 'alpha', ok=(0, 1))
+        check('migrate' not in r.stdout, 'migrated once')
+        r = cli('install', *ry, '--monsters', 'gamma', '--yes')
+        s2 = open(os.path.join(sd_, '0/system'), 'rb').read()
+        check(struct.unpack_from('<2H', s2, SLOT1 + WORN) == (1, 0xFFFF) and struct.unpack_from('<H', s2, SLOT1 + EQ_BOX + 2)[0] == 1287,
+              'alpha leaves: its head taken off, kept in the box (unequip)')
+        # a save holding another tool's data where the store is: the install stops unless --anyway
+        b = bytearray(open(os.path.join(sd_, '0/system'), 'rb').read())
+        b[SLOT1 + STORE + 8] ^= 0xFF                                     # the check word: not a store any more
+        write_save(sd_, bytes(b))
+        step2 = dict(step1, step=2, release='1.15.0', items=[[3050, 3051]])
+        v115 = make_release(rel, 'v1.15.0', '1.15.0', migrations=[step1, step2], cleaning=clean)
+        publish(rel, [v110, v111, pre, v114, v115])
+        r = cli('install', *ry, '--monsters', 'gamma', '--yes', ok=(4,))
+        check('cannot be migrated' in r.stdout, 'a save that cannot be migrated stops the install')
+        cli('install', *ry, '--monsters', 'gamma', '--yes', '--anyway')
+        check(open(os.path.join(sd_, '0/system'), 'rb').read() == bytes(b), '--anyway installs and leaves that save alone')
         # removal
-        cli('remove', *places, '--yes')
+        cli('remove', *places, '--yes', '--anyway')
         check(all(not os.path.exists(d) for d in mods.values()), 'removed from every mod folder')
         left = sorted(os.path.relpath(os.path.join(dp, f), a).replace(os.sep, '/') for dp, _, fs in os.walk(a) for f in fs)
         check(left == ['contents/%s/romfs/other_mod/file.bin' % TID], 'sdcard: only the other mod is left')

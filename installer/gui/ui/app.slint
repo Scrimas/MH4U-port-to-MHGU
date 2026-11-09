@@ -388,6 +388,10 @@ export component AppWindow inherits Window {
     in property <[Line]> dialog-lines;
     in property <string> confirm-label;
     in property <bool> confirm-danger;
+    // the review's choice for the gear of the monsters that leave (shown when a save holds some)
+    in property <bool> clean-shown;
+    in property <[string]> clean-options;
+    in property <int> clean-index;
     // settings
     in property <bool> set-prereleases;
     in property <bool> set-check-updates;
@@ -412,6 +416,7 @@ export component AppWindow inherits Window {
     callback remove-custom(int);
     callback remove-everything();
     callback open-about();
+    callback set-clean(int);
 
     HorizontalLayout {
         // ---------------------------------------------------------------- left: where, and the action
@@ -690,6 +695,21 @@ export component AppWindow inherits Window {
         height: root.height;
         title: root.dialog-title;
         Lines { lines: root.dialog-lines; }
+        if root.clean-shown: HorizontalLayout {
+            spacing: 12px;
+            Text {
+                text: @tr("Gear of the monsters that leave:");
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+                wrap: word-wrap;
+            }
+            ComboBox {
+                width: 300px;
+                model: root.clean-options;
+                current-index: root.clean-index;
+                selected => { root.set-clean(self.current-index); }
+            }
+        }
         HorizontalLayout {
             alignment: end;
             spacing: 8px;

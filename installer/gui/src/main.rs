@@ -12,6 +12,7 @@ use mh4uport_core::manifest::{Kind, Manifest};
 use mh4uport_core::places::{self, Custom, Place};
 use mh4uport_core::plan::{Action, PlacePlan, initial_wanted};
 use mh4uport_core::record::{self, State};
+use mh4uport_core::saves::{self, Clean, Found, Need, Owned};
 use mh4uport_core::selfupdate::{self, Update};
 use mh4uport_core::settings::{self, Settings};
 use mh4uport_core::source::{Release, Source, mod_releases};
@@ -55,6 +56,11 @@ struct App {
     plans: Vec<(usize, State, PlacePlan)>,
     update: Option<Update>,
     pending: Pending,
+    /// the review's choice for the gear of leaving monsters: 0 unequip, 1 remove the worn pieces, 2 remove all, 3 none
+    clean_index: i32,
+    /// saves that cannot be migrated, already warned about (the second pass installs without them)
+    warned_blocked: BTreeSet<String>,
+    review_remove_all: bool,
     busy: bool,
     done_places: Vec<String>,
     progress: Progress,
@@ -488,7 +494,55 @@ fn message(ui: &AppWindow, title: &str, lines: Vec<Line>) {
     ui.set_dialog(2);
 }
 
+/// The saves of the planned places: what each needs (the release's migrations, the cleaning of the monsters that
+/// leave), and the ones that cannot be migrated.
+/// a save, whether it migrates, and the cleaning it gets
+type SaveJob = (Found, bool, Option<(Owned, Clean)>);
+
+struct SaveWork {
+    jobs: Vec<SaveJob>,
+    blocked: Vec<(String, String)>,
+    holds_gear: bool,
+}
+
+fn clean_mode(i: i32) -> Option<Clean> {
+    match i {
+        0 => Some(Clean::Unequip),
+        1 => Some(Clean::RemoveWorn),
+        2 => Some(Clean::RemoveAll),
+        _ => None,
+    }
+}
+
+fn save_work(app: &App, m: &Manifest, plans: &[(usize, State, PlacePlan)]) -> Result<SaveWork, String> {
+    let steps = saves::steps(m)?;
+    let mut w = SaveWork { jobs: vec![], blocked: vec![], holds_gear: false };
+    for (i, _, plan) in plans {
+        let mut leaving = Owned::default();
+        for c in plan.removals().filter(|c| c.kind == Kind::Monster) {
+            leaving.add(&saves::owned(m, &c.package));
+        }
+        let held = std::collections::BTreeMap::from([("leaving".to_string(), leaving.clone())]);
+        for f in saves::find(&app.places[*i]) {
+            let gear = !leaving.is_empty() && !saves::holds(&f.file, &held).is_empty();
+            w.holds_gear |= gear;
+            match saves::need(&f.file, &steps) {
+                Need::Blocked(why) => w.blocked.push((f.label.clone(), why)),
+                need => {
+                    let clean = clean_mode(app.clean_index).filter(|_| gear).map(|c| (leaving.clone(), c));
+                    let migrate = matches!(need, Need::Migrate(_));
+                    if migrate || clean.is_some() {
+                        w.jobs.push((f, migrate, clean));
+                    }
+                }
+            }
+        }
+    }
+    Ok(w)
+}
+
 fn review(app: &mut App, ui: &AppWindow, remove_all: bool) {
+    app.review_remove_all = remove_all;
     let Some(m) = app.manifest.clone() else { return };
     let plans: Vec<(usize, State, PlacePlan)> = if remove_all {
         ticked(app)
@@ -539,6 +593,45 @@ fn review(app: &mut App, ui: &AppWindow, remove_all: bool) {
     if lines.is_empty() {
         return;
     }
+    match save_work(app, &m, &plans) {
+        Ok(w) => {
+            if !w.jobs.is_empty() || !w.blocked.is_empty() {
+                lines.push(line(tr("Saves"), 0, true));
+            }
+            for (f, migrate, clean) in &w.jobs {
+                let what = match (migrate, clean.as_ref().map(|c| c.1)) {
+                    (true, None) => trf("{}: moved to this release's IDs", &[&f.label]),
+                    (false, Some(_)) => trf("{}: the gear of the monsters that leave is cleaned", &[&f.label]),
+                    _ => {
+                        trf("{}: moved to this release's IDs, the gear of the monsters that leave cleaned", &[&f.label])
+                    }
+                };
+                lines.push(line(what, 0, false));
+            }
+            for (label, why) in &w.blocked {
+                lines.push(line(trf("{} cannot be migrated: {}", &[label, why]), 2, false));
+            }
+            if !w.jobs.is_empty() {
+                lines.push(line(
+                    trf("Every save is backed up first, into {}", &[&saves::backup_dir().display()]),
+                    0,
+                    false,
+                ));
+            }
+            ui.set_clean_shown(w.holds_gear);
+        }
+        Err(e) => {
+            lines.push(line(e, 2, false));
+            ui.set_clean_shown(false);
+        }
+    }
+    ui.set_clean_options(model(vec![
+        tr("Unequip only (nothing deleted)").into(),
+        tr("Remove the worn pieces (data loss)").into(),
+        tr("Remove all their items and gear (data loss)").into(),
+        tr("Leave the saves as they are").into(),
+    ]));
+    ui.set_clean_index(app.clean_index);
     lines.push(line(tr("Before you go on"), 0, true));
     if monster_leaves {
         lines.push(line(
@@ -586,15 +679,39 @@ fn start_install(app: &mut App, ui: &AppWindow, remove_all: bool) {
         return;
     }
     let (Some(m), Some(rel)) = (app.manifest.clone(), app.release.clone()) else { return };
-    let jobs: Vec<(Place, State, PlacePlan)> = ticked(app)
+    let planned: Vec<(usize, State, PlacePlan)> = ticked(app)
         .into_iter()
         .map(|i| {
             let (s, p) = apply::plan_for(&app.places[i], &m, &app.wanted, remove_all);
-            (app.places[i].clone(), s, p)
+            (i, s, p)
         })
-        .filter(|(_, _, p)| !p.is_empty())
         .collect();
-    if jobs.is_empty() {
+    let work = match save_work(app, &m, &planned) {
+        Ok(w) => w,
+        Err(e) => {
+            message(ui, &tr("The install failed"), vec![line(e, 2, false)]);
+            return;
+        }
+    };
+    // a save that cannot be migrated: the first pass only warns, the second installs without it
+    let unwarned: Vec<&(String, String)> =
+        work.blocked.iter().filter(|(l, _)| !app.warned_blocked.contains(l)).collect();
+    if !unwarned.is_empty() {
+        let mut lines: Vec<Line> = unwarned.iter().map(|(l, why)| line(trf("{}: {}", &[l, why]), 2, false)).collect();
+        lines.push(line(
+            tr("Installing anyway leaves these saves as they are, which may break their ported items and gear. Close this, check them (another tool's data, a newer release, the game running), then install again to go on without them."),
+            0,
+            false,
+        ));
+        app.warned_blocked.extend(unwarned.iter().map(|(l, _)| l.clone()));
+        message(ui, &tr("Some saves cannot be migrated"), lines);
+        return;
+    }
+    let save_jobs = work.jobs;
+    let steps = saves::steps(&m).unwrap_or_default();
+    let jobs: Vec<(Place, State, PlacePlan)> =
+        planned.into_iter().map(|(i, s, p)| (app.places[i].clone(), s, p)).filter(|(_, _, p)| !p.is_empty()).collect();
+    if jobs.is_empty() && save_jobs.is_empty() {
         return;
     }
     app.busy = true;
@@ -658,13 +775,24 @@ fn start_install(app: &mut App, ui: &AppWindow, remove_all: bool) {
                 apply::install(place, &m, state, plan, &zips, &|_, _, _| {}, &cancel)
                     .map_err(|e| trf("{}: {}", &[&place.name, &e]))?;
             }
-            Ok::<(), String>(())
+            // the saves, once the files of their release are in place; one failing does not stop the others
+            let mut errors = vec![];
+            let mut updated = 0;
+            for (f, _, clean) in &save_jobs {
+                let label = f.label.clone();
+                later(move |_, ui| ui.set_progress_text(trf("Updating the save {}", &[&label]).into()));
+                match saves::apply(f, &steps, clean.as_ref().map(|(o, c)| (o, *c)), &saves::backup_dir(), &m.release) {
+                    Ok(_) => updated += 1,
+                    Err(e) => errors.push(trf("{}: {}", &[&f.label, &e])),
+                }
+            }
+            Ok::<(usize, Vec<String>), String>((updated, errors))
         })();
         later(move |app, ui| finished(app, ui, res, remove_all));
     });
 }
 
-fn finished(app: &mut App, ui: &AppWindow, res: Result<(), String>, remove_all: bool) {
+fn finished(app: &mut App, ui: &AppWindow, res: Result<(usize, Vec<String>), String>, remove_all: bool) {
     app.busy = false;
     app.progress = Progress::default();
     reread_places(app);
@@ -673,17 +801,37 @@ fn finished(app: &mut App, ui: &AppWindow, res: Result<(), String>, remove_all: 
         return;
     }
     match res {
-        Ok(()) => {
+        Ok((updated, errors)) => {
             if !remove_all {
                 app.settings.warned_online = true;
                 let _ = settings::save(&app.settings);
             }
+            app.warned_blocked.clear();
             ui.set_phase(2);
-            ui.set_done_sub(if app.done_places.is_empty() {
-                tr("The mod was removed.").into()
+            let mut sub = if app.done_places.is_empty() {
+                tr("The mod was removed.")
             } else {
-                trf("Start MHGU in {}", &[&app.done_places.join(", ")]).into()
-            });
+                trf("Start MHGU in {}", &[&app.done_places.join(", ")])
+            };
+            if updated > 0 {
+                sub += &format!(
+                    " · {}",
+                    trn("{} save updated (backed up first)", "{} saves updated (backed up first)", updated)
+                );
+            }
+            ui.set_done_sub(sub.into());
+            if !errors.is_empty() {
+                let mut lines: Vec<Line> = errors.into_iter().map(|e| line(e, 2, false)).collect();
+                lines.push(line(
+                    trf(
+                        "The mod is installed; these saves were left as they were. Backups: {}",
+                        &[&saves::backup_dir().display()],
+                    ),
+                    0,
+                    false,
+                ));
+                message(ui, &tr("Some saves could not be updated"), lines);
+            }
         }
         Err(e) => {
             ui.set_phase(0);
@@ -832,6 +980,9 @@ fn main() {
             plans: vec![],
             update: None,
             pending: Pending::None,
+            clean_index: 0,
+            warned_blocked: BTreeSet::new(),
+            review_remove_all: false,
             busy: false,
             done_places: vec![],
             progress: Progress::default(),
@@ -1007,6 +1158,15 @@ fn main() {
         with(|app, ui| {
             ui.set_dialog(0);
             review(app, ui, true);
+        });
+    });
+    ui.on_set_clean(|i| {
+        with(|app, ui| {
+            app.clean_index = i;
+            let all = app.review_remove_all;
+            let pending = app.pending;
+            review(app, ui, all);
+            app.pending = pending;
         });
     });
     ui.on_update_now(|| {

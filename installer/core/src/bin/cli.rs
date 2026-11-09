@@ -3,18 +3,22 @@
 //!   mh4uport-cli places                                   the install places found, with what each holds
 //!   mh4uport-cli releases [--pre]                         the mod releases this installer can install
 //!   mh4uport-cli install --place KIND:PATH ... [--monsters a,b | all | none] [--pre] [--replace] [--yes]
+//!                        [--clean unequip | worn | all | none] [--anyway]
 //!   mh4uport-cli remove --place KIND:PATH ... [--yes]     the mod leaves those places (core included)
 //!
 //! KIND: ryujinx, yuzu, recomp, sdcard, folder (PATH = that place's root, places.rs). --monsters default: what the
-//! places hold, else all. A hand-extracted install is replaced only with --replace (exit 3 otherwise). Releases come
-//! from GitHub, or from $MH4UPORT_RELEASES (a folder with releases.json, source.rs); downloads are cached in
-//! $MH4UPORT_CACHE (default the installer's cache). Exit 0 done, 1 error, 2 usage, 3 needs --replace.
+//! places hold, else all. A hand-extracted install is replaced only with --replace (exit 3 otherwise). The places'
+//! saves get the release's migrations, and the gear of removed monsters is cleaned (--clean, default unequip:
+//! saves.rs), after a backup ($MH4UPORT_BACKUPS); a save that cannot be migrated stops the install unless --anyway
+//! (exit 4). Releases come from GitHub, or from $MH4UPORT_RELEASES (a folder with releases.json, source.rs);
+//! downloads are cached in $MH4UPORT_CACHE. Exit 0 done, 1 error, 2 usage, 3 needs --replace, 4 needs --anyway.
 
 use mh4uport_core::apply;
 use mh4uport_core::manifest::Manifest;
 use mh4uport_core::places::{self, Kind, Place};
 use mh4uport_core::plan::{Action, initial_wanted};
 use mh4uport_core::record::State;
+use mh4uport_core::saves::{self, Clean, Need, Owned};
 use mh4uport_core::source::{Source, mod_releases};
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -27,7 +31,7 @@ fn usage() -> ! {
         include_str!("cli.rs")
             .lines()
             .skip(2)
-            .take(9)
+            .take(12)
             .map(|l| l.trim_start_matches("//!").trim_start_matches(' '))
             .collect::<Vec<_>>()
             .join("\n")
@@ -115,7 +119,45 @@ fn main() {
                     println!("  {} {what}{by}", c.package);
                 }
             }
-            if plans.iter().all(|(_, p)| p.is_empty()) {
+            // saves: migrations of the release, cleaning of the monsters that leave
+            let steps = saves::steps(&m).unwrap_or_else(|e| fail(e));
+            let clean = match values("--clean").first().map(String::as_str) {
+                None | Some("unequip") => Some(Clean::Unequip),
+                Some("worn") => Some(Clean::RemoveWorn),
+                Some("all") => Some(Clean::RemoveAll),
+                Some("none") => None,
+                _ => usage(),
+            };
+            let mut save_jobs = vec![];
+            let mut blocked = 0;
+            for (p, (_, plan)) in places.iter().zip(&plans) {
+                let mut leaving = Owned::default();
+                for c in plan.removals().filter(|c| c.kind == mh4uport_core::manifest::Kind::Monster) {
+                    leaving.add(&saves::owned(&m, &c.package));
+                }
+                let held = std::collections::BTreeMap::from([("leaving".to_string(), leaving.clone())]);
+                for f in saves::find(p) {
+                    let need = saves::need(&f.file, &steps);
+                    let cleans = clean.is_some() && !leaving.is_empty() && !saves::holds(&f.file, &held).is_empty();
+                    match &need {
+                        Need::Blocked(why) => {
+                            println!("  save {}: cannot be migrated ({why})", f.label);
+                            blocked += 1;
+                        }
+                        Need::Migrate(v) => println!("  save {}: migrate {v:?}", f.label),
+                        Need::Nothing if cleans => println!("  save {}: clean", f.label),
+                        Need::Nothing => {}
+                    }
+                    if !matches!(need, Need::Blocked(_)) && (matches!(need, Need::Migrate(_)) || cleans) {
+                        save_jobs.push((f, clean.filter(|_| cleans).map(|c| (leaving.clone(), c))));
+                    }
+                }
+            }
+            if blocked > 0 && !flag("--anyway") {
+                eprintln!("{blocked} save(s) cannot be migrated: run again with --anyway to install without them");
+                exit(4);
+            }
+            if plans.iter().all(|(_, p)| p.is_empty()) && save_jobs.is_empty() {
                 return;
             }
             if !flag("--yes") {
@@ -131,6 +173,13 @@ fn main() {
                     apply::install(p, &m, state, plan, &zips, &|_, _, _| {}, &cancel).unwrap_or_else(|e| fail(e));
                     println!("{}: done", p.name);
                 }
+            }
+            for (f, clean) in &save_jobs {
+                let done =
+                    saves::apply(f, &steps, clean.as_ref().map(|(o, c)| (o, *c)), &saves::backup_dir(), &m.release)
+                        .unwrap_or_else(|e| fail(format!("{}: {e}", f.label)));
+                let backup = done.backup.map(|b| b.display().to_string()).unwrap_or_default();
+                println!("save {}: {} change(s), backup {backup}", f.label, done.counts.total());
             }
         }
         _ => usage(),

@@ -97,7 +97,10 @@ def build_id():
 
 def check():
     """[problem] of the current outputs (empty = releasable)"""
-    bad = ['allocations.toml: ' + e for e in alloc.check()]
+    bad = ['allocations.toml: ' + e for e in alloc.check()] + moved_ids()
+    steps = migrations(core()['version'])
+    if [s['step'] for s in steps] != list(range(1, len(steps) + 1)):
+        bad.append('migrations.toml: steps are numbered 1, 2, 3... in order (%s)' % [s['step'] for s in steps])
     c = core()
     defines = open(os.path.join(MODULE_OUT, 'defines.txt')).read().split() \
         if os.path.exists(os.path.join(MODULE_OUT, 'defines.txt')) else ['(module not built)']
@@ -188,6 +191,76 @@ def write_icons(path):
         return sorted(n[:-4] for n in z.namelist())
 
 
+MIGRATIONS = os.path.join(ROOT, 'migrations.toml')
+ID_KEYS = alloc.RANGES + alloc.LISTS + alloc.SCALARS + alloc.ORDERED + ('em_id', 'stage_alias', 'append', 'package')
+
+
+def migrations(rel):
+    """the migration steps released up to `rel` (migrations.toml), as the manifest lists them"""
+    steps = toml(MIGRATIONS).get('step', []) if os.path.exists(MIGRATIONS) else []
+    out = []
+    for s in sorted(steps, key=lambda s: s['step']):
+        if vtuple(s['release'].split('-')[0]) <= vtuple(rel.split('-')[0]):
+            out.append({k: s.get(k, []) if k not in ('step', 'release') else s[k]
+                        for k in ('step', 'release', 'items', 'decorations', 'armor', 'weapons', 'quests', 'save_slots')})
+    return out
+
+
+def cleaning(p):
+    """what a monster package owns in a save (the installer's cleaning on removal): its items and decorations (item ID
+    ranges, allocations.toml), its armor series and weapons (class, ID) as its data files append them (TBLA records
+    appended to table\\armorSeriesData and table\\weaponNNBaseData from their `base`)"""
+    items, armor, weapons = [], [], []
+    for m in p['entries']:
+        items += [list(m[k]) for k in ('items', 'decorations') if k in m]
+        _, secs = portdata.read(os.path.join(paths.gen(m['name']), m['name'] + '.bin'))
+        for tag, b in secs:
+            if tag != 'TBLA':
+                continue
+            for t in portdata.decode(tag, b):
+                ids = list(range(t['base'], t['base'] + t['count']))
+                w = re.fullmatch(r'table\\weapon(\d\d)BaseData', t['path'])
+                if t['path'] == 'table\\armorSeriesData':
+                    armor += ids
+                elif w:
+                    weapons += [[int(w.group(1)), i] for i in ids]
+    return dict(items=items, armor=sorted(set(armor)), weapons=weapons)
+
+
+def last_tag():
+    """the newest release tag v<major.minor.patch> before this one (None without git or tags)"""
+    r = subprocess.run(['git', '-C', ROOT, 'tag', '--list', 'v*'], capture_output=True, text=True)
+    tags = [t for t in r.stdout.split() if re.fullmatch(r'v\d+\.\d+\.\d+', t) and t != 'v' + core()['version']]
+    return max(tags, key=lambda t: vtuple(t[1:])) if r.returncode == 0 and tags else None
+
+
+def moved_ids():
+    """[problem]: an ID shipped in the last release tag that allocations.toml moved, without a migration step of this
+    release (migrations.toml)"""
+    tag = last_tag()
+    if not tag:
+        return []
+    r = subprocess.run(['git', '-C', ROOT, 'show', '%s:allocations.toml' % tag], capture_output=True, text=True)
+    if r.returncode:
+        return []
+    old = {m['name']: m for m in tomllib.loads(r.stdout).get('monster', [])}
+    now = {m['name']: m for m in alloc.monsters()}
+    names = [m['name'] for m in tomllib.loads(r.stdout).get('monster', [])]
+    bad = []
+    if [n for n in now if n in old] != names:
+        bad.append('allocations.toml: the entries shipped in %s changed order or left (registry order)' % tag)
+    for n, o in old.items():
+        for k in ID_KEYS:
+            if n in now and o.get(k) != now[n].get(k):
+                bad.append('allocations.toml: %s %s changed since %s (%s -> %s)' % (n, k, tag, o.get(k), now[n].get(k)))
+    steps = [s for s in migrations(core()['version']) if s['release'] == core()['version']]
+    if bad and steps:
+        print('allocations moved shipped IDs since %s, with migration step(s) %s: check that they cover:\n  %s' % (
+            tag, [s['step'] for s in steps], '\n  '.join(bad)))
+        return []
+    return [b + ' (shipped IDs never move: a migration step in migrations.toml if it must)' for b in bad]
+
+
 def manifest(rel, pre, c, pk, out, icons):
     """manifest.json of the release in out (the zips written): what the installer reads"""
     def pkg(name, kind, title, version, zname, **more):
@@ -206,7 +279,8 @@ def manifest(rel, pre, c, pk, out, icons):
         ps.append(pkg(p['name'], p.get('kind', 'monster'), p['title'], p['version'], zip_name(p), **more))
     return dict(schema=MANIFEST_SCHEMA, release=rel, prerelease=bool(pre), installer_min=INSTALLER_MIN,
                 title_id=TITLE_ID, mod_folder=MOD_NAME, icons='icons-%s.zip' % rel, packages=ps,
-                migrations=[], cleaning={}, warnings=c.get('warnings', []))
+                migrations=migrations(rel), cleaning={p['name']: cleaning(p) for p in pk if p.get('kind') != 'map'},
+                warnings=c.get('warnings', []))
 
 
 def package(out, pre=None):
