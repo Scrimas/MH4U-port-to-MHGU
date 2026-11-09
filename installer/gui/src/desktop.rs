@@ -48,6 +48,7 @@ mod linux {
 
     const ENTRY: &str = include_str!("../../packaging/mhgu-de-installer.desktop");
     const PNG: &[u8] = include_bytes!("../assets/icon-256.png");
+    const SVG: &[u8] = include_bytes!("../assets/icon.svg");
 
     pub fn install() {
         let Some(appimage) = std::env::var_os("APPIMAGE") else { return };
@@ -72,8 +73,12 @@ mod linux {
                 }
             }
         });
-        let icon = data.join(format!("icons/hicolor/256x256/apps/{NAME}.png"));
-        for (p, b) in [(file, entry(path, launcher.as_deref(), VERSION).into_bytes()), (icon, PNG.to_vec())] {
+        let icons = data.join("icons/hicolor");
+        for (p, b) in [
+            (file, entry(path, launcher.as_deref(), VERSION).into_bytes()),
+            (icons.join(format!("256x256/apps/{NAME}.png")), PNG.to_vec()),
+            (icons.join(format!("scalable/apps/{NAME}.svg")), SVG.to_vec()),
+        ] {
             if let Err(e) = write(&p, &b) {
                 eprintln!("desktop entry: {}: {e}", p.display());
             }
