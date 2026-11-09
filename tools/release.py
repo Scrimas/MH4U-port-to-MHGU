@@ -5,14 +5,17 @@ main).
   release.py build           every monster's build.py (all steps), then the module, both without test switches
   release.py check           release checks on the current outputs (exit 1 on any failure)
   release.py package [DIR] [--pre N]
-                             check, then the zips, icons-<release>.zip, manifest.json + NOTES.md into DIR (default
-                             dump/release/v<release>); --pre N: pre-release <core version>-pre.N
+                             check, then the zips, icons-<release>.zip, manifest.json, NOTES.md and NOTES-main.md
+                             into DIR (default dump/release/v<release>); --pre N: pre-release <core version>-pre.N
   release.py all [DIR] [--pre N]   build + package
   release.py publish DIR [--repo OWNER/NAME] [--yes] [--draft]
                              create the GitHub release v<release> on PACKAGES_REPO (default; manifest.json: a
                              pre-release is published as one, a release is marked Latest) with DIR's assets and NOTES.md
                              as its text (gh CLI); asks first unless --yes. REPO's own releases are the installer's
-                             (.github/workflows/installer.yml): a release of the mod is refused there.
+                             (.github/workflows/installer.yml): a release of the mod is refused there. Then main-notes.
+  release.py main-notes [DIR]
+                             REPO's draft v<installer version> (drafted by the workflow on the tag) gets NOTES-main.md
+                             as its text, above GitHub's generated notes; a published release is left alone
 
 Packages: core-<v>.zip = MHGU Definitive Edition/exefs/{subsdk1, <build id>.ips} + MHGU Definitive
 Edition/romfs/nativeNX/mhgu_de/<every monster>.bin (always installed together: gear IDs depend on all of them) + the
@@ -20,8 +23,10 @@ icon atlases micon_sd/hd.tex and hudicon_sd/hd.tex; <monster>-<v>.zip = MHGU Def
 monster's assets, optional); map-<map>-<v>.zip = a map package's RomFS (maps/<map>: a ported arena, installed with the
 monsters that require it). Every zip extracts into the game's mod directory ('<mods>/contents/<title>/' for Ryujinx,
 '<load>/<TITLE>/' for the yuzu family) and they merge into the one 'MHGU Definitive Edition' folder. NOTES.md (the
-release text): What's new (notes/release-news.md, one section per core version: write it before packaging), then how
-to install: the installer, or by hand (the maps each monster needs).
+release text on PACKAGES_REPO): What's new (notes/release-news.md, one section per core version: write it before
+packaging), then how to install: the installer, or by hand (the maps each monster needs). NOTES-main.md (the text of
+REPO's release, the page players land on): what the mod is, What's new, the monsters and their quests (read from the
+quest files), how to install (the installer's files, or the zips on PACKAGES_REPO), online play and removals.
 manifest.json (schema 1) is what the MHGU Definitive Edition Installer reads (installer/core/src/manifest.rs,
 notes/installer.md): the release, every package with its zip, size, sha256, requires and every file (path below 'MHGU
 Definitive Edition/', size, sha256), the save migrations and cleaning data (empty until the installer migrates saves)
@@ -314,6 +319,8 @@ def package(out, pre=None):
         f.write('\n')
     with open(os.path.join(out, 'NOTES.md'), 'w', encoding='utf-8') as f:
         f.write(notes(c, pk, pre))
+    with open(os.path.join(out, 'NOTES-main.md'), 'w', encoding='utf-8') as f:
+        f.write(notes_main(c, pk, rel, pre))
     for f in sorted(os.listdir(out)):
         print('%10d %s' % (os.path.getsize(os.path.join(out, f)), os.path.join(out, f)))
     return out
@@ -330,6 +337,29 @@ def news(version):
     i = text.index(head) + 1
     j = next((k for k in range(i, len(text)) if text[k].startswith('## v')), len(text))
     return [l for l in text[i:j]]
+
+
+def quests(p):
+    """[(monster title, rank, quest title)] of a package's shipped quests: board from the ID (below 10000 = Village,
+    GU's numbering; questData +0x11 is a quest type, not the board: GU uses 0..10 on both), rank from questData +0x12
+    stars (Hub: 1..7 = Low / High Rank, 11.. = G1..; Village: the star count), title = the English GMD's first
+    string"""
+    sys.path.insert(0, paths.GU_PY)
+    import gmd
+    rf, out = p['romfs'], []
+    for m in p['entries']:
+        for q in m.get('quests', []):
+            qd = open(os.path.join(rf, 'nativeNX/loc/quest/questData/questData_%07d.ext' % q), 'rb').read()
+            star = qd[0x12]
+            if q < 10000:
+                board, rank = 'Village', '★%d' % star
+            else:
+                board = 'Hub'
+                rank = 'G★%d' % (star - 10) if star > 10 else '%s ★%d' % ('High Rank' if star >= 4 else 'Low Rank', star)
+            title = gmd.gmd_strings(open(os.path.join(rf, 'nativeNX/eng/quest/questData/questData_%07d_eng.gmd' % q),
+                                         'rb').read())[0]
+            out.append((m.get('title', p['title']), '%s %s' % (board, rank), title))
+    return out
 
 
 def notes(c, pk, pre=None):
@@ -358,6 +388,62 @@ def notes(c, pk, pre=None):
     return '\n'.join(lines) + '\n'
 
 
+def installer_version():
+    return toml(os.path.join(ROOT, 'installer', 'Cargo.toml'))['workspace']['package']['version']
+
+
+def notes_main(c, pk, rel, pre=None):
+    """the text of REPO's release (the installer's: the page players land on): what the mod is, What's new, the
+    monsters and their quests, how to install (the installer's files, or this release's zips by hand), the tips"""
+    v, f = c['version'], 'MHGU-Definitive-Edition-Installer-%s-x86_64' % installer_version()
+    lines = (['> **Pre-release**: a test build that may contain bugs; use it at your own discretion.', '']
+             if pre else []) + \
+            ['MH4U monsters in MHGU (Switch 1.4): the monsters, their arenas, music, quests and gear.', '',
+             "## What's new"] + '\n'.join(news(v)).strip().split('\n') + ['', '## Monsters and quests',
+             'On the Hub quest board (Village: on the village board):']
+    for p in pk:
+        qs = quests(p)
+        for t in dict.fromkeys(t for t, _, _ in qs):
+            mine = [(r.replace('Hub ', ''), q) for tt, r, q in qs if tt == t]
+            lines.append('- **%s**: %s' % (t, ' · '.join('%s: %s' % (r, ', '.join('*%s*' % q for rr, q in mine if rr == r))
+                                                          for r in dict.fromkeys(r for r, _ in mine))))
+    lines += ['', '## Install',
+              '**With the installer**: download `%s.exe` (Windows 10 / 11) or `%s.AppImage` (Linux: make it '
+              'executable) below and run it. Tick where to install (Ryujinx, the yuzu family, an SD card...) and the '
+              'monsters you want: it downloads them with the maps they need, and updates or removes them later.'
+              % (f, f), '',
+              '**By hand**: the zips of this release are on [MHGU-Definitive-Edition-Packages v%s]'
+              '(https://github.com/%s/releases/tag/v%s): follow the instructions there.' % (rel, PACKAGES_REPO, rel), '',
+              '- **Online**: everyone needs the same release and the same monsters.',
+              '- **Removing a monster**: unequip its armor and weapons first (their models leave with it).']
+    return '\n'.join(lines) + '\n'
+
+
+MAIN_MARK = "<!-- release.py: NOTES-main.md above, GitHub's notes below -->"
+
+
+def main_notes(out):
+    """REPO's draft v<installer version> gets NOTES-main.md as its text, above the notes GitHub generated (kept); a
+    published release is left alone"""
+    tag, body = 'v' + installer_version(), os.path.join(out, 'NOTES-main.md')
+    assert os.path.exists(body), 'package %s first' % out
+    r = subprocess.run(['gh', 'release', 'view', tag, '--repo', REPO, '--json', 'isDraft,body'], capture_output=True,
+                       text=True)
+    if r.returncode:
+        print('no release %s on %s yet (.github/workflows/installer.yml drafts it on the tag): run release.py '
+              'main-notes %s once it is there' % (tag, REPO, out))
+        return
+    d = json.loads(r.stdout)
+    if not d['isDraft']:
+        print('%s on %s is published: its text is left alone' % (tag, REPO))
+        return
+    generated = d['body'].split(MAIN_MARK, 1)[-1].strip()
+    text = open(body, encoding='utf-8').read().rstrip() + '\n\n' + MAIN_MARK + '\n\n' + generated + '\n'
+    subprocess.run(['gh', 'release', 'edit', tag, '--repo', REPO, '--notes-file', '-'], input=text, text=True,
+                   check=True)
+    print("%s on %s (draft): NOTES-main.md above GitHub's notes" % (tag, REPO))
+
+
 def publish(out, repo, yes, draft):
     body, mf = os.path.join(out, 'NOTES.md'), os.path.join(out, 'manifest.json')
     assert os.path.exists(body) and os.path.exists(mf), 'package %s first' % out
@@ -376,6 +462,7 @@ def publish(out, repo, yes, draft):
     subprocess.run(['gh', 'release', 'create', tag, '--repo', repo, '--title', 'MHGU Definitive Edition %s' % tag,
                     '--notes-file', body] + (['--prerelease'] if pre else ['--latest']) + (['--draft'] if draft else [])
                    + files, check=True)
+    main_notes(out)
 
 
 def main():
@@ -386,7 +473,7 @@ def main():
         pre = int(a[i + 1]); assert pre > 0, '--pre N: N from 1'
         del a[i:i + 2]
     default_out = os.path.join(ROOT, 'dump', 'release', 'v' + release_id(pre))
-    if not a or a[0] not in ('build', 'check', 'package', 'all', 'publish'):
+    if not a or a[0] not in ('build', 'check', 'package', 'all', 'publish', 'main-notes'):
         sys.exit(__doc__)
     if a[0] in ('build', 'all'):
         build()
@@ -399,6 +486,8 @@ def main():
     if a[0] == 'publish':
         repo = a[a.index('--repo') + 1] if '--repo' in a else PACKAGES_REPO
         publish(a[1] if len(a) > 1 and not a[1].startswith('--') else default_out, repo, '--yes' in a, '--draft' in a)
+    if a[0] == 'main-notes':
+        main_notes(a[1] if len(a) > 1 else default_out)
 
 
 if __name__ == '__main__':
