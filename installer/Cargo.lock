@@ -2559,6 +2559,7 @@ dependencies = [
 name = "mhgu-de-installer"
 version = "2.0.0"
 dependencies = [
+ "dirs",
  "image",
  "mhgu-de-core",
  "rfd",
@@ -2567,6 +2568,7 @@ dependencies = [
  "slint",
  "slint-build",
  "sys-locale",
+ "windows 0.61.3",
  "winresource",
 ]
 

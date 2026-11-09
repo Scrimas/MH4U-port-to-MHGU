@@ -9,7 +9,7 @@ releases on MHGU-Definitive-Edition. Rust + Slint (Fluent), like MHGU_Editor.
 | Path | What |
 |---|---|
 | `core/` | everything without a window: `manifest.rs` (schema 1), `source.rs` (GitHub or a local folder), `places.rs`, `record.rs` (`mhgu-de-install.json`), `plan.rs`, `apply.rs` (download, check, extract, swap), `selfupdate.rs`, `settings.rs`; `src/bin/cli.rs` = `mhgu-de-cli` |
-| `gui/` | the window: `ui/app.slint`, `src/main.rs`, `src/i18n.rs`, `lang/` (gettext catalogs) |
+| `gui/` | the window: `ui/app.slint`, `src/main.rs`, `src/i18n.rs`, `src/desktop.rs` (the menu entry / Start Menu shortcut), `lang/` (gettext catalogs) |
 | `tools/i18n.py` | keeps `gui/lang/` in step with the strings (`@tr` in .slint, `tr` / `trf` / `trn` in Rust) |
 | `tests/cli_test.py` | end to end: a fake release of dummy files installed into every kind of place by `mhgu-de-cli` |
 | `packaging/build.py` | the release files: `.exe` (mingw-w64), `.AppImage` (zig, glibc 2.28), `SHA256SUMS-<v>` |

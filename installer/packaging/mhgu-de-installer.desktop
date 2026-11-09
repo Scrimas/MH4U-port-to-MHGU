@@ -6,3 +6,4 @@ Exec=mhgu-de-installer
 Icon=mhgu-de-installer
 Categories=Game;Utility;
 Terminal=false
+StartupWMClass=mhgu-de-installer

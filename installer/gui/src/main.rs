@@ -4,6 +4,7 @@
 // Windows: a window app, no console
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
+mod desktop;
 mod i18n;
 
 use mhgu_de_core::apply;
@@ -931,12 +932,15 @@ fn update_now(app: &mut App, ui: &AppWindow) {
             },
             &cancel,
         );
+        let ver = u.version.to_string();
         later(move |app, ui| {
             ui.set_update_busy(false);
             match r {
                 Ok(done) => {
                     app.settings.update_leftover = done.aside.clone();
                     let _ = settings::save(&app.settings);
+                    // the menu entry names the new file before this one quits
+                    desktop::moved(&old, &done.file, &ver);
                     if selfupdate::restart(&done.file).is_ok() {
                         let _ = slint::quit_event_loop();
                     } else {
@@ -965,6 +969,12 @@ fn main() {
         println!("{}", mhgu_de_core::VERSION);
         return;
     }
+    // the system's menu: the AppImage's desktop entry, the .exe's Start Menu shortcut (CI's Windows job checks it)
+    desktop::install();
+    // Wayland app id / X11 class, the entry's StartupWMClass: the desktop matches the window to its icon. Before
+    // any window.
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let _ = slint::set_xdg_app_id(desktop::NAME);
     let ui = AppWindow::new().expect("the window opens");
     i18n::set(i18n::index_of(&s.language));
     // CI (.github/workflows/installer.yml): the window opens, then closes by itself (--smoke); MHGU_DE_SNAPSHOT=<png>

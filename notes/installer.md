@@ -105,6 +105,12 @@ enabled unless mods/load_order.txt marks it `# off:`): strong, not confirmed; th
   (Settings switch), downloaded beside the running file and swapped in (Windows: the old .exe renamed aside, deleted
   at the next start; Linux: $APPIMAGE replaced), then restarted. Checksums catch a broken download, not a forged
   release.
+- The system's menu (`installer/gui/src/desktop.rs`, MHGU_Editor's desktop.rs for Linux): at each start the AppImage
+  writes `~/.local/share/applications/mhgu-de-installer.desktop` and its icon (on NixOS with nix-ld, through a
+  launcher that skips appimage-run's sandbox), the release .exe a Start Menu shortcut; the newest version keeps the
+  entry, an older copy takes it only when the file it names is gone. A self-update points the entry at the new file
+  before the restart. `TryExec` hides a Linux entry whose AppImage is deleted; a Windows shortcut to a deleted .exe
+  stays until another copy starts. CI's Windows job checks the shortcut after the snapshot run.
 - Settings and the download cache: `<config>/mhgu-de-installer/settings.json`, `<cache>/mhgu-de-installer/<release>/`;
   after each install only the installed release's zips stay (they serve another place later), older releases'
   folders are deleted.

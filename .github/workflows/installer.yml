@@ -121,6 +121,8 @@ jobs:
           test "$("dist/MHGU-Definitive-Edition-Installer-$VER-x86_64.exe" --version | tr -d '\r')" = "$VER"
           MHGU_DE_SNAPSHOT=window.png timeout 180 "dist/MHGU-Definitive-Edition-Installer-$VER-x86_64.exe"
           test -s window.png
+          # the Start Menu shortcut it wrote at start (gui/src/desktop.rs)
+          test -s "$(cygpath "$APPDATA")/Microsoft/Windows/Start Menu/Programs/MHGU Definitive Edition Installer.lnk"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
