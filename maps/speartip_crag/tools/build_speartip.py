@@ -1,16 +1,17 @@
 """build_speartip.py : Speartip Crag (4U stage 8, m08) for MHGU, as an alias of GU stage 18 (the Sanctuary, 2 areas).
 
-  build_speartip.py [--out DIR]     write (default DIR = monsters/dalamadur/romfs)
+  build_speartip.py [--out DIR]     write (default DIR = maps/speartip_crag/romfs)
                                       DIR/nativeNX/arc/stage/m29d/{m29d,a00,a01}.arc
                                       DIR/nativeNX/loc/arc/stage/map_com/m29.arc
                                       DIR/nativeNX/sound/bgm/map/m29d/wav/m29a00d.opus, m29a01d.opus
                                     report: dump/converted/dalamadur/speartip_report.json
 
-Route (notes/speartip-crag.md section 6, Gogmazios' Battlequarters precedent tools/stage4u2gu.py): our arcs keep the
-Sanctuary's INTERNAL paths (stage\\m18d\\..., sound\\...\\m18d\\...), so every file ID GU computes for stage 18 resolves
-by path hash to our resources; they ship at new RomFS paths (folder m29 = allocations.toml stage_alias) that the module
-asks for while Dalamadur's quests run (module/stage_alias.c). The Sanctuary's own files stay untouched (an addition).
-Area numbers are the same in both games (0 camp, 1 arena), so the 4U area info (SIS) ships unchanged.
+Route (monsters/dalamadur/notes/speartip-crag.md section 6, Gogmazios' Battlequarters precedent tools/stage4u2gu.py):
+our arcs keep the Sanctuary's INTERNAL paths (stage\\m18d\\..., sound\\...\\m18d\\...), so every file ID GU computes for
+stage 18 resolves by path hash to our resources; they ship at new RomFS paths (folder m29 = allocations.toml
+stage_alias) that the module asks for while Dalamadur's quests run (module/stage_alias.c). The Sanctuary's own files
+stay untouched (an addition). Area numbers are the same in both games (0 camp, 1 arena), so the 4U area info (SIS) ships
+unchanged.
 
   area arcs a00 / a01 (GU m18 aNN.arc as the base):
     - main model m18a0Nd <- 4U m08a0Nd (stage4u2gu convert_models / build_mrl / textures)
@@ -39,7 +40,7 @@ Deviations / G: 4U collision group flags w2 0x102 (arena lower floor 10, 52 tria
 import argparse, json, os, re, struct, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-MON = os.path.dirname(HERE)                          # monsters/dalamadur
+MON = os.path.dirname(HERE)                          # maps/speartip_crag
 ROOT = os.path.dirname(os.path.dirname(MON))
 sys.path.insert(0, os.path.join(ROOT, 'tools'))
 import paths                                         # noqa: E402
@@ -52,7 +53,7 @@ U4_ARCS = ('m08', 'm08a00', 'm08a01')
 GUX = os.path.join(ROOT, 'dump', 'gu_stage', 'nativeNX')
 STR4U = os.path.join(ROOT, 'dump', 'romfs', 'sound', 'bgm', 'str_map', 'm08')
 REPORT = os.path.join(ROOT, 'dump', 'converted', 'dalamadur', 'speartip_report.json')
-STAGE, FOLDER = 18, 29                               # allocations.toml dalamadur stage_alias
+STAGE, FOLDER = 18, 29                               # allocations.toml dalamadur stage_alias = package.toml folder
 G = 'm%02d' % STAGE
 T_MOD, T_MRL, T_TEX, T_SDL = s4.T_MOD, s4.T_MRL, s4.T_TEX, s4.T_SDL
 T_SBC, T_SIS, T_STQR = s4.T_SBC, s4.T_SIS, s4.T_STQR
@@ -382,7 +383,7 @@ def build_streams(outroot, rep):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
-    ap.add_argument('--out', default=paths.romfs('dalamadur'))
+    ap.add_argument('--out', default=paths.map_romfs('speartip_crag'))
     a = ap.parse_args()
     unpack_4u()
     s4.set_source(U4, 'm08')

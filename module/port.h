@@ -55,7 +55,7 @@ void port_load_all(void);
 const uint8_t *port_section(int m, const char *tag, int nth, uint32_t *size);
 #define PORT_U32(sec, off) (*(const uint32_t *)((sec) + (off)))
 #define PORT_STR(sec, off) ((const char *)(sec) + PORT_U32(sec, off))
-/* 1 = its assets are installed (monster arc present) */
+/* 1 = its assets are installed (monster arc present, and its map's stage arc when it has a stage alias) */
 int port_installed(int m);
 /* 1 = quests[k]'s loose questData file is present (the quest builders write it with the quest arc) */
 int port_quest_present(int m, int k);

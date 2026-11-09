@@ -4,8 +4,7 @@ published).
   python3 monsters/stygian_zinogre/build.py [STEP ...]      default: every step, in order (--list: the steps)
 
 Outputs (monsters/stygian_zinogre/): romfs/ (converted RomFS = its assets package: the monster arc, the weapon model
-  and sound arcs, the Heaven's Mount stage alias m30 (steps stage + stageui; the stage step extracts 4U m05 from
-  dump/base into dump/romfs and dump/m05_unpacked when missing)), gen/stygian_zinogre.bin (its data file, packed from
+  and sound arcs; Heaven's Mount is the map package maps/heavens_mount), gen/stygian_zinogre.bin (its data file, packed from
   the gen/*.sec sections, tools/portdata.py), tools/em057_01_manifest.json.
 Inputs: dump/romfs (4U em049.arc, em_data.arc), dump/gear_src (4U weapon arcs + MRL index), dump/base (4U ROM: core
   effect arcs, Arena stage arcs), dump/m19_unpacked/m19a03 (reference area-colour file) and the GU scratch dir of
@@ -46,8 +45,6 @@ def weapons():
 
 STEPS = [
     ('dt', 'dump/converted/em049/dt_em0NN/', dt),
-    ('stage', "Heaven's Mount: stage m30 (alias of 24)", lambda: [py(os.path.join(T, 'build_heavens_mount.py'), flags=('-B',))]),
-    ('stageui', 'its area maps + whole map (after stage)', lambda: [py(os.path.join(T, 'build_heavens_mount_ui.py'), flags=('-I', '-B'))]),
     ('arc', 'monster arc + manifest + FILE section', lambda: [py(os.path.join(T, 'build_em057_01_arc.py'))]),
     ('quest', 'his quests (QUESTS: all 11)', lambda: [py(os.path.join(T, 'build_em057_01_quest.py'), flags=('-I', '-B'))]),
     ('name', 'NAME (4U names, 5 languages)', lambda: [py(os.path.join(T, 'name_em057_01.py'))]),

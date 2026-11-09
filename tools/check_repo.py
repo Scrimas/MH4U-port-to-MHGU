@@ -8,7 +8,7 @@ tools/setup.py) and by CI; exit 1 with the reason for each refused file.
 import fnmatch, os, re, subprocess, sys
 
 DATA_PATHS = ['dump/*', 'ryuroot/*', 'save-backup-*', 'monsters/*/romfs*/*', 'monsters/*/gen/*', 'weapons/*/romfs*/*',
-              'weapons/*/gen/*']
+              'weapons/*/gen/*', 'maps/*/romfs*/*', 'maps/*/gen/*']
 GAME_EXT = {'.3ds', '.cci', '.cxi', '.cia', '.nsp', '.xci', '.nca', '.nso', '.arc', '.lmt', '.mod', '.tex', '.mrl',
             '.gmd', '.lmd', '.sbc', '.efl', '.lcm', '.emc', '.stq', '.stqr', '.mca', '.bcwav', '.opus', '.ext', '.qdl',
             '.gfd', '.gui', '.sav', '.keys'}

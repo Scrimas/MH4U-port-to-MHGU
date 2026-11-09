@@ -4,8 +4,8 @@
 
 Package monsters/dalamadur/ = Dalamadur, Shah Dalamadur and their tail halves (allocations.toml entries dalamadur,
 shah_dalamadur, dalamadur_tail, shah_dalamadur_tail). Outputs: romfs/ (converted RomFS = its assets package: the four
-monster arcs em090_00 / em090_01 / em091_00 / em091_01, the theme's opus streams, Speartip Crag = stage folder m29,
-the armor and weapon model arcs, the weapons' sound arcs), tools/<arc>_manifest.json, gen/<entry>/*.sec (data file
+monster arcs em090_00 / em090_01 / em091_00 / em091_01, the theme's opus streams, the armor and weapon model
+arcs, the weapons' sound arcs; Speartip Crag is the map package maps/speartip_crag), tools/<arc>_manifest.json, gen/<entry>/*.sec (data file
 sections, once the entries are allocated).
 Inputs: dump/romfs (4U em024 / em083 / em110 / em111 arcs, em_data.arc, m08*.arc, the stage BGM and str_m08
   streams), dump/base (4U ROM: core effect arcs), dump/m19_unpacked/m19a03 (reference area-colour file) and the GU
@@ -49,8 +49,6 @@ STEPS = [
     ('bgm', 'theme opus + dump/converted/dalamadur STQR', lambda: [py(os.path.join(T, 'bgm_dalamadur.py'))]),
     ('walk', 'walk collision SBC (dump/converted/dalamadur/walk)', lambda: [py('tools/walk4u2gu.py', 'convert')]),
     ('arc', 'the four monster arcs + manifests', lambda: [py(os.path.join(T, 'build_dalamadur_arc.py'))]),
-    ('speartip', 'Speartip Crag: stage m29 (alias of 18)', lambda: [py(os.path.join(T, 'build_speartip.py'))]),
-    ('ui', 'its area maps + whole map (after speartip)', lambda: [py(os.path.join(T, 'build_speartip_ui.py'))]),
     ('quest', 'the 6 quests (QUESTS; extdata ones)', lambda: [py(os.path.join(T, 'build_dalamadur_quest.py'))]),
     ('name', 'NAME of both heads (4U names, 5 languages)', lambda: [py(os.path.join(T, 'name_em090.py'))]),
     ('notes', "Hunter's Notes entry 125", lambda: [py(os.path.join(T, 'notes_em090.py'))]),

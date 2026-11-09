@@ -3,7 +3,7 @@
   build_speartip_ui.py [--out DIR] [--preview DIR]
       write DIR/nativeNX/<lang>/arc/stage/mapUI/m29d/a0N_ui_<lang>.arc (area maps, kind 49) and
       DIR/nativeNX/<lang>/arc/stage/map_com/m29_<lang>.arc (whole map, kind 55) for eng fre ger ita spa
-      (default DIR = monsters/dalamadur/romfs); --preview: the composed pictures as PNG
+      (default DIR = maps/speartip_crag/romfs); --preview: the composed pictures as PNG
 
 Same route as Battlequarters (tools/mapui4u2gu.py, whose GUI / texture helpers this uses; transforms in
 module/stage_alias.c): the GU map record of an area holds the 4U record (package.toml [stage] maprec, checked here
@@ -14,7 +14,7 @@ against 4U's table) and the GU picture is the 4U one at 2x, so GU map px = 2 * (
     run time); the arena's only exit is the under-floor fall volume (interior: no label; its big '1' is baked in).
     GUI m18a00dn: the exit highlight Tex_area01 onto the '1'. m18a01dn: the Sanctuary's breakable icons (AnimP_k01..03,
     HD_gmk_m18) off-screen / blank: 4U draws its own breakables (ui288a01 koware01..03, atlas right half) as overlays
-    that go with the breaks (goal D: pane UVs in notes/speartip-crag.md section 7).
+    that go with the breaks (goal D: pane UVs in monsters/dalamadur/notes/speartip-crag.md section 7).
   whole map: 4U m08d_ID, pane ui258_map shows its top-left 58x64 px, centred in the 128 px frame of the 4U icon
     transform (0xb832ac: u = (x + off + W / 2) / W * 128, W 30000; checked: every SIS point of both areas lands on
     the art); 2x into HD_map_18dn (BC3). GUI map18dn: the arena highlight area01 = 4U ui258_area01 (pos read as minus
@@ -70,9 +70,9 @@ def pane4u(arc, lyt, name):
 
 def mapcom():
     """our map_com m29.arc {(path, type): bytes} (item pops and whole-map offsets share stage\\m18d\\m18d)"""
-    return {(p, t): d for p, t, d in arcpack.read(open(os.path.join(paths.romfs('dalamadur'), 'nativeNX', 'loc', 'arc',
-                                                                    'stage', 'map_com', 'm%02d.arc' % FOLDER),
-                                                       'rb').read())[1]}
+    mc = os.path.join(paths.map_romfs('speartip_crag'), 'nativeNX', 'loc', 'arc', 'stage', 'map_com',
+                      'm%02d.arc' % FOLDER)
+    return {(p, t): d for p, t, d in arcpack.read(open(mc, 'rb').read())[1]}
 
 
 PASSAGE_Y = -1000.0                      # exits below are fall volumes (the arena's (0, -3350, 0) r 10000), no passage
@@ -156,7 +156,7 @@ def wholemap_check(img, mc):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
-    ap.add_argument('--out', default=paths.romfs('dalamadur'))
+    ap.add_argument('--out', default=paths.map_romfs('speartip_crag'))
     ap.add_argument('--preview')
     a = ap.parse_args()
     st = tomllib.load(open(os.path.join(MON, 'package.toml'), 'rb'))['stage']

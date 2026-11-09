@@ -1,0 +1,18 @@
+# Battlequarters map package: 4U m19 as an alias of GU stage 26 (the Fortress), loaded from folder m28 while the quests
+# of a monster requiring it run (module/stage_alias.c): stage arcs, area maps, map_com, area streams. Notes:
+# monsters/gogmazios/notes/stage.md (maps/battlequarters/notes/README.md).
+name = "battlequarters"
+kind = "map"
+title = "Battlequarters"
+version = "1.0.0"          # bump on every published change of this map's files
+requires_core = "1.10.0"   # oldest core that knows map packages (module/port.c port_installed: a monster whose
+                           # map is missing counts as not installed)
+folder = 28                # its RomFS stage folder m28 = allocations.toml stage_alias[1] of every monster
+                           # requiring it (tools/alloc.py checks it)
+
+[stage]                    # the Battlequarters alias (allocations.toml stage_alias, module/stage_alias.c)
+kinds = [49, 54, 55, 56, 58]   # arc paths -> m28: mapUI, map_com, language map_com, stage, area (no night version)
+hold_kobj_areas = [2]      # arena: doors / wall and the 4U breakables stay closed / intact at quest start
+maprec = [[1.8, 17, 11], [2.0, 0, -8], [1.1, 0, -1]]   # area maps: 4U m19 a00 / a01 / a03 records {k, x, y}
+                           # (tools/mapui4u2gu.py MAPREC, checked against the 4U table there)
+wholemap_k = 1.5           # whole map: GU dims[26] / 4U m19 W = 60000 / 40000 (tools/mapui4u2gu.py WMAP_K)

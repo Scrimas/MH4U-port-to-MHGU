@@ -13,6 +13,7 @@ Mark every fact you write down as C (confirmed in code or data), S (strong) or G
 | `notes/` | core notes (this guide, registry, enemy-class, port, api-map, assets, data, gear-weapons, installer) |
 | `monsters/<name>/` | one monster: `module/` (its C code, compiled into the core module), `tools/`, `notes/`, `package.toml` (version, C prefix), `build.py` (every generator, in order) |
 | `monsters/<name>/gen/`, `romfs/` | gitignored game data: its data file `<name>.bin` (+ the `.sec` sections) and its converted RomFS (= its assets) |
+| `maps/<map>/` | one map package (since 2026-11, core 1.10.0): a ported 4U arena (stage arcs, map UI, map_com, area streams) with its `package.toml` (`kind = "map"`, `folder`, `[stage]`), `build.py`, `tools/`, `notes/`; `romfs/` is gitignored. Monsters name it in their `package.toml` `requires` |
 | `dump/scratch/<monster>-session/` | gitignored local archive of a session scratchpad (the one-off RE / check scripts and outputs notes call "scratchpad"); copy yours there before a reboot wipes /tmp |
 
 Gogmazios files named below as `tools/*_em089.py`, `tools/build_gog_quest.py`, `tools/gogreport.py`,
@@ -95,8 +96,8 @@ pairs where possible (tools/dt_vote.py, dt_map.py, snd4u2gu.py selftest), then a
    any hook site or IPS record inside them; a hook goes past them (MID_EXIT) or behind a test switch. For a new
    plugin, `python3 tools/plugin_sigs.py <plugin>.nro` prints its checked offsets and width for PLUGIN_CHECKED.
 3. **RomFS additions** = the monster's assets (`monsters/<name>/romfs/...`): BGM (tools/snd_bgm.py), quest arc
-   (build_gog_quest.py), the stage alias arcs if the 4U arena is ported (tools/stage4u2gu.py), the map UI
-   (tools/mapui4u2gu.py), and the gear models (tools/armor4u2gu.py, tools/weapon4u2gu.py). Never a copy of a GU
+   (build_gog_quest.py) and the gear models (tools/armor4u2gu.py, tools/weapon4u2gu.py); a ported 4U arena is its
+   own map package (`maps/<map>/romfs/`, Phase 5). Never a copy of a GU
    file: another monster would ship the same path (build.py install refuses it); patch the loaded resource instead
    (the monster name is a NAME section applied to the loaded monsterName GMD).
 4. **Content** (Phase 5b): the monster's save slot, materials, carves / rewards, armor, weapons, skill and
@@ -208,12 +209,19 @@ pairs where possible (tools/dt_vote.py, dt_map.py, snd4u2gu.py selftest), then a
 ### Phase 5: quest, arena, UI
 - Quest: tools/build_gog_quest.py (G-rank Hub extra quest 11491 via the quest_group_fix / quest_unlocked hooks).
   Copy it for a new quest ID and boss.
-- Arena: if GU lacks it, follow notes/stage.md (alias build, collision, SIS, gimmicks, lighting: the 4U unlit
-  flag is MRL w6 bit 31, GU lighting comes from the template feature). Stage-specific engine tables matter
+- Arena: if GU lacks it, it becomes a map package `maps/<map>/` (copy `maps/speartip_crag/`): `package.toml` with
+  `kind = "map"`, `folder` = the monster's allocations.toml `stage_alias[1]` and the `[stage]` table the core
+  compiles in (module/build.py stage_alias), a `build.py` with the alias steps, and `requires = ["<map>"]` in the
+  monster's `package.toml` (checked by tools/alloc.py). Several monsters may require one map: the installer adds it
+  with the first monster that needs it and removes it with the last, and the core counts a monster whose map is
+  missing as not installed (module/port.c port_installed). Then follow notes/stage.md (alias build, collision, SIS,
+  gimmicks, lighting: the 4U unlit flag is MRL w6 bit 31, GU lighting comes from the template feature). Stage-specific engine tables matter
   (e.g. 4U arena point tables are per stage: 0x689f7c uses the em's emd +0x40 table except on stage 13).
-  Second example, smaller and more generic: monsters/dalamadur/tools/build_speartip.py (4U m08 on GU stage 18,
-  host audit and the GU stage files that carry another stage's look: notes/speartip-crag.md section 7).
-- Map UI: tools/mapui4u2gu.py (area maps + whole map, transforms in its docstring); Dalamadur's build_speartip_ui.py.
+  Second example, smaller and more generic: maps/speartip_crag/tools/build_speartip.py (4U m08 on GU stage 18,
+  host audit and the GU stage files that carry another stage's look: monsters/dalamadur/notes/speartip-crag.md
+  section 7).
+- Map UI: tools/mapui4u2gu.py (area maps + whole map, transforms in its docstring); maps/speartip_crag/tools/
+  build_speartip_ui.py.
 
 ### Phase 5b: content (save, items, gear, Notes, quests)
 Order that worked: save slot -> materials -> carves / rewards -> second quest + subquests -> armor data on a GU

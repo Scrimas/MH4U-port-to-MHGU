@@ -42,13 +42,23 @@ def core():
 
 
 def packages():
-    """one dict per package: its package.toml + entries = its allocations.toml entries (one data file each) + alloc =
-    the first entry"""
+    """one dict per package: its package.toml + romfs = its RomFS folder + entries = its allocations.toml entries (one
+    data file each) + alloc = the first entry; monster packages in registry order, then the map packages
+    (maps/<name>: no entries, alloc None)"""
     out = []
     for p in alloc.packages():
         ents = [m for m in alloc.monsters() if alloc.package(m) == p]
-        out.append(dict(toml(os.path.join(paths.monster(p), 'package.toml')), entries=ents, alloc=ents[0]))
+        out.append(dict(toml(os.path.join(paths.monster(p), 'package.toml')), entries=ents, alloc=ents[0],
+                        romfs=paths.romfs(p)))
+    for mp in paths.maps():
+        out.append(dict(toml(os.path.join(paths.map_dir(mp), 'package.toml')), entries=[], alloc=None,
+                        romfs=paths.map_romfs(mp)))
     return out
+
+
+def zip_name(p):
+    """<monster>-<v>.zip, map-<map>-<v>.zip"""
+    return ('map-%s-%s.zip' if p.get('kind') == 'map' else '%s-%s.zip') % (p['name'], p['version'])
 
 
 def clean_env():
@@ -61,7 +71,8 @@ def clean_env():
 def build():
     for p in packages():
         print('== build %s' % p['name'], flush=True)
-        subprocess.run([sys.executable, os.path.join(paths.monster(p['name']), 'build.py')], check=True, env=clean_env())
+        subprocess.run([sys.executable, os.path.join(paths.package_dir(p['name']), 'build.py')], check=True,
+                       env=clean_env())
     print('== build module', flush=True)
     subprocess.run([sys.executable, os.path.join(ROOT, 'module', 'build.py')], check=True, env=clean_env())
 
@@ -94,7 +105,7 @@ def check():
                 bad.append('%s: data file version %x != package.toml %s' % (e, hdr['version'], p['version']))
             if os.path.getmtime(data) < os.path.getmtime(os.path.join(paths.monster(e), 'package.toml')):
                 bad.append('%s: data file older than package.toml (repack)' % e)
-        rf = paths.romfs(name)
+        rf = p['romfs']
         files = [os.path.relpath(os.path.join(d, f), rf) for d, _, fs in os.walk(rf) for f in fs]
         if not files:
             bad.append('%s: empty romfs %s' % (name, rf))
@@ -147,10 +158,10 @@ def package(out):
     core_zip = 'core-%s.zip' % c['version']
     write_zip(os.path.join(out, core_zip), [(MOD_NAME + '/' + a, s) for a, s in members])
     for p in pk:
-        rf = paths.romfs(p['name'])
+        rf = p['romfs']
         mem = [(MOD_NAME + '/romfs/' + os.path.relpath(os.path.join(d, f), rf).replace(os.sep, '/'), os.path.join(d, f))
                for d, _, fs in os.walk(rf) for f in fs]
-        write_zip(os.path.join(out, '%s-%s.zip' % (p['name'], p['version'])), mem)
+        write_zip(os.path.join(out, zip_name(p)), mem)
     with open(os.path.join(out, 'NOTES.md'), 'w') as f:
         f.write(notes(c, pk, out))
     for f in sorted(os.listdir(out)):
@@ -178,7 +189,7 @@ def quests(p):
     string"""
     sys.path.insert(0, paths.GU_PY)
     import gmd
-    rf, out = paths.romfs(p['name']), []
+    rf, out = p['romfs'], []
     for m in p['entries']:
         for q in m.get('quests', []):
             qd = open(os.path.join(rf, 'nativeNX/loc/quest/questData/questData_%07d.ext' % q), 'rb').read()
@@ -218,7 +229,7 @@ def notes(c, pk, out):
               '<details><summary>Files (sha256)</summary>', '',
               '- core-%s.zip `%s`' % (v, sha256(os.path.join(out, 'core-%s.zip' % v)))]
     for p in pk:
-        z = '%s-%s.zip' % (p['name'], p['version'])
+        z = zip_name(p)
         lines.append('- %s `%s`' % (z, sha256(os.path.join(out, z))))
     lines += ['', '</details>']
     return '\n'.join(lines) + '\n'

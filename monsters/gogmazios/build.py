@@ -5,7 +5,7 @@
 Outputs (monsters/gogmazios/): romfs/ (converted RomFS = its assets package), gen/gogmazios.bin (its data file,
   packed from the gen/*.sec sections, tools/portdata.py), module/em089_slot75.inc, tools/em089_manifest.json;
   module/gear_hooks.txt (core); work files in dump/converted/.
-Inputs: dump/ (4U ROM dump/base/*.3ds, extracted dump/romfs + dump/exefs_v11, dump/m19_unpacked, dump/gu_stage,
+Inputs: dump/ (4U ROM dump/base/*.3ds, extracted dump/romfs + dump/exefs_v11,
   dump/converted/em089/{dtbase,dttune}.bin from tools/dt_convert.py in the unicorn venv), dump/gear_src/ (4U armor
   and weapon arcs + the MRL template indexes of tools/armor4u2gu.py / weapon4u2gu.py `index`), and the GU scratch
   dir of tools/paths.py. One line per step on stdout, the step's own output in $BUILD_LOGS/<step>.log (tools/steps.py).
@@ -22,11 +22,8 @@ WEAPONS = (('00', 'two097'), ('01', 'one097'), ('02', 'ham099'), ('03', 'lan082'
            ('13', 'rod025'), ('14', 'gaxe027'))   # class, 4U arc name (model = its last 3 digits)
 
 STEPS = [
-    ('snd_bgm', 'BGM opus + STQRs (dump/converted)', lambda: [py('tools/snd_bgm.py', 'all')]),
-    ('snd_area', 'arena area sounds (dump/converted)', lambda: [py('tools/snd_area.py', 'convert')]),
+    ('snd_bgm', 'battle themes opus + STQR (dump/converted)', lambda: [py('tools/snd_bgm.py', 'battle')]),
     ('arc', 'monster arc + manifest + FILE section', lambda: [py(os.path.join(T, 'build_em089_arc.py'), '--cmdtbl', 'gog')]),
-    ('stage', 'Battlequarters alias arcs (m28)', lambda: [py('tools/stage4u2gu.py', 'alias', flags=('-I',), timeout=1800)]),
-    ('mapui', "area + whole maps (reads stage's m28.arc)", lambda: [py('tools/mapui4u2gu.py', flags=('-I',), timeout=1200)]),
     ('ui', 'name (icon: tools/ui_icons.py)', lambda: [py(os.path.join(T, 'ui_em089.py'), flags=('-I',))]),
     ('quest1', '11491 (4U m11014)', lambda: [py(os.path.join(T, 'build_gog_quest.py'))]),
     ('quest2', '11492', lambda: [py(os.path.join(T, 'build_gog_quest.py'), '--source', 'm11035')]),

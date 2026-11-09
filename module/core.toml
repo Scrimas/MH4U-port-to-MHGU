@@ -3,7 +3,10 @@
 # (tools/release.py). Bump on every published change of the module or of any data file.
 name = "core"
 title = "MH4U Port core"
-version = "1.9.0"          # 1.9.0: Monoblos (PR #17, Diablos variant 1), the save store for monsters past GU's
+version = "1.10.0"         # 1.10.0: maps are packages of their own (maps/: Battlequarters, Speartip Crag,
+                           #         Heaven's Mount, required by their monsters): a monster whose map is
+                           #         missing counts as not installed (module/port.c port_installed);
+                           # 1.9.0: Monoblos (PR #17, Diablos variant 1), the save store for monsters past GU's
                            #        slots (hunts, captures, sizes; slot leases), Hunter's Notes past entry 127
                            #        (Black Gravios 128, Monoblos 129), ported gear in the smithy by rarity;
                            # 1.8.0: Black Gravios (PR #12, Gravios variant 1), hooks off Damage Numbers' checked

@@ -151,7 +151,9 @@ const uint8_t *port_section(int m, const char *tag, int nth, uint32_t *size)
     return port_data(m) ? section_of(s_data[m], tag, nth, size) : 0;
 }
 
-/* installed = its monster arc nativeNX/arc/enemy/emNNN_VV.arc exists (id = variant << 8 | em) */
+/* installed = its monster arc nativeNX/arc/enemy/emNNN_VV.arc exists (id = variant << 8 | em) and, with a stage alias,
+ * its map's stage arc nativeNX/arc/stage/mNNd/mNNd.arc (kind 56 of the folder: the map package it requires,
+ * maps/<map>, core 1.10.0): without its arena, its quests would load a stage that is not there */
 int port_installed(int m)
 {
     if (s_installed[m]) return s_installed[m] == 1;
@@ -162,6 +164,18 @@ int port_installed(int m)
     put(p, ".arc");
     uint32_t r = fs_entry_type(&type, path);
     s_installed[m] = !r && type == 1 ? 1 : 2;        /* DirectoryEntryType_File */
+    uint32_t f = port_monsters[m].stage_folder;      /* 28..99 (allocations.toml pool stage_folder) */
+    if (s_installed[m] == 1 && f) {
+        char map[64], a = (char)('0' + f / 10 % 10), b = (char)('0' + f % 10);
+        p = put(map, "app:/nativeNX/arc/stage/m");
+        *p++ = a; *p++ = b; p = put(p, "d/m"); *p++ = a; *p++ = b; put(p, "d.arc");
+        type = 0;
+        if (fs_entry_type(&type, map) || type != 1) {
+            s_installed[m] = 2;
+            logf("mh4uport: %s NOT installed (its map is missing: %s)", port_monsters[m].name, map);
+            return 0;
+        }
+    }
     logf("mh4uport: %s %s (%s)", port_monsters[m].name, s_installed[m] == 1 ? "installed" : "NOT installed", path);
     return s_installed[m] == 1;
 }

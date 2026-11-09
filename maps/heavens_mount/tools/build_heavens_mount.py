@@ -1,13 +1,13 @@
 """build_heavens_mount.py : Heaven's Mount (4U stage 5, m05) for MHGU, as an alias of GU stage 24 (the Ruined
-Pinnacle, 10 areas) for Stygian Zinogre's three Heaven's Mount quests (notes/heavens-mount.md).
+Pinnacle, 10 areas) for Stygian Zinogre's three Heaven's Mount quests (monsters/stygian_zinogre/notes/heavens-mount.md).
 
-  build_heavens_mount.py [--out DIR]   write (default DIR = monsters/stygian_zinogre/romfs)
+  build_heavens_mount.py [--out DIR]   write (default DIR = maps/heavens_mount/romfs)
                                          DIR/nativeNX/arc/stage/m30d/{m30d,a00..a09}.arc
                                          DIR/nativeNX/loc/arc/stage/map_com/m30.arc
                                          DIR/nativeNX/sound/bgm/map/m30d/wav/m30aNNd.opus (4U str_m05 streams)
                                        report: dump/converted/em049/heavens_mount_report.json
 
-Route = Speartip Crag's (monsters/dalamadur/tools/build_speartip.py) and the Battlequarters' (tools/stage4u2gu.py): our
+Route = Speartip Crag's (maps/speartip_crag/tools/build_speartip.py) and the Battlequarters' (tools/stage4u2gu.py): our
 arcs keep the Ruined Pinnacle's INTERNAL paths (stage\\m24d\\..., sound\\...\\m24d\\...), so every file ID GU computes
 for stage 24 resolves by path hash to our resources; they ship at new RomFS paths (folder m30 = allocations.toml
 stage_alias) that the core asks for while Stygian's quests run (module/stage_alias.c). The Ruined Pinnacle's own files
@@ -39,12 +39,12 @@ unchanged), GU area 9 is left over: no 4U SIS exit leads there (S: unreachable),
     per-area camera XFS etc\\m24aNNd-cam of areas 0..8 removed (GU rail cameras of GU terrain; the Sanctuary / 4U
     m08 ship none).
 Kept GU: area 9's files, the stage SE (snd_m24d), pec_m24d, snd_fs_ase24, setItemData, stage shells, area_select\\_map24
-(empty in GU). Deviations / G: see notes/heavens-mount.md.
+(empty in GU). Deviations / G: see monsters/stygian_zinogre/notes/heavens-mount.md.
 """
 import argparse, json, os, re, struct, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-MON = os.path.dirname(HERE)                          # monsters/stygian_zinogre
+MON = os.path.dirname(HERE)                          # maps/heavens_mount
 ROOT = os.path.dirname(os.path.dirname(MON))
 sys.path.insert(0, os.path.join(ROOT, 'tools'))
 import paths                                         # noqa: E402
@@ -60,7 +60,7 @@ ROM4U = paths.ROM_4U
 GUX = os.path.join(ROOT, 'dump', 'gu_stage', 'nativeNX')
 STR4U = os.path.join(ROOT, 'dump', 'romfs', 'sound', 'bgm', 'str_map', 'm05')
 REPORT = os.path.join(ROOT, 'dump', 'converted', 'em049', 'heavens_mount_report.json')
-STAGE, FOLDER = 24, 30                               # allocations.toml stygian_zinogre stage_alias
+STAGE, FOLDER = 24, 30                               # allocations.toml stygian_zinogre stage_alias = package folder
 NGU = 10                                             # GU 0x162bbe8[24]
 G = 'm%02d' % STAGE
 T_MOD, T_MRL, T_TEX, T_SDL = s4.T_MOD, s4.T_MRL, s4.T_TEX, s4.T_SDL
@@ -677,7 +677,7 @@ def build_streams(outroot, rep):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
-    ap.add_argument('--out', default=paths.romfs('stygian_zinogre'))
+    ap.add_argument('--out', default=paths.map_romfs('heavens_mount'))
     a = ap.parse_args()
     unpack_4u()
     s4.set_source(U4, 'm05')

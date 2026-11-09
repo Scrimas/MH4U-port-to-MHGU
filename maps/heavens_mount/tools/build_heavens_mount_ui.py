@@ -4,7 +4,7 @@ folder m30), after build_heavens_mount.py (it reads our map_com m30.arc).
   build_heavens_mount_ui.py [--out DIR] [--preview DIR]
       write DIR/nativeNX/<lang>/arc/stage/mapUI/m30d/aNN_ui_<lang>.arc (area maps 0..9, kind 49) and
       DIR/nativeNX/<lang>/arc/stage/map_com/m30_<lang>.arc (whole map, kind 55) for eng fre ger ita spa
-      (default DIR = monsters/stygian_zinogre/romfs); --preview: the composed pictures as PNG
+      (default DIR = maps/heavens_mount/romfs); --preview: the composed pictures as PNG
 
 Same route as Speartip Crag / Battlequarters (tools/mapui4u2gu.py helpers; transforms in module/stage_alias.c):
   area maps: 4U lyt\\quest\\m05\\m05aNN_ID, left 128 x 128 (pane ui285aNN_map1 UV (0, 0)-(0.5, 1)); exit labels from
@@ -83,9 +83,9 @@ def pane4u(lyt, name):
 
 
 def mapcom():
-    return {(p, t): d for p, t, d in arcpack.read(open(os.path.join(paths.romfs('stygian_zinogre'), 'nativeNX', 'loc',
-                                                                    'arc', 'stage', 'map_com', 'm%02d.arc' % FOLDER),
-                                                       'rb').read())[1]}
+    mc = os.path.join(paths.map_romfs('heavens_mount'), 'nativeNX', 'loc', 'arc', 'stage', 'map_com',
+                      'm%02d.arc' % FOLDER)
+    return {(p, t): d for p, t, d in arcpack.read(open(mc, 'rb').read())[1]}
 
 
 def sis_points(area, mc):
@@ -180,7 +180,7 @@ def wholemap_check(img, mc):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
-    ap.add_argument('--out', default=paths.romfs('stygian_zinogre'))
+    ap.add_argument('--out', default=paths.map_romfs('heavens_mount'))
     ap.add_argument('--preview')
     a = ap.parse_args()
     st = tomllib.load(open(os.path.join(MON, 'package.toml'), 'rb'))['stage']

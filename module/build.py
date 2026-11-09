@@ -455,13 +455,19 @@ GU_QUEST_MESSAGE = 120   # GU's questMessage strings (resident_eng.arc GUI\06_ms
 
 
 def stage_alias(m):
-    """package.toml [stage] of an entry with allocations.toml stage_alias (module/stage_alias.c): kinds = arc path kinds
+    """[stage] of the map an entry with allocations.toml stage_alias requires (maps/<map>/package.toml, alloc.stage_map;
+    module/stage_alias.c): kinds = arc path kinds
     redirected to the folder (49 mapUI, 54 map_com, 55 language map_com, 56 stage, 58 area), hold_kobj_areas = areas
     whose KowareObjs keep GU's quest-start command 0 from playing, maprec = the area map records [k, x, y] per area
     (with kind 49), wholemap_k = the whole-map record scale (with kind 55)"""
     if 'stage_alias' not in m: return {}
-    st = package(m).get('stage')
-    if not st or not st.get('kinds'): sys.exit('%s: stage_alias needs package.toml [stage] kinds' % m['name'])
+    try:
+        mp = alloc.stage_map(m)
+    except KeyError as e:
+        sys.exit(str(e))
+    st = paths.package_toml(mp).get('stage')
+    if not st or not st.get('kinds'):
+        sys.exit('%s: stage_alias needs [stage] kinds in maps/%s/package.toml' % (m['name'], mp))
     assert all(48 <= k < 80 for k in st['kinds']) and all(0 <= a < 8 for a in st.get('hold_kobj_areas', [])), st
     assert (49 in st['kinds']) == bool(st.get('maprec')) and len(st.get('maprec', [])) <= 4, st
     assert (55 in st['kinds']) == bool(st.get('wholemap_k')), st
@@ -718,12 +724,13 @@ def install():
         shutil.copy(src, os.path.join(dst, 'nativeNX', 'mh4uport'))
     for name in ui_icons.FILES:
         shutil.copy(os.path.join(OUT, name), os.path.join(dst, 'nativeNX', 'mh4uport'))
-    sel =os.environ.get('PORT_ASSETS', 'all')           # package names (an entry name selects its package)
+    sel = os.environ.get('PORT_ASSETS', 'all')          # package names (an entry name selects its package; a monster
     names = alloc.packages() if sel == 'all' else [] if sel == 'none' else \
-        list(dict.fromkeys(paths.package(n) for n in sel.split(',')))
+        list(dict.fromkeys(paths.package(n) for n in sel.split(',')))   # brings the maps it requires)
+    names = list(dict.fromkeys(r for n in names for r in paths.requires(n) + [n]))
     owner = {}
-    for name in names:                                 # monsters never ship the same RomFS path
-        src = paths.romfs(name)
+    for name in names:                                 # packages never ship the same RomFS path
+        src = paths.map_romfs(name) if name in paths.maps() else paths.romfs(name)
         for d, _, files in os.walk(src):
             for f in files:
                 rel = os.path.relpath(os.path.join(d, f), src)
