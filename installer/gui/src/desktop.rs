@@ -302,8 +302,15 @@ mod win {
         std::ffi::OsString::from_wide(&b[..n]).into()
     }
 
-    fn same(a: &Path, b: &Path) -> bool {
-        a.as_os_str().eq_ignore_ascii_case(b.as_os_str())
+    /// `a` and `b` name the same file, their folders as the system resolves them: a shortcut keeps the long form of
+    /// a folder the .exe may have been started through by its 8.3 short name (%TEMP% often is: C:\Users\RUNNER~1\...),
+    /// or in another case. The file itself may be gone (an update renames the old .exe aside).
+    pub(super) fn same(a: &Path, b: &Path) -> bool {
+        let key = |p: &Path| Some(std::fs::canonicalize(p.parent()?).ok()?.join(p.file_name()?));
+        match (key(a), key(b)) {
+            (Some(x), Some(y)) => x.as_os_str().eq_ignore_ascii_case(y.as_os_str()),
+            _ => a.as_os_str().eq_ignore_ascii_case(b.as_os_str()),
+        }
     }
 
     /// The file shortcut `lnk` starts.
@@ -364,6 +371,15 @@ mod win {
     #[cfg(test)]
     pub(super) fn with_com<R: Send>(f: impl FnOnce() -> Option<R> + Send) -> Option<R> {
         com(f)
+    }
+
+    /// `p` (an existing folder) by its 8.3 short name where the volume has them, else as it is.
+    #[cfg(test)]
+    pub(super) fn short(p: &Path) -> PathBuf {
+        use windows::Win32::Storage::FileSystem::GetShortPathNameW;
+        let mut buf = vec![0u16; 32768];
+        let n = unsafe { GetShortPathNameW(PCWSTR(wide(p).as_ptr()), Some(&mut buf)) } as usize;
+        if n == 0 || n >= buf.len() { p.to_path_buf() } else { from_wide(&buf[..n]) }
     }
 }
 
@@ -470,8 +486,11 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn a_shortcut_names_its_exe() {
-        let dir = std::env::temp_dir().join(format!("mhgu-de-lnk-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
+        use std::path::PathBuf;
+        let long = std::env::temp_dir().join(format!("mhgu-de-installer-lnk-{}", std::process::id()));
+        std::fs::create_dir_all(&long).unwrap();
+        // the .exe started through the folder's short name, the shortcut keeping its long one (CI's %TEMP%)
+        let dir = win::short(&long);
         let lnk = dir.join("Test Installer.lnk");
         let exe = |v: &str| dir.join(format!("MHGU-Definitive-Edition-Installer-{v}-x86_64.exe"));
         std::fs::write(exe("9.9.9"), "x").unwrap();
@@ -484,11 +503,15 @@ mod tests {
             win::moved_in(&lnk, &exe("9.9.9"), &exe("10.0.0"));
             Some((written, other, win::target(&lnk)))
         });
-        let _ = std::fs::remove_dir_all(&dir);
         let (written, other, after) = read.unwrap();
-        assert_eq!(written, Some(exe("9.9.9")));
-        assert_eq!(other, Some(exe("9.9.9")), "another copy's shortcut stays");
-        assert_eq!(after, Some(exe("10.0.0")));
+        let names = |p: Option<PathBuf>, v: &str| p.is_some_and(|p| win::same(&p, &exe(v)));
+        let (w, o, a) =
+            (names(written.clone(), "9.9.9"), names(other.clone(), "9.9.9"), names(after.clone(), "10.0.0"));
+        let _ = std::fs::remove_dir_all(&long);
+        assert!(w, "written: {written:?}, the .exe: {:?}", exe("9.9.9"));
+        assert!(o, "another copy's shortcut stays: {other:?}");
+        assert!(a, "moved to the new .exe: {after:?}");
+        assert!(!win::same(&exe("9.9.9"), &exe("10.0.0")));
         // the version an older copy compares with: this binary's resource (gui/build.rs, winresource)
         let v = win::file_version(&std::env::current_exe().unwrap());
         assert_eq!(v.as_deref(), VERSION.split('-').next());
