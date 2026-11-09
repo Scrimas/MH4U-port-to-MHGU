@@ -120,6 +120,11 @@ fn monogram(title: &str) -> String {
     s.to_uppercase()
 }
 
+/// A package's name on screen: the core's is the window's own translated word, the others are names (monsters, maps).
+fn shown_title(kind: &Kind, title: &str) -> String {
+    if matches!(kind, Kind::Core) { tr("Core") } else { title.to_string() }
+}
+
 fn line(text: impl Into<SharedString>, tone: i32, head: bool) -> Line {
     Line { text: text.into(), tone, head }
 }
@@ -589,13 +594,14 @@ fn review(app: &mut App, ui: &AppWindow, remove_all: bool) {
             ));
         }
         for c in &p.changes {
+            let title = shown_title(&c.kind, &c.title);
             let what = match &c.action {
-                Action::Add => trf("+ {} {} (new)", &[&c.title, &c.version]),
+                Action::Add => trf("+ {} {} (new)", &[&title, &c.version]),
                 Action::Update { from } if *from == c.version => {
-                    trf("↻ {} {} (repaired: files were missing)", &[&c.title, &c.version])
+                    trf("↻ {} {} (repaired: files were missing)", &[&title, &c.version])
                 }
-                Action::Update { from } => trf("↑ {} {} → {}", &[&c.title, from, &c.version]),
-                Action::Remove { version } => trf("− {} {} (removed)", &[&c.title, version]),
+                Action::Update { from } => trf("↑ {} {} → {}", &[&title, from, &c.version]),
+                Action::Remove { version } => trf("− {} {} (removed)", &[&title, version]),
             };
             let what =
                 if c.needed_by.is_empty() { what } else { trf("{} · for {}", &[&what, &c.needed_by.join(", ")]) };
@@ -762,7 +768,8 @@ fn start_install(app: &mut App, ui: &AppWindow, remove_all: bool) {
                         b.0 = pkg.to_string();
                     }
                     let all = b.1 + done;
-                    let (pkg, title) = (pkg.to_string(), m.package(pkg).map_or_else(String::new, |p| p.title.clone()));
+                    let (pkg, title) =
+                        (pkg.to_string(), m.package(pkg).map_or_else(String::new, |p| shown_title(&p.kind, &p.title)));
                     later(move |app, ui| {
                         app.progress = Progress {
                             package: pkg,

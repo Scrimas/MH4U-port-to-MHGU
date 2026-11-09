@@ -302,6 +302,10 @@ msgid "Damaged zip file ({})"
 msgstr ""
 
 #: gui/src/main.rs
+msgid "Core"
+msgstr ""
+
+#: gui/src/main.rs
 msgid "The release has no manifest.json"
 msgstr ""
 
@@ -387,10 +391,6 @@ msgstr ""
 #: gui/src/main.rs
 #. placeholders: {} in order, {0} {1} by position
 msgid "Release {}"
-msgstr ""
-
-#: gui/src/main.rs
-msgid "Core"
 msgstr ""
 
 #: gui/src/main.rs
