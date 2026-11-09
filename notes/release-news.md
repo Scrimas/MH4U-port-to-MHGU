@@ -11,6 +11,9 @@ written for players; write the section before `release.py package`.
 - The ported arenas are downloads of their own: Battlequarters (Gogmazios), Speartip Crag (Dalamadur) and Heaven's
   Mount (Stygian Zinogre). A monster whose arena is missing stays off instead of loading a missing stage.
 
+**Fixed**
+- Sorting the item box works when it holds items from a newer release of the mod: they stay at the end of the box.
+
 ## v1.9.0
 **New**
 - Monoblos, ported by @Rukasu1609, with his MH4U AI and attacks, 6 quests from MH4U (High and G rank, village and

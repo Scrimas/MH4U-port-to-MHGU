@@ -303,19 +303,18 @@ WORD_PATCHES = [
 ]
 
 # Items appended past GU's 2991 (allocations.toml [monster.append] items; notes/items-append.md): the code that bounds
-# item IDs by the count is raised by the appended count, the per-item buffers grow with it, and the items-obtained
-# set / clear / test are replaced (items.c: IDs from 3008 use a reserved save block). Nothing changes without them.
+# item IDs by the count is raised by the appended count, the per-item heap buffer grows with it, the item box sort and
+# the items-obtained set / clear / test are replaced (items.c: IDs from 3008 use a reserved save block). Nothing
+# changes without them.
 ITEMS_APPENDED = alloc.item_count() - alloc.GU_ITEMS
 ITEM_BOUND_SITES = [            # movw rX, #0xbad / #0xbae / #0xbaf: `id - 1 <= 2989` checks and one loop over all IDs
     0x6F3DF8, 0x6F90F4, 0x6FA504, 0x6FA7EC, 0x6FBA28, 0x6FCEBC, 0x6FCF98, 0x6FCFB0, 0x6FD020, 0x6FD0E0, 0x6FD19C,
     0x7054E8, 0x709438, 0x7094EC, 0x7094F4, 0x72F2B0, 0x72F890, 0x72FA24, 0x72FBF4, 0x744394, 0x78D9E4,
-    0x199C08,                   # item box sort / merge 0x199ae4: loop over its u32[2991] stack array
     0x383F14, 0x383F38, 0x383F78, 0x383F88, 0x383F9C, 0x383FD8]    # 0x3839bc: per-item byte buffer (size, count)
-ITEM_ARRAY_SIZE = 0x199B78      # movw r1, #0x2ebc: memset of that stack array (4 x 2991)
-ITEM_SORT_FRAME = (0x199AE8, 0x199D4C)    # sub / add sp, sp, #708 (+ #11264): the array is sp+8 .. the frame top
 if ITEMS_APPENDED:
-    HOOKS += [('obtained_set', 0x1943D4), ('obtained_clear', 0x194408), ('obtained_test', 0x19443C)]
-    REPLACE_HOOKS |= {'obtained_set', 'obtained_clear', 'obtained_test'}
+    HOOKS += [('obtained_set', 0x1943D4), ('obtained_clear', 0x194408), ('obtained_test', 0x19443C),
+              ('item_box_sort', 0x199AE4)]   # GU's u32[count] stack array overran on IDs past the table (items.c)
+    REPLACE_HOOKS |= {'obtained_set', 'obtained_clear', 'obtained_test', 'item_box_sort'}
 if 'EM089_DMG_RECV_DIAG' in os.environ.get('GOG_DEFINES', '').split():   # diagnostic: monster damage receiver
     HOOKS += [('dmg_recv', 0x9D6F8)]   # (monster, part, damage, kind) log (em089_diag.c). Its entry is checked by
     PLUGIN_CHECKED.pop(0x9D6F8)        # Damage Numbers: test builds only (that plugin then installs nothing)
@@ -329,14 +328,6 @@ def movw_imm(word, imm):
     return (word & 0xFFF0F000) | (imm & 0xF000) << 4 | (imm & 0xFFF)
 
 
-def arm_imm(v):
-    """ARM modified immediate (rot << 8 | imm8) for v, None when v has no encoding"""
-    for rot in range(16):
-        x = ((v << 2 * rot) | (v >> (32 - 2 * rot))) & 0xFFFFFFFF if rot else v
-        if x < 256: return rot << 8 | x
-    return None
-
-
 def item_patches(img):
     """(site, old, new) words for ITEMS_APPENDED items past 2991 (none without)"""
     if not ITEMS_APPENDED: return []
@@ -347,14 +338,6 @@ def item_patches(img):
         w = word(site)
         assert imm16(w) in (0xBAD, 0xBAE, 0xBAF), 'item bound %x: %x' % (site, w)
         out.append((site, w, movw_imm(w, imm16(w) + n)))
-    w = word(ITEM_ARRAY_SIZE)
-    assert imm16(w) == 0x2EBC, hex(w)
-    out.append((ITEM_ARRAY_SIZE, w, movw_imm(w, 0x2EBC + 4 * n)))
-    grow = next(d for d in range(4 * n, 4 * n + 1024, 8) if arm_imm(708 + d) is not None)   # keeps 8-byte alignment
-    for site, op in zip(ITEM_SORT_FRAME, (0xE24DDF00, 0xE28DDF00)):       # sub / add sp, sp, #708 (0xb1 ror 30)
-        w = word(site)
-        assert w == op | 0xB1, 'item sort frame %x: %x' % (site, w)
-        out.append((site, w, (w & ~0xFFF) | arm_imm(708 + grow)))
     return out
 
 
