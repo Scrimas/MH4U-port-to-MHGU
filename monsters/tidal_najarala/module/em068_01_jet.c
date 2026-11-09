@@ -14,7 +14,10 @@
  * - The shot, 0x765af0..0x765e50: from joint 13 + (0, 100, 0). Target outside +-20 degrees of her yaw, or a scale nearer than 800: target = (0, 0, 3000) turned by her
  *   pitch and yaw, from her position. Velocity (0, 0, 37.5), x 1.25 when enraged (0x954e48), toward target + (0, 70, 0). Subtype 53 when this shot's mode is 2, else 52;
  *   post 0x661f6c(mgr, this, sub, &pos, &vel, &zero, u16 work+0x2c) -> event 12. Sound 218 at joint 13 (0x304c34).
- * - Init 0xc61058 / case 0xc61804: flight effect (69, 12) = em093_019, mask -1, on the shell; +0xf3 = 0, +0xf4 = the u16 (the second scale's index), +0x270 = area;
+ * - Init 0xc61058 / case 0xc61804: flight effect (69, 12) = em093_019, mask -1, on the shell; +0xf3 = 0, +0xf4 = the u16 (the second scale's index), +0x270 = a new
+ *   hit group 0xbe9a0c(*0xfb6fb8) (a u16 counter at +0x2030, wraps at 60000: every jet has its own, so one jet's hit on a hunter does not stop the next jet; GU's twin is
+ *   0x16b920, which GU's slot init 0x168e98 already calls, and the arm keeps it for group 0xffff, 0x4a2884). Until 0.2.10 the port armed every jet with the area as
+ *   its group, and a jet passed through a hunter another jet of that area had hit (maintainer's test 2026-11-09);
  *   the target hunter 0x92c960(owner, W+0x27a, W+0x27c) in her area -> +0x2ac = his index, +0x2ad = 1 (or the Palico 0x92c90c, +0x2ad = 2, not ported: S, the next
  *   step then flies straight on); life +620 = 300 (0x10291c8); arm 0x9ab120(records 0x1028958, volumes 0x1028904, record 36, 31, 2), group = +0x270.
  * - Per frame 0xc61b80: owner gone: slot off, state 3. Life out: state 2. Capsule end +0x120 = position, window +448 = 100. Then 0x9ab0a0 (position += velocity * dt),
@@ -103,7 +106,9 @@ enum { SLOT_DEL = 1, SLOT_DTI = 5, SLOT_MOVE = 9, SLOT_KILL = 16, SLOT_SETUP = 7
 #define J_ARMED     (SIZE_uShellEnemy + 0x01)
 #define J_HOPS      (SIZE_uShellEnemy + 0x02)   /* u8 legs flown [+0xf3] */
 #define J_SECOND    (SIZE_uShellEnemy + 0x03)   /* u8 second scale's index [+0xf4] */
-#define J_GROUP     (SIZE_uShellEnemy + 0x04)   /* u16 hit group [+0x270] */
+#define J_GROUP     (SIZE_uShellEnemy + 0x04)   /* u16 hit group [+0x270], read back from the slot after the arm */
+#define ATK_GROUP   0x34        /* u16 the slot's hit group (GU 0x168ed0 / 0x4a2898) */
+#define GROUP_NEW   0xffffu     /* the arm keeps the slot's new group */
 #define J_SERIAL    (SIZE_uShellEnemy + 0x08)
 #define J_HUNTER    (SIZE_uShellEnemy + 0x0c)   /* void * the target hunter at the post [+0x2ac] */
 #define J_LIFE      (SIZE_uShellEnemy + 0x10)   /* float [+620] */
@@ -409,19 +414,19 @@ static int jet_setup(void *self, void *param)
     copy3(pos, V(self, J_POS));
     copy3(V(self, SH_POS2), pos);
     jet_angles(self);
-    FIELD(uint16_t, self, J_GROUP) = FIELD(uint8_t, self, SH_AREA);   /* 0xc61820: +0x270 = the area */
     FIELD(void *, self, J_EFX) = efx_on(owner, EFX_JET_FLIGHT, self);
-    if (uShell_hasHitData(self) == 1) {
-        ((arm_t)((*(uint32_t **)self)[SLOT_ARM]))(self, 0, (int32_t)HDS_JET, -1, 31, 2, FIELD(uint16_t, self, J_GROUP), FIELD(float, self, SH_ATK0 + ATK_F14));
+    if (uShell_hasHitData(self) == 1) {                     /* 0xc61820: a new group per jet (header) */
+        ((arm_t)((*(uint32_t **)self)[SLOT_ARM]))(self, 0, (int32_t)HDS_JET, -1, 31, 2, GROUP_NEW, FIELD(float, self, SH_ATK0 + ATK_F14));
+        FIELD(uint16_t, self, J_GROUP) = FIELD(uint16_t, self, SH_ATK0 + ATK_GROUP);
         FIELD(uint8_t, self, J_ARMED) = 1;
     }
     FIELD(float, self, J_LIFE) = J_LIFE0;
     FIELD(float, self, J_SNDT) = 0.0f;
     if (line_ok())
-        logf("tnport: jet %u kind %u at %d %d %d vel %d %d %d second %u hunter %x hit %u efx %x", FIELD(uint32_t, self, J_SERIAL), FIELD(uint8_t, self, J_KIND),
+        logf("tnport: jet %u kind %u at %d %d %d vel %d %d %d second %u hunter %x hit %u group %u efx %x", FIELD(uint32_t, self, J_SERIAL), FIELD(uint8_t, self, J_KIND),
              (int32_t)pos[0], (int32_t)pos[1], (int32_t)pos[2], (int32_t)V(self, J_VEL)[0], (int32_t)V(self, J_VEL)[1], (int32_t)V(self, J_VEL)[2],
              FIELD(uint8_t, self, J_SECOND), (uint32_t)FIELD(void *, self, J_HUNTER), FIELD(uint8_t, self, J_ARMED),
-             (uint32_t)FIELD(void *, self, J_EFX));
+             FIELD(uint16_t, self, J_GROUP), (uint32_t)FIELD(void *, self, J_EFX));
     return 1;
 }
 
