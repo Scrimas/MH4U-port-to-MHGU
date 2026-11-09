@@ -8,23 +8,23 @@ body:
   - type: input
     id: versions
     attributes:
-      label: Release and zips installed
-      description: Every zip in your MHGU Definitive Edition folder. Take zips from only one release (do not mix zips taken from different releases).
-      placeholder: "core-1.7.1, gogmazios-1.1.4, dalamadur-1.0.3"
+      label: Release and how you installed it
+      description: With the installer, the release it shows at the top. By hand, every zip in your MHGU Definitive Edition folder (all from one release, never mixed).
+      placeholder: "2.0.0 with the installer / by hand: core-2.0.0, gogmazios-1.1.7, map-battlequarters-1.0.0"
     validations:
       required: true
   - type: dropdown
     id: platform
     attributes:
       label: Where you play
-      options: [Ryujinx, Yuzu / Eden, MHGU PC Recomp, Other emulator / platform]
+      options: [Ryujinx, Yuzu / Eden, Switch (Atmosphère), MHGU PC Recomp, Other emulator / platform]
     validations:
       required: true
   - type: dropdown
     id: mode
     attributes:
       label: Solo or online
-      options: [Solo, Online (everyone has the same zips), Online (not sure about the others' zips)]
+      options: [Solo, Online (everyone has the same release and monsters), Online (not sure about the others')]
     validations:
       required: true
   - type: textarea

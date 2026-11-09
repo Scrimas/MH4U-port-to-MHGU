@@ -15,11 +15,13 @@ license when the merge happens.
 | **Report a bug** | The game and the mod, nothing else. Open an issue (see below). |
 | **Fix something** | The full setup below. |
 | **Port a new monster** | The full setup, then `notes/porting-guide.md`. Open an issue first, so nobody else starts the same monster. |
+| **Work on the installer** | Rust only, no game files: [The installer](#the-installer) below. |
 
 ### Report a bug
 
-1. Say which release you run (`core-x.y.z` and every monster zip, all from the same release), on which emulator or
-   console, and solo or online.
+1. Say which release you run and how you installed it: with the installer (it shows the release at the top, e.g.
+   2.0.0) or by hand (`core-x.y.z` and every zip, all from the same release). Then on which emulator or console, and
+   solo or online.
 2. Give the steps: quest, monster, what you did, and what happened versus what you expected (4U behaviour if you
    know it).
 3. Attach the **log** of the session. In Ryujinx: File > Open Logs Folder, then the newest file. A screenshot or
@@ -105,8 +107,26 @@ map package (`notes/porting-guide.md`, Phase 5).
 
 Feature and test switches are C `#ifdef`s: `GOG_DEFINES="NAME1 NAME2" python3 module/build.py` (PowerShell:
 `$env:GOG_DEFINES = "NAME1 NAME2"` first). Release builds use none. `python3 tools/release.py all` builds and packages a
-full release into `dump/release/`; the maintainer publishes it on MHGU-Definitive-Edition-Packages
-(`tools/release.py publish`). This repository's own releases are the installer's (`installer/README.md`).
+full release into `dump/release/` ([Releases](#releases-maintainer) below).
+
+## The installer
+
+`installer/` is the MHGU Definitive Edition Installer (Rust + Slint), the app players use. It needs no game files and
+none of the setup above: only [Rust](https://rustup.rs) (stable), and on Linux the fontconfig and xkbcommon
+development packages (Debian / Ubuntu: `libfontconfig1-dev libxkbcommon-dev`). `installer/README.md` maps its code;
+`notes/installer.md` is its design.
+
+```sh
+cargo test --manifest-path installer/Cargo.toml --workspace          # unit tests (synthetic saves, no game data)
+cargo build --manifest-path installer/Cargo.toml -p mhgu-de-core --bin mhgu-de-cli
+python3 installer/tests/cli_test.py                                 # end to end: a fake release, every place kind
+cargo run --manifest-path installer/Cargo.toml -p mhgu-de-installer  # the window, on the real releases
+python3 installer/tools/i18n.py                                     # after changing a shown string: the catalogs
+```
+
+It reads the mod's releases from MHGU-Definitive-Edition-Packages and its own from this repository;
+`MHGU_DE_RELEASES=<folder>` points it at a local release instead (a `releases.json` in the GitHub API's shape, see
+`installer/README.md`), to test a release before it is published.
 
 ## Workflow
 
@@ -142,6 +162,33 @@ full release into `dump/release/`; the maintainer publishes it on MHGU-Definitiv
   (`tools/ci_compile.py`; it cannot link, which needs GU's `main`). Run them locally before a PR.
 - **Save code**: a change to `module/save.c` (the mod's save store and slot leases) runs `python3 tools/test_save.py`
   too: it runs that file as ARM code under unicorn on a fake character, no game files needed.
+- **Installer CI** (`.github/workflows/installer.yml`, every push and PR touching `installer/`): `cargo fmt --check`,
+  the unit tests, the catalogs (`installer/tools/i18n.py --check`) and `installer/tests/cli_test.py`, on Linux and
+  Windows.
+
+## Releases (maintainer)
+
+A release has two GitHub releases with the same version: the zips on
+[MHGU-Definitive-Edition-Packages](https://github.com/Scrimas/MHGU-Definitive-Edition-Packages) (what the installer
+installs, published directly) and the installer on this repository (the page players land on, drafted, published by
+hand).
+
+1. Write the release's section in `notes/release-news.md` (`## v<version>`: **New** / **Fixed**, one short line each
+   for players).
+2. Bump the versions: `module/core.toml` (core), the `package.toml` of each changed package (`requires_core` too when
+   it needs the new core), and `installer/Cargo.toml` to the same version (the workflow refuses a tag that does not
+   match it). Build the installer once so `installer/Cargo.lock` follows (CI builds `--locked`), and commit all of it.
+3. `python3 tools/release.py all`: builds everything without test switches, checks it and packages
+   `dump/release/v<version>/` (the zips, `manifest.json`, `NOTES.md` for -Packages, `NOTES-main.md` for this
+   repository). Test that folder in game through the installer (`MHGU_DE_RELEASES`, above).
+4. Tag `main`: `git tag v<version> && git push origin v<version>`. The Installer workflow builds the .exe and the
+   AppImage, starts the .exe on Windows and drafts the release "MHGU Definitive Edition <version>" here.
+5. `python3 tools/release.py publish`: publishes the zips on -Packages (marked Latest), then gives this repository's
+   draft `NOTES-main.md` as its text (`python3 tools/release.py main-notes` if the draft was not there yet).
+6. Check the draft, then publish it: it becomes this repository's Latest release.
+
+Pre-releases: `release.py all --pre N` (version `<core>-pre.N`), published as GitHub pre-releases; the installer
+offers them only when its Settings switch is on.
 
 ## Using an AI coding assistant
 

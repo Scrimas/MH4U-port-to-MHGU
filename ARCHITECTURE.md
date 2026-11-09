@@ -171,7 +171,8 @@ Intermediate data
 Logs and outputs
   build_logs/<monster>/ one log per build.py step
   install_logs/         one log per install.sh run (rebuilt steps, switches, targets)
-  release/v<x.y.z>/     packaged release zips + NOTES.md (tools/release.py); release_build.log
+  release/v<x.y.z>/     packaged release zips, manifest.json, NOTES.md (-Packages), NOTES-main.md (this repository's
+                        release) (tools/release.py); release_build.log
   scratch/              per-session working notes and throwaway scripts
 ```
 
@@ -195,6 +196,8 @@ your 4U / GU dumps (dump/)
   -> python3 maps/<map>/build.py        the arenas' converters write maps/<map>/romfs/
   -> python3 module/build.py       core + every monster's module/ -> subsdk1 + IPS (reads allocations.toml)
   -> python3 tools/release.py all  build + checks + zips into dump/release/v<core version>/
+  -> python3 tools/release.py publish   the zips on MHGU-Definitive-Edition-Packages, the text of this repository's
+                                   installer release (drafted by .github/workflows/installer.yml on the v<version> tag)
 ```
 
 Feature and test switches are C `#ifdef`s, enabled with `GOG_DEFINES="NAME1 NAME2" python3 module/build.py`;

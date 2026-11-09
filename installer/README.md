@@ -25,6 +25,8 @@ GitHub API's shape, download URLs relative to it), `MHGU_DE_INSTALLER_RELEASES=<
 way), `MHGU_DE_CACHE`, `MHGU_DE_CONFIG`, `MHGU_DE_SNAPSHOT=<png>` (draw the window into a file and quit;
 `MHGU_DE_SNAPSHOT_OPEN=review|settings|about` opens that dialog first).
 
-Releases: bump `version` in `installer/Cargo.toml`, push the tag `v<version>`: `.github/workflows/installer.yml` builds,
-tests the .exe on Windows and drafts the release on this repository; publish the draft (it becomes Latest). The mod's
-releases are on MHGU-Definitive-Edition-Packages (`tools/release.py publish`).
+Releases: every release of the mod has one of the installer with the same version (CONTRIBUTING.md, Releases):
+`version` in `installer/Cargo.toml` = the release's, then the tag `v<version>`: `.github/workflows/installer.yml`
+builds, tests the .exe on Windows and drafts "MHGU Definitive Edition <version>" on this repository;
+`tools/release.py publish` puts the zips on MHGU-Definitive-Edition-Packages and gives the draft its text
+(NOTES-main.md); the maintainer publishes the draft (it becomes Latest).

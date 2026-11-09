@@ -32,3 +32,5 @@ Instructions for AI coding assistants working in this repo (Claude Code, Codex, 
 - In-game tests need a human. Ask the tester to play and close, then read the Ryujinx log yourself (Gogmazios:
   `monsters/gogmazios/tools/gogreport.py`). Ask only about what a log can't show (visuals, sound).
 - Commit messages: `<Monster or area>: <what changed> (issue #N)`. No AI attribution trailers.
+- Releases are the maintainer's (`CONTRIBUTING.md`, Releases): the zips published on MHGU-Definitive-Edition-Packages,
+  the installer's release on this repository left as a draft for the maintainer.

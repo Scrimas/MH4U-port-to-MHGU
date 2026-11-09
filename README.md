@@ -97,6 +97,7 @@ has the full map.
 | **Report a bug**       | The game and the mod, nothing else          | Open an [issue](../../issues): your release, what happened, your Ryujinx log |
 | **Fix something**      | Your own game dumps and the build setup     | [CONTRIBUTING.md](CONTRIBUTING.md): setup, quick start, workflow          |
 | **Port a new monster** | The build setup, then the porting guide     | Open an issue first, then read [notes/porting-guide.md](notes/porting-guide.md) |
+| **Work on the installer** | Rust only, no game files                 | [CONTRIBUTING.md](CONTRIBUTING.md#the-installer), [installer/README.md](installer/README.md) |
 
 > [!IMPORTANT]
 > **No game data is in this repo**: no ROM bytes, converted assets or text tables. You build everything from your own
