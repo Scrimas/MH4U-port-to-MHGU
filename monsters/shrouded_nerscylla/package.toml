@@ -1,7 +1,11 @@
 # Shrouded Nerscylla package: what the installer shows and installs, and the version written into its data file.
 name = "shrouded_nerscylla"
 title = "Shrouded Nerscylla"
-version = "0.1.13"      # bump on every published change of this monster's files (data, assets or code); 0.1.13: her
+version = "0.1.15"      # bump on every published change of this monster's files (data, assets or code); 0.1.15: her
+                        # chest and arm armor take the armor colour as in 4U (FTransparency on their tinted material,
+                        # tools/armor4u2gu.py --opaque-tint; they stayed cream, tests 2026-11-09); 0.1.14: the
+                        # grey rock chunks of her dig-in and burst hidden (GU drew them near white, maintainer's
+                        # test 2026-11-09), her 4U fall dust at 1x; 0.1.13: her
                         # weapons' own 4U sharpness (KIRX, read by the core's gear_kire_slash), the dead branch for
                         # GU Diablos' records out of em070_01_fx.c; 0.1.12: only
                         # 4U's quests where 4U has them (1062 village, 11370 / 11371 hub; 1063 / 1064 / 11369 gone); 0.1.11: her 4U

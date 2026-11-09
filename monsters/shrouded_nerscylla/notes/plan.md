@@ -70,7 +70,9 @@ dttune rows at file +0x8c (normal) and +0xdc (second table), 10 B: cut, impact, 
 The second table comes when part 2's counter (GU 0x9d428) reaches a value of the data block, by rank (0xf9f200, all 7 rows; shared with Nerscylla, whose second table raises ice instead). Part 2 is the worn hide (S: slot 132 shows parts 1, 2, 4 as broken, and 4U's rows for part 2 change mesh groups 2..5). So with the hide on she is weak to fire, without it to thunder. Body volumes are GU's file ("Attack, hit size, body data ... = em027's").
 
 ## Armor, weapons
-Armor: 4U Nerscylla Z (models 434 / 435), template GU Nerscylla X, defense 92 / 50 -> 123 / 75 by the X sets' ratio. Skills as 4U.
+Armor: 4U Nerscylla Z (models 434 / 435), template GU Nerscylla X, defense 92 / 50 -> 123 / 75 by the X sets' ratio. Skills as 4U. Colour 4U's 0x13 (6a648e), on every piece
+in full since 0.1.15: the models are built with tools/armor4u2gu.py --opaque-tint (build.py), which gives the tinted (symenv, type 3) material of her chest and arms GU's plain
+FTransparency; the template from Capcom's conversions had FTransparencyAlpha there, and with it GU left the plates almost untinted (cream). Helm, waist and legs had FTransparency already.
 Weapons: 9 lines, each first weapon forged from its 4U upgrade recipe (first_upgrade; IG added to it). Raw and element scaled to GU's level per class (weapons4u.gu_scale), the earlier ports keep 4U's: her 4U 180..260 stood against GU's about 310. Sharpness: no row left: mKireType holds GU's nearest rows (KIRE_NEAR, the fallback), and since 0.1.13 her 14 weapons on them read their own 4U row through the core (KIRX, notes/gear-weapons.md section 6). Silent Eye (4U 38, ends at 400) keeps GU row 38, GU's copy of that entry, equal up to 400.
 
 ## Limits (notes/porting-guide.md)
@@ -86,11 +88,15 @@ Weapons: 9 lines, each first weapon forged from its 4U upgrade recipe (first_upg
 5. Weapons scaled (wanted). Sharpness: none left since 0.1.13 (KIRX); with a core without that hook, the nearest GU rows.
 6. GU's web line sound; GU's common effects (not GU Nerscylla's forest debris cm200_067, and 4U's dig-in dust stays: "Effects", 0.1.2).
 7. Ground records do not ride the joint.
+8. The grey rock chunks of her dig-in and burst dust are hidden (GU draws them near white), as on Black Gravios, Dalamadur and Stygian Zinogre (issue #6); her dig-in, burst and fall dust
+   are drawn at 1x brightness (0.1.10, 0.1.14).
 
 ## Open (a test log tells)
 - Spawn positions on GU's Dunes: 4U's floats, area 7 (2650, -275, 597), area 4 (-74, 119, 1743): S that the geometry is equal (Monoblos' quests stand on it); no wrong spawn seen in the tests of 0.1.0 .. 0.1.11.
-- Played: 0.1.0 .. 0.1.11 (History; the long hunt of 0.1.11 to the end); 0.1.12 / 0.1.13 change only her quest list and sharpness, not played yet. Logs: prefix `snport:`.
-- Still to see in game: her bite's status icon (the rows say paralysis, S) and eating.
+- Played: 0.1.0 .. 0.1.11 (History; the long hunt of 0.1.11 to the end); 0.1.13 by the maintainer (PR #23, 2026-11-09); 0.1.14 in the smithy and at the dig-in, 0.1.15
+  in the smithy, by the user (2026-11-09). Logs: prefix `snport:`.
+- Seen by the maintainer (2026-11-09): her bite's status icon and eating work. Seen by the user (2026-11-09, smithy preview of 0.1.15): Nerscylla Z's chest and arms are
+  dark like the other three pieces.
 
 ## History
 - 0.1.0 (2026-11-06): the first build.
@@ -116,3 +122,19 @@ Weapons: 9 lines, each first weapon forged from its 4U upgrade recipe (first_upg
 - 2026-11-08, the user on 0.1.10 (screenshot, no log yet): the glitter is still there, far from her, while she has not seen the hunter ("Ungesehen"); it vanishes when walked to, cannot be gathered, and "taucht hinter Nerscylla auf und verschwindet wieder". 0.1.11: her 4U turn dust em096_040 (record 50, motions 6 / 8, posted from frame 7 / 20 on her ground at every turn, cream after the x2 bake) out of both turns (GU_DROP). S: no 0.1.10 log; the user's description fits it. Only em070_01.arc (PSL 0) and the data version changed. Not played yet.
 - 0.1.12 (2026-11-08, the user: no village quests where 4U has none; Monoblos' village / hub pairs were the exception, 4U has no multiplayer quest of his): only 4U's quests where 4U has them. m01014 is a caravan quest -> village 1062; m10902 / m10914 are guild quests -> hub 11370 / 11371. Gone: 1063 / 1064 (village copies) and 11369 (hub copy of m01014), from allocations.toml (her list and the pool), QUESTS (k renumbered: the internal setEmMain names in 11370 / 11371 change), her romfs and the test folder. The core changes too (port_monsters' quest list). The "Quests (C)" table above still lists the six of 0.1.11.
 - 0.1.13 (2026-11-08, the user: "ich will schon die originalen werte"): her weapons' own 4U sharpness (KIRX, the core's new hook on 0xf4724). Her data file changed (a KIRX section, the version), and em070_01_fx.c lost the branch for GU Diablos' records 370 / 1402 / 1403 (none is in her PEL lists since 0.1.8 / 0.1.9, C: the built arc read through); her arcs and quests are the same as in 0.1.12. Not played yet.
+- 2026-11-09, the maintainer's test of 0.1.13 (PR #23): "When she dives underground or is toppled, some efx is broken and appear as near-pure white"; some of her armor shows the regular
+  Nerscylla's colour; status icons and eating seen working. Tidal's jet hit group fixed by the maintainer (Tidal 0.2.11, commit 42dc4c8 on the PR branch).
+- 0.1.14 (2026-11-09): the white effects (tools/build_em070_01_arc.py DUST_1X notes, C): hide_grey_models 'chunks' hides the grey chunk model units of qe006_010 (dig-in, entry 2) and
+  em096_200 (burst, entries 8 9 11 21 22), and by the same rule those of em096_102 (entry 1; 4U code posts 1031 / 1032), em096_201 (entry 3), qe000_000 (6 entries; code post 1012) and
+  qe000_001 (5 entries; code post 1004); her 4U fall dust qe006_001 (501 in 0x304, the one bank-3 motion where it is left) at 1x like the dig-in dust. em070_01.arc: the same 735 files in
+  the same order, only these 7 EFLs differ; the data file differs in its version byte alone. The armor colour is open ("Open"). Not played yet.
+- 2026-11-09, the user's smithy check of 0.1.14 (screenshots, Blademaster and Gunner): helm, waist and legs dark as in 4U; chest and arms cream (the maintainer's finding). The dig-in dust:
+  sand-coloured with lighter spots, no white left (its units are alpha-blended at 1x; 4U draws them at 2x / 4x).
+- 0.1.15 (2026-11-09): the cause (C): every piece's tinted material (symenv, type 3) is the same byte for byte (states, constants, slots; texture indices aside) except its
+  FTransparency function: FTransparency on helm, waist and legs, FTransparencyAlpha on chest and arms (both sexes, both classes), from the templates of Capcom's conversions (GU's own
+  Nerscylla X 330 / 331 has the same split; its dye 0x29 is near white, so it never shows). The series colour reaches all five pieces alike (GU's per-part armor classes share the getter
+  0xcf428 / 0xcf44c: series +0x80 / +0x83 = file +116 / +119, ArmorColorData only when +0x7e / +0x81 is set). S: with FTransparencyAlpha GU weights the colour by the albedo alpha,
+  which in a converted 4U texture is 4U's specular mask (about 0.1 under her tinted material). tools/armor4u2gu.py --opaque-tint (opt-in, tools/mrl_build.py set_function) selects
+  FTransparency on tinted materials whose 4U source is BSSolid. Against 0.1.14: 8 armor arcs (body / arm of m / f 434 / 435), in each only the MRL's FTransparency value of the
+  symenv material (4 bytes); the data file's version byte. Other packages: the default path is unchanged (Tidal's f/432 body rebuilt byte-equal). Not played yet.
+- 2026-11-09, the user's smithy check of 0.1.15: the chest and arms now match the helm, waist and legs ("es passt nun"). Tidal's armor stays as it is (the user, 2026-11-09).

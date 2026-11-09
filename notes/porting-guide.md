@@ -521,3 +521,9 @@ Notes: monsters/tigerstripe_zamtrios/notes/ (plan, phase1-variant-map, missing-a
 - Gear converters: a GU template with a sphere map for a 4U material without an extend map now falls back to a
   template without one (tools/weapon4u2gu.py and tools/armor4u2gu.py pick_template; outputs that converted before
   are unchanged). Check that every armor model the records name is converted (Stygian's were missing).
+- Armor colour (Shrouded Nerscylla, 2026-11-09): 4U's piece colour (record +19) goes to the series' default dye, and GU
+  tints a piece's 'sym' material (type 3) with it, but in full only when that material's FTransparency function is
+  plain FTransparency. Capcom's conversions often give it FTransparencyAlpha (GU's own Nerscylla X body and arms,
+  dyed near white); then the colour nearly vanishes, and her chest and arms stayed the cream of the texture while
+  helm, waist and legs were dark. New ports with a dark or strong 4U colour: build the armor with
+  armor(ROMFS, ARMOR, '--opaque-tint') (tools/steps.py) and compare every piece in the smithy against 4U.

@@ -476,7 +476,14 @@ KEEP_4U = {(4, 33): {504}}
 # 0.1.10 (the user on 0.1.9, log 2026-11-08 13-17-24: the 4U dust at the dig-in shows "irgendwie gelb"): 4U's Intensity 1 baked as x2 into the soil-multiplied grey turns qe006_010 into (255, 230, 162)
 #   and em096_200 into (252, 198, 140) (C, dustcol); GU lights it brighter still. At 1x they come out (147, 115, 82) / (126, 99, 70), the brown of GU's own Dunes dust (cm202_002's sand elements
 #   ff5f7f9f = (159, 127, 95), C). So the dig-in and burst dust stay 1x: a DEVIATION from 4U's brightness, for the colour the user expects. Her other effects keep the bake.
-DUST_1X = ('qe006_010', 'em096_200')
+# 0.1.14 (the maintainer's test of 0.1.13, PR #23, 2026-11-09: "When she dives underground or is toppled, some efx is broken and appear as near-pure white"): two causes (C, her 4U EFLs).
+#   (1) Rock chunks: the dig-in dust qe006_010 (504; motions 0x409, 0x40c, 0x421) draws one grey model unit (e4e4e6) of the shared chunk model qe000_001, the burst em096_200 (502 / 503;
+#   0x422) five (999999 .. bfbfbf) of cm000_000 / qe001_000. GU washes these grey chunk models out to near white (issue #6, tools/efl4u2gu.py HIDE_GREY_MODELS notes), so they are hidden
+#   as on Black Gravios, Dalamadur and Stygian Zinogre (spec hide_grey_models 'chunks', efl4u2gu.CHUNK_MODELS): a DEVIATION from 4U, which draws them. The dust itself stays. The rule also
+#   hides the chunk units of em096_102, em096_201, qe000_000 and qe000_001 (4U code posts 1031 / 1032, 1012, 1004).
+#   (2) Her 4U fall dust qe006_001 (500 / 501) still had the x2 bake that made the dig-in dust white before 0.1.10. It is left only where GU's motion has no common effect of its own: 501 in
+#   0x304, one of her bank-3 reaction motions (the others play GU's common dust). Now 1x as well, the brown of the dig-in and burst dust.
+DUST_1X = ('qe006_010', 'em096_200', 'qe006_001')
 DIABLOS_POSTS = {}
 GU_DROP = {(4, 33): {(3, 250)}, (4, 34): {(3, 250)}, (0, 61): {(3, 30), (3, 31)}, (0, 62): {(3, 30), (3, 31)},
            (0, 6): {(4, 50)}, (0, 8): {(4, 50)}}
@@ -692,12 +699,14 @@ def burrow_trail(rom, ents, notes):
 
 
 def effects(S, gu_pel_u, gu_pel_c, gu_psls, notes):
-    """her effects (tools/efl4u2gu.py effect_set) -> [(path, type, data)]. hide_grey_models stays off: 4U draws her effect chunks. Effects of 4U's ground flag: the list of what remains after GU's common effects is logged, notes/plan.md "Ground"."""
+    """her effects (tools/efl4u2gu.py effect_set) -> [(path, type, data)]. hide_grey_models 'chunks' since 0.1.14: GU draws the grey rock-chunk models of her dig-in and burst near white (DUST_1X
+    notes). Effects of 4U's ground flag: the list of what remains after GU's common effects is logged, notes/plan.md "Ground"."""
     groups = {96: EFL96}
     groups.update({g: 'effect\\efl\\qe\\qe%03d\\qe%03d_%%03d' % (g, g) for g in (0, 3, 6, 8, 13)})
     spec = dict(arc=SRC_4U, stage_unpacked=[], mef=MEF, em_efl='effect\\efl\\em\\em096\\', groups=groups, extra=[],
                 lmts=[(P4 + 'mot\\em096_%d' % b, PSL % b) for b in BANKS], pel=PEL_U, soil=dunes_soil(notes),
-                list2=shell_list2(efl4u2gu.pel_lists(gu_pel_u)[2]), solid_fill=SOLID_FILL, intensity=True, intensity_skip=DUST_1X)
+                list2=shell_list2(efl4u2gu.pel_lists(gu_pel_u)[2]), solid_fill=SOLID_FILL, intensity=True, intensity_skip=DUST_1X,
+                hide_grey_models='chunks')
     log = []
     out = efl4u2gu.effect_set(spec, log)
     out[(PEL_U, efl4u2gu.T['PEL'])] = pel_ground_records(out[(PEL_U, efl4u2gu.T['PEL'])], S, notes)

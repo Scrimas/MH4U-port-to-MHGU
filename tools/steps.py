@@ -28,15 +28,16 @@ def py(script, *args, flags=(), timeout=None, venv=False):
     return [exe, '-X', 'utf8', *flags, script, *[str(a) for a in args]], timeout
 
 
-def armor(romfs, series):
-    """armor model arcs: 4U pl_{m,f}_<part><n>.arc -> romfs/nativeNX/arc/player/com/<s>/<n>/<part>.arc"""
+def armor(romfs, series, *flags):
+    """armor model arcs: 4U pl_{m,f}_<part><n>.arc -> romfs/nativeNX/arc/player/com/<s>/<n>/<part>.arc
+    (flags: tools/armor4u2gu.py convert options, e.g. '--opaque-tint')"""
     for s in 'mf':
         for n in series:
             for p in ('helm', 'arm', 'wst', 'leg', 'body'):
                 out = os.path.join(romfs, 'nativeNX', 'arc', 'player', 'com', s, str(n))
                 os.makedirs(out, exist_ok=True)
                 yield py('tools/armor4u2gu.py', 'convert', os.path.join(GS, 'armor', '4u', 'data', 'pl_%s_%s%s.arc' % (s, p, n)),
-                         os.path.join(out, p + '.arc'), os.path.join(GS, 'armor', 'out', 'mrl_index.pkl'))
+                         os.path.join(out, p + '.arc'), os.path.join(GS, 'armor', 'out', 'mrl_index.pkl'), *flags)
 
 
 def weapon(romfs, cls, arc, model, *flags):

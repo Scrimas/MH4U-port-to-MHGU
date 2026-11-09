@@ -15,7 +15,8 @@ from steps import DUMP, py, armor, weapon, main
 
 T = os.path.join(MON, 'tools')
 ROMFS = os.path.join(MON, 'romfs')
-# Nerscylla Z 434 / 435 (tools/gear_em070_01.py)
+# Nerscylla Z 434 / 435 (tools/gear_em070_01.py). --opaque-tint: her chest and arm plates take the armor colour 0x13 in
+# full, as in 4U (tools/armor4u2gu.py; the maintainer's and the user's test 2026-11-09: they stayed cream)
 ARMOR = (434, 435)
 # class, 4U arc prefix, models (tools/gear_weapons_em070_01.py): every model arc of the line. No sound arcs: each 4U arc holds a
 # sound set GU ships (checked there)
@@ -41,7 +42,7 @@ STEPS = [
     ('name', 'NAME (4U names, 5 languages)', lambda: [py(os.path.join(T, 'name_em070_01.py'))]),
     ('items', 'TBLA + TXTA (materials) + BUI4', lambda: [py(os.path.join(T, 'items_em070_01.py'))]),
     ('gear', 'armor records (Nerscylla Z)', lambda: [py(os.path.join(T, 'gear_em070_01.py'))]),
-    ('armor', 'armor model arcs (20)', lambda: armor(ROMFS, ARMOR)),
+    ('armor', 'armor model arcs (20)', lambda: armor(ROMFS, ARMOR, '--opaque-tint')),
     ('weapons', 'weapon model arcs', weapons),
     ('gearw', 'weapon table records (9 lines, 20)', lambda: [py(os.path.join(T, 'gear_weapons_em070_01.py'))]),
     ('notes', "Hunter's Notes entry 131", lambda: [py(os.path.join(T, 'notes_em070_01.py'), flags=('-B',))]),
