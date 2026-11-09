@@ -24,6 +24,8 @@ Sections (written by the monster tools, consumed by module/*.c):
   NAME  u32 monsterName entry, u32 name[5]                                                           (items.c)
   SKIL  u32 n, n x {u32 skill, u32 grants[3]}: having `skill` also answers yes for the granted GU skills (gear.c)
   PWLF  u32 n, n x {u32 path suffix, u16 model, u8 from, u8 to}: weapon motion-set fixes             (gear.c)
+  KIRX  u32 n, n x {u8 class NN, u8 weapon ID (mNo), u8 mLevel, u8 mKireType (the GU row its record holds), u16
+        mSlash[7], u16 0}: a weapon's own sharpness past the full kireajiData (tools/weapons4u.py exact)  (gear.c)
   GPTS  u32 n, n x {u8 GU rank, u8 list, u16 0, u32 offset}, lists {u8 weight, u8 qty, u16 item} closed by weight
         0xff: a monster's runtime gather-point item lists (monsters/dalamadur/module/dala_gather.c)
   WALK  u32 n, n x {u16 joint, u16 triangles, u32 offset}, triangles x 9 f32 bone-local vertices: 4U walk strips
@@ -212,6 +214,8 @@ def decode(tag, b):
         return [u(4 + 16 * k, 4) for k in range(u(0)[0])]
     if tag == 'PWLF':
         return [(cstr(b, u(4 + 8 * k)[0]),) + struct.unpack_from('<HBB', b, 8 + 8 * k) for k in range(u(0)[0])]
+    if tag == 'KIRX':
+        return [struct.unpack_from('<4B7H', b, 4 + 20 * k) for k in range(u(0)[0])]
     return b.hex()
 
 

@@ -17,7 +17,7 @@ from unicorn import Uc, UcError, UC_ARCH_ARM, UC_MODE_ARM, UC_HOOK_INTR  # noqa:
 from unicorn import arm_const as A  # noqa: E402
 
 TESTS = ('test_fixed', 'test_lessee', 'test_takeback', 'test_conflict', 'test_two', 'test_foreign', 'test_damaged',
-         'test_full', 'test_cap', 'test_nochar', 'test_loaded', 'test_size')
+         'test_full', 'test_cap', 'test_nochar', 'test_loaded', 'test_size', 'test_bits')
 STACK, RET = 0x7F000000, 0x7FFF0000
 STORE_OFF = 0x3900
 

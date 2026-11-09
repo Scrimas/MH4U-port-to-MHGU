@@ -30,10 +30,13 @@ static const struct atk s_atk[] = {
     {7, 126, 0, 26, ALWAYS, 52},                                                      /* 84f38c (param 1) */
 };
 
+void em070_01_atk(uint32_t *regs);       /* monsters/shrouded_nerscylla/module/em070_01.c: a site has one hook */
+
 /* GU attackEx 0x7dc2c(self, slot, index, flags) */
 int em057_01_atk_c(uint32_t *regs)
 {
     void *self = (void *)regs[R0];
+    em070_01_atk(regs);
     if (!self || FIELD(uint16_t, self, EN_ID) != STYGIAN_ZINOGRE_EM_ID) return 0;
     uint8_t cat = FIELD(uint8_t, self, EN_ACT_CAT), num = FIELD(uint8_t, self, EN_ACT_NUM);
     for (uint32_t i = 0; i < sizeof s_atk / sizeof s_atk[0]; i++) {

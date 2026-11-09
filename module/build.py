@@ -100,6 +100,7 @@ HOOKS = [
     ('notes_list_visible', 0x5B0BD4), ('notes_list_new', 0x5B0A44),      # Notes list screen: an entry past the save map
     ('notes_new_clear', 0x5B0AD4), ('notes_em_unlocked', 0x524770),      # has no bit (notes.c; MID_EXIT below)
     ('smithy_list', 0x6F9644),  # smithy list builder 0x6f9438's exit: ported entries by rarity, display only (gear.c)
+    ('gear_kire_slash', 0xF4724),  # LevelData slash getter (vt+0x80), the sharpness table's only reader: KIRX rows (gear.c)
     ('utf8_null_guard', 0x7CA340),  # (out, s, n) UTF-8 helper: s = NULL -> "" (abandon crash safety net, stage.c)
     ('stage_gimmicks', 0x50249C),   # stage gimmick shell spawner (Fortress st003/004/006/007/008): log only (stage.c)
     ('dmg_sub', 0x98AF4),      # diagnostic: enemy HP -= pending damage (main.c)
@@ -175,6 +176,22 @@ HOOKS = [
     ('em007_01_motion', 0xD38C0C), # uEm007_00 slot 130, every frame: his attacks tied to motions (em007_01_mv_j.c)
     ('em007_01_parts', 0xD39FC8),  # uEm007_00 slot 132, every frame: GU's parts states, which skip variant 1: his mesh
                                    # groups by his 4U rows (monsters/monoblos/module/em007_01_mat.c)
+    ('em068_01_act', 0xF8903C),    # uEm068_00 slot 125: Tidal Najarala (variant 1) log, 4U's 7/20 speed (monsters/tidal_najarala/module/em068_01.c)
+    ('em068_01_start', 0xF7CED8),  # uEm068_00 slot 129 action start: her water scales GU dropped
+    ('em068_01_fire', 0xF7D634),   # uEm068_00's scale request: her launches of 7/60 7/61 7/25
+    ('em068_01_blast', 0xF85944),  # 7/24's blast post: GU's variant-0 path for her (mid hooks, return 0)
+    ('em068_01_blast2', 0xF85AA4),
+    ('em068_01_rx', 0xA134C),      # the reaction runner: her reactions hold 60 frames longer, as 4U's tables
+    ('em068_01_drop', 0x41B1DC),   # EmBase36 when a scale's end time is out: her 3 % shiny drop
+    ('em068_01_psl', 0x700D4),     # uFestaEnemy slot 75 PSL post, its PEL u branch: her effects on the ground, her ground set (em068_01_fx.c)
+    ('em068_01_pslc', 0x70068),    # the same post, its PEL c branch: GU's common effects take her ground set (em068_01_fx.c)
+    ('em068_01_pair', 0xB0170),    # the pair motion start: a longer blend when her slither is cut short (em068_01.c)
+    ('em068_01_pair2', 0xB0230),   # the pair started again at a quadrant change, GU's blend 0: keeps that longer blend (em068_01.c)
+    ('em068_01_spit403', 0xF8672C),  # her spit f861b0, its start of 0x403 with blend 0: 8 frames (em068_01.c)
+    ('em070_01_act', 0xFAE550),    # uEm070_00 slot 125: Shrouded Nerscylla (variant 1) log (monsters/shrouded_nerscylla/module/em070_01.c)
+    ('em070_01_line', 0xF9F3EC),   # uEm070_00 slot 130's web line sound, GU's variant test: GU's variant-0 path for her (mid hooks, return 0)
+    ('em070_01_line2', 0xF9F534),
+    ('gear_listed_set', 0x524980), ('gear_listed_get', 0x5249F4),  # the smithy's armor "listed" save bits: a record past their 576 is kept in the mod's store (gear.c)
     ('enemy_drop_log', 0xAC0EC),   # the item drop (shiny), entry: log only, ported monsters (port.c)
     ('dala_dmg_end', 0x98E44),     # enemy damage update 0x97ddc, after the rage add, before the reaction dispatcher
                                    # (r0 = this): Dalamadur tail rage -> head, shared reactions (dala_react.c)

@@ -112,9 +112,9 @@ Subject to change, not ordered
 - [x] Stygian Zinogre
 - [x] Black Gravios
 - [x] Monoblos
+- [x] Tidal Najarala
+- [x] Shrouded Nerscylla
 - [ ] Magnet Spike (MHF-ZZ weapon class), in progress as of Oct 29, 2026
-- [ ] Tidal Najarala
-- [ ] Shrouded Nerscylla
 - [ ] Desert Seltas Queen & Desert Seltas
 - [ ] G-rank Crimson Fatalis
 - [ ] White Monoblos
@@ -136,8 +136,9 @@ Subject to change, not ordered
 ## Credits
 
 - [@jM5557](https://github.com/jM5557), for adding support to Yuzu, Eden and other Yuzu-based emulators
-- [@Rukasu1609](https://github.com/Rukasu1609), for the Black Gravios ([PR #12](https://github.com/Scrimas/MH4U-port-to-MHGU/pull/12))
-  and Monoblos ([PR #17](https://github.com/Scrimas/MH4U-port-to-MHGU/pull/17)) ports
+- [@Rukasu1609](https://github.com/Rukasu1609), for the Black Gravios ([PR #12](https://github.com/Scrimas/MH4U-port-to-MHGU/pull/12)),
+  Monoblos ([PR #17](https://github.com/Scrimas/MH4U-port-to-MHGU/pull/17)), Tidal Najarala and Shrouded Nerscylla
+  ([PR #23](https://github.com/Scrimas/MH4U-port-to-MHGU/pull/23)) ports
 
 ## License
 

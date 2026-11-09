@@ -452,5 +452,52 @@ int test_size(void)
     return g_fails;
 }
 
+/* a few bits under a key no monster has (the armor "listed" bits past GU's arrays, module/gear.c) */
+int save_bits_get(uint32_t key, uint32_t bit);
+void save_bits_set(uint32_t key, uint32_t bit);
+
+int test_bits(void)
+{
+    int r;
+    fresh();
+    CHECK(!save_bits_get(0xf001, 0), "no store yet: a bit reads 0");
+    CHECK(changed_outside(0, 0) == 0, "reading writes nothing, the block stays empty");
+    save_bits_set(0xf001, 0);
+    CHECK(save_bits_get(0xf001, 0) && !save_bits_get(0xf001, 1) && !save_bits_get(0xf002, 0), "that bit of that key only");
+    save_bits_set(0xf001, 17);
+    save_bits_set(0xf001, 79);
+    CHECK(save_bits_get(0xf001, 0) && save_bits_get(0xf001, 17) && save_bits_get(0xf001, 79), "all kept (the check word still fits, or they would read 0)");
+    CHECK(FIELD(uint16_t, g_user, STORE_OFF + 6) == 1 && FIELD(uint16_t, g_user, STORE_OFF + 16) == 0xf001, "one record, under the key");
+    CHECK(changed_outside(STORE_OFF, STORE_END) == 0, "nothing outside the store changed");
+    snapshot();
+    save_bits_set(0xf001, 80);
+    CHECK(!save_bits_get(0xf001, 80) && changed_outside(0, 0) == 0, "a bit past the record: not kept, no byte changed");
+    quest(99001);                           /* a monster's record next to the key's */
+    save_slot_tally(LESSEE, g_quest);
+    gu_tally(109, 1, 0, 1000);
+    CHECK(gu_writer(109) == 3, "the monster's record is added");
+    save_bits_set(0xf002, 3);
+    hook(save_hunts_id_c, 0, 0x65, 0, &r);
+    CHECK(r && R[R0] == 1 && save_bits_get(0xf001, 79) && save_bits_get(0xf002, 3), "both keys and the monster's numbers stay");
+    CHECK(changed_outside(STORE_OFF, STORE_END) == 0, "nothing outside the store changed");
+    fresh();                                /* data in the block that is not a store */
+    for (uint32_t i = STORE_OFF + 8; i < STORE_OFF + 64; i++) g_user[i] = (uint8_t)i;
+    snapshot();
+    save_bits_set(0xf001, 0);
+    CHECK(!save_bits_get(0xf001, 0) && changed_outside(0, 0) == 0, "not a store: left alone");
+    fresh();                                /* a full store */
+    store_build(232, 0x2000, 1);
+    snapshot();
+    save_bits_set(0xf001, 0);
+    CHECK(!save_bits_get(0xf001, 0) && changed_outside(0, 0) == 0, "full: dropped, no byte changed");
+    fresh();                                /* no character */
+    s_userinfo = 0;
+    save_bits_set(0xf001, 0);
+    CHECK(!save_bits_get(0xf001, 0), "no character: reads 0");
+    s_userinfo = (uint32_t)g_user;
+    CHECK(changed_outside(0, 0) == 0, "no character: no byte changed");
+    return g_fails;
+}
+
 /* the store as test_lessee leaves it, for test_save.py */
 uint8_t *store_bytes(void) { return g_user + STORE_OFF; }
