@@ -5,7 +5,7 @@ their monsters, 2026-11), by comparing the current outputs with a packaged relea
                                    dump/release/v*)
 
 Every file of RELEASE_DIR's zips is looked up in the current outputs:
-  core-<v>.zip   exefs/<f> = module/out/<f>; romfs/nativeNX/mh4uport/<entry>.bin = the entry's gen/<entry>.bin;
+  core-<v>.zip   exefs/<f> = module/out/<f>; romfs/nativeNX/mhgu_de/<entry>.bin = the entry's gen/<entry>.bin;
                  the icon atlases = module/out/<name>
   other zips     romfs/<path> = the one package (monster or map) whose romfs holds <path> now
 One line per zip (identical / differs / missing, and where its files live now), then the current files that no zip of
@@ -18,7 +18,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import alloc, paths, ui_icons
 
-MOD = 'MH4U Port/'
+MOD = 'MHGU Definitive Edition/'
 MODULE_OUT = os.path.join(paths.ROOT, 'module', 'out')
 
 
@@ -47,10 +47,10 @@ def current():
 
 
 def core_file(rel):
-    """the current file of a core zip member (path below 'MH4U Port/')"""
+    """the current file of a core zip member (path below 'MHGU Definitive Edition/')"""
     if rel.startswith('exefs/'):
         return os.path.join(MODULE_OUT, rel[6:])
-    m = re.fullmatch(r'romfs/nativeNX/mh4uport/(.+)', rel)
+    m = re.fullmatch(r'romfs/nativeNX/mhgu_de/(.+)', rel)
     if m and m.group(1) in ui_icons.FILES:
         return os.path.join(MODULE_OUT, m.group(1))
     if m and m.group(1).endswith('.bin'):

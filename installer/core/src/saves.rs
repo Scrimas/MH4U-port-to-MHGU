@@ -529,7 +529,7 @@ pub fn find(p: &Place) -> Vec<Found> {
                     // the newest backup (folder time), not one made by this installer already
                     let newest = sorted_dirs(&game)
                         .into_iter()
-                        .filter(|b| is_save(&b.join("system")) && !name_of(b).contains("MH4U Port"))
+                        .filter(|b| is_save(&b.join("system")) && !name_of(b).contains("MHGU Definitive Edition"))
                         .max_by_key(|b| b.metadata().and_then(|m| m.modified()).ok());
                     if let Some(b) = newest {
                         out.push(Found {
@@ -666,7 +666,7 @@ pub fn apply(
     if f.backup_tool.is_some() {
         // a new backup folder beside the newest one, holding the migrated save
         let old = f.file.parent().ok_or_else(|| tr("The backup folder has no parent folder"))?;
-        let new = old.with_file_name(format!("{} MH4U Port {release}", name_of(old)));
+        let new = old.with_file_name(format!("{} MHGU Definitive Edition {release}", name_of(old)));
         copy_dir(old, &new).map_err(|e| trf("Could not write {} ({})", &[&new.display(), &e]))?;
         let (_, mut nloc) = open(&new.join("system"))?;
         store::write_all(&mut s, &mut nloc).map_err(|e| trf("Could not write {} ({})", &[&new.display(), &e]))?;
@@ -690,12 +690,12 @@ fn copy_dir(from: &Path, to: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-/// The installer's folder for save backups: `<data>/mh4uport-installer/save-backups` ($MH4UPORT_BACKUPS for tests).
+/// The installer's folder for save backups: `<data>/mhgu-de-installer/save-backups` ($MHGU_DE_BACKUPS for tests).
 pub fn backup_dir() -> PathBuf {
-    if let Some(d) = std::env::var_os("MH4UPORT_BACKUPS").filter(|v| !v.is_empty()) {
+    if let Some(d) = std::env::var_os("MHGU_DE_BACKUPS").filter(|v| !v.is_empty()) {
         return PathBuf::from(d);
     }
-    dirs::data_dir().unwrap_or_else(std::env::temp_dir).join("mh4uport-installer/save-backups")
+    dirs::data_dir().unwrap_or_else(std::env::temp_dir).join("mhgu-de-installer/save-backups")
 }
 
 /// The gear (by package) a save holds of `owned`: what the removal popup shows.
@@ -732,7 +732,7 @@ mod tests {
     }
 
     fn tmp(tag: &str) -> PathBuf {
-        let d = std::env::temp_dir().join(format!("mh4u-saves-{tag}-{}", std::process::id()));
+        let d = std::env::temp_dir().join(format!("mhgu-de-saves-{tag}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&d);
         std::fs::create_dir_all(&d).unwrap();
         d

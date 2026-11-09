@@ -99,7 +99,7 @@ for bit (GU's code emulated with an element of the same numbers; a scratch check
 | offset | size | |
 |---|---|---|
 | 0 | 4 | magic "MH4S" |
-| 4 | 2 | version 2 (core 1.10.0; version 1 up to core 1.9.0: read, and turned into version 2 at load) |
+| 4 | 2 | version 2 (core 2.0.0; version 1 up to core 1.9.0: read, and turned into version 2 at load) |
 | 6 | 2 | records |
 | 8 | 4 | FNV-1a 32 of bytes 4..7, (version 2) bytes 12..15, and the records |
 | 12 | 4 | version 2: the migration level, the last save-migration step the installer applied to this character (installer/core/src/saves.rs; the core never changes it); version 1: 0 |

@@ -1,18 +1,13 @@
-# Strings of the MH4U Port Installer, extracted by installer/tools/i18n.py.
+# Strings of the MHGU Definitive Edition Installer, extracted by installer/tools/i18n.py.
 msgid ""
 msgstr ""
-"Project-Id-Version: mh4uport-installer\n"
+"Project-Id-Version: mhgu-de-installer\n"
 "PO-Revision-Date: 2026-11-09 00:00+0000\n"
-"Last-Translator: Automatically generated\n"
-"Language-Team: none\n"
-"Language: de\n"
-"MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 #: gui/ui/app.slint
-msgid "MH4U Port Installer"
+msgid "MHGU Definitive Edition Installer"
 msgstr ""
 
 #: gui/ui/app.slint
@@ -103,67 +98,66 @@ msgstr ""
 msgid "About"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/ui/app.slint
-msgid "MH4U Port Installer {}"
+#. placeholders: {} in order, {0} {1} by position
+msgid "MHGU Definitive Edition Installer {}"
 msgstr ""
 
 #: gui/ui/app.slint
-msgid "Installs the MH4U Port mod for Monster Hunter Generations Ultimate from its GitHub releases. Free software under the GNU GPL v3 or later."
+msgid "Installs the MHGU Definitive Edition mod for Monster Hunter Generations Ultimate from its GitHub releases. Free software under the GNU GPL v3 or later."
 msgstr ""
 
 #: core/src/apply.rs core/src/source.rs gui/src/main.rs
 msgid "Cancelled"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: core/src/apply.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "{} is not in this release"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: core/src/apply.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "The release has no {}"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: core/src/apply.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "The download of {} does not match the release's checksum"
 msgstr ""
 
+#: core/src/apply.rs core/src/record.rs core/src/saves.rs core/src/selfupdate.rs core/src/source.rs
 #. placeholders: {} in order, {0} {1} by position
-#: core/src/apply.rs core/src/record.rs core/src/saves.rs
-#: core/src/selfupdate.rs core/src/source.rs
 msgid "Could not write {} ({})"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: core/src/apply.rs core/src/source.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "Could not read {} ({})"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: core/src/apply.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "{} holds {}, which its release does not list"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: core/src/apply.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "{} in {} does not match the release"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: core/src/apply.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "{} lacks {}"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: core/src/apply.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "Could not copy {} ({})"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: core/src/apply.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "Could not remove {} ({})"
 msgstr ""
 
@@ -171,13 +165,13 @@ msgstr ""
 msgid "The mod folder has no parent folder"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: core/src/apply.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "{} was not downloaded"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: core/src/apply.rs core/src/selfupdate.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "Could not replace {} ({})"
 msgstr ""
 
@@ -185,8 +179,8 @@ msgstr ""
 msgid "..."
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: core/src/manifest.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "Unreadable manifest ({})"
 msgstr ""
 
@@ -194,18 +188,18 @@ msgstr ""
 msgid "This release needs a newer installer: update the installer first"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: core/src/manifest.rs core/src/saves.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "Invalid manifest: {}"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: core/src/places.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "{} (Flatpak)"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: core/src/places.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "SD card ({})"
 msgstr ""
 
@@ -217,13 +211,13 @@ msgstr ""
 msgid "yuzu family (folder)"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: core/src/record.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "{} was written by a newer installer"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: core/src/record.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "{} is damaged ({})"
 msgstr ""
 
@@ -231,33 +225,33 @@ msgstr ""
 msgid "The hunter holds a weapon that leaves, and the box has no other weapon"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: core/src/saves.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "{} cannot be read ({})"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: core/src/saves.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "character {} holds another tool's data where the mod keeps its own"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: core/src/saves.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "character {} was migrated by a newer release"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: core/src/saves.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "step {} needs a newer installer"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: core/src/saves.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "character {}: {}"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: core/src/saves.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "Could not back up {} ({})"
 msgstr ""
 
@@ -265,8 +259,8 @@ msgstr ""
 msgid "The backup folder has no parent folder"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: core/src/selfupdate.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "{} is not in {}"
 msgstr ""
 
@@ -282,28 +276,28 @@ msgstr ""
 msgid "GitHub refused the request (too many in the last hour), try later"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: core/src/source.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "GitHub answered HTTP {}"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: core/src/source.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "Could not reach GitHub ({})"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: core/src/source.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "Unexpected answer from GitHub ({})"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: core/src/source.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "Download failed ({})"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: core/src/zipread.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "Damaged zip file ({})"
 msgstr ""
 
@@ -315,8 +309,8 @@ msgstr ""
 msgid "Looking for the latest release…"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "Release {} needs installer {} or newer: update the installer first."
 msgstr ""
 
@@ -324,8 +318,8 @@ msgstr ""
 msgid "No release of the mod can be installed by this installer yet."
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "Could not read the releases: {}"
 msgstr ""
 
@@ -349,23 +343,23 @@ msgstr ""
 msgid "Its install record is unreadable"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "Release {} · {}"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "new · {}"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "repair · {}"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "{} → none"
 msgstr ""
 
@@ -373,8 +367,8 @@ msgstr ""
 msgid "System language"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "Installer {} is out"
 msgstr ""
 
@@ -390,8 +384,8 @@ msgstr ""
 msgid "pre-release"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "Release {}"
 msgstr ""
 
@@ -415,13 +409,13 @@ msgstr ""
 msgid "shared files"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "{} · also for {}"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "{} in this release · each brings the map it needs"
 msgstr ""
 
@@ -438,36 +432,40 @@ msgid "Up to date"
 msgstr ""
 
 #: gui/src/main.rs
-msgid "An MH4U Port folder extracted by hand is there: it is removed, then installed fresh."
+msgid "An MHGU Definitive Edition folder extracted by hand is there: it is removed, then installed fresh."
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+msgid "The mod from before 2.0.0, when it was called MH4U Port, is there: it is removed."
+msgstr ""
+
+#: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "+ {} {} (new)"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "↻ {} {} (repaired: files were missing)"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "↑ {} {} → {}"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "− {} {} (removed)"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "{} · for {}"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "Moves to release {} (nothing to download)"
 msgstr ""
 
@@ -475,28 +473,28 @@ msgstr ""
 msgid "Saves"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "{}: moved to this release's IDs"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "{}: the gear of the monsters that leave is cleaned"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "{}: moved to this release's IDs, the gear of the monsters that leave cleaned"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "{} cannot be migrated: {}"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "Every save is backed up first, into {}"
 msgstr ""
 
@@ -532,13 +530,13 @@ msgstr ""
 msgid "Online, everyone in the group needs the same release and the same monsters."
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "Close {} first: the game must not run while its files change."
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "Download: {}"
 msgstr ""
 
@@ -554,8 +552,8 @@ msgstr ""
 msgid "Close the game first"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "{} is running: close it, then install again."
 msgstr ""
 
@@ -563,8 +561,8 @@ msgstr ""
 msgid "The install failed"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "{}: {}"
 msgstr ""
 
@@ -580,23 +578,23 @@ msgstr ""
 msgid "Starting…"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "Downloading · {} / {}"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "Downloading {} · {} / {}"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "Installing into {} ({} of {})"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "Updating the save {}"
 msgstr ""
 
@@ -604,13 +602,13 @@ msgstr ""
 msgid "The mod was removed."
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "Start MHGU in {}"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "The mod is installed; these saves were left as they were. Backups: {}"
 msgstr ""
 
@@ -638,8 +636,8 @@ msgstr ""
 msgid "This copy cannot replace itself: download the new installer from its release page."
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "Installed: start {}"
 msgstr ""
 
@@ -659,52 +657,52 @@ msgstr ""
 msgid "While this is on, the installer installs the newest pre-release when there is one."
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "{} monster"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "{} monsters"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "{} removal"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "{} removals"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "{} change"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "{} changes"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "Install {} change"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "Install {} changes"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "{} save updated (backed up first)"
 msgstr ""
 
-#. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "{} saves updated (backed up first)"
 msgstr ""

@@ -110,7 +110,7 @@ static int store_check(uint8_t **out)
     uint8_t *b = store_block();
     int st = store_state(b);
     if (st == ST_VALID && FIELD(uint16_t, b, 4) < STORE_VERSION) {     /* version 1 -> 2: level 0 (already 0) */
-        logf("mh4uport: store version %u -> %u (%u record(s))", FIELD(uint16_t, b, 4), STORE_VERSION,
+        logf("mhgu-de: store version %u -> %u (%u record(s))", FIELD(uint16_t, b, 4), STORE_VERSION,
              FIELD(uint16_t, b, 6));
         FIELD(uint16_t, b, 4) = STORE_VERSION;
         FIELD(uint32_t, b, 8) = store_check_word(b);
@@ -118,9 +118,9 @@ static int store_check(uint8_t **out)
     if (b != s_blk || st != s_st) {
         s_blk = b;
         s_st = st;
-        logf("mh4uport: store sUserInfo+%x (%u bytes, %u records max): %s, %u record(s)", STORE_OFF, STORE_SIZE,
+        logf("mhgu-de: store sUserInfo+%x (%u bytes, %u records max): %s, %u record(s)", STORE_OFF, STORE_SIZE,
              REC_MAX, ST_NAME[st], st == ST_VALID ? FIELD(uint16_t, b, 6) : 0u);
-        if (st == ST_VALID) logf("mh4uport: store migration level %u", FIELD(uint32_t, b, 12));
+        if (st == ST_VALID) logf("mhgu-de: store migration level %u", FIELD(uint32_t, b, 12));
     }
     *out = b;
     return st;
@@ -171,7 +171,7 @@ static struct store_rec *store_open(uint32_t em)
     if (r) return r;
     uint32_t n = FIELD(uint16_t, b, 6);
     if (n >= REC_MAX) {
-        logf("mh4uport: store full (%u records): em %x not recorded", n, em);
+        logf("mhgu-de: store full (%u records): em %x not recorded", n, em);
         return 0;
     }
     r = (struct store_rec *)(b + HDR) + n;
@@ -207,7 +207,7 @@ void save_bits_set(uint32_t key, uint32_t bit)
     static uint32_t s_n;
     struct store_rec *r;
     if (bit >= 80u) {
-        if (++s_n <= 8) logf("mh4uport: store bit %u of key %x past its record: not kept", bit, key);
+        if (++s_n <= 8) logf("mhgu-de: store bit %u of key %x past its record: not kept", bit, key);
         return;
     }
     r = store_open(key);
@@ -245,7 +245,7 @@ static void slot_dress(int k, int m)
     reg_icon[SLOT_FIRST + k] = m >= 0 ? reg_icon[port_monsters[m].index] : s_icon_built[k];
     size_slot_dress(SLOT_FIRST + k, m);
     s_dressed[k] = (int8_t)m;
-    logf("mh4uport: save slot %u (id %x) shows %s", SLOT_FIRST + k, SLOT_ID(k),
+    logf("mhgu-de: save slot %u (id %x) shows %s", SLOT_FIRST + k, SLOT_ID(k),
          m >= 0 ? port_monsters[m].name : "its owner");
 }
 
@@ -304,10 +304,10 @@ uint32_t save_slot_tally(int m, uint8_t *o)
                     s_user[k2] = (int8_t)n;
                     s_lease_q[k2] = q;
                     slot_dress(k2, n);
-                    logf("mh4uport: %s moved from save slot %u to %u (its owner %s is counted)", port_monsters[n].name,
+                    logf("mhgu-de: %s moved from save slot %u to %u (its owner %s is counted)", port_monsters[n].name,
                          p->save_index, SLOT_FIRST + k2, p->name);
                 } else {
-                    logf("mh4uport: ERROR %s and %s share save slot %u in this quest", port_monsters[n].name, p->name,
+                    logf("mhgu-de: ERROR %s and %s share save slot %u in this quest", port_monsters[n].name, p->name,
                          p->save_index);
                 }
             }
@@ -323,7 +323,7 @@ uint32_t save_slot_tally(int m, uint8_t *o)
         k = lease_pick(m, q, o, -1);
         if (k < 0) {                        /* 7 ported monsters counted in one quest: never past index 136 */
             k = PREF[0];
-            logf("mh4uport: ERROR no free save slot for %s: counted in slot %u with another monster", p->name,
+            logf("mhgu-de: ERROR no free save slot for %s: counted in slot %u with another monster", p->name,
                  SLOT_FIRST + k);
         }
         for (int i = 0; i < SLOTS; i++)
@@ -333,7 +333,7 @@ uint32_t save_slot_tally(int m, uint8_t *o)
             }
         s_user[k] = (int8_t)m;
         s_lease_q[k] = q;
-        logf("mh4uport: %s leases save slot %u (id %x) for quest %u", p->name, SLOT_FIRST + k, SLOT_ID(k), q);
+        logf("mhgu-de: %s leases save slot %u (id %x) for quest %u", p->name, SLOT_FIRST + k, SLOT_ID(k), q);
     }
     slot_dress(k, m);
     return SLOT_FIRST + (uint32_t)k;
@@ -460,7 +460,7 @@ static int add_count(uint32_t *regs, int captures)
         else v = r->hunts = add_capped(r->hunts, regs[R2]);
         store_seal();
     }
-    logf("mh4uport: %s +%u %s -> store %d (slot %x untouched)", port_monsters[n].name, regs[R2],
+    logf("mhgu-de: %s +%u %s -> store %d (slot %x untouched)", port_monsters[n].name, regs[R2],
          captures ? "capture(s)" : "hunt(s)", r ? (int)v : -1, regs[R1] & 0xffff);
     return 1;
 }
@@ -487,7 +487,7 @@ static int size_record(uint32_t *regs, int largest)
         }
         store_seal();
     }
-    logf("mh4uport: %s size %u: %s record %s", port_monsters[n].name, v, largest ? "largest" : "smallest",
+    logf("mhgu-de: %s size %u: %s record %s", port_monsters[n].name, v, largest ? "largest" : "smallest",
          regs[R0] ? "new" : "kept");
     return 1;
 }
@@ -501,11 +501,11 @@ static void log_save(const char *when)
     int st = store_check(&b);
     if (!s) return;
     for (int k = 0; k < SLOTS; k++)
-        logf("mh4uport: %s: save slot %u: hunts %u, captures %u", when, SLOT_FIRST + k,
+        logf("mhgu-de: %s: save slot %u: hunts %u, captures %u", when, SLOT_FIRST + k,
              FIELD(uint16_t, s, TALLIES + 2 * (SLOT_FIRST + k)), FIELD(uint16_t, s, TALLIES + 0x112 + 2 * (SLOT_FIRST + k)));
     for (uint32_t i = 0, n = st == ST_VALID ? FIELD(uint16_t, b, 6) : 0; i < n && i < 16; i++) {
         const struct store_rec *r = (const struct store_rec *)(b + HDR) + i;
-        logf("mh4uport: %s: store em %x: hunts %u, captures %u, smallest %u, largest %u", when, r->em, r->hunts,
+        logf("mhgu-de: %s: store em %x: hunts %u, captures %u, smallest %u, largest %u", when, r->em, r->hunts,
              r->captures, r->size_min, r->size_max);
     }
 }

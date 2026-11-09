@@ -1,20 +1,22 @@
 name: Installer
 
-# MH4U Port Installer (installer/): built from code only, no game data (the mod's releases are made by tools/release.py
-# on the machine with the dumps).
+# MHGU Definitive Edition Installer (installer/): built from code only, no game data (the mod's releases are made by
+# tools/release.py on the machine with the dumps).
 #   tests        every push / PR touching installer/: cargo fmt, cargo test, the catalogs, the end-to-end CLI test
 #                (installer/tests/cli_test.py, a fake release of dummy files) on Linux and Windows
-#   build        installer-v* tags (and by hand): installer/packaging/build.py in an Arch Linux container (the editor's
-#                toolchain): MH4U-Port-Installer-<v>-x86_64.exe (mingw-w64), .AppImage (zig, glibc 2.28, type 2
-#                runtime) and SHA256SUMS-<v>
+#   build        v* tags (and by hand): installer/packaging/build.py in an Arch Linux container (the editor's
+#                toolchain): MHGU-Definitive-Edition-Installer-<v>-x86_64.exe (mingw-w64), .AppImage (zig, glibc
+#                2.28, type 2 runtime) and SHA256SUMS-<v>
 #   windows      the shipped .exe started on Windows: it opens its window and draws it into a PNG, then quits
-#   release      a tag: a DRAFT release with the files, never marked Latest (the repository's Latest stays on the
-#                mod's release; the installer finds its own releases by their installer-v prefix)
+#   release      a tag: a DRAFT release with the files, Latest once published (GitHub's default: the newest
+#                version). This repository's releases are the installer's since 2.0.0; the mod's are on
+#                MHGU-Definitive-Edition-Packages (tools/release.py). The installer tells its own releases by their
+#                files (source.rs installer_releases)
 
 on:
   push:
     branches: ["**"]
-    tags: ["installer-v*"]     # (GitHub does not evaluate path filters for tag pushes)
+    tags: ["v*"]               # (GitHub does not evaluate path filters for tag pushes)
     paths: ["installer/**", ".github/workflows/installer.yml"]
   pull_request:
     paths: ["installer/**", ".github/workflows/installer.yml"]
@@ -55,7 +57,7 @@ jobs:
         run: cargo test --manifest-path installer/Cargo.toml --workspace --locked
       - name: End to end (command line, fake release)
         run: |
-          cargo build --manifest-path installer/Cargo.toml -p mh4uport-core --bin mh4uport-cli --locked
+          cargo build --manifest-path installer/Cargo.toml -p mhgu-de-core --bin mhgu-de-cli --locked
           python installer/tests/cli_test.py
 
   build:
@@ -85,7 +87,7 @@ jobs:
         id: ver
         run: |
           ver=$(sed -n 's/^version = "\(.*\)"/\1/p' installer/Cargo.toml | head -1)
-          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "installer-v$ver" ]; then
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "v$ver" ]; then
             echo "::error::tag $GITHUB_REF_NAME does not match installer/Cargo.toml version $ver"
             exit 1
           fi
@@ -98,7 +100,7 @@ jobs:
         run: APPIMAGE_RUNTIME="$RUNNER_TEMP/runtime-x86_64" python installer/packaging/build.py
       - uses: actions/upload-artifact@v4
         with:
-          name: MH4U-Port-Installer-${{ steps.ver.outputs.ver }}
+          name: MHGU-Definitive-Edition-Installer-${{ steps.ver.outputs.ver }}
           path: installer/dist/*${{ steps.ver.outputs.ver }}*
           if-no-files-found: error
           retention-days: 1
@@ -111,12 +113,12 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: MH4U-Port-Installer-${{ needs.build.outputs.ver }}
+          name: MHGU-Definitive-Edition-Installer-${{ needs.build.outputs.ver }}
           path: dist
       - name: Start the .exe
         run: |
-          test "$("dist/MH4U-Port-Installer-$VER-x86_64.exe" --version | tr -d '\r')" = "$VER"
-          MH4UPORT_SNAPSHOT=window.png timeout 180 "dist/MH4U-Port-Installer-$VER-x86_64.exe"
+          test "$("dist/MHGU-Definitive-Edition-Installer-$VER-x86_64.exe" --version | tr -d '\r')" = "$VER"
+          MHGU_DE_SNAPSHOT=window.png timeout 180 "dist/MHGU-Definitive-Edition-Installer-$VER-x86_64.exe"
           test -s window.png
       - uses: actions/upload-artifact@v4
         if: always()
@@ -135,11 +137,11 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: MH4U-Port-Installer-${{ needs.build.outputs.ver }}
+          name: MHGU-Definitive-Edition-Installer-${{ needs.build.outputs.ver }}
           path: dist
       - name: Draft release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft --verify-tag --latest=false \
-            --title "MH4U Port Installer $VER" --generate-notes dist/*"$VER"*
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft --verify-tag \
+            --title "MHGU Definitive Edition Installer $VER" --generate-notes dist/*"$VER"*

@@ -4,10 +4,19 @@ tools/release.py puts the section of the core version being packaged into the re
 groups, **New** (something added) and **Fixed** (what works now, not what was broken), one short plain line each,
 written for players; write the section before `release.py package`.
 
-## v1.10.0
+## v2.0.0
 **New**
-- The MH4U Port Installer (Windows, Linux): it downloads the monsters you tick into Ryujinx, the yuzu family or an SD
-  card, with the maps they need, and updates or removes them.
+- MH4U Port is now **MHGU Definitive Edition**, and so is its mod folder. The installer removes the old `MH4U Port`
+  folder; if you extract the zips by hand, delete `MH4U Port` first, or the game loads the mod twice.
+- The MHGU Definitive Edition Installer (Windows, Linux): it downloads the monsters you tick into Ryujinx, the yuzu
+  family or an SD card, with the maps they need, and updates or removes them. Get it from
+  [MHGU-Definitive-Edition](https://github.com/Scrimas/MHGU-Definitive-Edition/releases/latest).
+- The zips now have a repository of their own,
+  [MHGU-Definitive-Edition-Packages](https://github.com/Scrimas/MHGU-Definitive-Edition-Packages/releases).
+- Tidal Najarala, ported by @Rukasu1609, with her water jet and scales, 2 hub quests from MH4U, her armor, weapons and
+  a Hunter's Notes page.
+- Shrouded Nerscylla, ported by @Rukasu1609, with her MH4U bite, 3 quests from MH4U, her armor, weapons and a Hunter's
+  Notes page.
 - The ported arenas are downloads of their own: Battlequarters (Gogmazios), Speartip Crag (Dalamadur) and Heaven's
   Mount (Stygian Zinogre). A monster whose arena is missing stays off instead of loading a missing stage.
 

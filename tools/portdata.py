@@ -1,4 +1,4 @@
-"""portdata.py : a monster's data file nativeNX/mh4uport/<name>.bin, read by the core module (module/port.c).
+"""portdata.py : a monster's data file nativeNX/mhgu_de/<name>.bin, read by the core module (module/port.c).
 
   portdata.py pack NAME          monsters/NAME/gen/*.sec (one per section, written by the monster's tools through
                                  write_section) + monsters/NAME/package.toml -> monsters/NAME/gen/NAME.bin

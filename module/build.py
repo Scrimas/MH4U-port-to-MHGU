@@ -2,7 +2,7 @@
 
   build.py            build into module/out/
   build.py install    also install into the Ryujinx mod folder: exefs/, every monster's data file
-                      (romfs/nativeNX/mh4uport/<name>.bin, always) and the monsters' assets (romfs/...); PORT_ASSETS =
+                      (romfs/nativeNX/mhgu_de/<name>.bin, always) and the monsters' assets (romfs/...); PORT_ASSETS =
                       comma-separated packages whose assets to install (default: all, "none" = none)
 
 Hooks: (name, main offset of the hooked instruction). The two instructions at the site
@@ -63,8 +63,10 @@ def main_ref(off):
     return '(__module_start - 0x%x)' % (MAIN_GAP - off) if off <= MAIN_GAP else '(__module_start + 0x%x)' % (off - MAIN_GAP)
 # install target: the test data dir by default (tools/ryutest.sh); GOG_MOD_ROOT=~/.config/Ryujinx/mods for the real one
 MOD_ROOT = os.path.expanduser(os.environ.get('GOG_MOD_ROOT', os.path.join(ROOT, 'ryuroot', 'mods')))
-MOD_NAME = 'MH4U Port'
+MOD_NAME = 'MHGU Definitive Edition'
 MOD_DIR = os.path.join(MOD_ROOT, 'contents', '0100770008dd8000', MOD_NAME)
+# the mod's folder before 2.0.0 (MH4U Port): removed by install(), or the emulator loads the module twice
+LEGACY_DIR = os.path.join(MOD_ROOT, 'contents', '0100770008dd8000', 'MH4U Port')
 
 HOOKS = [
     ('em_create', 0x4EBCC),    # monster factory (DTI table 0x1731e2c)
@@ -700,7 +702,7 @@ def main():
         for k, v in sorted(syms.items(), key=lambda kv: kv[1]):
             f.write('%08x %08x %s\n' % (MODULE_BASE + v, v, k))
     open(os.path.join(OUT, 'defines.txt'), 'w').write(' '.join(EXTRA_DEFINES) + '\n')   # tools/release.py: none
-    ui_icons.build(OUT)                                # the icon atlases (romfs nativeNX/mh4uport, icons.c)
+    ui_icons.build(OUT)                                # the icon atlases (romfs nativeNX/mhgu_de, icons.c)
     print('built', len(data), 'bytes; hooks', ', '.join('%s@%x' % h for h in HOOKS))
     for k in ('g_init_magic', 'g_hook_count'):
         if k in syms: print('  %s = 0x%x' % (k, MODULE_BASE + syms[k]))
@@ -717,13 +719,13 @@ def install():
         shutil.copy(os.path.join(OUT, f), os.path.join(ex, f))
     dst = os.path.join(MOD_DIR, 'romfs')
     shutil.rmtree(dst, ignore_errors=True)
-    os.makedirs(os.path.join(dst, 'nativeNX', 'mh4uport'))
+    os.makedirs(os.path.join(dst, 'nativeNX', 'mhgu_de'))
     for m in MONSTERS:
         src = os.path.join(paths.gen(m['name']), m['name'] + '.bin')
         if not os.path.exists(src): sys.exit('no data file %s: run monsters/%s/build.sh' % (src, alloc.package(m)))
-        shutil.copy(src, os.path.join(dst, 'nativeNX', 'mh4uport'))
+        shutil.copy(src, os.path.join(dst, 'nativeNX', 'mhgu_de'))
     for name in ui_icons.FILES:
-        shutil.copy(os.path.join(OUT, name), os.path.join(dst, 'nativeNX', 'mh4uport'))
+        shutil.copy(os.path.join(OUT, name), os.path.join(dst, 'nativeNX', 'mhgu_de'))
     sel = os.environ.get('PORT_ASSETS', 'all')          # package names (an entry name selects its package; a monster
     names = alloc.packages() if sel == 'all' else [] if sel == 'none' else \
         list(dict.fromkeys(paths.package(n) for n in sel.split(',')))   # brings the maps it requires)
@@ -740,6 +742,9 @@ def install():
                 shutil.copy(os.path.join(d, f), os.path.join(dst, rel))
     print('installed into %s: data of %s, assets of %s' % (MOD_DIR, ', '.join(m['name'] for m in MONSTERS),
                                                            ', '.join(names) or 'none'))
+    if os.path.isdir(LEGACY_DIR):
+        shutil.rmtree(LEGACY_DIR)
+        print('removed %s (the mod before 2.0.0)' % LEGACY_DIR)
 
 
 if __name__ == '__main__':

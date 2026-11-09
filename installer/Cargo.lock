@@ -2542,8 +2542,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "mh4uport-core"
-version = "1.0.0"
+name = "mhgu-de-core"
+version = "2.0.0"
 dependencies = [
  "dirs",
  "mhgu-save",
@@ -2556,11 +2556,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "mh4uport-installer"
-version = "1.0.0"
+name = "mhgu-de-installer"
+version = "2.0.0"
 dependencies = [
  "image",
- "mh4uport-core",
+ "mhgu-de-core",
  "rfd",
  "serde",
  "serde_json",

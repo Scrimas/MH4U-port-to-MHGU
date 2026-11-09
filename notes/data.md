@@ -70,11 +70,11 @@ words 0x1839b38..). Not finished.
   72-px cells) like HD UI v4's (1024x1024, 144-px cells) holds only cells 0..48 (i 98..146). micon00/01 come from
   resident_<lang>.arc, which HD UI v4 replaces, so patching them is not shippable.
 - **Since 2026-10-26: a third atlas (C for the code paths, untested in game).** UI index 196 + k = cell k of
-  romfs nativeNX/mh4uport/micon_sd.tex / micon_hd.tex (tools/ui_icons.py: GU micon01's size and grid, 4U art 2x / 4x
+  romfs nativeNX/mhgu_de/micon_sd.tex / micon_hd.tex (tools/ui_icons.py: GU micon01's size and grid, 4U art 2x / 4x
   nearest; cell 0 = 4U '?'). module/icons.c hook 0x56ef58: GU skips the bind (i >= 196) and sets rect i % 98 = k;
   the hook points the sprite (as 0x546f48: [gui +0xf8 / +0x294][obj] +0xd8 [kind]) at a copy of the .gui's micon01
   texture entry (0xb80fd0([sprite +0x78], ids[1]); 64 B: +4 flags, +8..+0xe s16 rect, +0x28 rTexture) with +0x28 = our
-  rTexture (sResource vt[0x30](mgr, rTexture DTI 0x21255d0, "mh4uport\\micon_sd|hd", 1), picked by micon01's
+  rTexture (sResource vt[0x30](mgr, rTexture DTI 0x21255d0, "mhgu_de\\micon_sd|hd", 1), picked by micon01's
   +0xdc / +0xe0 size), sprite +0x100 = 0x4d480000 (0xa4faf0 rebinds any real ID). No atlas -> cell 146 instead.
 - Quest board bytes (0x3a3178): < 142 = UI index + 1, 142..186 = hyper (table 0x162a63c + badge at 0x613318),
   > 186 = none in GU; icons.c maps 200.. to our cells (tools/alloc.py board_byte) and hands the board loop byte 0

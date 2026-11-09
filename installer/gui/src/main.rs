@@ -1,21 +1,21 @@
-//! MH4U Port Installer: the window. The state lives on the UI thread (STATE); downloads, installs and the release
-//! list run on worker threads that hand their results back through `slint::invoke_from_event_loop`. Everything that
-//! decides what goes where is in mh4uport-core.
+//! MHGU Definitive Edition Installer: the window. The state lives on the UI thread (STATE); downloads, installs and
+//! the release lists run on worker threads that hand their results back through `slint::invoke_from_event_loop`.
+//! Everything that decides what goes where is in mhgu-de-core.
 // Windows: a window app, no console
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
 mod i18n;
 
-use mh4uport_core::apply;
-use mh4uport_core::i18n::{tr, trf, trn};
-use mh4uport_core::manifest::{Kind, Manifest};
-use mh4uport_core::places::{self, Custom, Place};
-use mh4uport_core::plan::{Action, PlacePlan, initial_wanted};
-use mh4uport_core::record::{self, State};
-use mh4uport_core::saves::{self, Clean, Found, Need, Owned};
-use mh4uport_core::selfupdate::{self, Update};
-use mh4uport_core::settings::{self, Settings};
-use mh4uport_core::source::{Release, Source, mod_releases};
+use mhgu_de_core::apply;
+use mhgu_de_core::i18n::{tr, trf, trn};
+use mhgu_de_core::manifest::{Kind, Manifest};
+use mhgu_de_core::places::{self, Custom, Place};
+use mhgu_de_core::plan::{Action, PlacePlan, initial_wanted};
+use mhgu_de_core::record::{self, State};
+use mhgu_de_core::saves::{self, Clean, Found, Need, Owned};
+use mhgu_de_core::selfupdate::{self, Update};
+use mhgu_de_core::settings::{self, Settings};
+use mhgu_de_core::source::{Release, Source, mod_releases};
 use slint::{ComponentHandle, Image, ModelRc, Rgba8Pixel, SharedPixelBuffer, SharedString, VecModel};
 use std::cell::RefCell;
 use std::collections::{BTreeSet, HashMap};
@@ -44,10 +44,12 @@ struct Progress {
 
 struct App {
     settings: Settings,
+    /// the mod's releases (PACKAGES_REPO) and the installer's (REPO)
     source: Source,
+    installer_source: Source,
     places: Vec<Place>,
     states: Vec<State>,
-    releases: Vec<Release>,
+    installer_releases: Vec<Release>,
     release: Option<Release>,
     manifest: Option<Manifest>,
     icons: HashMap<String, Image>,
@@ -129,18 +131,20 @@ fn model<T: Clone + 'static>(v: Vec<T>) -> ModelRc<T> {
 
 /// What the loader thread brings back.
 struct Loaded {
-    releases: Vec<Release>,
+    installer_releases: Vec<Release>,
     picked: Result<Option<(Release, Manifest)>, String>,
     icons: Vec<(String, u32, u32, Vec<u8>)>,
 }
 
-fn load(src: Source, prereleases: bool) -> Loaded {
+fn load(src: Source, installer_src: Source, prereleases: bool) -> Loaded {
+    // the installer's releases only offer an update: without them the mod still installs
+    let installer_releases = installer_src.releases().unwrap_or_default();
     let releases = match src.releases() {
         Ok(r) => r,
-        Err(e) => return Loaded { releases: vec![], picked: Err(e), icons: vec![] },
+        Err(e) => return Loaded { installer_releases, picked: Err(e), icons: vec![] },
     };
     let Some(rel) = mod_releases(&releases, prereleases).into_iter().next() else {
-        return Loaded { releases, picked: Ok(None), icons: vec![] };
+        return Loaded { installer_releases, picked: Ok(None), icons: vec![] };
     };
     let picked = rel
         .asset("manifest.json")
@@ -151,18 +155,18 @@ fn load(src: Source, prereleases: bool) -> Loaded {
     if let Ok(m) = &picked
         && let Some(a) = m.icons.as_ref().and_then(|n| rel.asset(n))
         && let Ok(z) = src.bytes(a)
-        && let Ok(entries) = mh4uport_core::zipread::entries(&z)
+        && let Ok(entries) = mhgu_de_core::zipread::entries(&z)
     {
         for e in entries {
             let Some(name) = e.name.strip_suffix(".png") else { continue };
-            let Ok(png) = mh4uport_core::zipread::read(&z, &e) else { continue };
+            let Ok(png) = mhgu_de_core::zipread::read(&z, &e) else { continue };
             if let Ok(img) = image::load_from_memory_with_format(&png, image::ImageFormat::Png) {
                 let rgba = img.to_rgba8();
                 icons.push((name.to_string(), rgba.width(), rgba.height(), rgba.into_raw()));
             }
         }
     }
-    Loaded { releases, picked: picked.map(|m| Some((rel, m))), icons }
+    Loaded { installer_releases, picked: picked.map(|m| Some((rel, m))), icons }
 }
 
 fn start_loading(app: &mut App, ui: &AppWindow) {
@@ -171,22 +175,22 @@ fn start_loading(app: &mut App, ui: &AppWindow) {
     ui.set_status(tr("Looking for the latest release…").into());
     ui.set_status_error(false);
     refresh(app, ui);
-    let (src, pre) = (app.source.clone(), app.settings.prereleases);
+    let (src, installer_src, pre) = (app.source.clone(), app.installer_source.clone(), app.settings.prereleases);
     std::thread::spawn(move || {
-        let l = load(src, pre);
+        let l = load(src, installer_src, pre);
         later(move |app, ui| loaded(app, ui, l));
     });
 }
 
 fn loaded(app: &mut App, ui: &AppWindow, l: Loaded) {
-    app.releases = l.releases;
+    app.installer_releases = l.installer_releases;
     for (name, w, h, px) in l.icons {
         let buf = SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(&px, w, h);
         app.icons.insert(name, Image::from_rgba8(buf));
     }
     match l.picked {
         Ok(Some((rel, m))) => {
-            if mh4uport_core::version::older(mh4uport_core::VERSION, &m.installer_min) {
+            if mhgu_de_core::version::older(mhgu_de_core::VERSION, &m.installer_min) {
                 ui.set_status(
                     trf(
                         "Release {} needs installer {} or newer: update the installer first.",
@@ -211,7 +215,7 @@ fn loaded(app: &mut App, ui: &AppWindow, l: Loaded) {
         }
     }
     if app.settings.check_updates {
-        app.update = selfupdate::available(&app.releases, mh4uport_core::VERSION);
+        app.update = selfupdate::available(&app.installer_releases, mhgu_de_core::VERSION);
     }
     reread_places(app);
     if let Some(m) = &app.manifest {
@@ -225,8 +229,8 @@ fn loaded(app: &mut App, ui: &AppWindow, l: Loaded) {
         app.wanted = initial_wanted(m, ticked.into_iter().filter_map(State::record));
     }
     refresh(app, ui);
-    // snapshots (MH4UPORT_SNAPSHOT): open a dialog first
-    match std::env::var("MH4UPORT_SNAPSHOT_OPEN").as_deref() {
+    // snapshots (MHGU_DE_SNAPSHOT): open a dialog first
+    match std::env::var("MHGU_DE_SNAPSHOT_OPEN").as_deref() {
         Ok("review") => review(app, ui, false),
         Ok("settings") => ui.set_dialog(3),
         Ok("about") => ui.set_dialog(4),
@@ -236,7 +240,7 @@ fn loaded(app: &mut App, ui: &AppWindow, l: Loaded) {
 
 fn reread_places(app: &mut App) {
     app.places = places::detect(&app.settings.custom);
-    let mod_folder = app.manifest.as_ref().map_or("MH4U Port".to_string(), |m| m.mod_folder.clone());
+    let mod_folder = app.manifest.as_ref().map_or("MHGU Definitive Edition".to_string(), |m| m.mod_folder.clone());
     app.states = app.places.iter().map(|p| record::read(p, &mod_folder)).collect();
     // a ticked place that is gone from the list stays ticked in the settings (an SD card taken out)
 }
@@ -335,7 +339,7 @@ fn refresh(app: &mut App, ui: &AppWindow) {
         })
         .collect();
     ui.set_custom_places(model(custom));
-    ui.set_version(mh4uport_core::VERSION.into());
+    ui.set_version(mhgu_de_core::VERSION.into());
     ui.set_set_prereleases(app.settings.prereleases);
     ui.set_set_check_updates(app.settings.check_updates);
     let mut langs: Vec<SharedString> = vec![tr("System language").into()];
@@ -569,9 +573,16 @@ fn review(app: &mut App, ui: &AppWindow, remove_all: bool) {
         if let State::Unreadable(why) = s {
             lines.push(line(why.clone(), 2, false));
         }
-        if p.replace_hand_install {
+        if p.replace_hand_install && record::hand_extracted(&app.places[*i], &m.mod_folder) {
             lines.push(line(
-                tr("An MH4U Port folder extracted by hand is there: it is removed, then installed fresh."),
+                tr("An MHGU Definitive Edition folder extracted by hand is there: it is removed, then installed fresh."),
+                2,
+                false,
+            ));
+        }
+        if !p.legacy.is_empty() {
+            lines.push(line(
+                tr("The mod from before 2.0.0, when it was called MH4U Port, is there: it is removed."),
                 2,
                 false,
             ));
@@ -908,7 +919,7 @@ fn update_now(app: &mut App, ui: &AppWindow) {
     };
     ui.set_update_busy(true);
     ui.set_update_progress(0.0);
-    let (src, cancel) = (app.source.clone(), app.cancel.clone());
+    let (src, cancel) = (app.installer_source.clone(), app.cancel.clone());
     std::thread::spawn(move || {
         let r = selfupdate::install(
             &src,
@@ -951,14 +962,14 @@ fn main() {
         let _ = settings::save(&s);
     }
     if std::env::args().any(|a| a == "--version") {
-        println!("{}", mh4uport_core::VERSION);
+        println!("{}", mhgu_de_core::VERSION);
         return;
     }
     let ui = AppWindow::new().expect("the window opens");
     i18n::set(i18n::index_of(&s.language));
-    // CI (.github/workflows/installer.yml): the window opens, then closes by itself (--smoke); MH4UPORT_SNAPSHOT=<png>
+    // CI (.github/workflows/installer.yml): the window opens, then closes by itself (--smoke); MHGU_DE_SNAPSHOT=<png>
     // also draws it into that file first (a crash, a hang or no picture fails the job)
-    let snapshot = std::env::var_os("MH4UPORT_SNAPSHOT").filter(|v| !v.is_empty());
+    let snapshot = std::env::var_os("MHGU_DE_SNAPSHOT").filter(|v| !v.is_empty());
     if snapshot.is_some() || std::env::args().any(|a| a == "--smoke") {
         let weak = ui.as_weak();
         slint::Timer::single_shot(std::time::Duration::from_secs(3), move || {
@@ -975,10 +986,11 @@ fn main() {
     STATE.with_borrow_mut(|st| {
         *st = Some(App {
             settings: s,
-            source: Source::from_env(),
+            source: Source::mods(),
+            installer_source: Source::installer(),
             places: vec![],
             states: vec![],
-            releases: vec![],
+            installer_releases: vec![],
             release: None,
             manifest: None,
             icons: HashMap::new(),
@@ -1131,7 +1143,7 @@ fn main() {
             if !app.settings.check_updates {
                 app.update = None;
             } else {
-                app.update = selfupdate::available(&app.releases, mh4uport_core::VERSION);
+                app.update = selfupdate::available(&app.installer_releases, mhgu_de_core::VERSION);
             }
             let _ = settings::save(&app.settings);
             refresh(app, ui);

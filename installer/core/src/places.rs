@@ -1,22 +1,32 @@
 //! Install places: Ryujinx, the yuzu family (yuzu, suyu, sudachi, citron, eden, torzu), MHGU PC Recomp (untested),
 //! Atmosphère SD cards and any folder. Each knows where the mod goes and where its install record is kept.
 //!
-//! - Ryujinx: `<data>/mods/contents/0100770008dd8000/MH4U Port`, data = `<config>/Ryujinx` (Linux ~/.config,
-//!   Windows %APPDATA%), its Flatpaks, or a folder picked by the player (portable Ryujinx).
-//! - yuzu family: `<load>/0100770008DD8000/MH4U Port`, load = `<data>/load` (Linux ~/.local/share/<name>, Windows
-//!   %APPDATA%\<name>, Flatpaks `~/.var/app/*/data/<name>`) unless qt-config.ini names another load folder.
-//! - MHGU PC Recomp: `<folder of mhgurecomp>/mods/MH4U Port` (or $MHGU_MODS_DIR); a new mod folder loads, enabled,
-//!   unless mods/load_order.txt marks it `# off:` (morerokk/MHGURecomp runtime/mods.c, via DeepWiki: strong, not
-//!   confirmed; the port never ran there).
+//! - Ryujinx: `<data>/mods/contents/0100770008dd8000/MHGU Definitive Edition`, data = `<config>/Ryujinx` (Linux
+//!   ~/.config, Windows %APPDATA%), its Flatpaks, or a folder picked by the player (portable Ryujinx).
+//! - yuzu family: `<load>/0100770008DD8000/MHGU Definitive Edition`, load = `<data>/load` (Linux ~/.local/share/<name>,
+//!   Windows %APPDATA%\<name>, Flatpaks `~/.var/app/*/data/<name>`) unless qt-config.ini names another load folder.
+//! - MHGU PC Recomp: `<folder of mhgurecomp>/mods/MHGU Definitive Edition` (or $MHGU_MODS_DIR); a new mod folder loads,
+//!   enabled, unless mods/load_order.txt marks it `# off:` (morerokk/MHGURecomp runtime/mods.c, via DeepWiki: strong,
+//!   not confirmed; the port never ran there).
 //! - Atmosphère SD card: `atmosphere/contents/0100770008DD8000/{exefs,romfs}`, the IPS in
-//!   `atmosphere/exefs_patches/MH4U Port/` (other mods share contents/<title>: only our files are touched).
-//! - Folder: `<folder>/MH4U Port`.
+//!   `atmosphere/exefs_patches/MHGU Definitive Edition/` (other mods share contents/<title>: only our files are
+//!   touched).
+//! - Folder: `<folder>/MHGU Definitive Edition`.
+//!
+//! Before 2.0.0 the mod was called MH4U Port: a v1.x release extracted by hand left a `MH4U Port` folder (SD card:
+//! `romfs/nativeNX/mh4uport`, `exefs_patches/MH4U Port`). It counts as a hand install and goes with the next install
+//! or removal (Place::legacy), or the emulator would load the module twice.
 
 use crate::i18n::{tr, trf};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 pub const TITLE_ID: &str = "0100770008DD8000";
+/// The mod's data folder (module/port.c DATA_DIR), below the mod folder.
+pub const DATA_DIR: &str = "romfs/nativeNX/mhgu_de";
+/// The mod folder of the releases before 2.0.0, and their data folder.
+pub const LEGACY_FOLDER: &str = "MH4U Port";
+pub const LEGACY_DATA_DIR: &str = "romfs/nativeNX/mh4uport";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -57,7 +67,7 @@ pub struct Place {
     /// Shown: "Ryujinx", "Eden (Flatpak)", "SD card E:\"…
     pub name: String,
     /// Ryujinx / yuzu: the emulator's data folder; recomp: the folder of mhgurecomp; SD card: the card's root;
-    /// folder: the folder that receives `MH4U Port`.
+    /// folder: the folder that receives `MHGU Definitive Edition`.
     pub root: PathBuf,
     /// Added by the player (kept in the settings), not found by itself.
     pub custom: bool,
@@ -111,6 +121,22 @@ impl Place {
             Layout::ModFolder(d) => d.join(rel),
             Layout::Atmosphere(r) => atmosphere_target(&r, mod_folder, rel),
         }
+    }
+
+    /// What a release before 2.0.0 left here (LEGACY_FOLDER): its mod folder; on an SD card its data folder and IPS
+    /// folder (its exefs files have the same names as ours and are replaced). Empty when `mod_folder` is that name.
+    pub fn legacy(&self, mod_folder: &str) -> Vec<PathBuf> {
+        if mod_folder == LEGACY_FOLDER {
+            return vec![];
+        }
+        let found = match self.layout(LEGACY_FOLDER) {
+            Layout::ModFolder(d) => vec![d],
+            Layout::Atmosphere(r) => vec![
+                r.join("atmosphere/contents").join(TITLE_ID).join(LEGACY_DATA_DIR),
+                r.join("atmosphere/exefs_patches").join(LEGACY_FOLDER),
+            ],
+        };
+        found.into_iter().filter(|p| p.exists()).collect()
     }
 }
 
@@ -293,19 +319,22 @@ mod tests {
 
     #[test]
     fn each_place_has_its_mod_folder() {
-        let m = "MH4U Port";
+        let m = "MHGU Definitive Edition";
         assert_eq!(
             place(Kind::Ryujinx, "/r").layout(m),
-            Layout::ModFolder(PathBuf::from("/r/mods/contents/0100770008dd8000/MH4U Port"))
+            Layout::ModFolder(PathBuf::from("/r/mods/contents/0100770008dd8000/MHGU Definitive Edition"))
         );
-        assert_eq!(place(Kind::Folder, "/f").record_path(m), PathBuf::from("/f/MH4U Port/mh4uport-install.json"));
+        assert_eq!(
+            place(Kind::Folder, "/f").record_path(m),
+            PathBuf::from("/f/MHGU Definitive Edition/mhgu-de-install.json")
+        );
         // a yuzu folder without qt-config.ini: <data>/load
-        let d = std::env::temp_dir().join(format!("mh4u-places-{}", std::process::id()));
-        let y = d.join("eden-mh4u-test"); // no such folder in ~/.config: only its own qt-config.ini counts
+        let d = std::env::temp_dir().join(format!("mhgu-de-places-{}", std::process::id()));
+        let y = d.join("eden-mhgu-de-test"); // no such folder in ~/.config: only its own qt-config.ini counts
         std::fs::create_dir_all(y.join("config")).unwrap();
         assert_eq!(
             place(Kind::Yuzu, y.to_str().unwrap()).layout(m),
-            Layout::ModFolder(y.join("load/0100770008DD8000/MH4U Port"))
+            Layout::ModFolder(y.join("load/0100770008DD8000/MHGU Definitive Edition"))
         );
         std::fs::write(
             y.join("config/qt-config.ini"),
@@ -314,7 +343,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             place(Kind::Yuzu, y.to_str().unwrap()).layout(m),
-            Layout::ModFolder(PathBuf::from("/games/load/0100770008DD8000/MH4U Port"))
+            Layout::ModFolder(PathBuf::from("/games/load/0100770008DD8000/MHGU Definitive Edition"))
         );
         std::fs::remove_dir_all(&d).unwrap();
     }
@@ -322,25 +351,25 @@ mod tests {
     #[test]
     fn sd_card_files_go_to_atmosphere_folders() {
         let p = place(Kind::SdCard, "/sd");
-        let m = "MH4U Port";
+        let m = "MHGU Definitive Edition";
         assert_eq!(
             p.target(m, "exefs/subsdk1"),
             PathBuf::from("/sd/atmosphere/contents/0100770008DD8000/exefs/subsdk1")
         );
         assert_eq!(
             p.target(m, "exefs/FB08F1D2.ips"),
-            PathBuf::from("/sd/atmosphere/exefs_patches/MH4U Port/FB08F1D2.ips")
+            PathBuf::from("/sd/atmosphere/exefs_patches/MHGU Definitive Edition/FB08F1D2.ips")
         );
         assert_eq!(
-            p.target(m, "romfs/nativeNX/mh4uport/a.bin"),
-            PathBuf::from("/sd/atmosphere/contents/0100770008DD8000/romfs/nativeNX/mh4uport/a.bin")
+            p.target(m, "romfs/nativeNX/mhgu_de/a.bin"),
+            PathBuf::from("/sd/atmosphere/contents/0100770008DD8000/romfs/nativeNX/mhgu_de/a.bin")
         );
-        assert_eq!(p.record_path(m), PathBuf::from("/sd/atmosphere/contents/0100770008DD8000/mh4uport-install.json"));
+        assert_eq!(p.record_path(m), PathBuf::from("/sd/atmosphere/contents/0100770008DD8000/mhgu-de-install.json"));
     }
 
     #[test]
     fn a_picked_folder_is_recognised() {
-        let d = std::env::temp_dir().join(format!("mh4u-kind-{}", std::process::id()));
+        let d = std::env::temp_dir().join(format!("mhgu-de-kind-{}", std::process::id()));
         for (sub, kind) in [("atmosphere", Kind::SdCard), ("nand", Kind::Yuzu), ("bis", Kind::Folder)] {
             let f = d.join(sub.to_string() + "-case");
             std::fs::create_dir_all(f.join(sub)).unwrap();

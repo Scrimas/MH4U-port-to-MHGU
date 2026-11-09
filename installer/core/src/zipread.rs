@@ -141,11 +141,14 @@ mod tests {
     #[test]
     fn a_written_zip_reads_back() {
         let big = vec![7u8; 100_000];
-        let z = write(&[("MH4U Port/exefs/subsdk1", b"module"), ("MH4U Port/romfs/a.arc", &big)]);
+        let z = write(&[
+            ("MHGU Definitive Edition/exefs/subsdk1", b"module"),
+            ("MHGU Definitive Edition/romfs/a.arc", &big),
+        ]);
         let e = entries(&z).unwrap();
         assert_eq!(
             e.iter().map(|e| e.name.as_str()).collect::<Vec<_>>(),
-            ["MH4U Port/exefs/subsdk1", "MH4U Port/romfs/a.arc"]
+            ["MHGU Definitive Edition/exefs/subsdk1", "MHGU Definitive Edition/romfs/a.arc"]
         );
         assert_eq!(read(&z, &e[0]).unwrap(), b"module");
         assert_eq!(read(&z, &e[1]).unwrap(), big);

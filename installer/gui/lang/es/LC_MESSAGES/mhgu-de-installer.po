@@ -1,18 +1,18 @@
-# Strings of the MH4U Port Installer, extracted by installer/tools/i18n.py.
+# Strings of the MHGU Definitive Edition Installer, extracted by installer/tools/i18n.py.
 msgid ""
 msgstr ""
-"Project-Id-Version: mh4uport-installer\n"
+"Project-Id-Version: mhgu-de-installer\n"
 "PO-Revision-Date: 2026-11-09 00:00+0000\n"
 "Last-Translator: Automatically generated\n"
 "Language-Team: none\n"
-"Language: it\n"
+"Language: es\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 #: gui/ui/app.slint
-msgid "MH4U Port Installer"
+msgid "MHGU Definitive Edition Installer"
 msgstr ""
 
 #: gui/ui/app.slint
@@ -105,11 +105,11 @@ msgstr ""
 
 #. placeholders: {} in order, {0} {1} by position
 #: gui/ui/app.slint
-msgid "MH4U Port Installer {}"
+msgid "MHGU Definitive Edition Installer {}"
 msgstr ""
 
 #: gui/ui/app.slint
-msgid "Installs the MH4U Port mod for Monster Hunter Generations Ultimate from its GitHub releases. Free software under the GNU GPL v3 or later."
+msgid "Installs the MHGU Definitive Edition mod for Monster Hunter Generations Ultimate from its GitHub releases. Free software under the GNU GPL v3 or later."
 msgstr ""
 
 #: core/src/apply.rs core/src/source.rs gui/src/main.rs
@@ -438,7 +438,11 @@ msgid "Up to date"
 msgstr ""
 
 #: gui/src/main.rs
-msgid "An MH4U Port folder extracted by hand is there: it is removed, then installed fresh."
+msgid "An MHGU Definitive Edition folder extracted by hand is there: it is removed, then installed fresh."
+msgstr ""
+
+#: gui/src/main.rs
+msgid "The mod from before 2.0.0, when it was called MH4U Port, is there: it is removed."
 msgstr ""
 
 #. placeholders: {} in order, {0} {1} by position

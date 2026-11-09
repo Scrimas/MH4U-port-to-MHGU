@@ -1,17 +1,17 @@
 [package]
-name = "mh4uport-installer"
-description = "MH4U Port Installer: downloads and installs the MH4U Port mod for MHGU"
+name = "mhgu-de-installer"
+description = "MHGU Definitive Edition Installer: downloads and installs the MHGU Definitive Edition mod for MHGU"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 build = "build.rs"
 
 [[bin]]
-name = "mh4uport-installer"
+name = "mhgu-de-installer"
 path = "src/main.rs"
 
 [dependencies]
-mh4uport-core = { path = "../core" }
+mhgu-de-core = { path = "../core" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sys-locale = "0.3"

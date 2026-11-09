@@ -18,9 +18,9 @@ static void redirect(const char *what, uint32_t word, uint32_t orig, uint32_t *c
     volatile uint32_t *p = (volatile uint32_t *)MAIN(word);
     if (*p == MAIN(orig)) {
         *p = (uint32_t)copy;
-        logf("mh4uport: %s table -> %x (readback %x)", what, (uint32_t)copy, *p);
+        logf("mhgu-de: %s table -> %x (readback %x)", what, (uint32_t)copy, *p);
     } else {
-        logf("mh4uport: word %x holds %x, expected %x: %s table NOT relocated", MAIN(word), *p, MAIN(orig), what);
+        logf("mhgu-de: word %x holds %x, expected %x: %s table NOT relocated", MAIN(word), *p, MAIN(orig), what);
     }
 }
 
@@ -35,7 +35,7 @@ static void redirect(const char *what, uint32_t word, uint32_t orig, uint32_t *c
 void module_init(void)
 {
     uint32_t w = *(volatile uint32_t *)MAIN(CHECK_SITE);
-    logf("mh4uport: module_init, base %x, %d monster(s); main %x: %s (word %x)", (uint32_t)(uintptr_t)&module_init,
+    logf("mhgu-de: module_init, base %x, %d monster(s); main %x: %s (word %x)", (uint32_t)(uintptr_t)&module_init,
          PORT_N, MAIN_BASE, w == CHECK_WORD ? "ok" : "MISMATCH", w);
     for (int m = 0; m < PORT_N; m++) {
         /* a monster's manifest is its donor's until its data file is read (port.c load) */
@@ -92,7 +92,7 @@ int em_create_c(uint32_t *regs)
     regs[R0] = standin_swap(regs[R0]);
     int m = port_by_em(regs[R0] & 0xffff);
     if (m >= 0)
-        logf("mh4uport: em_create %s id=%x serial=%x lr=%x", port_monsters[m].name, regs[R0], regs[R1],
+        logf("mhgu-de: em_create %s id=%x serial=%x lr=%x", port_monsters[m].name, regs[R0], regs[R1],
              regs[LR] - MAIN_BASE);
     return 0;
 }
@@ -105,12 +105,12 @@ int quest_prep_c(uint32_t *regs)
 #endif
     if (regs[LR] - MAIN_BASE == 0x3adcf8) {   /* the quest loader's call: r4 = quest object [0x188ad90] */
         static uint32_t s_n;
-        if (++s_n <= 20) logf("mh4uport: quest_prep quest %u (obj %u) id=%x", port_quest_id(),
+        if (++s_n <= 20) logf("mhgu-de: quest_prep quest %u (obj %u) id=%x", port_quest_id(),
                               FIELD(uint32_t, regs[R4], 0xe0), regs[R1]);
     }
     regs[R1] = standin_swap(regs[R1]);
     int m = port_by_em(regs[R1] & 0xffff);
-    if (m >= 0) logf("mh4uport: quest_prep %s id=%x lr=%x", port_monsters[m].name, regs[R1], regs[LR] - MAIN_BASE);
+    if (m >= 0) logf("mhgu-de: quest_prep %s id=%x lr=%x", port_monsters[m].name, regs[R1], regs[LR] - MAIN_BASE);
     return 0;
 }
 
@@ -122,7 +122,7 @@ int em_arc_request_c(uint32_t *regs)
 #endif
     uint32_t id = regs[R1] & 0xffff, q = port_quest_id();
     int m = port_by_em(id);
-    if (m >= 0) logf("mh4uport: em_arc_request %s id=%x lr=%x", port_monsters[m].name, regs[R1], regs[LR] - MAIN_BASE);
+    if (m >= 0) logf("mhgu-de: em_arc_request %s id=%x lr=%x", port_monsters[m].name, regs[R1], regs[LR] - MAIN_BASE);
     /* the quest is not known here (preload list 0x3b512c): with a stand-in, also request the arc of each installed
      * monster it stands in for, so it is resident before the spawn-prep swap (the call re-enters this hook with the
      * monster's ID and passes through). Its other quests skip the arc, but only when the quest is KNOWN (0 = load) */
@@ -147,7 +147,7 @@ int em_record_c(uint32_t *regs)
 #else
     regs[R1] = port_monsters[m].donor_index;
 #endif
-    logf("mh4uport: em_record index %u (count %u) -> %u", port_monsters[m].index, FIELD(uint32_t, regs[R0], 0x68),
+    logf("mhgu-de: em_record index %u (count %u) -> %u", port_monsters[m].index, FIELD(uint32_t, regs[R0], 0x68),
          regs[R1]);
     return 0;
 }
@@ -169,7 +169,7 @@ int stats_add_c(uint32_t *regs)
     if (m < 0) return 0;
     regs[R0] = save_slot_tally(m, (uint8_t *)regs[R5]);
     /* kind = r2 at the entry, spilled to [sp+0x3c]; the caller's sp is just above the 8 saved registers */
-    logf("mh4uport: %s quest-end tally kind %u -> save slot %u%s", port_monsters[m].name,
+    logf("mhgu-de: %s quest-end tally kind %u -> save slot %u%s", port_monsters[m].name,
          FIELD(uint32_t, regs, 32 + 0x3c), regs[R0], port_lease(m) ? " (leased)" : "");
     /* the quest clears when its rule's objectives are done (quest+0xe8 from questData +0x1d; check 0x3a027c): a
      * one-hunt quest needs +0x1d = 0 (Tigerstripe test 2026-10-21, monsters/tigerstripe_zamtrios/notes/plan.md) */
@@ -239,7 +239,7 @@ int size_data_c(uint32_t *regs)
         if (!slot) continue;
         size_set(slot, donor, p);
         if (++s_n <= 8)
-            logf("mh4uport: %s size record: slot %u = base %d cm, crowns %d / %d / %d %%", p->name, p->save_index,
+            logf("mhgu-de: %s size record: slot %u = base %d cm, crowns %d / %d / %d %%", p->name, p->save_index,
                  (int)p->size[0], (int)(p->size[1] * 100.0f), (int)(p->size[2] * 100.0f), (int)(p->size[3] * 100.0f));
     }
     s_size_res = res;

@@ -1,7 +1,7 @@
-// MH4U Port Installer: one window (design "B2 compact", 1066 x 600): the install places and the action on the left,
-// the release's monsters with the maps they bring on the right, dialogs over both. Fluent style (follows the
-// system's light / dark), colours as MHGU_Editor's (app/gui/ui/common.slint Tok). The Rust side (src/main.rs) fills
-// the models and answers the callbacks; nothing here decides what gets installed.
+// MHGU Definitive Edition Installer: one window (design "B2 compact", 1066 x 600): the install places and the action
+// on the left, the release's monsters with the maps they bring on the right, dialogs over both. Fluent style (follows
+// the system's light / dark), colours as MHGU_Editor's (app/gui/ui/common.slint Tok). The Rust side (src/main.rs)
+// fills the models and answers the callbacks; nothing here decides what gets installed.
 
 import { Button, ScrollView, ComboBox, Palette, AboutSlint } from "std-widgets.slint";
 
@@ -348,7 +348,7 @@ component SettingRow inherits Rectangle {
 }
 
 export component AppWindow inherits Window {
-    title: @tr("MH4U Port Installer");
+    title: @tr("MHGU Definitive Edition Installer");
     icon: @image-url("../assets/icon-256.png");
     // a fixed size (min = max): Hyprland and other tiling compositors open it floating, centered, at this size
     preferred-width: 1066px;
@@ -449,7 +449,7 @@ export component AppWindow inherits Window {
                         alignment: center;
                         horizontal-stretch: 1;
                         Text {
-                            text: "MH4U Port";
+                            text: "MHGU Definitive Edition";
                             font-size: 18px;
                             font-weight: 600;
                         }
@@ -816,9 +816,9 @@ export component AppWindow inherits Window {
     if root.dialog == 4: Dialog {
         width: root.width;
         height: root.height;
-        title: @tr("MH4U Port Installer {}", root.version);
+        title: @tr("MHGU Definitive Edition Installer {}", root.version);
         Text {
-            text: @tr("Installs the MH4U Port mod for Monster Hunter Generations Ultimate from its GitHub releases. Free software under the GNU GPL v3 or later.");
+            text: @tr("Installs the MHGU Definitive Edition mod for Monster Hunter Generations Ultimate from its GitHub releases. Free software under the GNU GPL v3 or later.");
             wrap: word-wrap;
         }
         AboutSlint {

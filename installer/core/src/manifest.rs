@@ -220,10 +220,10 @@ pub(crate) mod tests {
             prerelease: false,
             installer_min: "1.0.0".into(),
             title_id: "0100770008DD8000".into(),
-            mod_folder: "MH4U Port".into(),
+            mod_folder: "MHGU Definitive Edition".into(),
             icons: None,
             packages: vec![
-                pkg("core", Kind::Core, &[], &["exefs/subsdk1", "exefs/FB08.ips", "romfs/nativeNX/mh4uport/a.bin"]),
+                pkg("core", Kind::Core, &[], &["exefs/subsdk1", "exefs/FB08.ips", "romfs/nativeNX/mhgu_de/a.bin"]),
                 pkg("gogmazios", Kind::Monster, &["battlequarters"], &["romfs/nativeNX/arc/enemy/em089_00.arc"]),
                 pkg("dalamadur", Kind::Monster, &["speartip_crag"], &["romfs/nativeNX/arc/enemy/em090_00.arc"]),
                 pkg("shah", Kind::Monster, &["speartip_crag"], &["romfs/nativeNX/arc/enemy/em090_01.arc"]),

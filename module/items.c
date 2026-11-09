@@ -50,7 +50,7 @@ int item_data_loaded_c(uint32_t *regs)
             uint8_t *r = recs + ITEM_REC * id;
             if (id >= n || FIELD(uint32_t, r, 0x08) != id || r[0x18] != it[6] ||
                 FIELD(uint32_t, r, 0x1c) != PORT_U32(it, 8)) {
-                logf("mh4uport: %s item %u is not a DUMMY record, left alone", port_monsters[m].name, id);
+                logf("mhgu-de: %s item %u is not a DUMMY record, left alone", port_monsters[m].name, id);
                 continue;
             }
             r[0x0d] = it[2] - 1;
@@ -62,7 +62,7 @@ int item_data_loaded_c(uint32_t *regs)
             r[0x24] = it[5];
             done++;
         }
-        if (s) logf("mh4uport: item data (%u records): %u %s items set", n, done, port_monsters[m].name);
+        if (s) logf("mhgu-de: item data (%u records): %u %s items set", n, done, port_monsters[m].name);
     }
     return 0;
 }
@@ -79,7 +79,7 @@ static void item_names(int m, const char **str, uint32_t n, uint32_t lang, const
         str[k + 1] = PORT_STR(s, t + 4 * (2 * (lang * cnt + i) + 1));
         done++;
     }
-    if (s) logf("mh4uport: item text %s: %u %s names set", path, done, port_monsters[m].name);
+    if (s) logf("mhgu-de: item text %s: %u %s names set", path, done, port_monsters[m].name);
 }
 
 static int is_dummy(const char *s)       /* GU's unused names 'dummy1'..'dummy7' */
@@ -95,11 +95,11 @@ static void monster_name(int m, const char **str, uint32_t n, uint32_t lang)
     if (!s) return;
     uint32_t e = PORT_U32(s, 0);
     if (e >= n || !is_dummy(str[e])) {
-        logf("mh4uport: %s name entry %u is not a dummy entry, left alone", port_monsters[m].name, e);
+        logf("mhgu-de: %s name entry %u is not a dummy entry, left alone", port_monsters[m].name, e);
         return;
     }
     str[e] = PORT_STR(s, 4 + 4 * lang);
-    logf("mh4uport: monster name entry %u = %s", e, str[e]);
+    logf("mhgu-de: monster name entry %u = %s", e, str[e]);
 }
 
 /* ---- items obtained (notes/items-append.md) ----
@@ -218,7 +218,7 @@ int item_box_sort_c(uint32_t *regs)
         FIELD(uint16_t, box, BOX_DST + 4 * k) = (uint16_t)s_box_ent[k];
         FIELD(uint16_t, box, BOX_DST + 4 * k + 2) = (uint16_t)(s_box_ent[k] >> 16);
     }
-    if (unknown) logf("mh4uport: item box sort: %u stacks, %u of items past the table kept last", n, unknown);
+    if (unknown) logf("mhgu-de: item box sort: %u stacks, %u of items past the table kept last", n, unknown);
     return 1;
 }
 
@@ -295,7 +295,7 @@ int bui_record_c(uint32_t *regs)
             continue;
         if ((!FIELD(uint16_t, s_bui[m], 4) || s_bui_rank[m] != rank + 1) && !bui_build(m, rank)) return 0;
         regs[R0] = (uint32_t)s_bui[m];
-        logf("mh4uport: break rewards for id %x: %s record (rank %d)", id, p->name, rank);
+        logf("mhgu-de: break rewards for id %x: %s record (rank %d)", id, p->name, rank);
         return 1;
     }
     return 0;

@@ -1,5 +1,5 @@
-//! The installer's settings: `<config>/mh4uport-installer/settings.json` (Linux ~/.config, Windows %APPDATA%), and
-//! its download cache `<cache>/mh4uport-installer/<release>/` (Linux ~/.cache, Windows %LOCALAPPDATA%): only the
+//! The installer's settings: `<config>/mhgu-de-installer/settings.json` (Linux ~/.config, Windows %APPDATA%), and
+//! its download cache `<cache>/mhgu-de-installer/<release>/` (Linux ~/.cache, Windows %LOCALAPPDATA%): only the
 //! installed release's zips stay (apply.rs prune_cache after each install).
 
 use crate::places::Custom;
@@ -40,17 +40,17 @@ impl Default for Settings {
 }
 
 pub fn dir() -> PathBuf {
-    if let Some(d) = std::env::var_os("MH4UPORT_CONFIG").filter(|v| !v.is_empty()) {
+    if let Some(d) = std::env::var_os("MHGU_DE_CONFIG").filter(|v| !v.is_empty()) {
         return PathBuf::from(d);
     }
-    dirs::config_dir().unwrap_or_else(std::env::temp_dir).join("mh4uport-installer")
+    dirs::config_dir().unwrap_or_else(std::env::temp_dir).join("mhgu-de-installer")
 }
 
 pub fn cache_dir() -> PathBuf {
-    if let Some(d) = std::env::var_os("MH4UPORT_CACHE").filter(|v| !v.is_empty()) {
+    if let Some(d) = std::env::var_os("MHGU_DE_CACHE").filter(|v| !v.is_empty()) {
         return PathBuf::from(d);
     }
-    dirs::cache_dir().unwrap_or_else(std::env::temp_dir).join("mh4uport-installer")
+    dirs::cache_dir().unwrap_or_else(std::env::temp_dir).join("mhgu-de-installer")
 }
 
 pub fn load() -> Settings {

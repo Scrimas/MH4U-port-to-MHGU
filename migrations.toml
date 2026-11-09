@@ -1,4 +1,4 @@
-# Save migrations, applied by the MH4U Port Installer to every save of the places it installs into
+# Save migrations, applied by the MHGU Definitive Edition Installer to every save of the places it installs into
 # (installer/core/src/saves.rs; tools/release.py copies them into the release's manifest.json).
 #
 # Only for the exception: shipped IDs never move (allocations.toml). When one really has to, add a step here in the

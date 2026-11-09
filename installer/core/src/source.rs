@@ -1,8 +1,9 @@
-//! Where releases come from: the repository's GitHub releases, or a local folder (tests, offline use:
-//! `MH4UPORT_RELEASES=<folder>`, a `releases.json` in the GitHub API's shape whose download URLs are paths relative
-//! to it). The mod's releases (`v1.10.0`, `v1.11.0-pre.1`) and the installer's (`installer-v1.0.0`) share the
-//! repository: one list call per start serves both (GitHub allows 60 unauthenticated API calls an hour per address;
-//! asset downloads do not count).
+//! Where releases come from: GitHub releases, or a local folder (tests, offline use: a `releases.json` in the GitHub
+//! API's shape whose download URLs are paths relative to it). The mod's releases (`v2.0.0`, `v2.1.0-pre.1`) are on
+//! PACKAGES_REPO (or `MHGU_DE_RELEASES=<folder>`), the installer's (`v2.0.0`, with its .exe and AppImage) on REPO (or
+//! `MHGU_DE_INSTALLER_RELEASES=<folder>`), whose older `v1.x` releases are the mod's from before the split. One list
+//! call per repository and start (GitHub allows 60 unauthenticated API calls an hour per address; asset downloads do
+//! not count).
 
 use crate::i18n::{tr, trf};
 use crate::version::Version;
@@ -72,11 +73,16 @@ pub fn mod_releases(all: &[Release], prereleases: bool) -> Vec<Release> {
     v
 }
 
-/// The installer's own releases, newest first (`installer-v*`; its pre-releases are left out).
+/// The file name every installer build starts with (installer/packaging/build.py NAME).
+pub const INSTALLER_ASSET: &str = "MHGU-Definitive-Edition-Installer-";
+
+/// The installer's own releases, newest first: tag `v<version>` with an installer file (REPO's v1.x releases are the
+/// mod's, from before the split); its pre-releases are left out.
 pub fn installer_releases(all: &[Release]) -> Vec<Release> {
     let mut v: Vec<Release> = all
         .iter()
-        .filter(|r| r.tag.starts_with("installer-v") && !r.draft && !r.prerelease && r.version().is_some())
+        .filter(|r| r.tag.starts_with('v') && !r.draft && !r.prerelease && r.version().is_some())
+        .filter(|r| r.assets.iter().any(|a| a.name.starts_with(INSTALLER_ASSET)))
         .cloned()
         .collect();
     v.sort_by_key(|r| std::cmp::Reverse(r.version()));
@@ -90,7 +96,7 @@ fn agent() -> ureq::Agent {
         .timeout_recv_response(Some(Duration::from_secs(30)))
         // a stalled download fails instead of waiting forever (Cancel also leaves)
         .timeout_recv_body(Some(Duration::from_secs(30 * 60)))
-        .user_agent(format!("mh4uport-installer/{}", crate::VERSION))
+        .user_agent(format!("mhgu-de-installer/{}", crate::VERSION))
         .build()
         .into()
 }
@@ -108,11 +114,20 @@ fn http(url: &str) -> Result<Box<dyn Read + Send>, String> {
 }
 
 impl Source {
-    /// `MH4UPORT_RELEASES=<folder>` when set (tests), else GitHub.
-    pub fn from_env() -> Source {
-        match std::env::var_os("MH4UPORT_RELEASES").filter(|v| !v.is_empty()) {
+    /// The mod's releases: `MHGU_DE_RELEASES=<folder>` when set (tests), else PACKAGES_REPO.
+    pub fn mods() -> Source {
+        Source::from_env("MHGU_DE_RELEASES", crate::PACKAGES_REPO)
+    }
+
+    /// The installer's releases: `MHGU_DE_INSTALLER_RELEASES=<folder>` when set (tests), else REPO.
+    pub fn installer() -> Source {
+        Source::from_env("MHGU_DE_INSTALLER_RELEASES", crate::REPO)
+    }
+
+    fn from_env(var: &str, repo: &str) -> Source {
+        match std::env::var_os(var).filter(|v| !v.is_empty()) {
             Some(d) => Source::Local(PathBuf::from(d)),
-            None => Source::GitHub(crate::REPO.to_string()),
+            None => Source::GitHub(repo.to_string()),
         }
     }
 
@@ -228,24 +243,33 @@ mod tests {
     }
 
     #[test]
-    fn mod_and_installer_releases_are_told_apart() {
-        let all = [
-            rel("installer-v1.1.0", false, &["MH4U-Port-Installer-1.1.0-x86_64.exe"]),
-            rel("v1.9.0", false, &["core-1.9.0.zip"]),
+    fn mod_releases_need_a_manifest() {
+        let packages = [
+            rel("v2.0.0", false, &["manifest.json", "core-2.0.0.zip"]),
+            rel("v2.1.0-pre.1", true, &["manifest.json"]),
             rel("v1.10.0", false, &["manifest.json"]),
-            rel("v1.11.0-pre.1", true, &["manifest.json"]),
-            rel("installer-v1.2.0-pre.1", true, &[]),
         ];
         let tags = |v: Vec<Release>| v.into_iter().map(|r| r.tag).collect::<Vec<_>>();
-        assert_eq!(tags(mod_releases(&all, false)), ["v1.10.0"], "1.9.0 has no manifest");
-        assert_eq!(tags(mod_releases(&all, true)), ["v1.11.0-pre.1", "v1.10.0"]);
-        assert_eq!(tags(installer_releases(&all)), ["installer-v1.1.0"]);
-        assert_eq!(all[2].day(), "2026-11-09");
+        assert_eq!(tags(mod_releases(&packages, false)), ["v2.0.0"], "1.10.0 is older than the first release");
+        assert_eq!(tags(mod_releases(&packages, true)), ["v2.1.0-pre.1", "v2.0.0"]);
+        assert_eq!(packages[0].day(), "2026-11-09");
+    }
+
+    #[test]
+    fn installer_releases_are_those_with_an_installer() {
+        let repo = [
+            rel("v2.1.0", false, &["MHGU-Definitive-Edition-Installer-2.1.0-x86_64.exe", "SHA256SUMS-2.1.0"]),
+            rel("v2.2.0-pre.1", true, &["MHGU-Definitive-Edition-Installer-2.2.0-pre.1-x86_64.exe"]),
+            rel("v1.9.0", false, &["core-1.9.0.zip", "gogmazios-1.1.7.zip"]),
+            rel("v2.0.0", false, &["MHGU-Definitive-Edition-Installer-2.0.0-x86_64.AppImage"]),
+        ];
+        let tags = |v: Vec<Release>| v.into_iter().map(|r| r.tag).collect::<Vec<_>>();
+        assert_eq!(tags(installer_releases(&repo)), ["v2.1.0", "v2.0.0"], "the mod's v1.x and pre-releases left out");
     }
 
     #[test]
     fn a_local_folder_serves_releases_and_downloads() {
-        let d = std::env::temp_dir().join(format!("mh4u-source-{}", std::process::id()));
+        let d = std::env::temp_dir().join(format!("mhgu-de-source-{}", std::process::id()));
         std::fs::create_dir_all(d.join("v1.10.0")).unwrap();
         std::fs::write(d.join("v1.10.0/core-1.10.0.zip"), b"zipdata").unwrap();
         std::fs::write(

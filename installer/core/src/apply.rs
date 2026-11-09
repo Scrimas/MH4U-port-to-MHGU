@@ -1,10 +1,11 @@
 //! Doing a plan: download the zips (cache, size + sha256 against the manifest), then per place
-//! - mod folder (emulators, recomp, folders): the new `MH4U Port` is built beside the old one (`.MH4U Port.new`:
-//!   unchanged packages hard-linked or copied from the old folder, the others extracted), then swapped in by rename;
-//!   the old folder stays until the swap worked, so a place is never half installed;
+//! - mod folder (emulators, recomp, folders): the new `MHGU Definitive Edition` is built beside the old one
+//!   (`.MHGU Definitive Edition.new`: unchanged packages hard-linked or copied from the old folder, the others
+//!   extracted), then swapped in by rename; the old folder stays until the swap worked, so a place is never half
+//!   installed;
 //! - SD card: our old files deleted, the new ones written, the record last (other mods share contents/<title>).
 //!   Every extracted file is checked against the manifest (path, size, sha256); a zip member outside the package's
-//!   files is refused.
+//!   files is refused. What a release before 2.0.0 left (the `MH4U Port` folder, places.rs legacy) goes too.
 
 use crate::i18n::{tr, trf};
 use crate::manifest::{Manifest, Package};
@@ -33,7 +34,8 @@ pub fn plan_for(place: &Place, m: &Manifest, wanted: &BTreeSet<String>, remove_a
             }
         }
     }
-    let p = plan(m, wanted, &state, remove_all);
+    let mut p = plan(m, wanted, &state, remove_all);
+    p.legacy = place.legacy(&m.mod_folder);
     (state, p)
 }
 
@@ -162,9 +164,14 @@ pub fn install(
         return Err(why.clone());
     }
     match place.layout(&m.mod_folder) {
-        Layout::ModFolder(dir) => install_folder(&dir, m, plan, zips, progress, cancel),
-        Layout::Atmosphere(root) => install_sd(place, &root, m, state, plan, zips, progress, cancel),
+        Layout::ModFolder(dir) => install_folder(&dir, m, plan, zips, progress, cancel)?,
+        Layout::Atmosphere(root) => install_sd(place, &root, m, state, plan, zips, progress, cancel)?,
     }
+    // the release before the rename, last: it stays when the install failed
+    for p in &plan.legacy {
+        remove_tree(p)?;
+    }
+    Ok(())
 }
 
 fn link_or_copy(from: &Path, to: &Path) -> Result<(), String> {
@@ -282,7 +289,7 @@ fn install_sd(
     let mut old: Vec<String> = vec![];
     if plan.replace_hand_install {
         old.extend(m.packages.iter().flat_map(|p| p.files.iter().map(|f| f.path.clone())));
-        remove_tree(&contents.join("romfs/nativeNX/mh4uport"))?;
+        remove_tree(&contents.join(crate::places::DATA_DIR))?;
         remove_tree(&stop.join("exefs_patches").join(mf))?;
     } else if let Some(r) = state.record() {
         for c in plan.changes.iter().filter(|c| !matches!(c.action, Action::Add)) {
@@ -330,7 +337,7 @@ mod tests {
             for f in &mut p.files {
                 let data = format!("{} {}", p.name, f.path).into_bytes();
                 *f = FileEntry { path: f.path.clone(), size: data.len() as u64, sha256: hex(&Sha256::digest(&data)) };
-                members.push((format!("MH4U Port/{}", f.path), data));
+                members.push((format!("MHGU Definitive Edition/{}", f.path), data));
             }
             let refs: Vec<(&str, &[u8])> = members.iter().map(|(n, d)| (n.as_str(), d.as_slice())).collect();
             let z = zipread::write(&refs);
@@ -342,7 +349,7 @@ mod tests {
     }
 
     fn tmp(tag: &str) -> PathBuf {
-        let d = std::env::temp_dir().join(format!("mh4u-apply-{tag}-{}", std::process::id()));
+        let d = std::env::temp_dir().join(format!("mhgu-de-apply-{tag}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&d);
         std::fs::create_dir_all(&d).unwrap();
         d
@@ -381,24 +388,24 @@ mod tests {
         let m = fake(&d.join("zips"));
         let place = Place { kind: PlaceKind::Folder, name: String::new(), root: d.join("mods"), custom: true };
         run(&place, &m, &d.join("zips"), &["gogmazios"], false);
-        let got = files(&d.join("mods/MH4U Port"));
+        let got = files(&d.join("mods/MHGU Definitive Edition"));
         assert!(got.contains(&"romfs/nativeNX/arc/stage/m28d/m28d.arc".to_string()), "the map came along");
-        assert!(got.contains(&"mh4uport-install.json".to_string()));
+        assert!(got.contains(&"mhgu-de-install.json".to_string()));
         assert_eq!(files(&d.join("mods")).iter().filter(|f| f.starts_with('.')).count(), 0, "no staging left");
         // swap Gogmazios for Monoblos: his map leaves with him
         let p = run(&place, &m, &d.join("zips"), &["monoblos"], false);
         assert_eq!(p.to_extract(), ["monoblos"]);
-        let got = files(&d.join("mods/MH4U Port"));
+        let got = files(&d.join("mods/MHGU Definitive Edition"));
         assert!(!got.iter().any(|f| f.contains("m28d") || f.contains("em089")));
         assert!(got.contains(&"romfs/nativeNX/arc/enemy/em007_01.arc".to_string()));
         // a deleted file is repaired
-        std::fs::remove_file(d.join("mods/MH4U Port/romfs/nativeNX/arc/enemy/em007_01.arc")).unwrap();
+        std::fs::remove_file(d.join("mods/MHGU Definitive Edition/romfs/nativeNX/arc/enemy/em007_01.arc")).unwrap();
         let p = run(&place, &m, &d.join("zips"), &["monoblos"], false);
         assert_eq!(p.changes[0].action, Action::Update { from: "1.0.0".into() });
-        assert!(d.join("mods/MH4U Port/romfs/nativeNX/arc/enemy/em007_01.arc").is_file());
+        assert!(d.join("mods/MHGU Definitive Edition/romfs/nativeNX/arc/enemy/em007_01.arc").is_file());
         assert!(plan_for(&place, &m, &set(&["monoblos"]), false).1.is_empty());
         run(&place, &m, &d.join("zips"), &[], true);
-        assert!(!d.join("mods/MH4U Port").exists());
+        assert!(!d.join("mods/MHGU Definitive Edition").exists());
         std::fs::remove_dir_all(&d).unwrap();
     }
 
@@ -407,12 +414,45 @@ mod tests {
         let d = tmp("hand");
         let m = fake(&d.join("zips"));
         let place = Place { kind: PlaceKind::Folder, name: String::new(), root: d.join("mods"), custom: true };
-        std::fs::create_dir_all(d.join("mods/MH4U Port/romfs/old")).unwrap();
-        std::fs::write(d.join("mods/MH4U Port/romfs/old/leftover.arc"), "x").unwrap();
+        std::fs::create_dir_all(d.join("mods/MHGU Definitive Edition/romfs/old")).unwrap();
+        std::fs::write(d.join("mods/MHGU Definitive Edition/romfs/old/leftover.arc"), "x").unwrap();
         let p = run(&place, &m, &d.join("zips"), &["monoblos"], false);
         assert!(p.replace_hand_install);
-        assert!(!d.join("mods/MH4U Port/romfs/old").exists());
-        assert!(matches!(record::read(&place, "MH4U Port"), State::Recorded(_)));
+        assert!(!d.join("mods/MHGU Definitive Edition/romfs/old").exists());
+        assert!(matches!(record::read(&place, "MHGU Definitive Edition"), State::Recorded(_)));
+        std::fs::remove_dir_all(&d).unwrap();
+    }
+
+    #[test]
+    fn the_folder_of_a_release_before_the_rename_goes() {
+        let d = tmp("legacy");
+        let m = fake(&d.join("zips"));
+        let place = Place { kind: PlaceKind::Folder, name: String::new(), root: d.join("mods"), custom: true };
+        std::fs::create_dir_all(d.join("mods/MH4U Port/exefs")).unwrap();
+        std::fs::write(d.join("mods/MH4U Port/exefs/subsdk1"), "v1.9.0").unwrap();
+        let p = run(&place, &m, &d.join("zips"), &["monoblos"], false);
+        assert!(p.replace_hand_install && p.legacy == [d.join("mods/MH4U Port")]);
+        assert!(!d.join("mods/MH4U Port").exists(), "the old folder is gone");
+        assert!(matches!(record::read(&place, "MHGU Definitive Edition"), State::Recorded(_)));
+        assert!(plan_for(&place, &m, &set(&["monoblos"]), false).1.is_empty());
+        // one extracted by hand again later, beside a recorded install: the next install removes it
+        std::fs::create_dir_all(d.join("mods/MH4U Port/exefs")).unwrap();
+        let (_, p) = plan_for(&place, &m, &set(&["monoblos"]), false);
+        assert!(!p.is_empty() && p.changes.is_empty() && !p.replace_hand_install);
+        run(&place, &m, &d.join("zips"), &["monoblos"], false);
+        assert!(!d.join("mods/MH4U Port").exists());
+        // an SD card: the old data and IPS folders go, the exefs files are replaced
+        let sd = Place { kind: PlaceKind::SdCard, name: String::new(), root: d.join("sd"), custom: true };
+        let a = d.join("sd/atmosphere");
+        for f in ["contents/0100770008DD8000/romfs/nativeNX/mh4uport/monoblos.bin", "exefs_patches/MH4U Port/FB08.ips"]
+        {
+            std::fs::create_dir_all(a.join(f).parent().unwrap()).unwrap();
+            std::fs::write(a.join(f), "v1.9.0").unwrap();
+        }
+        run(&sd, &m, &d.join("zips"), &["monoblos"], false);
+        assert!(!a.join("contents/0100770008DD8000/romfs/nativeNX/mh4uport").exists());
+        assert!(!a.join("exefs_patches/MH4U Port").exists());
+        assert!(a.join("exefs_patches/MHGU Definitive Edition/FB08.ips").is_file());
         std::fs::remove_dir_all(&d).unwrap();
     }
 
@@ -426,7 +466,7 @@ mod tests {
         std::fs::write(&other, "theirs").unwrap();
         run(&place, &m, &d.join("zips"), &["gogmazios"], false);
         let a = d.join("sd/atmosphere");
-        assert!(a.join("exefs_patches/MH4U Port/FB08.ips").is_file());
+        assert!(a.join("exefs_patches/MHGU Definitive Edition/FB08.ips").is_file());
         assert!(a.join("contents/0100770008DD8000/exefs/subsdk1").is_file());
         assert!(a.join("contents/0100770008DD8000/romfs/nativeNX/arc/stage/m28d/m28d.arc").is_file());
         run(&place, &m, &d.join("zips"), &[], true);
@@ -442,14 +482,20 @@ mod tests {
         let m = fake(&d.join("zips"));
         let place = Place { kind: PlaceKind::Folder, name: String::new(), root: d.join("mods"), custom: true };
         // a member the manifest does not list (a path that would escape is never listed: manifest.rs safe_path)
-        let z = zipread::write(&[("MH4U Port/romfs/x.arc", b"x"), ("MH4U Port/../../escape", b"x")]);
+        let z = zipread::write(&[
+            ("MHGU Definitive Edition/romfs/x.arc", b"x"),
+            ("MHGU Definitive Edition/../../escape", b"x"),
+        ]);
         std::fs::write(d.join("zips/monoblos-1.0.0.zip"), z).unwrap();
         let (state, p) = plan_for(&place, &m, &set(&["monoblos"]), false);
         let zips: HashMap<String, PathBuf> =
             m.packages.iter().map(|p| (p.name.clone(), d.join("zips").join(&p.zip))).collect();
         let e = install(&place, &m, &state, &p, &zips, &|_, _, _| {}, &AtomicBool::new(false)).unwrap_err();
         assert!(e.contains("does not list"), "{e}");
-        assert!(!d.join("mods/MH4U Port").exists() && !d.join("escape").exists(), "nothing installed, nothing escaped");
+        assert!(
+            !d.join("mods/MHGU Definitive Edition").exists() && !d.join("escape").exists(),
+            "nothing installed, nothing escaped"
+        );
         assert!(files(&d.join("mods")).is_empty(), "no staging left");
         std::fs::remove_dir_all(&d).unwrap();
     }

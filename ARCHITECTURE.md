@@ -1,7 +1,8 @@
 # Architecture
 
-MH4U Port adds Monster Hunter 4 Ultimate monsters (with their quests, armor, weapons and skills) to Monster Hunter
-Generations Ultimate (Switch, v1.4). Everything is **added**; no GU monster, quest or item is replaced.
+MHGU Definitive Edition (MH4U Port before 2.0.0) adds Monster Hunter 4 Ultimate monsters (with their quests, armor,
+weapons and skills) to Monster Hunter Generations Ultimate (Switch, v1.4). Everything is **added**; no GU monster,
+quest or item is replaced.
 Ported so far: Gogmazios, Dalamadur / Shah Dalamadur, Tigerstripe Zamtrios, Stygian Zinogre. In progress: the
 Magnet Spike weapon class from MHF-ZZ.
 
@@ -13,13 +14,13 @@ New contributor? Start with `CONTRIBUTING.md` (setup, quick start, workflow), th
 
 ## How it runs in the game
 
-A release is one mod folder, `MH4U Port/`, loaded by the emulator (Ryujinx) or Atmosphere:
+A release is one mod folder, `MHGU Definitive Edition/`, loaded by the emulator (Ryujinx) or Atmosphere:
 
 | Path in the mod | Built from | Role |
 |---|---|---|
 | `exefs/subsdk1` | `module/` (C) + each monster's `module/` | Code injected into GU: hooks and the ported monster classes |
 | `exefs/<build id>.ips` | `module/build.py` | Patch to GU's `main` that branches into the hooks (trampolines) |
-| `romfs/nativeNX/mh4uport/<name>.bin` | `monsters/<name>/gen/` (`tools/portdata.py`) | Per-monster data file read by the code at run time |
+| `romfs/nativeNX/mhgu_de/<name>.bin` | `monsters/<name>/gen/` (`tools/portdata.py`) | Per-monster data file read by the code at run time |
 | `romfs/nativeNX/...` (arcs, textures, sounds) | `monsters/<name>/romfs/`, `maps/<map>/romfs/` | Converted 4U assets (layeredFS) |
 
 Release = `core-<v>.zip` (exefs + data files) + one optional zip per monster (its assets) + one per map (a ported
@@ -86,12 +87,13 @@ maps/<map>/           One ported arena each: battlequarters (m28), speartip_crag
 weapons/magnet_spike/ WIP: MHF-ZZ weapon class on GU's weapon class slot 5 (tools/, gen/, romfs/)
 requirements.txt      Python packages (one .venv for every tool)
 migrations.toml       save migration steps for the installer (empty: shipped IDs never move)
-installer/            MH4U Port Installer (Rust + Slint): core/ (releases, places, planner, install, saves),
-                      gui/, vendor/mhgu-save (MHGU_Editor's save parser), tests/, packaging/ (notes/installer.md)
+installer/            MHGU Definitive Edition Installer (Rust + Slint): core/ (releases, places, planner, install,
+                      saves), gui/, vendor/mhgu-save (MHGU_Editor's save parser), tests/, packaging/
+                      (notes/installer.md)
 notes/                Project docs: porting-guide (start here), port, api-map, data, enemy-class,
                       registry, gear-weapons, items-append, assets, installer, release-news
 .github/workflows/    ci.yml (checks without game data), installer.yml (installer tests; builds and a draft
-                      release on installer-v* tags). A mod release cannot be built in CI: it needs ~15 GB of dumps
+                      release on v* tags). A mod release cannot be built in CI: it needs ~15 GB of dumps
 ```
 
 ### Local only (gitignored)

@@ -1,6 +1,6 @@
 [package]
-name = "mh4uport-core"
-description = "MH4U Port Installer without its window: releases, manifest, install places, planner, install, self-update"
+name = "mhgu-de-core"
+description = "MHGU Definitive Edition Installer without its window: releases, manifest, install places, planner, install, self-update"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -19,5 +19,5 @@ mhgu-save = { path = "../vendor/mhgu-save" }
 
 [[bin]]
 # the command-line installer: tests (installer/tests/cli_test.py) and scripts
-name = "mh4uport-cli"
+name = "mhgu-de-cli"
 path = "src/bin/cli.rs"

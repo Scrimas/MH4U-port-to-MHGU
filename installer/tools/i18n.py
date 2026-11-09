@@ -7,14 +7,14 @@ tools/i18n.py). Pure stdlib plus GNU gettext (msginit, msgmerge, msgattrib, msgf
                                             much of each catalog is translated
 
 Strings come from installer/gui/ui/**.slint (@tr("text")) and installer/{gui,core}/src/**.rs (tr("text"),
-trf("text", ...)). Writes installer/gui/lang/mh4uport-installer.pot and gui/lang/<code>/LC_MESSAGES/mh4uport-installer.po
+trf("text", ...)). Writes installer/gui/lang/mhgu-de-installer.pot and gui/lang/<code>/LC_MESSAGES/mhgu-de-installer.po
 (the codes of gui/src/i18n.rs LANGS). A new catalog starts empty; an entry left untranslated shows in English.
 """
 import os, re, subprocess, sys, tempfile
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 LANG = os.path.join(ROOT, 'gui', 'lang')
-DOMAIN = 'mh4uport-installer'
+DOMAIN = 'mhgu-de-installer'
 POT = os.path.join(LANG, DOMAIN + '.pot')
 PLURALS = {
     'fr': 'nplurals=2; plural=(n > 1);',
@@ -80,7 +80,7 @@ def po_str(s):
 
 
 def template(entries):
-    out = ['# Strings of the MH4U Port Installer, extracted by installer/tools/i18n.py.',
+    out = ['# Strings of the MHGU Definitive Edition Installer, extracted by installer/tools/i18n.py.',
            'msgid ""', 'msgstr ""',
            '"Project-Id-Version: %s\\n"' % DOMAIN,
            '"PO-Revision-Date: 2026-11-09 00:00+0000\\n"',

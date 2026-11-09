@@ -9,7 +9,7 @@ body:
     id: versions
     attributes:
       label: Release and zips installed
-      description: Every zip in your MH4U Port folder. Take zips from only one release (do not mix zips taken from different releases).
+      description: Every zip in your MHGU Definitive Edition folder. Take zips from only one release (do not mix zips taken from different releases).
       placeholder: "core-1.7.1, gogmazios-1.1.4, dalamadur-1.0.3"
     validations:
       required: true

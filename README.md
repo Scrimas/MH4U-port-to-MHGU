@@ -1,6 +1,6 @@
-<h1 align="center" style="text-align: center">MH4U Port</h1>
+<h1 align="center" style="text-align: center">MHGU Definitive Edition</h1>
 <p align="center" style="text-align: center"><b>Monster Hunter 4 Ultimate monsters in Monster Hunter Generations Ultimate (Switch, v1.4)</b></p>
-<p align="center" style="text-align: center"><a href="../../releases/latest"><img src="https://img.shields.io/github/v/release/Scrimas/MH4U-port-to-MHGU?label=release" alt="Release"></a> <a href="../../releases"><img src="https://img.shields.io/github/downloads/Scrimas/MH4U-port-to-MHGU/total" alt="Downloads"></a> <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue" alt="License: GPL-3.0-or-later"></a> <img src="https://img.shields.io/badge/MHGU-Switch%20v1.4-c0392b" alt="MHGU v1.4"> <img src="https://img.shields.io/badge/runs%20on-Ryujinx%20%7C%20yuzu%20%7C%20Eden-555" alt="Runs on Ryujinx, yuzu, Eden"></p>
+<p align="center" style="text-align: center"><a href="../../releases/latest"><img src="https://img.shields.io/github/v/release/Scrimas/MHGU-Definitive-Edition?label=installer" alt="Installer"></a> <a href="https://github.com/Scrimas/MHGU-Definitive-Edition-Packages/releases/latest"><img src="https://img.shields.io/github/v/release/Scrimas/MHGU-Definitive-Edition-Packages?label=release" alt="Release"></a> <a href="https://github.com/Scrimas/MHGU-Definitive-Edition-Packages/releases"><img src="https://img.shields.io/github/downloads/Scrimas/MHGU-Definitive-Edition-Packages/total" alt="Downloads"></a> <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue" alt="License: GPL-3.0-or-later"></a> <img src="https://img.shields.io/badge/MHGU-Switch%20v1.4-c0392b" alt="MHGU v1.4"> <img src="https://img.shields.io/badge/runs%20on-Ryujinx%20%7C%20yuzu%20%7C%20Eden-555" alt="Runs on Ryujinx, yuzu, Eden"></p>
 <p align="center" style="text-align: center"><a href="#monsters-and-quests"><img src=".github/icons/Gogmazios.png" width="72" alt="Gogmazios" title="Gogmazios"></a> <a href="#monsters-and-quests"><img src=".github/icons/Dalamadur.png" width="72" alt="Dalamadur" title="Dalamadur"></a> <a href="#monsters-and-quests"><img src=".github/icons/Dalamadur_Tail.png" width="72" alt="Dalamadur (tail)" title="Dalamadur (tail)"></a> <a href="#monsters-and-quests"><img src=".github/icons/Shah_Dalamadur.png" width="72" alt="Shah Dalamadur" title="Shah Dalamadur"></a> <a href="#monsters-and-quests"><img src=".github/icons/Shah_Dalamadur_Tail.png" width="72" alt="Shah Dalamadur (tail)" title="Shah Dalamadur (tail)"></a> <a href="#monsters-and-quests"><img src=".github/icons/Tigerstripe_Zamtrios.png" width="72" alt="Tigerstripe Zamtrios" title="Tigerstripe Zamtrios"></a> <a href="#monsters-and-quests"><img src=".github/icons/Stygian_Zinogre.png" width="72" alt="Stygian Zinogre" title="Stygian Zinogre"></a> <a href="#monsters-and-quests"><img src=".github/icons/Black_Gravios.png" width="72" alt="Black Gravios" title="Black Gravios"></a> <a href="#monsters-and-quests"><img src=".github/icons/Monoblos.png" width="72" alt="Monoblos" title="Monoblos"></a></p>
 <p align="center" style="text-align: center"><a href="#monsters-and-quests">Monsters</a> · <a href="#install">Install</a> · <a href="#how-it-works">How it works</a> · <a href="#contributing">Contributing</a> · <a href="#roadmap">Roadmap</a></p>
 
@@ -47,25 +47,28 @@ monster's MH4U rank falls among MHGU's quests of the same species.
 
 ## Install
 
-**With the installer** (Windows, Linux): download the latest *MH4U Port Installer* from the
-[Releases](../../releases?q=installer) page (`.exe` for Windows, `.AppImage` for Linux) and run it. Tick where to
+**With the installer** (Windows, Linux): download the latest *MHGU Definitive Edition Installer* from the
+[Releases](../../releases/latest) page (`.exe` for Windows, `.AppImage` for Linux) and run it. Tick where to
 install (Ryujinx, yuzu / Eden and their forks, an Atmosphère SD card, any folder) and the monsters you want: it
 downloads them with the arenas they need, updates them to new releases, removes them, and keeps your saves in step
 (a backup of every save first).
 
 **By hand:**
 
-1. Download every zip you want from **one** release on the [Releases](../../releases) page: `core`, the monsters,
-   and the maps (`map-...`) they need (the release text lists them).
+1. Download every zip you want from **one** release of
+   [MHGU-Definitive-Edition-Packages](https://github.com/Scrimas/MHGU-Definitive-Edition-Packages/releases/latest):
+   `core`, the monsters, and the maps (`map-...`) they need (the release text lists them).
 2. Open the game's mod folder:
    - Ryujinx: right-click MHGU > *Open Mods Directory*
    - Yuzu / Eden: right-click MHGU > *Open Mod Data Location*
-3. Extract `core` (always needed), then the monsters and their maps. They all merge into one single `MH4U Port`
-   folder.
+3. Extract `core` (always needed), then the monsters and their maps. They all merge into one single
+   `MHGU Definitive Edition` folder.
 
 > [!WARNING]
-> - **Never mix zips from different releases.** A release is one matched set. To update, delete `MH4U Port` and
->   extract the new set.
+> - **Never mix zips from different releases.** A release is one matched set. To update, delete
+>   `MHGU Definitive Edition` and extract the new set.
+> - **Coming from MH4U Port** (the mod's name before 2.0.0)? Delete its `MH4U Port` folder, or the game loads the mod
+>   twice. The installer does it for you.
 > - **Unequip a monster's armor and weapons before removing that monster**, otherwise the game will crash.
 > - **Online:** everyone in the lobby needs the same release and the same monsters.
 
@@ -146,9 +149,9 @@ Subject to change, not ordered
 ## Credits
 
 - [@jM5557](https://github.com/jM5557), for adding support to Yuzu, Eden and other Yuzu-based emulators
-- [@Rukasu1609](https://github.com/Rukasu1609), for the Black Gravios ([PR #12](https://github.com/Scrimas/MH4U-port-to-MHGU/pull/12)),
-  Monoblos ([PR #17](https://github.com/Scrimas/MH4U-port-to-MHGU/pull/17)), Tidal Najarala and Shrouded Nerscylla
-  ([PR #23](https://github.com/Scrimas/MH4U-port-to-MHGU/pull/23)) ports
+- [@Rukasu1609](https://github.com/Rukasu1609), for the Black Gravios ([PR #12](https://github.com/Scrimas/MHGU-Definitive-Edition/pull/12)),
+  Monoblos ([PR #17](https://github.com/Scrimas/MHGU-Definitive-Edition/pull/17)), Tidal Najarala and Shrouded Nerscylla
+  ([PR #23](https://github.com/Scrimas/MHGU-Definitive-Edition/pull/23)) ports
 
 ## License
 

@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=MH4U Port Installer
-Comment=Install the MH4U Port mod for Monster Hunter Generations Ultimate
-Exec=mh4uport-installer
-Icon=mh4uport-installer
-Categories=Game;Utility;
-Terminal=false

@@ -1,25 +1,26 @@
-//! mh4uport-cli: the installer without its window (installer/tests/cli_test.py, scripts).
+//! mhgu-de-cli: the installer without its window (installer/tests/cli_test.py, scripts).
 //!
-//!   mh4uport-cli places                                   the install places found, with what each holds
-//!   mh4uport-cli releases [--pre]                         the mod releases this installer can install
-//!   mh4uport-cli install --place KIND:PATH ... [--monsters a,b | all | none] [--pre] [--replace] [--yes]
-//!                        [--clean unequip | worn | all | none] [--anyway]
-//!   mh4uport-cli remove --place KIND:PATH ... [--yes]     the mod leaves those places (core included)
+//!   mhgu-de-cli places                                   the install places found, with what each holds
+//!   mhgu-de-cli releases [--pre]                         the mod releases this installer can install
+//!   mhgu-de-cli install --place KIND:PATH ... [--monsters a,b | all | none] [--pre] [--replace] [--yes]
+//!                       [--clean unequip | worn | all | none] [--anyway]
+//!   mhgu-de-cli remove --place KIND:PATH ... [--yes]     the mod leaves those places (core included)
 //!
 //! KIND: ryujinx, yuzu, recomp, sdcard, folder (PATH = that place's root, places.rs). --monsters default: what the
-//! places hold, else all. A hand-extracted install is replaced only with --replace (exit 3 otherwise). The places'
-//! saves get the release's migrations, and the gear of removed monsters is cleaned (--clean, default unequip:
-//! saves.rs), after a backup ($MH4UPORT_BACKUPS); a save that cannot be migrated stops the install unless --anyway
-//! (exit 4). Releases come from GitHub, or from $MH4UPORT_RELEASES (a folder with releases.json, source.rs);
-//! downloads are cached in $MH4UPORT_CACHE. Exit 0 done, 1 error, 2 usage, 3 needs --replace, 4 needs --anyway.
+//! places hold, else all. A hand-extracted install (or the mod's folder from before 2.0.0, `MH4U Port`) is replaced
+//! only with --replace (exit 3 otherwise). The places' saves get the release's migrations, and the gear of removed
+//! monsters is cleaned (--clean, default unequip: saves.rs), after a backup ($MHGU_DE_BACKUPS); a save that cannot be
+//! migrated stops the install unless --anyway (exit 4). Releases come from GitHub, or from $MHGU_DE_RELEASES (a folder
+//! with releases.json, source.rs); downloads are cached in $MHGU_DE_CACHE. Exit 0 done, 1 error, 2 usage, 3 needs
+//! --replace, 4 needs --anyway.
 
-use mh4uport_core::apply;
-use mh4uport_core::manifest::Manifest;
-use mh4uport_core::places::{self, Kind, Place};
-use mh4uport_core::plan::{Action, initial_wanted};
-use mh4uport_core::record::State;
-use mh4uport_core::saves::{self, Clean, Need, Owned};
-use mh4uport_core::source::{Source, mod_releases};
+use mhgu_de_core::apply;
+use mhgu_de_core::manifest::Manifest;
+use mhgu_de_core::places::{self, Kind, Place};
+use mhgu_de_core::plan::{Action, initial_wanted};
+use mhgu_de_core::record::State;
+use mhgu_de_core::saves::{self, Clean, Need, Owned};
+use mhgu_de_core::source::{Source, mod_releases};
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::process::exit;
@@ -31,7 +32,7 @@ fn usage() -> ! {
         include_str!("cli.rs")
             .lines()
             .skip(2)
-            .take(12)
+            .take(13)
             .map(|l| l.trim_start_matches("//!").trim_start_matches(' '))
             .collect::<Vec<_>>()
             .join("\n")
@@ -56,7 +57,7 @@ fn main() {
             }
         }
         Some("releases") => {
-            let all = Source::from_env().releases().unwrap_or_else(|e| fail(e));
+            let all = Source::mods().releases().unwrap_or_else(|e| fail(e));
             for r in mod_releases(&all, pre) {
                 println!("{}\t{}\t{}", r.tag, if r.prerelease { "pre-release" } else { "release" }, r.day());
             }
@@ -73,13 +74,13 @@ fn main() {
             if places.is_empty() {
                 usage();
             }
-            let src = Source::from_env();
+            let src = Source::mods();
             let all = src.releases().unwrap_or_else(|e| fail(e));
             let rel =
                 mod_releases(&all, pre).into_iter().next().unwrap_or_else(|| fail("no release to install".into()));
             let ma = rel.asset("manifest.json").unwrap();
             let m = Manifest::parse(&src.bytes(ma).unwrap_or_else(|e| fail(e))).unwrap_or_else(|e| fail(e));
-            let states: Vec<State> = places.iter().map(|p| mh4uport_core::record::read(p, &m.mod_folder)).collect();
+            let states: Vec<State> = places.iter().map(|p| mhgu_de_core::record::read(p, &m.mod_folder)).collect();
             let wanted: BTreeSet<String> = match values("--monsters").first().map(String::as_str) {
                 Some("all") => m.monsters().map(|p| p.name.clone()).collect(),
                 Some("none") => BTreeSet::new(),
@@ -96,6 +97,9 @@ fn main() {
                 println!("{} ({}): {}", p.name, p.root.display(), if plan.is_empty() { "up to date" } else { "" });
                 if let State::Unreadable(why) = state {
                     fail(why.clone());
+                }
+                for old in &plan.legacy {
+                    println!("  remove {} (the mod from before 2.0.0)", old.display());
                 }
                 if plan.replace_hand_install {
                     println!("  replace the hand-extracted install");
@@ -132,7 +136,7 @@ fn main() {
             let mut blocked = 0;
             for (p, (_, plan)) in places.iter().zip(&plans) {
                 let mut leaving = Owned::default();
-                for c in plan.removals().filter(|c| c.kind == mh4uport_core::manifest::Kind::Monster) {
+                for c in plan.removals().filter(|c| c.kind == mhgu_de_core::manifest::Kind::Monster) {
                     leaving.add(&saves::owned(&m, &c.package));
                 }
                 let held = std::collections::BTreeMap::from([("leaving".to_string(), leaving.clone())]);
@@ -166,7 +170,7 @@ fn main() {
             let need: Vec<String> =
                 plans.iter().flat_map(|(_, p)| p.to_extract()).collect::<BTreeSet<_>>().into_iter().collect();
             let cancel = AtomicBool::new(false);
-            let cache = mh4uport_core::settings::cache_dir();
+            let cache = mhgu_de_core::settings::cache_dir();
             let zips = apply::fetch(&src, &rel, &m, &need, &cache, &|_, _, _| {}, &cancel).unwrap_or_else(|e| fail(e));
             for (p, (state, plan)) in places.iter().zip(&plans) {
                 if !plan.is_empty() {

@@ -1,5 +1,5 @@
 //! Interface languages, MHGU_Editor's set. The .slint files' @tr() strings and the Rust side's tr() (core and gui)
-//! share one gettext catalog per language, gui/lang/<code>/LC_MESSAGES/mh4uport-installer.po (installer/tools/i18n.py
+//! share one gettext catalog per language, gui/lang/<code>/LC_MESSAGES/mhgu-de-installer.po (installer/tools/i18n.py
 //! keeps them in step): Slint bundles them at build time, the Rust side parses them here. English is the source text;
 //! an entry left untranslated shows in English.
 
@@ -19,7 +19,7 @@ pub const LANGS: [(&str, &str); 7] = [
 
 macro_rules! po {
     ($c:literal) => {
-        include_str!(concat!("../lang/", $c, "/LC_MESSAGES/mh4uport-installer.po"))
+        include_str!(concat!("../lang/", $c, "/LC_MESSAGES/mhgu-de-installer.po"))
     };
 }
 
@@ -101,7 +101,7 @@ pub fn system() -> usize {
 
 /// Use language `i` of LANGS for both the window and the Rust strings.
 pub fn set(i: usize) {
-    mh4uport_core::i18n::set_lookup(lookup);
+    mhgu_de_core::i18n::set_lookup(lookup);
     let i = i.min(LANGS.len() - 1);
     if let Ok(mut c) = CATALOG.write() {
         *c = Some(parse(PO[i]));

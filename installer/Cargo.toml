@@ -3,7 +3,7 @@ members = ["core", "gui"]
 resolver = "3"
 
 [workspace.package]
-version = "1.0.0"
+version = "2.0.0"
 edition = "2024"
 # GPL v3 or later like the rest of the repo (LICENSE). Slint is used under its Royalty-free 2.0 licence, which
 # requires the AboutSlint widget in the About dialog.

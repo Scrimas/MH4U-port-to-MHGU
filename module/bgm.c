@@ -36,7 +36,7 @@ static uint32_t s_count;
 void port_bgm_register(const struct port_bgm *b)
 {
     for (uint32_t i = 0; i < s_count; i++) if (s_bgm[i].b == b) return;
-    if (s_count >= BGM_MAX) { logf("mh4uport: bgm: no room for %s", b->name); return; }
+    if (s_count >= BGM_MAX) { logf("mhgu-de: bgm: no room for %s", b->name); return; }
     s_bgm[s_count++].b = b;
 }
 

@@ -32,6 +32,8 @@ pub struct Change {
 pub struct PlacePlan {
     /// Mod files without a record are removed first, then everything is installed fresh.
     pub replace_hand_install: bool,
+    /// What a release before 2.0.0 left (places.rs legacy), removed with the install (apply.rs plan_for fills it).
+    pub legacy: Vec<std::path::PathBuf>,
     pub changes: Vec<Change>,
     /// The packages the place holds afterwards (the record's), in install order.
     pub keep: Vec<String>,
@@ -43,7 +45,10 @@ pub struct PlacePlan {
 impl PlacePlan {
     /// Nothing to do: no change and the record already names this release.
     pub fn is_empty(&self) -> bool {
-        self.changes.is_empty() && !self.replace_hand_install && self.from_release == self.to_release
+        self.changes.is_empty()
+            && !self.replace_hand_install
+            && self.legacy.is_empty()
+            && self.from_release == self.to_release
     }
 
     pub fn download_size(&self) -> u64 {
@@ -124,7 +129,7 @@ pub fn plan(m: &Manifest, wanted: &BTreeSet<String>, state: &State, remove_all: 
         }
     };
     let to = if keep.is_empty() { String::new() } else { m.release.clone() };
-    PlacePlan { replace_hand_install: replace, changes, keep, from_release: from, to_release: to }
+    PlacePlan { replace_hand_install: replace, legacy: vec![], changes, keep, from_release: from, to_release: to }
 }
 
 /// The monsters to show switched on: those the ticked places hold (any of them), else every monster of the release.

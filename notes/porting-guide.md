@@ -13,7 +13,7 @@ Mark every fact you write down as C (confirmed in code or data), S (strong) or G
 | `notes/` | core notes (this guide, registry, enemy-class, port, api-map, assets, data, gear-weapons, installer) |
 | `monsters/<name>/` | one monster: `module/` (its C code, compiled into the core module), `tools/`, `notes/`, `package.toml` (version, C prefix), `build.py` (every generator, in order) |
 | `monsters/<name>/gen/`, `romfs/` | gitignored game data: its data file `<name>.bin` (+ the `.sec` sections) and its converted RomFS (= its assets) |
-| `maps/<map>/` | one map package (since 2026-11, core 1.10.0): a ported 4U arena (stage arcs, map UI, map_com, area streams) with its `package.toml` (`kind = "map"`, `folder`, `[stage]`), `build.py`, `tools/`, `notes/`; `romfs/` is gitignored. Monsters name it in their `package.toml` `requires` |
+| `maps/<map>/` | one map package (since 2026-11, core 2.0.0): a ported 4U arena (stage arcs, map UI, map_com, area streams) with its `package.toml` (`kind = "map"`, `folder`, `[stage]`), `build.py`, `tools/`, `notes/`; `romfs/` is gitignored. Monsters name it in their `package.toml` `requires` |
 | `dump/scratch/<monster>-session/` | gitignored local archive of a session scratchpad (the one-off RE / check scripts and outputs notes call "scratchpad"); copy yours there before a reboot wipes /tmp |
 
 Gogmazios files named below as `tools/*_em089.py`, `tools/build_gog_quest.py`, `tools/gogreport.py`,
@@ -102,7 +102,7 @@ pairs where possible (tools/dt_vote.py, dt_map.py, snd4u2gu.py selftest), then a
    (the monster name is a NAME section applied to the loaded monsterName GMD).
 4. **Content** (Phase 5b): the monster's save slot, materials, carves / rewards, armor, weapons, skill and
    decorations, Hunter's Notes entry and quests. The tools write them into the data file
-   (`nativeNX/mh4uport/<name>.bin`, tools/portdata.py: sections ITEM, BUI, TBLA, TXTA, NOTE, NAME, SKIL, PWLF, FILE);
+   (`nativeNX/mhgu_de/<name>.bin`, tools/portdata.py: sections ITEM, BUI, TBLA, TXTA, NOTE, NAME, SKIL, PWLF, FILE);
    the core patches the loaded tables (module/items.c, gear.c, notes.c), never ships resident arcs: UI mods
    replace resident.arc / resident_<lang>.arc (the
    maintainer's HD UI v4 does), and shipping blacksmith.arc from the v1.0 RomFS could undo update changes.
@@ -390,10 +390,10 @@ testable alone (the maintainer checks the smithy or one quest).
 2. Install only on the maintainer's go:
    `GOG_DEFINES=... GOG_MOD_ROOT=$HOME/.config/Ryujinx/mods python3 module/build.py install` (exefs + every data
    file + the assets of PORT_ASSETS = comma-separated names, default all, `none` = none) into the mod folder
-   "MH4U Port".
+   "MHGU Definitive Edition".
 3. The maintainer plays and closes. Read the log with `python3 monsters/gogmazios/tools/gogreport.py` (extend it for the
-   new monster's lines; core lines start with `mh4uport:`) and ask only about visuals.
-4. Uninstall: `rm -rf ~/.config/Ryujinx/mods/contents/0100770008dd8000/"MH4U Port"`.
+   new monster's lines; core lines start with `mhgu-de:`) and ask only about visuals.
+4. Uninstall: `rm -rf ~/.config/Ryujinx/mods/contents/0100770008dd8000/"MHGU Definitive Edition"`.
 Automated smoke runs without the maintainer: tools/ryutest.sh. `build.py install` without GOG_MOD_ROOT installs into the
 isolated ryuroot/; `ryutest.sh gui` boots it windowed on hidden workspace 10 (headless `run` aborts ~1.5 s in) and
 its log (written to ~/.config/Ryujinx/Logs) shows the boot-time table patches (items, armor / skill / weapon /

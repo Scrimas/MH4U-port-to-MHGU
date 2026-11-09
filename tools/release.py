@@ -1,5 +1,6 @@
-"""release.py : build, check and package an MH4U Port release on the machine that holds the game dumps (a release can
-never be built in hosted CI: the converters read ~15 GB of 4U / GU data and the module build reads GU's main).
+"""release.py : build, check and package an MHGU Definitive Edition release on the machine that holds the game dumps (a
+release can never be built in hosted CI: the converters read ~15 GB of 4U / GU data and the module build reads GU's
+main).
 
   release.py build           every monster's build.py (all steps), then the module, both without test switches
   release.py check           release checks on the current outputs (exit 1 on any failure)
@@ -7,23 +8,26 @@ never be built in hosted CI: the converters read ~15 GB of 4U / GU data and the 
                              check, then the zips, icons-<release>.zip, manifest.json + NOTES.md into DIR (default
                              dump/release/v<release>); --pre N: pre-release <core version>-pre.N
   release.py all [DIR] [--pre N]   build + package
-  release.py publish DIR --repo OWNER/NAME [--yes] [--draft]
-                             create the GitHub release v<release> (manifest.json: a pre-release is published as one,
-                             a release is marked Latest) with DIR's assets and NOTES.md as its text (gh CLI); asks
-                             first unless --yes.
+  release.py publish DIR [--repo OWNER/NAME] [--yes] [--draft]
+                             create the GitHub release v<release> on PACKAGES_REPO (default; manifest.json: a
+                             pre-release is published as one, a release is marked Latest) with DIR's assets and NOTES.md
+                             as its text (gh CLI); asks first unless --yes. REPO's own releases are the installer's
+                             (.github/workflows/installer.yml): a release of the mod is refused there.
 
-Packages: core-<v>.zip = MH4U Port/exefs/{subsdk1, <build id>.ips} + MH4U Port/romfs/nativeNX/mh4uport/<every
-monster>.bin (always installed together: gear IDs depend on all of them) + the icon atlases micon_sd/hd.tex and
-hudicon_sd/hd.tex; <monster>-<v>.zip = MH4U Port/romfs/... (that monster's assets, optional); map-<map>-<v>.zip = a map
-package's RomFS (maps/<map>: a ported arena, installed with the monsters that require it). Every zip extracts into the
-game's mod directory ('<mods>/contents/<title>/' for Ryujinx, '<load>/<TITLE>/' for the yuzu family) and they merge into
-the one 'MH4U Port' folder. NOTES.md (the release text): what the mod is, What's new (notes/release-news.md, one section
-per core version: write it before packaging), the monsters and their quests (read from the quest files), install /
-update / online play, files with sha256, warnings.
-manifest.json (schema 1) is what the MH4U Port Installer reads (installer/core/src/manifest.rs, notes/installer.md):
-the release, every package with its zip, size, sha256, requires and every file (path below 'MH4U Port/', size,
-sha256), the save migrations and cleaning data (empty until the installer migrates saves) and extra warnings.
-Releases before 1.10.0 have none (the installer supports 1.10.0 and later).
+Packages: core-<v>.zip = MHGU Definitive Edition/exefs/{subsdk1, <build id>.ips} + MHGU Definitive
+Edition/romfs/nativeNX/mhgu_de/<every monster>.bin (always installed together: gear IDs depend on all of them) + the
+icon atlases micon_sd/hd.tex and hudicon_sd/hd.tex; <monster>-<v>.zip = MHGU Definitive Edition/romfs/... (that
+monster's assets, optional); map-<map>-<v>.zip = a map package's RomFS (maps/<map>: a ported arena, installed with the
+monsters that require it). Every zip extracts into the game's mod directory ('<mods>/contents/<title>/' for Ryujinx,
+'<load>/<TITLE>/' for the yuzu family) and they merge into the one 'MHGU Definitive Edition' folder. NOTES.md (the
+release text): what the mod is, What's new (notes/release-news.md, one section per core version: write it before
+packaging), the monsters and their quests (read from the quest files), install / update / online play, files with
+sha256, warnings.
+manifest.json (schema 1) is what the MHGU Definitive Edition Installer reads (installer/core/src/manifest.rs,
+notes/installer.md): the release, every package with its zip, size, sha256, requires and every file (path below 'MHGU
+Definitive Edition/', size, sha256), the save migrations and cleaning data (empty until the installer migrates saves)
+and extra warnings. The releases before 2.0.0 (MH4U Port v1.x, on REPO) have none: the installer supports 2.0.0 and
+later.
 """
 import hashlib, io, json, os, re, struct, subprocess, sys, tomllib, zipfile
 
@@ -33,10 +37,12 @@ import alloc, paths, portdata, ui_icons
 
 ROOT = paths.ROOT
 TITLE_ID = '0100770008DD8000'
-MOD_NAME = 'MH4U Port'
+MOD_NAME = 'MHGU Definitive Edition'
 MANIFEST_SCHEMA = 1        # bump on a change an older installer would misread (installer/core/src/manifest.rs)
-INSTALLER_MIN = '1.0.0'    # oldest installer that installs this release (it asks for its own update otherwise)
-REPO = 'Scrimas/MH4U-port-to-MHGU'
+INSTALLER_MIN = '2.0.0'    # oldest installer that installs this release (it asks for its own update otherwise)
+LEGACY_NAME = 'MH4U Port'  # the mod's folder before 2.0.0 (installer/core/src/places.rs LEGACY_FOLDER)
+REPO = 'Scrimas/MHGU-Definitive-Edition'                    # the code and the installer's releases
+PACKAGES_REPO = 'Scrimas/MHGU-Definitive-Edition-Packages'  # the mod's releases (installer/core/src/lib.rs)
 MODULE_OUT = os.path.join(ROOT, 'module', 'out')
 
 
@@ -164,7 +170,7 @@ def release_id(pre=None):
 
 
 def zip_files(path):
-    """[{path below 'MH4U Port/', size, sha256}] of a written zip, in zip order"""
+    """[{path below 'MHGU Definitive Edition/', size, sha256}] of a written zip, in zip order"""
     out = []
     with zipfile.ZipFile(path) as z:
         for zi in z.infolist():
@@ -293,9 +299,9 @@ def package(out, pre=None):
     rel = release_id(pre)
     members = [('exefs/subsdk1', os.path.join(MODULE_OUT, 'subsdk1')),
                ('exefs/' + build_id(), os.path.join(MODULE_OUT, build_id()))]
-    members += [('romfs/nativeNX/mh4uport/%s.bin' % m['name'], os.path.join(paths.gen(m['name']), m['name'] + '.bin'))
+    members += [('romfs/nativeNX/mhgu_de/%s.bin' % m['name'], os.path.join(paths.gen(m['name']), m['name'] + '.bin'))
                 for p in pk for m in p['entries']]
-    members += [('romfs/nativeNX/mh4uport/' + name, os.path.join(MODULE_OUT, name)) for name in ui_icons.FILES]
+    members += [('romfs/nativeNX/mhgu_de/' + name, os.path.join(MODULE_OUT, name)) for name in ui_icons.FILES]
     core_zip = 'core-%s.zip' % c['version']
     write_zip(os.path.join(out, core_zip), [(MOD_NAME + '/' + a, s) for a, s in members])
     for p in pk:
@@ -375,8 +381,8 @@ def notes(c, pk, out, rel=None, pre=None):
             need = [p['title'] for p in pk if mp['name'] in p.get('requires', [])]
             lines.append('- **%s** (`%s`): needed by %s' % (mp['title'], zip_name(mp), ', '.join(need)))
     lines += ['', '## Install',
-              '**With the installer** (Windows, Linux): download the [MH4U Port Installer]'
-              '(https://github.com/%s/releases?q=installer) and run it. Tick where to install (Ryujinx, the yuzu '
+              '**With the installer** (Windows, Linux): download the [MHGU Definitive Edition Installer]'
+              '(https://github.com/%s/releases/latest) and run it. Tick where to install (Ryujinx, the yuzu '
               'family, an SD card...) and the monsters you want: it downloads them with the maps they need, and '
               'updates or removes them later.' % REPO, '',
               '**By hand**:',
@@ -384,7 +390,8 @@ def notes(c, pk, out, rel=None, pre=None):
               'right-click MHGU > Open Mod Data Location.',
               '2. Extract **core** (always), then the monsters you want and the maps they need (`map-...` zips, '
               'above). They all merge into one `%s` folder.' % MOD_NAME,
-              '3. To update: delete `%s`, then extract the new zips.' % MOD_NAME, '',
+              '3. To update: delete `%s` (and `%s`, its name before 2.0.0), then extract the new zips.'
+              % (MOD_NAME, LEGACY_NAME), '',
               '- **Online**: everyone needs the same release and the same monsters.',
               '- **Removing a monster**: unequip its armor and weapons first (their models leave with it).', '',
               '<details><summary>Files (sha256)</summary>', '',
@@ -399,6 +406,8 @@ def notes(c, pk, out, rel=None, pre=None):
 def publish(out, repo, yes, draft):
     body, mf = os.path.join(out, 'NOTES.md'), os.path.join(out, 'manifest.json')
     assert os.path.exists(body) and os.path.exists(mf), 'package %s first' % out
+    if repo.lower() == REPO.lower():
+        sys.exit("%s's releases are the installer's: the mod's go to %s" % (REPO, PACKAGES_REPO))
     m = json.load(open(mf, encoding='utf-8'))
     tag, pre = 'v%s' % m['release'], m['prerelease']
     files = [os.path.join(out, f) for f in sorted(os.listdir(out)) if f.endswith('.zip')] + [mf]
@@ -408,9 +417,8 @@ def publish(out, repo, yes, draft):
     for f in files: print('  ', os.path.basename(f))
     if not yes and input('publish? [y/N] ').strip().lower() != 'y':
         sys.exit('not published')
-    # a pre-release never takes the Latest badge; a release takes it back from the installer's releases (installer-v*,
-    # published with --latest=false by .github/workflows/installer.yml)
-    subprocess.run(['gh', 'release', 'create', tag, '--repo', repo, '--title', 'MH4U Port %s' % tag,
+    # a pre-release never takes the Latest badge (the installer installs the Latest release, pre-releases on request)
+    subprocess.run(['gh', 'release', 'create', tag, '--repo', repo, '--title', 'MHGU Definitive Edition %s' % tag,
                     '--notes-file', body] + (['--prerelease'] if pre else ['--latest']) + (['--draft'] if draft else [])
                    + files, check=True)
 
@@ -434,10 +442,8 @@ def main():
     if a[0] in ('package', 'all'):
         package(a[1] if len(a) > 1 else default_out, pre)
     if a[0] == 'publish':
-        if '--repo' not in a:
-            sys.exit('publish needs --repo OWNER/NAME')
-        publish(a[1] if len(a) > 1 and not a[1].startswith('--') else default_out, a[a.index('--repo') + 1],
-                '--yes' in a, '--draft' in a)
+        repo = a[a.index('--repo') + 1] if '--repo' in a else PACKAGES_REPO
+        publish(a[1] if len(a) > 1 and not a[1].startswith('--') else default_out, repo, '--yes' in a, '--draft' in a)
 
 
 if __name__ == '__main__':
