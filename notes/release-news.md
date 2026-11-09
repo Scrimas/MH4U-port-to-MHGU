@@ -4,6 +4,13 @@ tools/release.py puts the section of the core version being packaged into the re
 groups, **New** (something added) and **Fixed** (what works now, not what was broken), one short plain line each,
 written for players; write the section before `release.py package`.
 
+## v1.10.0
+**New**
+- The MH4U Port Installer (Windows, Linux): it downloads the monsters you tick into Ryujinx, the yuzu family or an SD
+  card, with the maps they need, and updates or removes them.
+- The ported arenas are downloads of their own: Battlequarters (Gogmazios), Speartip Crag (Dalamadur) and Heaven's
+  Mount (Stygian Zinogre). A monster whose arena is missing stays off instead of loading a missing stage.
+
 ## v1.9.0
 **New**
 - Monoblos, ported by @Rukasu1609, with his MH4U AI and attacks, 6 quests from MH4U (High and G rank, village and

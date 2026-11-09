@@ -3,20 +3,29 @@ never be built in hosted CI: the converters read ~15 GB of 4U / GU data and the 
 
   release.py build           every monster's build.py (all steps), then the module, both without test switches
   release.py check           release checks on the current outputs (exit 1 on any failure)
-  release.py package [DIR]   check, then the zips + NOTES.md into DIR (default dump/release/v<core version>)
-  release.py all [DIR]       build + package
+  release.py package [DIR] [--pre N]
+                             check, then the zips, icons-<release>.zip, manifest.json + NOTES.md into DIR (default
+                             dump/release/v<release>); --pre N: pre-release <core version>-pre.N
+  release.py all [DIR] [--pre N]   build + package
   release.py publish DIR --repo OWNER/NAME [--yes] [--draft]
-                             create the GitHub release v<core version> with DIR's zips and NOTES.md as its text (gh
-                             CLI); asks first unless --yes. No installer apps (user, 2026-10-21): users extract the zips.
+                             create the GitHub release v<release> (manifest.json: a pre-release is published as one,
+                             a release is marked Latest) with DIR's assets and NOTES.md as its text (gh CLI); asks
+                             first unless --yes.
 
 Packages: core-<v>.zip = MH4U Port/exefs/{subsdk1, <build id>.ips} + MH4U Port/romfs/nativeNX/mh4uport/<every
-monster>.bin (always installed together: gear IDs depend on all of them) + the icon atlases micon_sd/hd.tex and hudicon_sd/hd.tex; <monster>-<v>.zip = MH4U Port/romfs/... (that
-monster's assets, optional). Every zip extracts into the game's mod directory ('<mods>/contents/<title>/' for Ryujinx,
-'<load>/<TITLE>/' for the yuzu family) and they merge into the one 'MH4U Port' folder. NOTES.md (the release text):
-what the mod is, What's new (notes/release-news.md, one section per core version: write it before packaging), the
-monsters and their quests (read from the quest files), install / update / online play, files with sha256, warnings.
+monster>.bin (always installed together: gear IDs depend on all of them) + the icon atlases micon_sd/hd.tex and
+hudicon_sd/hd.tex; <monster>-<v>.zip = MH4U Port/romfs/... (that monster's assets, optional); map-<map>-<v>.zip = a map
+package's RomFS (maps/<map>: a ported arena, installed with the monsters that require it). Every zip extracts into the
+game's mod directory ('<mods>/contents/<title>/' for Ryujinx, '<load>/<TITLE>/' for the yuzu family) and they merge into
+the one 'MH4U Port' folder. NOTES.md (the release text): what the mod is, What's new (notes/release-news.md, one section
+per core version: write it before packaging), the monsters and their quests (read from the quest files), install /
+update / online play, files with sha256, warnings.
+manifest.json (schema 1) is what the MH4U Port Installer reads (installer/core/src/manifest.rs, notes/installer.md):
+the release, every package with its zip, size, sha256, requires and every file (path below 'MH4U Port/', size,
+sha256), the save migrations and cleaning data (empty until the installer migrates saves) and extra warnings.
+Releases before 1.10.0 have none (the installer supports 1.10.0 and later).
 """
-import hashlib, os, re, struct, subprocess, sys, tomllib, zipfile
+import hashlib, io, json, os, re, struct, subprocess, sys, tomllib, zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -25,6 +34,9 @@ import alloc, paths, portdata, ui_icons
 ROOT = paths.ROOT
 TITLE_ID = '0100770008DD8000'
 MOD_NAME = 'MH4U Port'
+MANIFEST_SCHEMA = 1        # bump on a change an older installer would misread (installer/core/src/manifest.rs)
+INSTALLER_MIN = '1.0.0'    # oldest installer that installs this release (it asks for its own update otherwise)
+REPO = 'Scrimas/MH4U-port-to-MHGU'
 MODULE_OUT = os.path.join(ROOT, 'module', 'out')
 
 
@@ -143,13 +155,68 @@ def write_zip(path, members):
                 z.writestr(zi, f.read(), compresslevel=9)
 
 
-def package(out):
+def release_id(pre=None):
+    """the release (= tag without 'v'): the core version, '<core>-pre.N' for a pre-release"""
+    return core()['version'] + ('-pre.%d' % pre if pre else '')
+
+
+def zip_files(path):
+    """[{path below 'MH4U Port/', size, sha256}] of a written zip, in zip order"""
+    out = []
+    with zipfile.ZipFile(path) as z:
+        for zi in z.infolist():
+            if zi.is_dir(): continue
+            assert zi.filename.startswith(MOD_NAME + '/'), zi.filename
+            with z.open(zi) as f:
+                h = hashlib.sha256()
+                for b in iter(lambda: f.read(1 << 20), b''): h.update(b)
+            out.append(dict(path=zi.filename[len(MOD_NAME) + 1:], size=zi.file_size, sha256=h.hexdigest()))
+    return out
+
+
+def write_icons(path):
+    """icons-<release>.zip: <package>.png per monster package (tools/ui_icons.py package_icons), deterministic"""
+    from PIL import Image
+    with zipfile.ZipFile(path, 'w', zipfile.ZIP_STORED) as z:
+        for name, img in sorted(ui_icons.package_icons().items()):
+            b = io.BytesIO()
+            Image.fromarray(img, 'RGBA').save(b, 'PNG', optimize=True)
+            zi = zipfile.ZipInfo(name + '.png', date_time=(2026, 1, 1, 0, 0, 0))
+            zi.external_attr = 0o644 << 16
+            z.writestr(zi, b.getvalue())
+    with zipfile.ZipFile(path) as z:
+        return sorted(n[:-4] for n in z.namelist())
+
+
+def manifest(rel, pre, c, pk, out, icons):
+    """manifest.json of the release in out (the zips written): what the installer reads"""
+    def pkg(name, kind, title, version, zname, **more):
+        z = os.path.join(out, zname)
+        return dict(name=name, kind=kind, title=title, version=version, zip=zname, size=os.path.getsize(z),
+                    sha256=sha256(z), **more, files=zip_files(z))
+    ps = [pkg('core', 'core', 'Core', c['version'], 'core-%s.zip' % c['version'], subtitle='Needed by every monster',
+              requires=[])]
+    for p in pk:
+        more = dict(subtitle=p.get('subtitle', ''), requires=p.get('requires', []), requires_core=p['requires_core'])
+        if p.get('kind') == 'map':
+            more['folder'] = p['folder']
+        else:
+            more['entries'] = [m['name'] for m in p['entries']]
+            if p['name'] in icons: more['icon'] = p['name'] + '.png'
+        ps.append(pkg(p['name'], p.get('kind', 'monster'), p['title'], p['version'], zip_name(p), **more))
+    return dict(schema=MANIFEST_SCHEMA, release=rel, prerelease=bool(pre), installer_min=INSTALLER_MIN,
+                title_id=TITLE_ID, mod_folder=MOD_NAME, icons='icons-%s.zip' % rel, packages=ps,
+                migrations=[], cleaning={}, warnings=c.get('warnings', []))
+
+
+def package(out, pre=None):
     bad = check()
     if bad:
         sys.exit('not releasable:\n  ' + '\n  '.join(bad))
     os.makedirs(out, exist_ok=True)
     c = core()
     pk = packages()
+    rel = release_id(pre)
     members = [('exefs/subsdk1', os.path.join(MODULE_OUT, 'subsdk1')),
                ('exefs/' + build_id(), os.path.join(MODULE_OUT, build_id()))]
     members += [('romfs/nativeNX/mh4uport/%s.bin' % m['name'], os.path.join(paths.gen(m['name']), m['name'] + '.bin'))
@@ -162,8 +229,12 @@ def package(out):
         mem = [(MOD_NAME + '/romfs/' + os.path.relpath(os.path.join(d, f), rf).replace(os.sep, '/'), os.path.join(d, f))
                for d, _, fs in os.walk(rf) for f in fs]
         write_zip(os.path.join(out, zip_name(p)), mem)
-    with open(os.path.join(out, 'NOTES.md'), 'w') as f:
-        f.write(notes(c, pk, out))
+    icons = write_icons(os.path.join(out, 'icons-%s.zip' % rel))
+    with open(os.path.join(out, 'manifest.json'), 'w', encoding='utf-8') as f:
+        json.dump(manifest(rel, pre, c, pk, out, icons), f, indent=1, ensure_ascii=False)
+        f.write('\n')
+    with open(os.path.join(out, 'NOTES.md'), 'w', encoding='utf-8') as f:
+        f.write(notes(c, pk, out, rel, pre))
     for f in sorted(os.listdir(out)):
         print('%10d %s' % (os.path.getsize(os.path.join(out, f)), os.path.join(out, f)))
     return out
@@ -205,11 +276,14 @@ def quests(p):
     return out
 
 
-def notes(c, pk, out):
-    """release text: what the mod is, What's new (notes/release-news.md), the monsters and their quests, install /
-    update / online play, the files with their sha256, the warnings"""
+def notes(c, pk, out, rel=None, pre=None):
+    """release text: what the mod is, What's new (notes/release-news.md), the monsters and their quests, the maps,
+    install (the installer first) / update / online play, the files with their sha256, the warnings"""
     v = c['version']
-    lines = ['MH4U monsters in MHGU (Switch 1.4): the monsters, their arenas, music, quests and gear. '
+    rel = rel or v
+    lines = (['> **Pre-release**: a test build that may contain bugs; use it at your own discretion (the installer '
+              'offers it only when pre-releases are switched on in its Settings).', ''] if pre else []) + \
+            ['MH4U monsters in MHGU (Switch 1.4): the monsters, their arenas, music, quests and gear. '
              'Take zips from only one release (do not mix zips taken from different releases).', '',
              "## What's new"] + '\n'.join(news(v)).strip().split('\n') + ['', '## Monsters and quests',
              'On the Hub quest board (Village: on the village board):']
@@ -219,39 +293,62 @@ def notes(c, pk, out):
             mine = [(r.replace('Hub ', ''), q) for tt, r, q in qs if tt == t]
             lines.append('- **%s**: %s' % (t, ' · '.join('%s: %s' % (r, ', '.join('*%s*' % q for rr, q in mine if rr == r))
                                                           for r in dict.fromkeys(r for r, _ in mine))))
+    by = {p['name']: p for p in pk}
+    maps = [p for p in pk if p.get('kind') == 'map']
+    if maps:
+        lines += ['', '## Maps', 'The ported arenas, each a zip of its own, needed by the monsters fought there:']
+        for mp in maps:
+            need = [p['title'] for p in pk if mp['name'] in p.get('requires', [])]
+            lines.append('- **%s** (`%s`): needed by %s' % (mp['title'], zip_name(mp), ', '.join(need)))
     lines += ['', '## Install',
+              '**With the installer** (Windows, Linux): download the [MH4U Port Installer]'
+              '(https://github.com/%s/releases?q=installer) and run it. Tick where to install (Ryujinx, the yuzu '
+              'family, an SD card...) and the monsters you want: it downloads them with the maps they need, and '
+              'updates or removes them later.' % REPO, '',
+              '**By hand**:',
               '1. Open the mod folder: Ryujinx: right-click MHGU > Open Mods Directory. yuzu / Eden and others: '
               'right-click MHGU > Open Mod Data Location.',
-              '2. Extract **core** (always), then the monsters you want. They all merge into one `%s` folder.' % MOD_NAME,
+              '2. Extract **core** (always), then the monsters you want and the maps they need (`map-...` zips, '
+              'above). They all merge into one `%s` folder.' % MOD_NAME,
               '3. To update: delete `%s`, then extract the new zips.' % MOD_NAME, '',
               '- **Online**: everyone needs the same release and the same monsters.',
               '- **Removing a monster**: unequip its armor and weapons first (their models leave with it).', '',
               '<details><summary>Files (sha256)</summary>', '',
               '- core-%s.zip `%s`' % (v, sha256(os.path.join(out, 'core-%s.zip' % v)))]
-    for p in pk:
-        z = zip_name(p)
+    for z in [zip_name(p) for p in pk] + ['icons-%s.zip' % rel, 'manifest.json']:
         lines.append('- %s `%s`' % (z, sha256(os.path.join(out, z))))
     lines += ['', '</details>']
+    assert all(r in by for p in pk for r in p.get('requires', [])), 'requires a package that is not in the release'
     return '\n'.join(lines) + '\n'
 
 
 def publish(out, repo, yes, draft):
-    c = core()
-    tag = 'v%s' % c['version']
-    files = [os.path.join(out, f) for f in sorted(os.listdir(out)) if f.endswith('.zip')]
-    body = os.path.join(out, 'NOTES.md')
-    assert os.path.exists(body) and any(os.path.basename(f).startswith('core-') for f in files), 'package %s first' % out
-    print('%srelease %s on %s with %d files:' % ('draft ' if draft else '', tag, repo, len(files)))
+    body, mf = os.path.join(out, 'NOTES.md'), os.path.join(out, 'manifest.json')
+    assert os.path.exists(body) and os.path.exists(mf), 'package %s first' % out
+    m = json.load(open(mf, encoding='utf-8'))
+    tag, pre = 'v%s' % m['release'], m['prerelease']
+    files = [os.path.join(out, f) for f in sorted(os.listdir(out)) if f.endswith('.zip')] + [mf]
+    assert any(os.path.basename(f).startswith('core-') for f in files), 'package %s first' % out
+    print('%s%s %s on %s with %d files:' % ('draft ' if draft else '', 'pre-release' if pre else 'release', tag, repo,
+                                          len(files)))
     for f in files: print('  ', os.path.basename(f))
     if not yes and input('publish? [y/N] ').strip().lower() != 'y':
         sys.exit('not published')
+    # a pre-release never takes the Latest badge; a release takes it back from the installer's releases (installer-v*,
+    # published with --latest=false by .github/workflows/installer.yml)
     subprocess.run(['gh', 'release', 'create', tag, '--repo', repo, '--title', 'MH4U Port %s' % tag,
-                    '--notes-file', body] + (['--draft'] if draft else []) + files, check=True)
+                    '--notes-file', body] + (['--prerelease'] if pre else ['--latest']) + (['--draft'] if draft else [])
+                   + files, check=True)
 
 
 def main():
     a = sys.argv[1:]
-    default_out = os.path.join(ROOT, 'dump', 'release', 'v' + core()['version'])
+    pre = None
+    if '--pre' in a:
+        i = a.index('--pre')
+        pre = int(a[i + 1]); assert pre > 0, '--pre N: N from 1'
+        del a[i:i + 2]
+    default_out = os.path.join(ROOT, 'dump', 'release', 'v' + release_id(pre))
     if not a or a[0] not in ('build', 'check', 'package', 'all', 'publish'):
         sys.exit(__doc__)
     if a[0] in ('build', 'all'):
@@ -261,7 +358,7 @@ def main():
         print('releasable' if not bad else 'not releasable:\n  ' + '\n  '.join(bad))
         sys.exit(1 if bad else 0)
     if a[0] in ('package', 'all'):
-        package(a[1] if len(a) > 1 else default_out)
+        package(a[1] if len(a) > 1 else default_out, pre)
     if a[0] == 'publish':
         if '--repo' not in a:
             sys.exit('publish needs --repo OWNER/NAME')
