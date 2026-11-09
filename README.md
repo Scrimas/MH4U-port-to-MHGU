@@ -22,6 +22,8 @@ as they are.
 | **Stygian Zinogre**                | 11 · HR★7, G★4, Village★10 | Heaven's Mount |
 | **Black Gravios**                  | 8 · HR★7, G★4, Village★10  | –              |
 | **Monoblos**                       | 6 · HR★7, G★4, Village★10  | –              |
+| **Tidal Najarala**                 | 2 · G★3, G★4               | –              |
+| **Shrouded Nerscylla**             | 3 · G★3, Village★10        | –              |
 
 Quests are on the Hub quest board (Village quests on the village board). Ranks follow MH4U: each quest sits where its
 monster's MH4U rank falls among MHGU's quests of the same species.
@@ -42,6 +44,8 @@ monster's MH4U rank falls among MHGU's quests of the same species.
   *Advanced: Whale of a Hammer*
 - **Monoblos:** HR★7 *Skiff Competition* · *The Hero and the Sandy Spear* · G★4 *Bad Hair Day: Monoblos* ·
   Village★10 *Skiff Competition* · *The Hero and the Sandy Spear* · *Bad Hair Day: Monoblos*
+- **Tidal Najarala:** G★3 *Serpent Serenade* · G★4 *Advanced: Rhapsody in Rime*
+- **Shrouded Nerscylla:** G★3 *Course Correction* · *Advanced: Spider Study* · Village★10 *Shrouded in Mystery*
 
 </details>
 
