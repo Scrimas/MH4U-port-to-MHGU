@@ -66,7 +66,7 @@ void notes_data_loaded(int m)
     if (at > NOTES_COUNT - 1) at = NOTES_COUNT - 1;
     for (k = NOTES_COUNT - 1; k > at; k--) notes_order[k] = notes_order[k - 1];
     notes_order[at] = e;
-    logf("mh4uport: hunter's notes entry %u = %s (em %x), listed at %u after entry %u", e, port_monsters[m].name,
+    logf("mhgu-de: hunter's notes entry %u = %s (em %x), listed at %u after entry %u", e, port_monsters[m].name,
          FIELD(uint16_t, notes_list + 16 * e, 4), at, PORT_U32(s, 24));
 }
 
@@ -83,7 +83,7 @@ int notes_unlock_check_c(uint32_t *regs)
     if (regs[R0] < GU_COUNT || regs[R0] >= NOTES_COUNT || ++s_n > 10) return 0;
     uint8_t *save = *(uint8_t **)MAIN(0x1897f78);
     uint32_t q = FIELD(uint32_t, notes_unlock, 8 * regs[R0]);
-    logf("mh4uport: hunter's notes: unlock check of entry %u (lr %x), quest %u cleared %d", regs[R0],
+    logf("mhgu-de: hunter's notes: unlock check of entry %u (lr %x), quest %u cleared %d", regs[R0],
          regs[LR] - MAIN_BASE, q, save ? questCleared(save + 0x42c, q) : -1);
     return 0;
 }

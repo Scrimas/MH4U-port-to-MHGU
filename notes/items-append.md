@@ -17,7 +17,7 @@ main offsets. C = read in code / data, S = strong, G = guess. Script: dump/scrat
 | class | sites | action |
 |---|---|---|
 | bound (`id - 1 <= 2989`, or a loop over all IDs) | 0x1943d8 (obtained set), 0x19440c (obtained clear), 0x6f3df8, 0x6f90f4, 0x6fa504, 0x6fa7ec, 0x6fba28, 0x6fcebc, 0x6fcf98, 0x6fcfb0, 0x6fd020, 0x6fd0e0 (#0xbae: `id - 1 < 2990`), 0x6fd19c, 0x7054e8, 0x709438, 0x7094ec, 0x7094f4, 0x72f2b0, 0x72f890, 0x72fa24, 0x72fbf4, 0x744394 (loop 0x744370 over every ID: category-49 items obtained), 0x78d9e4 (`r1 - 81 <= 2989`, r1 = item + 80) | raise by the appended count |
-| per-item buffer | 0x199ae4 item box sort/merge (S): u32[2991] on its stack at sp+8 (frame 708 + 11264, memset 0x2ebc at 0x199b78, loop end 0x199c08; only sp+4 and sp+8 used, one prologue / epilogue): grow the frame (`sub` / `add sp, #708`), the memset size and the loop end. 0x3839bc: heap byte buffer of 2991 (alloc size 0x383f38, count stored at +0x168 by 0x383fd8, reuse check 0x383f14 / 0x383f78 #0xbae, 0x383f88, memset 0x383f9c) | resize together |
+| per-item buffer | 0x199ae4 item box sort/merge (C, 2026-11-09): u32[2991] on its stack at sp+8 (frame 708 + 11264, `__aeabi_memclr8` 0x2ebc at 0x199b78, loop end 0x199c08), indexed by the box's IDs without a bound, then a bubble sort reading each ID's record (null past the table): replaced, see below. 0x3839bc: heap byte buffer of 2991 (alloc size 0x383f38, count stored at +0x168 by 0x383fd8, reuse check 0x383f14 / 0x383f78 #0xbae, 0x383f88, memset 0x383f9c) | resize together |
 | keep | 0x19a504, 0x19a578, 0x19e0c0, 0x19e198 (0x3df1b8(stream, 2991) = the bit width of the saved IDs, 12 bits while IDs < 4096, S); 0x198838 (MHX save import: 1949 old IDs mapped by 0x6aa9b8, 0xbaf = no match, S); 0x385288, 0x3887c8, 0x388868, 0x388908, 0x3889a8, 0x389dd4, 0x38a040, 0x38a094, 0x38a344 (static u16 item lists terminated by 0xbaf, C) | sentinels: never change |
 - Other `0x2ebc` hits (0x7008f0, 0x701210, 0x701ed8, 0x70b380, 0x70b4b8, 0x8622c8, 0x863280, 0x86ba34..bc) are struct
   field offsets next to 0x2eb8 / 0x2ec4 (S).
@@ -37,8 +37,15 @@ main offsets. C = read in code / data, S = strong, G = guess. Script: dump/scrat
 - Records: the monster's TBLA block for `table\itemData` (class tuple from gu_class above, 44-B file records,
   base = 2991 + earlier appends); items.c item_data_loaded_c runs gear_tables_loaded on the item table before the
   DUMMY patches. Texts: TXTA `itemData` (2 strings per item, base 2 x that count).
-- module/build.py item_patches(): every bound site + the 0x3839bc buffer + the 0x199ae4 loop end raised by n, the
-  0x199ae4 memset by 4n, its frame (`sub` / `add sp, #708`) by the smallest 8-aligned encodable grow >= 4n (n = 30:
-  708 -> 828); each original word asserted. Hooks obtained_set / _clear / _test (REPLACE) at 0x1943d4 / 0x194408 /
-  0x19443c (items.c): IDs < 3008 GU's map, IDs from 3008 sUserInfo +0x3700 (512 B = IDs 3008..7103).
+- module/build.py item_patches(): every bound site + the 0x3839bc buffer raised by n; each original word asserted.
+  Hooks obtained_set / _clear / _test (REPLACE) at 0x1943d4 / 0x194408 / 0x19443c (items.c): IDs < 3008 GU's map,
+  IDs from 3008 sUserInfo +0x3700 (512 B = IDs 3008..7103).
+- Item box sort 0x199ae4 (Y in the item box; 4 other callers): REPLACE hook item_box_sort (items.c), the same merge
+  (stacks of 99, then the rest, per ID) and order (record +0x10 ascending, count descending, stable) on static
+  buffers for every 12-bit ID; stacks of IDs past the table follow in ID order, kept. Before (until 2026-11-09) its
+  frame, clear size and loop end were raised by n: an ID past the table still wrote past the array, onto the saved
+  registers (C: the maintainer's box held a WIP branch's materials 3048..3054 with 3048 items; Y froze then crashed
+  in the caller 0x71693c on `this` + 5), and an odd n left the array 4-aligned for `__aeabi_memclr8`.
+- Equipment box sort 0x142268 (C): one key per box entry from the gear record (0x13c208: null past a table's live
+  count, read as key 0), then a quicksort 0x149560 of (key, index) pairs: no per-ID array, nothing to patch.
 - Checked: simulated n = 30 gives 31 patch words; the real build (n = 0) installs no item hook or patch.

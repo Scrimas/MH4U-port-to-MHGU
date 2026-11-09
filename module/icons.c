@@ -40,10 +40,10 @@ typedef void *(*res_get_t)(void *mgr, void *dti, const char *path, uint32_t mode
 
 enum { ATLAS_MICON, ATLAS_HUD };
 static const struct { uint32_t w, h; const char *path; } s_atlas[2][2] = {
-    { { 512, 512, "mh4uport\\micon_sd" },       /* GU's micon01 size */
-      { 1024, 1024, "mh4uport\\micon_hd" } },   /* HD UI v4's */
-    { { 256, 256, "mh4uport\\hudicon_sd" },     /* GU's HD_hud_icon size */
-      { 1024, 1024, "mh4uport\\hudicon_hd" } }, /* HD UI v4's */
+    { { 512, 512, "mhgu_de\\micon_sd" },       /* GU's micon01 size */
+      { 1024, 1024, "mhgu_de\\micon_hd" } },   /* HD UI v4's */
+    { { 256, 256, "mhgu_de\\hudicon_sd" },     /* GU's HD_hud_icon size */
+      { 1024, 1024, "mhgu_de\\hudicon_hd" } }, /* HD UI v4's */
 };
 static void *s_tex[2][2];
 static uint8_t s_tried[2][2];
@@ -63,13 +63,13 @@ static void *atlas(uint32_t set, const uint8_t *ref)
             void *mgr = *(void **)MAIN(RES_MGR);
             res_get_t get = (*(res_get_t **)mgr)[0x30 / 4];
             s_tex[set][k] = get(mgr, (void *)MAIN(DTI_RTEXTURE), s_atlas[set][k].path, 1);
-            logf("mh4uport: icon atlas %s -> %x", s_atlas[set][k].path, (uint32_t)(uintptr_t)s_tex[set][k]);
+            logf("mhgu-de: icon atlas %s -> %x", s_atlas[set][k].path, (uint32_t)(uintptr_t)s_tex[set][k]);
         }
         uint8_t *t = s_tex[set][k];
         return t && FIELD(uint32_t, t, 0xdc) == w && FIELD(uint32_t, t, 0xe0) == h && FIELD(void *, t, 0xd0) ? t : 0;
     }
     static uint8_t s_logged[2];
-    if (!s_logged[set]++) logf("mh4uport: no icon atlas (set %u) for a %ux%u texture", set, w, h);
+    if (!s_logged[set]++) logf("mhgu-de: no icon atlas (set %u) for a %ux%u texture", set, w, h);
     return 0;
 }
 
@@ -132,7 +132,7 @@ int icon_set_c(uint32_t *regs)
     uint8_t *c = t ? entry_copy(e, t) : 0;
     if (!c) {
         static uint32_t s_n;
-        if (++s_n <= 10) logf("mh4uport: icon %u: no atlas (sprite %x entry %x), cell %u", i,
+        if (++s_n <= 10) logf("mhgu-de: icon %u: no atlas (sprite %x entry %x), cell %u", i,
                               (uint32_t)(uintptr_t)spr, (uint32_t)(uintptr_t)e, ICON_FALLBACK);
         regs[R3] = ICON_FALLBACK;
         return 0;
@@ -163,7 +163,7 @@ int tex_bind_c(uint32_t *regs)
     if (o < 0 || s_own[o].tab != FIELD(void *, spr, 0x78) || (id != s_own[o].id[0] && id != s_own[o].id[1]))
         return 0;
     static uint32_t s_n;
-    if (++s_n <= 20) logf("mh4uport: icon sprite %x: rebind of micon ID %x kept off", (uint32_t)(uintptr_t)spr, id);
+    if (++s_n <= 20) logf("mhgu-de: icon sprite %x: rebind of micon ID %x kept off", (uint32_t)(uintptr_t)spr, id);
     return 1;
 }
 
@@ -212,7 +212,7 @@ void icons_hud_own(uint8_t *spr, int on)
     uint8_t *c = t ? entry_copy(e, t) : 0;
     static uint32_t s_n;
     if (!c) {
-        if (++s_n <= 10) logf("mh4uport: HUD icon sprite %x: no atlas (ID %x entry %x)", (uint32_t)(uintptr_t)spr,
+        if (++s_n <= 10) logf("mhgu-de: HUD icon sprite %x: no atlas (ID %x entry %x)", (uint32_t)(uintptr_t)spr,
                               id, (uint32_t)(uintptr_t)e);
         return;
     }
@@ -224,5 +224,5 @@ void icons_hud_own(uint8_t *spr, int on)
     }
     s_own[o].tab = FIELD(void *, spr, 0x78);
     s_own[o].id[0] = s_own[o].id[1] = id;
-    if (++s_n <= 10) logf("mh4uport: HUD icon sprite %x: our atlas (GU ID %x)", (uint32_t)(uintptr_t)spr, id);
+    if (++s_n <= 10) logf("mhgu-de: HUD icon sprite %x: our atlas (GU ID %x)", (uint32_t)(uintptr_t)spr, id);
 }

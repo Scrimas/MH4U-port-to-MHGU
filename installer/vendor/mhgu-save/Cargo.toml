@@ -1,0 +1,10 @@
+# Vendored from MHGU_Editor app/core by installer/tools/vendor_save.py (do not edit)
+[package]
+name = "mhgu-save"
+description = "Read and edit Monster Hunter Generations Ultimate (Switch) saves (the part of MHGU_Editor's parser the installer uses)"
+version = "0.0.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+
+[lints.rust]
+dead_code = "allow"

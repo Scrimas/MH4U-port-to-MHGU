@@ -92,7 +92,7 @@ static int tbl_append(void *res, const struct tbl_cls *c, const uint8_t *recs, u
     uint32_t count = FIELD(uint32_t, res, 0x64), len = n * rec_bytes, i;
     uint8_t *old = FIELD(uint8_t *, res, 0x6c), *base, *arr;
     if (count != expect || !old || len + PAD > sizeof s_buf) {
-        logf("mh4uport: gear %s: table has %u records, expected %u: nothing appended", what, count, expect);
+        logf("mhgu-de: gear %s: table has %u records, expected %u: nothing appended", what, count, expect);
         return 0;
     }
     base = FN(tbl_alloc_t, c->alloc)((count + n) * c->size + 8, 16);
@@ -110,7 +110,7 @@ static int tbl_append(void *res, const struct tbl_cls *c, const uint8_t *recs, u
         FN(tbl_parse_t, c->parse)(e, &r);
     }
     if (r.pos != len) {          /* record layout wrong: keep the game's table */
-        logf("mh4uport: gear %s: the parser read %u bytes of %u, append undone", what, r.pos, len);
+        logf("mhgu-de: gear %s: the parser read %u bytes of %u, append undone", what, r.pos, len);
         FN(tbl_free_t, c->free)(base);
         return 0;
     }
@@ -118,7 +118,7 @@ static int tbl_append(void *res, const struct tbl_cls *c, const uint8_t *recs, u
     FIELD(uint8_t *, res, 0x6c) = arr;
     FIELD(uint32_t, res, 0x64) = count + n;
     appended_note(what, arr, count);
-    logf("mh4uport: gear %s: %u -> %u records", what, count, count + n);
+    logf("mhgu-de: gear %s: %u -> %u records", what, count, count + n);
     return 1;
 }
 
@@ -230,7 +230,7 @@ int smithy_list_c(uint32_t *regs)
     for (i = 0; i < n * SMITHY_ENTRY; i++) list[i] = s_out[i];
     if (s_lines < 24) {
         s_lines++;
-        logf("mh4uport: smithy category %u: %u entries, %u ported by rarity, first at %u (rarity %u), tail at %u",
+        logf("mhgu-de: smithy category %u: %u entries, %u ported by rarity, first at %u (rarity %u), tail at %u",
              cat, n, mine, s_before[0], s_rare[s_mine[0]] + 1, tail_at);
     }
     return 0;
@@ -251,7 +251,7 @@ int gear_listed_set_c(uint32_t *regs)
     static uint32_t s_n;
     if (!LISTED_PART(regs[R1]) || regs[R2] < LISTED_BITS) return 0;
     save_bits_set(LISTED_KEY(regs[R1]), regs[R2] - LISTED_BITS);
-    if (++s_n <= 24) logf("mh4uport: smithy part %u record %u listed (store, past the save's %u records)", regs[R1], regs[R2] / 4, LISTED_BITS / 4);
+    if (++s_n <= 24) logf("mhgu-de: smithy part %u record %u listed (store, past the save's %u records)", regs[R1], regs[R2] / 4, LISTED_BITS / 4);
     return 1;
 }
 
@@ -306,7 +306,7 @@ static void kirx_level_loaded(int m, const char *path, int ok)
     if (!s_kirx_read[m]) {
         const uint8_t *s = port_section(m, "KIRX", 0, &size);
         if (s && !kirx_valid(s, size)) {
-            logf("mh4uport: gear %s: KIRX of %u bytes malformed, GU's rows stay", port_monsters[m].name, size);
+            logf("mhgu-de: gear %s: KIRX of %u bytes malformed, GU's rows stay", port_monsters[m].name, size);
             s = 0;
         }
         s_kirx[m] = s;
@@ -319,7 +319,7 @@ static void kirx_level_loaded(int m, const char *path, int ok)
     s_kirx_ok[m] |= (uint16_t)(1u << nn);
     for (uint32_t i = 0, cnt = s_kirx[m] ? PORT_U32(s_kirx[m], 0) : 0; i < cnt; i++)
         n += s_kirx[m][4 + KIRX_SIZE * i] == (uint32_t)nn;
-    if (n) logf("mh4uport: gear %s: %s: own 4U sharpness rows (KIRX): %u", path, port_monsters[m].name, n);
+    if (n) logf("mhgu-de: gear %s: %s: own 4U sharpness rows (KIRX): %u", path, port_monsters[m].name, n);
 }
 
 void gear_tables_loaded(void *res)        /* also items.c: the item table's TBLA blocks (appended items) */
@@ -334,7 +334,7 @@ void gear_tables_loaded(void *res)        /* also items.c: the item table's TBLA
                 if (!path_ends(res, path)) continue;
                 uint32_t flags = PORT_U32(t, 4);
                 if ((flags & TBL_NEEDS_KIREAJI) && s_kire[m] < 0) {
-                    logf("mh4uport: gear %s: %s sharpness refused, its levels not appended", path, port_monsters[m].name);
+                    logf("mhgu-de: gear %s: %s sharpness refused, its levels not appended", path, port_monsters[m].name);
                     continue;
                 }
                 struct tbl_cls c = {PORT_U32(t, 8), PORT_U32(t, 12), PORT_U32(t, 16), PORT_U32(t, 20),
@@ -381,7 +381,7 @@ int gear_kire_slash_c(uint32_t *regs)
             regs[R0] = FIELD(uint16_t, e, 4 + 2 * colour);
             if (i < 64 && !(s_kirx_logged[m] & (1ull << i))) {
                 s_kirx_logged[m] |= 1ull << i;
-                logf("mh4uport: gear %s w%u weapon %u Lv%u: own sharpness %u %u %u %u %u %u %u (KIRX), not GU row %u",
+                logf("mhgu-de: gear %s w%u weapon %u Lv%u: own sharpness %u %u %u %u %u %u %u (KIRX), not GU row %u",
                      port_monsters[m].name, nn, e[1], e[2], FIELD(uint16_t, e, 4), FIELD(uint16_t, e, 6),
                      FIELD(uint16_t, e, 8), FIELD(uint16_t, e, 10), FIELD(uint16_t, e, 12), FIELD(uint16_t, e, 14),
                      FIELD(uint16_t, e, 16), e[3]);
@@ -413,7 +413,7 @@ static void gmd_append(uint8_t *m, uint32_t expect, const uint8_t *sec, const ui
     uint32_t count = FIELD(uint32_t, m, 0x88), i;
     const char **old = FIELD(const char **, m, 0x98), **arr;
     if (count != expect || !old) {
-        logf("mh4uport: text %s: %u strings, expected %u: nothing appended", what, count, expect);
+        logf("mhgu-de: text %s: %u strings, expected %u: nothing appended", what, count, expect);
         return;
     }
     arr = ((res_alloc_t)(*(uint32_t **)m)[0x40 / 4])(m, (count + n) * 4);
@@ -422,7 +422,7 @@ static void gmd_append(uint8_t *m, uint32_t expect, const uint8_t *sec, const ui
     for (i = 0; i < n; i++) arr[count + i] = (const char *)sec + PORT_U32(offs, 4 * i);
     FIELD(const char **, m, 0x98) = arr;
     FIELD(uint32_t, m, 0x88) = count + n;
-    logf("mh4uport: text %s: %u -> %u strings", what, count, count + n);
+    logf("mhgu-de: text %s: %u -> %u strings", what, count, count + n);
 }
 
 /* called by items.c for every rGUIMessage load (name = GMD internal name, lang = data file language index).
@@ -456,7 +456,7 @@ int gear_pwl_c(uint32_t *regs)
             if (!path_ends(res, (const char *)s + PORT_U32(f, 0))) continue;
             uint32_t *mot = recs && model < n ? &FIELD(uint32_t, recs, 20 * model + 4) : 0;
             if (mot && *mot == from) *mot = to;
-            logf("mh4uport: gear %s model %u: motion set %d (expected %u -> %u)", (const char *)s + PORT_U32(f, 0),
+            logf("mhgu-de: gear %s model %u: motion set %d (expected %u -> %u)", (const char *)s + PORT_U32(f, 0),
                  model, mot ? (int)*mot : -1, from, to);
         }
     }

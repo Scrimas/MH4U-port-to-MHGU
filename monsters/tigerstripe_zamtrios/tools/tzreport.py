@@ -49,7 +49,7 @@ def main():
     for e, n in errors.most_common(5):
         print('  error x%d: %s' % (n, e))
 
-    core = [(l[:12], l.split('mh4uport: ', 1)[1]) for l in lines if 'mh4uport: ' in l]
+    core = [(l[:12], l.split('mhgu-de: ', 1)[1]) for l in lines if 'mhgu-de: ' in l]
     print('\ncore:')
     for ts, m in core:
         if re.search(r'tigerstripe_zamtrios (data|installed|NOT installed|em_create|quest_prep|em_arc|em_record)|'

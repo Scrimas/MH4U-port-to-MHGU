@@ -2,7 +2,7 @@
 
   build.py            build into module/out/
   build.py install    also install into the Ryujinx mod folder: exefs/, every monster's data file
-                      (romfs/nativeNX/mh4uport/<name>.bin, always) and the monsters' assets (romfs/...); PORT_ASSETS =
+                      (romfs/nativeNX/mhgu_de/<name>.bin, always) and the monsters' assets (romfs/...); PORT_ASSETS =
                       comma-separated packages whose assets to install (default: all, "none" = none)
 
 Hooks: (name, main offset of the hooked instruction). The two instructions at the site
@@ -63,8 +63,10 @@ def main_ref(off):
     return '(__module_start - 0x%x)' % (MAIN_GAP - off) if off <= MAIN_GAP else '(__module_start + 0x%x)' % (off - MAIN_GAP)
 # install target: the test data dir by default (tools/ryutest.sh); GOG_MOD_ROOT=~/.config/Ryujinx/mods for the real one
 MOD_ROOT = os.path.expanduser(os.environ.get('GOG_MOD_ROOT', os.path.join(ROOT, 'ryuroot', 'mods')))
-MOD_NAME = 'MH4U Port'
+MOD_NAME = 'MHGU Definitive Edition'
 MOD_DIR = os.path.join(MOD_ROOT, 'contents', '0100770008dd8000', MOD_NAME)
+# the mod's folder before 2.0.0 (MH4U Port): removed by install(), or the emulator loads the module twice
+LEGACY_DIR = os.path.join(MOD_ROOT, 'contents', '0100770008dd8000', 'MH4U Port')
 
 HOOKS = [
     ('em_create', 0x4EBCC),    # monster factory (DTI table 0x1731e2c)
@@ -320,19 +322,18 @@ WORD_PATCHES = [
 ]
 
 # Items appended past GU's 2991 (allocations.toml [monster.append] items; notes/items-append.md): the code that bounds
-# item IDs by the count is raised by the appended count, the per-item buffers grow with it, and the items-obtained
-# set / clear / test are replaced (items.c: IDs from 3008 use a reserved save block). Nothing changes without them.
+# item IDs by the count is raised by the appended count, the per-item heap buffer grows with it, the item box sort and
+# the items-obtained set / clear / test are replaced (items.c: IDs from 3008 use a reserved save block). Nothing
+# changes without them.
 ITEMS_APPENDED = alloc.item_count() - alloc.GU_ITEMS
 ITEM_BOUND_SITES = [            # movw rX, #0xbad / #0xbae / #0xbaf: `id - 1 <= 2989` checks and one loop over all IDs
     0x6F3DF8, 0x6F90F4, 0x6FA504, 0x6FA7EC, 0x6FBA28, 0x6FCEBC, 0x6FCF98, 0x6FCFB0, 0x6FD020, 0x6FD0E0, 0x6FD19C,
     0x7054E8, 0x709438, 0x7094EC, 0x7094F4, 0x72F2B0, 0x72F890, 0x72FA24, 0x72FBF4, 0x744394, 0x78D9E4,
-    0x199C08,                   # item box sort / merge 0x199ae4: loop over its u32[2991] stack array
     0x383F14, 0x383F38, 0x383F78, 0x383F88, 0x383F9C, 0x383FD8]    # 0x3839bc: per-item byte buffer (size, count)
-ITEM_ARRAY_SIZE = 0x199B78      # movw r1, #0x2ebc: memset of that stack array (4 x 2991)
-ITEM_SORT_FRAME = (0x199AE8, 0x199D4C)    # sub / add sp, sp, #708 (+ #11264): the array is sp+8 .. the frame top
 if ITEMS_APPENDED:
-    HOOKS += [('obtained_set', 0x1943D4), ('obtained_clear', 0x194408), ('obtained_test', 0x19443C)]
-    REPLACE_HOOKS |= {'obtained_set', 'obtained_clear', 'obtained_test'}
+    HOOKS += [('obtained_set', 0x1943D4), ('obtained_clear', 0x194408), ('obtained_test', 0x19443C),
+              ('item_box_sort', 0x199AE4)]   # GU's u32[count] stack array overran on IDs past the table (items.c)
+    REPLACE_HOOKS |= {'obtained_set', 'obtained_clear', 'obtained_test', 'item_box_sort'}
 if 'EM089_DMG_RECV_DIAG' in os.environ.get('GOG_DEFINES', '').split():   # diagnostic: monster damage receiver
     HOOKS += [('dmg_recv', 0x9D6F8)]   # (monster, part, damage, kind) log (em089_diag.c). Its entry is checked by
     PLUGIN_CHECKED.pop(0x9D6F8)        # Damage Numbers: test builds only (that plugin then installs nothing)
@@ -346,14 +347,6 @@ def movw_imm(word, imm):
     return (word & 0xFFF0F000) | (imm & 0xF000) << 4 | (imm & 0xFFF)
 
 
-def arm_imm(v):
-    """ARM modified immediate (rot << 8 | imm8) for v, None when v has no encoding"""
-    for rot in range(16):
-        x = ((v << 2 * rot) | (v >> (32 - 2 * rot))) & 0xFFFFFFFF if rot else v
-        if x < 256: return rot << 8 | x
-    return None
-
-
 def item_patches(img):
     """(site, old, new) words for ITEMS_APPENDED items past 2991 (none without)"""
     if not ITEMS_APPENDED: return []
@@ -364,14 +357,6 @@ def item_patches(img):
         w = word(site)
         assert imm16(w) in (0xBAD, 0xBAE, 0xBAF), 'item bound %x: %x' % (site, w)
         out.append((site, w, movw_imm(w, imm16(w) + n)))
-    w = word(ITEM_ARRAY_SIZE)
-    assert imm16(w) == 0x2EBC, hex(w)
-    out.append((ITEM_ARRAY_SIZE, w, movw_imm(w, 0x2EBC + 4 * n)))
-    grow = next(d for d in range(4 * n, 4 * n + 1024, 8) if arm_imm(708 + d) is not None)   # keeps 8-byte alignment
-    for site, op in zip(ITEM_SORT_FRAME, (0xE24DDF00, 0xE28DDF00)):       # sub / add sp, sp, #708 (0xb1 ror 30)
-        w = word(site)
-        assert w == op | 0xB1, 'item sort frame %x: %x' % (site, w)
-        out.append((site, w, (w & ~0xFFF) | arm_imm(708 + grow)))
     return out
 
 
@@ -472,13 +457,19 @@ GU_QUEST_MESSAGE = 120   # GU's questMessage strings (resident_eng.arc GUI\06_ms
 
 
 def stage_alias(m):
-    """package.toml [stage] of an entry with allocations.toml stage_alias (module/stage_alias.c): kinds = arc path kinds
+    """[stage] of the map an entry with allocations.toml stage_alias requires (maps/<map>/package.toml, alloc.stage_map;
+    module/stage_alias.c): kinds = arc path kinds
     redirected to the folder (49 mapUI, 54 map_com, 55 language map_com, 56 stage, 58 area), hold_kobj_areas = areas
     whose KowareObjs keep GU's quest-start command 0 from playing, maprec = the area map records [k, x, y] per area
     (with kind 49), wholemap_k = the whole-map record scale (with kind 55)"""
     if 'stage_alias' not in m: return {}
-    st = package(m).get('stage')
-    if not st or not st.get('kinds'): sys.exit('%s: stage_alias needs package.toml [stage] kinds' % m['name'])
+    try:
+        mp = alloc.stage_map(m)
+    except KeyError as e:
+        sys.exit(str(e))
+    st = paths.package_toml(mp).get('stage')
+    if not st or not st.get('kinds'):
+        sys.exit('%s: stage_alias needs [stage] kinds in maps/%s/package.toml' % (m['name'], mp))
     assert all(48 <= k < 80 for k in st['kinds']) and all(0 <= a < 8 for a in st.get('hold_kobj_areas', [])), st
     assert (49 in st['kinds']) == bool(st.get('maprec')) and len(st.get('maprec', [])) <= 4, st
     assert (55 in st['kinds']) == bool(st.get('wholemap_k')), st
@@ -711,7 +702,7 @@ def main():
         for k, v in sorted(syms.items(), key=lambda kv: kv[1]):
             f.write('%08x %08x %s\n' % (MODULE_BASE + v, v, k))
     open(os.path.join(OUT, 'defines.txt'), 'w').write(' '.join(EXTRA_DEFINES) + '\n')   # tools/release.py: none
-    ui_icons.build(OUT)                                # the icon atlases (romfs nativeNX/mh4uport, icons.c)
+    ui_icons.build(OUT)                                # the icon atlases (romfs nativeNX/mhgu_de, icons.c)
     print('built', len(data), 'bytes; hooks', ', '.join('%s@%x' % h for h in HOOKS))
     for k in ('g_init_magic', 'g_hook_count'):
         if k in syms: print('  %s = 0x%x' % (k, MODULE_BASE + syms[k]))
@@ -728,19 +719,20 @@ def install():
         shutil.copy(os.path.join(OUT, f), os.path.join(ex, f))
     dst = os.path.join(MOD_DIR, 'romfs')
     shutil.rmtree(dst, ignore_errors=True)
-    os.makedirs(os.path.join(dst, 'nativeNX', 'mh4uport'))
+    os.makedirs(os.path.join(dst, 'nativeNX', 'mhgu_de'))
     for m in MONSTERS:
         src = os.path.join(paths.gen(m['name']), m['name'] + '.bin')
         if not os.path.exists(src): sys.exit('no data file %s: run monsters/%s/build.sh' % (src, alloc.package(m)))
-        shutil.copy(src, os.path.join(dst, 'nativeNX', 'mh4uport'))
+        shutil.copy(src, os.path.join(dst, 'nativeNX', 'mhgu_de'))
     for name in ui_icons.FILES:
-        shutil.copy(os.path.join(OUT, name), os.path.join(dst, 'nativeNX', 'mh4uport'))
-    sel =os.environ.get('PORT_ASSETS', 'all')           # package names (an entry name selects its package)
+        shutil.copy(os.path.join(OUT, name), os.path.join(dst, 'nativeNX', 'mhgu_de'))
+    sel = os.environ.get('PORT_ASSETS', 'all')          # package names (an entry name selects its package; a monster
     names = alloc.packages() if sel == 'all' else [] if sel == 'none' else \
-        list(dict.fromkeys(paths.package(n) for n in sel.split(',')))
+        list(dict.fromkeys(paths.package(n) for n in sel.split(',')))   # brings the maps it requires)
+    names = list(dict.fromkeys(r for n in names for r in paths.requires(n) + [n]))
     owner = {}
-    for name in names:                                 # monsters never ship the same RomFS path
-        src = paths.romfs(name)
+    for name in names:                                 # packages never ship the same RomFS path
+        src = paths.map_romfs(name) if name in paths.maps() else paths.romfs(name)
         for d, _, files in os.walk(src):
             for f in files:
                 rel = os.path.relpath(os.path.join(d, f), src)
@@ -750,6 +742,9 @@ def install():
                 shutil.copy(os.path.join(d, f), os.path.join(dst, rel))
     print('installed into %s: data of %s, assets of %s' % (MOD_DIR, ', '.join(m['name'] for m in MONSTERS),
                                                            ', '.join(names) or 'none'))
+    if os.path.isdir(LEGACY_DIR):
+        shutil.rmtree(LEGACY_DIR)
+        print('removed %s (the mod before 2.0.0)' % LEGACY_DIR)
 
 
 if __name__ == '__main__':

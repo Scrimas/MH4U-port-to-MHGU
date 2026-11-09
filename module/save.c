@@ -22,9 +22,12 @@
  * and touched by no other GU code (scan of every function that loads sUserInfo, notes/save-store.md); items.c keeps
  * the items-obtained bits of IDs 3008.. at +0x3700..+0x38ff. So the store is saved with the character, in the same
  * file and commit as GU's own data, on every platform GU's save works on, and an older core leaves it alone.
- * Format at STORE_OFF: header {u32 'MH4S', u16 version 1, u16 records, u32 FNV-1a of version, record count and the
- * records, u32 0}, then 12-byte records {u16 em ID, hunts, captures, smallest, largest, flags 0}. An all-zero block is
- * an empty store; a block that is neither empty nor a valid store (another tool's data, a newer format) is never
+ * Format at STORE_OFF: header {u32 'MH4S', u16 version 2, u16 records, u32 FNV-1a of version, record count, migration
+ * level and the records, u32 migration level}, then 12-byte records {u16 em ID, hunts, captures, smallest, largest,
+ * flags 0}. The migration level is the last save-migration step the installer applied to this character
+ * (installer/core/src/saves.rs; the core never changes it). Version 1 (cores up to 1.9.0) had 0 there and left it out
+ * of the check word: such a store is read and turned into version 2 with level 0, in place (logged). An all-zero block
+ * is an empty store; a block that is neither empty nor a valid store (another tool's data, a newer format) is never
  * written: lessees' numbers are then not recorded (logged) and nothing else changes. */
 #include <stdint.h>
 #include "util.h"
@@ -41,7 +44,7 @@ extern uint32_t reg_icon[];                 /* tables.S: UI icon per registry in
 #define STORE_END   0x43f8u                 /* end of the reserved block */
 #define STORE_SIZE  (STORE_END - STORE_OFF) /* 2808 bytes */
 #define STORE_MAGIC 0x5334484du             /* "MH4S" */
-#define STORE_VERSION 1u
+#define STORE_VERSION 2u                 /* 1: no migration level (cores up to 1.9.0) */
 #define HDR 16u
 
 struct store_rec { uint16_t em, hunts, captures, size_min, size_max, flags; };
@@ -66,11 +69,13 @@ static uint32_t fnv_bytes(uint32_t h, const uint8_t *p, uint32_t n)
     return h;
 }
 
-static uint32_t store_check_word(const uint8_t *b)    /* FNV-1a of version, record count and the records */
+/* FNV-1a of version, record count, (version 2) the migration level, and the records */
+static uint32_t store_check_word(const uint8_t *b)
 {
-    uint32_t n = FIELD(uint16_t, b, 6);
+    uint32_t n = FIELD(uint16_t, b, 6), h = fnv_bytes(2166136261u, b + 4, 4);
     if (n > REC_MAX) n = REC_MAX;
-    return fnv_bytes(fnv_bytes(2166136261u, b + 4, 4), b + HDR, n * (uint32_t)sizeof(struct store_rec));
+    if (FIELD(uint16_t, b, 4) >= 2) h = fnv_bytes(h, b + 12, 4);
+    return fnv_bytes(h, b + HDR, n * (uint32_t)sizeof(struct store_rec));
 }
 
 enum { ST_NONE, ST_EMPTY, ST_VALID, ST_FOREIGN };
@@ -90,8 +95,9 @@ static int store_state(const uint8_t *b)
             if (b[i]) return ST_FOREIGN;
         return ST_EMPTY;
     }
-    if (FIELD(uint32_t, b, 0) != STORE_MAGIC || FIELD(uint16_t, b, 4) != STORE_VERSION ||
-        FIELD(uint16_t, b, 6) > REC_MAX || FIELD(uint32_t, b, 12) || FIELD(uint32_t, b, 8) != store_check_word(b))
+    uint32_t v = FIELD(uint16_t, b, 4);
+    if (FIELD(uint32_t, b, 0) != STORE_MAGIC || v < 1 || v > STORE_VERSION || (v == 1 && FIELD(uint32_t, b, 12)) ||
+        FIELD(uint16_t, b, 6) > REC_MAX || FIELD(uint32_t, b, 8) != store_check_word(b))
         return ST_FOREIGN;
     return ST_VALID;
 }
@@ -103,11 +109,18 @@ static int store_check(uint8_t **out)
     static int s_st = -1;
     uint8_t *b = store_block();
     int st = store_state(b);
+    if (st == ST_VALID && FIELD(uint16_t, b, 4) < STORE_VERSION) {     /* version 1 -> 2: level 0 (already 0) */
+        logf("mhgu-de: store version %u -> %u (%u record(s))", FIELD(uint16_t, b, 4), STORE_VERSION,
+             FIELD(uint16_t, b, 6));
+        FIELD(uint16_t, b, 4) = STORE_VERSION;
+        FIELD(uint32_t, b, 8) = store_check_word(b);
+    }
     if (b != s_blk || st != s_st) {
         s_blk = b;
         s_st = st;
-        logf("mh4uport: store sUserInfo+%x (%u bytes, %u records max): %s, %u record(s)", STORE_OFF, STORE_SIZE,
+        logf("mhgu-de: store sUserInfo+%x (%u bytes, %u records max): %s, %u record(s)", STORE_OFF, STORE_SIZE,
              REC_MAX, ST_NAME[st], st == ST_VALID ? FIELD(uint16_t, b, 6) : 0u);
+        if (st == ST_VALID) logf("mhgu-de: store migration level %u", FIELD(uint32_t, b, 12));
     }
     *out = b;
     return st;
@@ -158,7 +171,7 @@ static struct store_rec *store_open(uint32_t em)
     if (r) return r;
     uint32_t n = FIELD(uint16_t, b, 6);
     if (n >= REC_MAX) {
-        logf("mh4uport: store full (%u records): em %x not recorded", n, em);
+        logf("mhgu-de: store full (%u records): em %x not recorded", n, em);
         return 0;
     }
     r = (struct store_rec *)(b + HDR) + n;
@@ -194,7 +207,7 @@ void save_bits_set(uint32_t key, uint32_t bit)
     static uint32_t s_n;
     struct store_rec *r;
     if (bit >= 80u) {
-        if (++s_n <= 8) logf("mh4uport: store bit %u of key %x past its record: not kept", bit, key);
+        if (++s_n <= 8) logf("mhgu-de: store bit %u of key %x past its record: not kept", bit, key);
         return;
     }
     r = store_open(key);
@@ -232,7 +245,7 @@ static void slot_dress(int k, int m)
     reg_icon[SLOT_FIRST + k] = m >= 0 ? reg_icon[port_monsters[m].index] : s_icon_built[k];
     size_slot_dress(SLOT_FIRST + k, m);
     s_dressed[k] = (int8_t)m;
-    logf("mh4uport: save slot %u (id %x) shows %s", SLOT_FIRST + k, SLOT_ID(k),
+    logf("mhgu-de: save slot %u (id %x) shows %s", SLOT_FIRST + k, SLOT_ID(k),
          m >= 0 ? port_monsters[m].name : "its owner");
 }
 
@@ -291,10 +304,10 @@ uint32_t save_slot_tally(int m, uint8_t *o)
                     s_user[k2] = (int8_t)n;
                     s_lease_q[k2] = q;
                     slot_dress(k2, n);
-                    logf("mh4uport: %s moved from save slot %u to %u (its owner %s is counted)", port_monsters[n].name,
+                    logf("mhgu-de: %s moved from save slot %u to %u (its owner %s is counted)", port_monsters[n].name,
                          p->save_index, SLOT_FIRST + k2, p->name);
                 } else {
-                    logf("mh4uport: ERROR %s and %s share save slot %u in this quest", port_monsters[n].name, p->name,
+                    logf("mhgu-de: ERROR %s and %s share save slot %u in this quest", port_monsters[n].name, p->name,
                          p->save_index);
                 }
             }
@@ -310,7 +323,7 @@ uint32_t save_slot_tally(int m, uint8_t *o)
         k = lease_pick(m, q, o, -1);
         if (k < 0) {                        /* 7 ported monsters counted in one quest: never past index 136 */
             k = PREF[0];
-            logf("mh4uport: ERROR no free save slot for %s: counted in slot %u with another monster", p->name,
+            logf("mhgu-de: ERROR no free save slot for %s: counted in slot %u with another monster", p->name,
                  SLOT_FIRST + k);
         }
         for (int i = 0; i < SLOTS; i++)
@@ -320,7 +333,7 @@ uint32_t save_slot_tally(int m, uint8_t *o)
             }
         s_user[k] = (int8_t)m;
         s_lease_q[k] = q;
-        logf("mh4uport: %s leases save slot %u (id %x) for quest %u", p->name, SLOT_FIRST + k, SLOT_ID(k), q);
+        logf("mhgu-de: %s leases save slot %u (id %x) for quest %u", p->name, SLOT_FIRST + k, SLOT_ID(k), q);
     }
     slot_dress(k, m);
     return SLOT_FIRST + (uint32_t)k;
@@ -447,7 +460,7 @@ static int add_count(uint32_t *regs, int captures)
         else v = r->hunts = add_capped(r->hunts, regs[R2]);
         store_seal();
     }
-    logf("mh4uport: %s +%u %s -> store %d (slot %x untouched)", port_monsters[n].name, regs[R2],
+    logf("mhgu-de: %s +%u %s -> store %d (slot %x untouched)", port_monsters[n].name, regs[R2],
          captures ? "capture(s)" : "hunt(s)", r ? (int)v : -1, regs[R1] & 0xffff);
     return 1;
 }
@@ -474,7 +487,7 @@ static int size_record(uint32_t *regs, int largest)
         }
         store_seal();
     }
-    logf("mh4uport: %s size %u: %s record %s", port_monsters[n].name, v, largest ? "largest" : "smallest",
+    logf("mhgu-de: %s size %u: %s record %s", port_monsters[n].name, v, largest ? "largest" : "smallest",
          regs[R0] ? "new" : "kept");
     return 1;
 }
@@ -488,11 +501,11 @@ static void log_save(const char *when)
     int st = store_check(&b);
     if (!s) return;
     for (int k = 0; k < SLOTS; k++)
-        logf("mh4uport: %s: save slot %u: hunts %u, captures %u", when, SLOT_FIRST + k,
+        logf("mhgu-de: %s: save slot %u: hunts %u, captures %u", when, SLOT_FIRST + k,
              FIELD(uint16_t, s, TALLIES + 2 * (SLOT_FIRST + k)), FIELD(uint16_t, s, TALLIES + 0x112 + 2 * (SLOT_FIRST + k)));
     for (uint32_t i = 0, n = st == ST_VALID ? FIELD(uint16_t, b, 6) : 0; i < n && i < 16; i++) {
         const struct store_rec *r = (const struct store_rec *)(b + HDR) + i;
-        logf("mh4uport: %s: store em %x: hunts %u, captures %u, smallest %u, largest %u", when, r->em, r->hunts,
+        logf("mhgu-de: %s: store em %x: hunts %u, captures %u, smallest %u, largest %u", when, r->em, r->hunts,
              r->captures, r->size_min, r->size_max);
     }
 }

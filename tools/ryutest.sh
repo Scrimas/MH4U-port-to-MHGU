@@ -10,7 +10,8 @@ set -u
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 R=$ROOT/ryuroot
 GAME=${GAME:-"$HOME/Switch Games/Monster Hunter Generations Ultimate  [0100770008dd8000][v0].nsp"}
-MOD="$R/mods/contents/0100770008dd8000/MH4U Port"     # = module/build.py MOD_NAME (PORT_ASSETS passes through)
+# = module/build.py MOD_NAME (PORT_ASSETS passes through)
+MOD="$R/mods/contents/0100770008dd8000/MHGU Definitive Edition"
 
 ryu_pids() {   # only Ryujinx processes running on our root dir (the gui launch's /proc/PID/exe is unreadable: cmdline)
     for p in /proc/[0-9]*; do

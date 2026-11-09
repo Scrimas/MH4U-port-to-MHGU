@@ -1,7 +1,11 @@
 """snd_bgm.py : MH4U Gogmazios battle BGM (and the Battlequarters streams) -> MHGU Opus streams + battle STQR.
 
-  snd_bgm.py all [--keep]        extract, decode, encode, level, write the opus files + the extended bgm_bt.stqr
-                                 into monsters/gogmazios/romfs/nativeNX/sound/bgm/... (work files: dump/converted/bgm/)
+  snd_bgm.py all [--keep]        battle + stage below
+  snd_bgm.py battle [--keep]     Gogmazios' themes: extract, decode, encode, level, write the opus files into
+                                 monsters/gogmazios/romfs/nativeNX/sound/bgm/battle/ + his battle STQR (dump/converted)
+  snd_bgm.py stage               the Battlequarters streams (map package): the opus files into
+                                 maps/battlequarters/romfs/nativeNX/sound/bgm/map/m28d/ + bgm_m28.json + the m28d STQR
+                                 (dump/converted; tools/stage4u2gu.py alias packs them). Work files: dump/converted/bgm/
   snd_bgm.py check FILE.opus     parse a GU (Capcom) opus stream, decode it, print levels
   snd_bgm.py stqr                only rebuild bgm_bt.stqr from the already written opus files
 
@@ -37,8 +41,9 @@ sys.path.insert(0, paths.GU_PY)
 ROM_4U = paths.ROM_4U
 GU_ROMFS = paths.GU_ROMFS
 WORK = os.path.join(ROOT, 'dump/converted/bgm')
-GOG_ROMFS = paths.romfs('gogmazios')
-OUT = os.path.join(GOG_ROMFS, 'nativeNX/sound/bgm')
+GOG_ROMFS = paths.romfs('gogmazios')                     # his battle themes
+MAP_ROMFS = paths.map_romfs('battlequarters')            # the arena's area streams + camp jingle
+OUT = os.path.join(MAP_ROMFS, 'nativeNX/sound/bgm')       # (map/m28d: build_m28d_stqr)
 GU_BT = '/nativeNX/sound/bgm/battle/bgm_bt.stqr'
 
 import alloc
@@ -416,8 +421,8 @@ def build_m28d_stqr(m28, jingle, med, log):
         [e['stream'] for e in m28], len(s['streams']) - 1, path, STAGE_JINGLE_DB_4U + med, M28D_STQR))
 
 
-def write(path, data):
-    p = os.path.join(GOG_ROMFS, 'nativeNX', path.replace('\\', '/'))
+def write(path, data, root):
+    p = os.path.join(root, 'nativeNX', path.replace('\\', '/'))
     os.makedirs(os.path.dirname(p), exist_ok=True)
     open(p, 'wb').write(data)
     return p
@@ -431,34 +436,37 @@ def main():
         pcm = opus_decode(g['packets'], g['ch'])
         print({k: v for k, v in g.items() if k != 'packets'}, len(g['packets']), 'packets, rms %.1f dBFS' % rms_db(pcm))
         return
-    if cmd in ('all',):
+    if cmd in ('all', 'battle', 'stage'):
         os.makedirs(WORK, exist_ok=True)
         med, db4 = levels(log)
-        srcs = extract([t[0] for t in TRACKS] + [t[0] for t in STAGE])
+        battle, stage = cmd in ('all', 'battle'), cmd in ('all', 'stage')
+        srcs = extract([t[0] for t in TRACKS] * battle + [t[0] for t in STAGE] * stage)
         new = []
-        for src, path, db_4u, rid in TRACKS:
+        for src, path, db_4u, rid in TRACKS * battle:
             log.append(path)
             opus, ns, ls, le, r = convert_track(srcs[src], log)
-            write(path + '.opus', opus)
+            write(path + '.opus', opus, GOG_ROMFS)
             # GU level = 4U level + median anchor delta; our rms equals the 4U master's (same PCM)
             db = db_4u + med if '--keep' not in sys.argv else db_4u
             new.append((path + '', len(opus), ns, ls, le, rid, db))
         m28 = []
-        for src, path, slot in STAGE:
+        for src, path, slot in STAGE * stage:
             log.append(path)
             opus, ns, ls, le, r = convert_track(srcs[src], log)
-            write(path + '.opus', opus)
+            write(path + '.opus', opus, MAP_ROMFS)
             if slot is not None:
                 m28.append(dict(stream=slot, samples=ns, channels=2, rate=RATE, loop_start=ls, loop_end=le,
                                 source=src))
             else:
                 jingle = (path, len(opus), ns)
-        import json
-        json.dump(m28, open(BGM_M28_JSON, 'w'), indent=1)
-        log.append('  -> %s (%d streams)' % (BGM_M28_JSON, len(m28)))
-        build_m28d_stqr(m28, jingle, med, log)
-        open(os.path.join(WORK, 'battle_streams.txt'), 'w').write(repr(new))
-        build_em089_stqr(new, log)
+        if stage:
+            import json
+            json.dump(m28, open(BGM_M28_JSON, 'w'), indent=1)
+            log.append('  -> %s (%d streams)' % (BGM_M28_JSON, len(m28)))
+            build_m28d_stqr(m28, jingle, med, log)
+        if battle:
+            open(os.path.join(WORK, 'battle_streams.txt'), 'w').write(repr(new))
+            build_em089_stqr(new, log)
     elif cmd == 'stqr':
         new = eval(open(os.path.join(WORK, 'battle_streams.txt')).read())
         build_em089_stqr(new, log)

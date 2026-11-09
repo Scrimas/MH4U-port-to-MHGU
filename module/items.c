@@ -50,7 +50,7 @@ int item_data_loaded_c(uint32_t *regs)
             uint8_t *r = recs + ITEM_REC * id;
             if (id >= n || FIELD(uint32_t, r, 0x08) != id || r[0x18] != it[6] ||
                 FIELD(uint32_t, r, 0x1c) != PORT_U32(it, 8)) {
-                logf("mh4uport: %s item %u is not a DUMMY record, left alone", port_monsters[m].name, id);
+                logf("mhgu-de: %s item %u is not a DUMMY record, left alone", port_monsters[m].name, id);
                 continue;
             }
             r[0x0d] = it[2] - 1;
@@ -62,7 +62,7 @@ int item_data_loaded_c(uint32_t *regs)
             r[0x24] = it[5];
             done++;
         }
-        if (s) logf("mh4uport: item data (%u records): %u %s items set", n, done, port_monsters[m].name);
+        if (s) logf("mhgu-de: item data (%u records): %u %s items set", n, done, port_monsters[m].name);
     }
     return 0;
 }
@@ -79,7 +79,7 @@ static void item_names(int m, const char **str, uint32_t n, uint32_t lang, const
         str[k + 1] = PORT_STR(s, t + 4 * (2 * (lang * cnt + i) + 1));
         done++;
     }
-    if (s) logf("mh4uport: item text %s: %u %s names set", path, done, port_monsters[m].name);
+    if (s) logf("mhgu-de: item text %s: %u %s names set", path, done, port_monsters[m].name);
 }
 
 static int is_dummy(const char *s)       /* GU's unused names 'dummy1'..'dummy7' */
@@ -95,11 +95,11 @@ static void monster_name(int m, const char **str, uint32_t n, uint32_t lang)
     if (!s) return;
     uint32_t e = PORT_U32(s, 0);
     if (e >= n || !is_dummy(str[e])) {
-        logf("mh4uport: %s name entry %u is not a dummy entry, left alone", port_monsters[m].name, e);
+        logf("mhgu-de: %s name entry %u is not a dummy entry, left alone", port_monsters[m].name, e);
         return;
     }
     str[e] = PORT_STR(s, 4 + 4 * lang);
-    logf("mh4uport: monster name entry %u = %s", e, str[e]);
+    logf("mhgu-de: monster name entry %u = %s", e, str[e]);
 }
 
 /* ---- items obtained (notes/items-append.md) ----
@@ -147,6 +147,78 @@ int obtained_test_c(uint32_t *regs)
 {
     uint32_t id = regs[R1] & 0xffff, bit, *w = id < PORT_ITEM_COUNT ? obtained_word(regs[R0], id, &bit) : 0;
     regs[R0] = w && (*w & bit) ? 1 : 0;      /* 0 / 1 as GU's test (`movwne r0, #1`): callers `cmp r0, #1` */
+    return 1;
+}
+
+/* ---- item box sort (Y in the item box; also 4 other menus) ----
+ * GU 0x199ae4(box) (C, disassembly): box this+0x1a {u16 id, s16 count} x slots, its sorted copy this+0x240a (same
+ * layout, 2300 entries), this+0x47fa u16 x slots set to 0xffff; slots = 1000 + 300 * 0x525878(sUserInfo) + 200 x
+ * (bits 21 and 22 of sUserInfo +0x958). It adds every stack's count into a u32[item count] array on its stack, writes
+ * stacks of 99 then the rest per ID in ID order, then bubble-sorts them by the item record's u16 +0x10 (ascending)
+ * and count (descending), a stable order. An ID past the item table (items of a build with more appended items: the
+ * maintainer's box held a WIP monster's materials 3048..3054, 2026-11-09) wrote past that array onto the saved
+ * registers (its caller's `this` + 5 = crash), and its record is null (GU's sort reads [null + 0x10]). Replaced
+ * (build.py REPLACE_HOOKS, with items appended) by the same merge and order on static buffers for every 12-bit ID
+ * (the save's item box width): the stacks of items past the table follow the known ones in ID order, kept. */
+#define BOX_SRC 0x1a
+#define BOX_DST 0x240a
+#define BOX_UNSET 0x47fa
+#define BOX_CAP 2300u
+#define BOX_IDS 4096u
+
+typedef int16_t (*box_pages_t)(void *user);                  /* 0x525878 */
+typedef const uint8_t *(*item_record_t)(void *mgr, uint32_t id);   /* 0x194228: rItemData record, 0 past the table */
+static uint32_t s_box_sum[BOX_IDS];
+static uint32_t s_box_ent[BOX_CAP];                          /* id | count << 16 */
+static uint32_t s_box_key[BOX_CAP];                          /* record +0x10, or 0x10000 + id past the table */
+
+static int box_before(uint32_t key, uint32_t ent, uint32_t key2, uint32_t ent2)   /* GU's swap test */
+{
+    return key < key2 || (key == key2 && (int16_t)(ent >> 16) > (int16_t)(ent2 >> 16));
+}
+
+int item_box_sort_c(uint32_t *regs)
+{
+    uint8_t *box = (uint8_t *)regs[R0];
+    void *user = *(void **)MAIN(0x1897f78), *mgr = *(void **)MAIN(0x18583a8);
+    uint32_t bits = FIELD(uint32_t, user, 0x958), n = 0, unknown = 0;
+    int32_t s = 1000 + 300 * FN(box_pages_t, 0x525878)(user) + 200 * (int32_t)((bits >> 21 & 1) + (bits >> 22 & 1));
+    uint32_t slots = s < 0 ? 0 : (uint32_t)s > BOX_CAP ? BOX_CAP : (uint32_t)s;
+    for (uint32_t k = 0; k < slots; k++) {
+        FIELD(uint16_t, box, BOX_DST + 4 * k) = 0;
+        FIELD(uint16_t, box, BOX_DST + 4 * k + 2) = 0;
+        FIELD(uint16_t, box, BOX_UNSET + 2 * k) = 0xffff;
+    }
+    for (uint32_t i = 0; i < BOX_IDS; i++) s_box_sum[i] = 0;
+    for (uint32_t k = 0; k < slots; k++) {
+        uint32_t id = FIELD(uint16_t, box, BOX_SRC + 4 * k);
+        if (id < BOX_IDS) s_box_sum[id] += (uint32_t)(int32_t)FIELD(int16_t, box, BOX_SRC + 4 * k + 2);
+    }
+    for (uint32_t id = 0; id < BOX_IDS; id++) {
+        const uint8_t *rec = s_box_sum[id] ? FN(item_record_t, 0x194228)(mgr, id) : 0;
+        uint32_t key = rec ? FIELD(uint16_t, rec, 0x10) : 0x10000u + id;
+        for (uint32_t c = s_box_sum[id]; c && n < BOX_CAP; n++) {
+            uint32_t q = c >= 99 ? 99 : c;
+            s_box_ent[n] = id | q << 16;
+            s_box_key[n] = key;
+            c -= q;
+            unknown += !rec;
+        }
+    }
+    for (uint32_t i = 1; i < n; i++) {                       /* insertion sort: stable, GU's bubble sort's order */
+        uint32_t e = s_box_ent[i], key = s_box_key[i], j = i;
+        for (; j && box_before(key, e, s_box_key[j - 1], s_box_ent[j - 1]); j--) {
+            s_box_ent[j] = s_box_ent[j - 1];
+            s_box_key[j] = s_box_key[j - 1];
+        }
+        s_box_ent[j] = e;
+        s_box_key[j] = key;
+    }
+    for (uint32_t k = 0; k < n; k++) {
+        FIELD(uint16_t, box, BOX_DST + 4 * k) = (uint16_t)s_box_ent[k];
+        FIELD(uint16_t, box, BOX_DST + 4 * k + 2) = (uint16_t)(s_box_ent[k] >> 16);
+    }
+    if (unknown) logf("mhgu-de: item box sort: %u stacks, %u of items past the table kept last", n, unknown);
     return 1;
 }
 
@@ -223,7 +295,7 @@ int bui_record_c(uint32_t *regs)
             continue;
         if ((!FIELD(uint16_t, s_bui[m], 4) || s_bui_rank[m] != rank + 1) && !bui_build(m, rank)) return 0;
         regs[R0] = (uint32_t)s_bui[m];
-        logf("mh4uport: break rewards for id %x: %s record (rank %d)", id, p->name, rank);
+        logf("mhgu-de: break rewards for id %x: %s record (rank %d)", id, p->name, rank);
         return 1;
     }
     return 0;

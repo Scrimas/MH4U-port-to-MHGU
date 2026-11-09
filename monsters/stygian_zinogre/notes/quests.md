@@ -100,8 +100,8 @@ GU RomFS, S = strong, G = guess.
   so quests not built yet take the placeholder too; cached, logged when missing), port.h PORT_QUESTS 12 +
   quest_append, build.py monsters_c, tools/alloc.py (QUESTS_PER_ENTRY 12, quest_append: no quest_slots, the
   placeholder 1111010 in no pool), allocations.toml (11 IDs in pools.quests; Stygian quests + quest_append = true).
-  Module 939956 bytes, clean. Log lines: "mh4uport: quest_group: N entries + 11 appended (indexes N..N+10)", and
-  "mh4uport: stygian_zinogre quest Q NOT present (...)" for each quest not built yet. To check in the first test:
+  Module 939956 bytes, clean. Log lines: "mhgu-de: quest_group: N entries + 11 appended (indexes N..N+10)", and
+  "mhgu-de: stygian_zinogre quest Q NOT present (...)" for each quest not built yet. To check in the first test:
   the board lists 10775 at HR7, the clear sets its bit (index 1509 on the v1.0 list; 1.4 may list more), no crash on
   the results screen. Per-index arrays (S, 2026-10-28): the 76 call sites of the entry getter 0x39bd1c (this, i ->
   entries + 12 i, 0 past +0x64) loop to +0x64 or look an ID up; the constants near them are quest IDs (0x259, 0x3ed,

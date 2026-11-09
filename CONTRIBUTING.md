@@ -65,7 +65,7 @@ repo.
 **Linux:**
 
 ```sh
-git clone https://github.com/Scrimas/MH4U-port-to-MHGU.git && cd MH4U-port-to-MHGU
+git clone https://github.com/Scrimas/MHGU-Definitive-Edition.git && cd MHGU-Definitive-Edition
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 source .venv/bin/activate          # fish: source .venv/bin/activate.fish
 # put your dumps in dump/ (table above), then:
@@ -79,7 +79,7 @@ GOG_MOD_ROOT=~/.config/Ryujinx/mods python3 module/build.py install   # into you
 **Windows** (PowerShell):
 
 ```powershell
-git clone https://github.com/Scrimas/MH4U-port-to-MHGU.git; cd MH4U-port-to-MHGU
+git clone https://github.com/Scrimas/MHGU-Definitive-Edition.git; cd MHGU-Definitive-Edition
 py -m venv .venv; .venv\Scripts\pip install -r requirements.txt
 .venv\Scripts\Activate.ps1         # if refused: Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 setx PYTHONUTF8 1                  # once, then open a new PowerShell (the tools read and write UTF-8 text)
@@ -91,17 +91,22 @@ python module\build.py
 $env:GOG_MOD_ROOT = "$env:APPDATA\Ryujinx\mods"; python module\build.py install
 ```
 
-Then start MHGU in Ryujinx and play the monster's quest. To remove the mod, delete the `MH4U Port` folder in
-`<Ryujinx mods>/contents/0100770008dd8000/` (Linux: `~/.config/Ryujinx/mods`, Windows: `%APPDATA%\Ryujinx\mods`),
-and unequip that monster's gear before removing it. `module/build.py install` without `GOG_MOD_ROOT` installs into
-`ryuroot/`, the maintainer's isolated test setup (`tools/ryutest.sh`, Linux only).
+Then start MHGU in Ryujinx and play the monster's quest. To remove the mod, delete the `MHGU Definitive Edition`
+folder in `<Ryujinx mods>/contents/0100770008dd8000/` (Linux: `~/.config/Ryujinx/mods`, Windows:
+`%APPDATA%\Ryujinx\mods`), and unequip that monster's gear before removing it. `module/build.py install` also removes
+`MH4U Port`, the mod's folder before 2.0.0. Without `GOG_MOD_ROOT` it installs into `ryuroot/`, the maintainer's
+isolated test setup (`tools/ryutest.sh`, Linux only).
 
 A monster's `build.py` runs its steps in order, one line each, with the step's own output in
 `dump/build_logs/<monster>/<step>.log`. `build.py STEP ...` re-runs only those steps; `build.py --list` lists them.
+A ported arena is a map package of its own (`maps/<map>/build.py`, same runner): build the map a monster `requires`
+(its `package.toml`) too; `module/build.py install` installs the required maps with the monster. A new arena = a new
+map package (`notes/porting-guide.md`, Phase 5).
 
 Feature and test switches are C `#ifdef`s: `GOG_DEFINES="NAME1 NAME2" python3 module/build.py` (PowerShell:
 `$env:GOG_DEFINES = "NAME1 NAME2"` first). Release builds use none. `python3 tools/release.py all` builds and packages a
-full release into `dump/release/`.
+full release into `dump/release/`; the maintainer publishes it on MHGU-Definitive-Edition-Packages
+(`tools/release.py publish`). This repository's own releases are the installer's (`installer/README.md`).
 
 ## Workflow
 

@@ -72,6 +72,18 @@ def packages(reg=None):
     return out
 
 
+def stage_map(m):
+    """the map package (maps/<name>) holding the stage alias of entry m (its allocations.toml stage_alias): the one
+    map in its package's `requires` whose package.toml folder is stage_alias[1]; None without stage_alias"""
+    if 'stage_alias' not in m: return None
+    maps = [r for r in paths.requires(m['name']) if paths.package_toml(r).get('kind') == 'map']
+    mine = [r for r in maps if paths.package_toml(r).get('folder') == m['stage_alias'][1]]
+    if len(mine) != 1:
+        raise KeyError('%s: stage_alias %s needs one required map with folder %d (package.toml requires: %s)' % (
+            m['name'], m['stage_alias'], m['stage_alias'][1], maps))
+    return mine[0]
+
+
 def offset(name, table, sub=None, reg=None):
     """records the monsters listed before `name` append to `table` (weapons: sub = 'w00'..)"""
     n = 0
@@ -196,6 +208,7 @@ def check(reg=None, gu_main=paths.GU_MAIN):
             if m.get('items') != [first, first + n_app - 1]:
                 errs.append('%s: items %s, expected [%d, %d] (append items = %d)' % (m['name'], m.get('items'),
                                                                                     first, first + n_app - 1, n_app))
+    errs += check_packages(reg)
     if gu_main and os.path.exists(gu_main):        # the em IDs must be free in GU's own registry
         img = open(gu_main, 'rb').read()
         gu_ids = {struct.unpack_from('<I', img, GU_PAIRS + 8 * i)[0] for i in range(GU_COUNT)}
@@ -206,6 +219,30 @@ def check(reg=None, gu_main=paths.GU_MAIN):
             if m.get('em_id', 0) >> 8 and em not in gu_ids | ported:   # a variant: variant 0 must exist (GU or ours)
                 errs.append('%s: em_id %#x is a variant of em %d, which neither GU nor a port has' %
                             (m['name'], m['em_id'], em))
+    return errs
+
+
+def check_packages(reg=None):
+    """package dependencies: every `requires` names a map package (maps/<name>/package.toml, kind "map"), an entry with
+    stage_alias requires exactly one map whose folder is stage_alias[1], every map is required by a monster"""
+    errs, used = [], set()
+    maps = paths.maps()
+    for p in packages(reg):
+        for r in paths.package_toml(p).get('requires', []):
+            if r not in maps or paths.package_toml(r).get('kind') != 'map':
+                errs.append('%s: requires %r, which is no map package (maps/<name>/package.toml)' % (p, r))
+            used.add(r)
+    for m in monsters(reg):
+        try:
+            stage_map(m)
+        except KeyError as e:
+            errs.append(str(e).strip('"\''))
+    for mp in maps:
+        t = paths.package_toml(mp)
+        if t.get('name') != mp or t.get('kind') != 'map' or not isinstance(t.get('folder'), int):
+            errs.append('maps/%s/package.toml: name = its folder, kind = "map" and a folder number' % mp)
+        if mp not in used:
+            errs.append('map %s is required by no monster' % mp)
     return errs
 
 

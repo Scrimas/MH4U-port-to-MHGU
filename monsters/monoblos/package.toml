@@ -1,6 +1,8 @@
 # Monoblos package: what the installer shows and installs, and the version written into its data file.
 name = "monoblos"
+kind = "monster"
 title = "Monoblos"
+subtitle = "Flying Wyvern"
 version = "1.0.0"       # bump on every published change of this monster's files (data, assets or code); 1.0.0:
                         # first release (core 1.9.0); 0.4.9:
                         # every turn of his (unaware, engaged, enraged) is the quick turn, the maintainer confirmed after
@@ -43,6 +45,7 @@ version = "1.0.0"       # bump on every published change of this monster's files
                         # stage 1 (notes/plan.md "Stages"): his model, own motions, dttune, name, icon, size, lease save
                         # and his three 4U quests; GU Diablos' AI and handlers (a deviation until stage 2)
 requires_core = "1.9.0"    # oldest core module (exefs) that runs this version: the save store (save = "lease")
+requires = []              # packages it needs besides the core (maps/<name>; later shared utilities)
 code = "em007_01"          # C prefix of its module code (hooks gated on GU variant 1)
 gu_class = "uEm007_00"     # GU's Diablos class runs it as variant 1 (module/build.py: registry DTI = donor's; built
                            # with that name at GU 0x50410, the class tools/apialign2.py pairs with 4U uEm099)

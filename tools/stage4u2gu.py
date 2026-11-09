@@ -6,7 +6,7 @@
                                                    [--keep-relation] [--keep-doors] [--keep-cart]
                                                    [--keep-static-doors] [--keep-static-cannons] [--keep-items]
                                                    [--keep-camera] [--keep-gate]
-                                                   build the alias stage arcs (default monsters/gogmazios/romfs); the --keep-*
+                                                   build the alias stage arcs (default maps/battlequarters/romfs); the --keep-*
                                                    flags fall back to the Fortress data of one session-5 change
                                                    (bisecting aid if the in-game test fails at area load)
 
@@ -1503,11 +1503,11 @@ def build_stage_arc(report):
 # 0x15542770, u32 0}; paths `sound\bgm\map\m26d\wav\m26a0Nd` = loose nativeNX/sound/bgm/map/m26d/wav/*.opus.
 # The sound agent's converted 4U streams are picked up from BGM_JSON when it exists:
 #   [{"stream": 0..3, "samples": n, "channels": c, "rate": r, "loop_start": a, "loop_end": b}, ...] with the opus at
-#   monsters/gogmazios/romfs/nativeNX/sound/bgm/map/m28d/wav/m28a0<stream>d.opus; listed streams get the m28d path
+#   maps/battlequarters/romfs/nativeNX/sound/bgm/map/m28d/wav/m28a0<stream>d.opus; listed streams get the m28d path
 #   (same string length), the others keep the Fortress stream.
 T_STQR = 0x167dbbff
 BGM_JSON = os.path.join(ROOT, 'dump', 'converted', 'bgm_m28.json')
-BGM_DIR = os.path.join(paths.romfs('gogmazios'), 'nativeNX', 'sound', 'bgm', 'map', 'm28d', 'wav')
+BGM_DIR = os.path.join(paths.map_romfs('battlequarters'), 'nativeNX', 'sound', 'bgm', 'map', 'm28d', 'wav')
 
 
 BGM_STQR = os.path.join(ROOT, 'dump', 'converted', 'bgm_m28d.stqr')   # sound agent's full replacement (preferred):
@@ -1579,6 +1579,6 @@ if __name__ == '__main__':
         KEEP.update(a[7:] for a in sys.argv[2:] if a.startswith('--keep-'))
         assert KEEP <= {'sets', 'filters', 'gimmicks', 'koware', 'sound', 'relation', 'doors', 'cart',
                         'static-doors', 'static-cannons', 'items', 'camera', 'gate'}, KEEP
-        alias(args[0] if args else paths.romfs('gogmazios'))
+        alias(args[0] if args else paths.map_romfs('battlequarters'))
     else:
         raise SystemExit(__doc__)

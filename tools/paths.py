@@ -10,6 +10,9 @@ Repo layout: tools/ + module/ + notes/ = shared core; monsters/<package>/{module
 monsters/<package>/{gen,romfs} = its generated tables and converted RomFS (gitignored: game data). A package holds one
 allocations.toml entry, or several (their `package` key, e.g. Dalamadur, Shah Dalamadur and their tail halves): the
 functions below take an entry name and resolve its package; gen/ keeps one data file per entry.
+maps/<map>/{package.toml,build.py,tools,notes} = a map package (a ported arena: stage arcs, map UI, map_com, stage
+BGM), required by the monsters whose package.toml lists it in `requires`; maps/<map>/romfs = its converted RomFS
+(gitignored). A map has no allocations.toml entry: its stage folder is the stage_alias of the monsters requiring it.
 """
 import glob, os, tomllib
 
@@ -52,3 +55,43 @@ def romfs(name):
 def gen(name):
     """monsters/<package>/gen: generated tables and the entries' data files <name>.bin"""
     return os.path.join(monster(name), 'gen')
+
+
+MAPS = os.path.join(ROOT, 'maps')
+
+
+def maps():
+    """map package names (maps/<name>/package.toml), sorted"""
+    return sorted(os.path.basename(os.path.dirname(p)) for p in glob.glob(os.path.join(MAPS, '*', 'package.toml')))
+
+
+def map_dir(name):
+    """maps/<name>"""
+    return os.path.join(MAPS, name)
+
+
+def map_romfs(name):
+    """maps/<name>/romfs: the map's converted RomFS (nativeNX/...)"""
+    return os.path.join(map_dir(name), 'romfs')
+
+
+def package_dir(name):
+    """the folder of any package: maps/<name> for a map, else monsters/<package of name>"""
+    return map_dir(name) if os.path.exists(os.path.join(map_dir(name), 'package.toml')) else monster(name)
+
+
+def package_toml(name):
+    """the package.toml of any package: a map, or the package of a monster entry (KeyError: no such package)"""
+    p = os.path.join(package_dir(name), 'package.toml')
+    if not os.path.exists(p): raise KeyError('no package %r (maps/<name> or monsters/<name>)' % name)
+    with open(p, 'rb') as f:
+        return tomllib.load(f)
+
+
+def requires(name):
+    """every package that package `name` needs besides the core (its `requires`, theirs first), without itself"""
+    out = []
+    for r in package_toml(name).get('requires', []):
+        for x in requires(r) + [r]:
+            if x not in out: out.append(x)
+    return out

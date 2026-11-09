@@ -11,7 +11,7 @@ data, **S** strong, **G** guess.
 attacks, like Black Gravios"). Played solo on Ryujinx: quests 10784, 10785, 11452 (logs of 2026-11-05 and 11-06), two real
 hunts of 10784 through the store. yuzu / Eden and the PC recomp not run. Not in a saved log yet: the village quests 1057..1059,
 a broken horn, sleeping and eating, a kill in a capture quest. Test log lines: "mbport: em007_01 ..." (actions / motions),
-"mbport: parts", "mh4uport: monoblos leases save slot". The dated sections below are the build's history.
+"mbport: parts", "mhgu-de: monoblos leases save slot". The dated sections below are the build's history.
 
 ## Phase 0: identification
 - 4U em numbers (C, 4U emName): 99 Diablos, 100 Black Diablos, 101 Monoblos, 102 White Monoblos, 119 'Diablos'

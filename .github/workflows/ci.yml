@@ -36,7 +36,7 @@ jobs:
       - name: Python compiles
         run: git ls-files -z '*.py' | xargs -0 python -m py_compile
       - name: Build scripts list their steps
-        run: for b in monsters/*/build.py; do python -X utf8 "$b" --list > /dev/null || exit 1; done
+        run: for b in monsters/*/build.py maps/*/build.py; do python -X utf8 "$b" --list > /dev/null || exit 1; done
       - name: C compiles
         run: |
           pip install -q numpy Pillow
