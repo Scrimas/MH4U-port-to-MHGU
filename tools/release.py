@@ -15,7 +15,8 @@ main).
                              (.github/workflows/installer.yml): a release of the mod is refused there. Then main-notes.
   release.py main-notes [DIR]
                              REPO's draft v<installer version> (drafted by the workflow on the tag) gets NOTES-main.md
-                             as its text, above GitHub's generated notes; a published release is left alone
+                             as its whole text and the title "MHGU Definitive Edition <version>"; a published release
+                             is left alone
 
 Packages: core-<v>.zip = MHGU Definitive Edition/exefs/{subsdk1, <build id>.ips} + MHGU Definitive
 Edition/romfs/nativeNX/mhgu_de/<every monster>.bin (always installed together: gear IDs depend on all of them) + the
@@ -419,15 +420,13 @@ def notes_main(c, pk, rel, pre=None):
     return '\n'.join(lines) + '\n'
 
 
-MAIN_MARK = "<!-- release.py: NOTES-main.md above, GitHub's notes below -->"
-
-
 def main_notes(out):
-    """REPO's draft v<installer version> gets NOTES-main.md as its text, above the notes GitHub generated (kept); a
-    published release is left alone"""
-    tag, body = 'v' + installer_version(), os.path.join(out, 'NOTES-main.md')
+    """REPO's draft v<installer version> gets NOTES-main.md as its whole text and the title "MHGU Definitive Edition
+    <version>" (the maintainer's format, 2.0.0); a published release is left alone"""
+    v = installer_version()
+    tag, body = 'v' + v, os.path.join(out, 'NOTES-main.md')
     assert os.path.exists(body), 'package %s first' % out
-    r = subprocess.run(['gh', 'release', 'view', tag, '--repo', REPO, '--json', 'isDraft,body'], capture_output=True,
+    r = subprocess.run(['gh', 'release', 'view', tag, '--repo', REPO, '--json', 'isDraft'], capture_output=True,
                        text=True)
     if r.returncode:
         print('no release %s on %s yet (.github/workflows/installer.yml drafts it on the tag): run release.py '
@@ -437,11 +436,9 @@ def main_notes(out):
     if not d['isDraft']:
         print('%s on %s is published: its text is left alone' % (tag, REPO))
         return
-    generated = d['body'].split(MAIN_MARK, 1)[-1].strip()
-    text = open(body, encoding='utf-8').read().rstrip() + '\n\n' + MAIN_MARK + '\n\n' + generated + '\n'
-    subprocess.run(['gh', 'release', 'edit', tag, '--repo', REPO, '--notes-file', '-'], input=text, text=True,
-                   check=True)
-    print("%s on %s (draft): NOTES-main.md above GitHub's notes" % (tag, REPO))
+    subprocess.run(['gh', 'release', 'edit', tag, '--repo', REPO, '--title', '%s %s' % (MOD_NAME, v), '--notes-file',
+                    body], check=True)
+    print('%s on %s (draft): NOTES-main.md as its text' % (tag, REPO))
 
 
 def publish(out, repo, yes, draft):

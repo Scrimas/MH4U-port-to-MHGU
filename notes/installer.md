@@ -26,7 +26,8 @@ again, with the saves of those places migrated and cleaned. Decisions are the ma
   the installer tells its own by their files. One release-list call per repository and start (no `releases/latest`).
   Each release: the tag `v<version>` on main drafts the installer's release (the maintainer publishes it),
   `release.py publish` publishes the zips on -Packages with NOTES.md, then gives the draft NOTES-main.md (What's
-  new, monsters and quests, install, tips) above GitHub's generated notes (`release.py main-notes` again later).
+  new, monsters and quests, install, tips) as its whole text and the title "MHGU Definitive Edition <version>"
+  (`release.py main-notes` when the draft comes later).
 - Releases before 2.0.0 have no manifest: the installer installs 2.0.0 and later (no rollback, so nothing is lost).
 
 ## Packages
