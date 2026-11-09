@@ -655,7 +655,9 @@ pub fn apply(
     let key = {
         use sha2::{Digest, Sha256};
         let h = Sha256::digest(f.file.to_string_lossy().as_bytes());
-        format!("{}-{}", name_of(f.file.parent().unwrap_or(Path::new(""))), crate::source::hex(&h[..4]))
+        // the save's own folder (Ryujinx `<id>` holding 0/ and 1/), else the folder of the file
+        let dir = loc.save_dir.clone().or_else(|| f.file.parent().map(Path::to_path_buf)).unwrap_or_default();
+        format!("{}-{}", name_of(&dir), crate::source::hex(&h[..4]))
     };
     let snap_name = format!("{}-{release}", stamp());
     let snap = store::snapshot(&loc, &backups.join(&key), &snap_name)
@@ -882,6 +884,11 @@ mod tests {
         let done = apply(&found[0], &steps, None, &d.join("backups"), "1.11.0").unwrap();
         let snap = done.backup.unwrap();
         assert!(snap.join("1/system_backup").is_file(), "every copy backed up");
+        assert!(
+            name_of(snap.parent().unwrap()).starts_with("0000000000000002-"),
+            "named after the save: {}",
+            snap.display()
+        );
         for c in ["0/system", "0/system_backup", "1/system", "1/system_backup"] {
             let s2 =
                 Save::from_bytes(std::fs::read(ryu.join("bis/user/save/0000000000000002").join(c)).unwrap()).unwrap();

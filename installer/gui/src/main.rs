@@ -97,6 +97,9 @@ fn human(n: u64) -> String {
 }
 
 fn open_url(url: &str) {
+    if url.is_empty() {
+        return;
+    }
     #[cfg(windows)]
     let r = std::process::Command::new("explorer").arg(url).spawn();
     #[cfg(not(windows))]
@@ -363,7 +366,8 @@ fn refresh(app: &mut App, ui: &AppWindow) {
         ui.set_action_enabled(false);
         return;
     };
-    ui.set_has_release(true);
+    // the "What's new" link: only with a release page to open (a local release has none)
+    ui.set_has_release(app.release.as_ref().is_some_and(|r| !r.page.is_empty()));
     let pre = if m.prerelease { format!(" ({})", tr("pre-release")) } else { String::new() };
     ui.set_release_line(format!("{}{pre} ·", trf("Release {}", &[&m.release])).into());
     // plans of the ticked places
