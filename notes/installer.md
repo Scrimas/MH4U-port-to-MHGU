@@ -91,7 +91,9 @@ enabled unless mods/load_order.txt marks it `# off:`): strong, not confirmed; th
 - Self-update: the newest `installer-v*` release with its `SHA256SUMS-<v>`, checked at start (Settings switch),
   downloaded beside the running file and swapped in (Windows: the old .exe renamed aside, deleted at the next start;
   Linux: $APPIMAGE replaced), then restarted. Checksums catch a broken download, not a forged release.
-- Settings and the download cache: `<config>/mh4uport-installer/settings.json`, `<cache>/mh4uport-installer/`.
+- Settings and the download cache: `<config>/mh4uport-installer/settings.json`, `<cache>/mh4uport-installer/<release>/`;
+  after each install only the installed release's zips stay (they serve another place later), older releases'
+  folders are deleted.
 - Languages: MHGU_Editor's set (en, fr, de, es, it, zh_TW, zh_CN), gettext catalogs in `installer/gui/lang/`
   (`installer/tools/i18n.py`); English now, the other catalogs empty.
 - Tests: core unit tests (synthetic saves: zeros with valid slot pointers, no game data), `installer/tests/cli_test.py`

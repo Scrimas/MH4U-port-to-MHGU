@@ -74,6 +74,31 @@ pub fn fetch(
     Ok(out)
 }
 
+/// After a successful install: delete the cache folders of every other release (`cache/<release>/`), keeping `keep`'s
+/// (its zips serve another place later); only folders named like a release version are touched. Returns the bytes
+/// freed.
+pub fn prune_cache(cache: &Path, keep: &str) -> u64 {
+    fn size(p: &Path) -> u64 {
+        std::fs::read_dir(p)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .map(|e| if e.path().is_dir() { size(&e.path()) } else { e.metadata().map(|m| m.len()).unwrap_or(0) })
+            .sum()
+    }
+    let mut freed = 0;
+    for e in std::fs::read_dir(cache).into_iter().flatten().flatten() {
+        let name = e.file_name().to_string_lossy().into_owned();
+        if name != keep && e.path().is_dir() && crate::version::Version::parse(&name).is_some() {
+            let n = size(&e.path());
+            if std::fs::remove_dir_all(e.path()).is_ok() {
+                freed += n;
+            }
+        }
+    }
+    freed
+}
+
 fn write_file(to: &Path, data: &[u8]) -> Result<(), String> {
     let err = |e: std::io::Error| trf("Could not write {} ({})", &[&to.display(), &e]);
     if let Some(d) = to.parent() {
@@ -426,6 +451,25 @@ mod tests {
         assert!(e.contains("does not list"), "{e}");
         assert!(!d.join("mods/MH4U Port").exists() && !d.join("escape").exists(), "nothing installed, nothing escaped");
         assert!(files(&d.join("mods")).is_empty(), "no staging left");
+        std::fs::remove_dir_all(&d).unwrap();
+    }
+
+    #[test]
+    fn the_cache_keeps_only_the_installed_release() {
+        let d = tmp("prune");
+        for (dir, f) in
+            [("1.9.0", "core-1.9.0.zip"), ("1.10.0", "core-1.10.0.zip"), ("1.11.0-pre.1", "a.zip"), ("notes", "x")]
+        {
+            std::fs::create_dir_all(d.join(dir)).unwrap();
+            std::fs::write(d.join(dir).join(f), "12345").unwrap();
+        }
+        assert_eq!(prune_cache(&d, "1.10.0"), 10);
+        assert!(
+            d.join("1.10.0/core-1.10.0.zip").is_file() && d.join("notes/x").is_file(),
+            "kept: this release, not a release"
+        );
+        assert!(!d.join("1.9.0").exists() && !d.join("1.11.0-pre.1").exists());
+        assert_eq!(prune_cache(&d.join("missing"), "1.10.0"), 0);
         std::fs::remove_dir_all(&d).unwrap();
     }
 

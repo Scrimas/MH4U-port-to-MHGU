@@ -1,5 +1,6 @@
 //! The installer's settings: `<config>/mh4uport-installer/settings.json` (Linux ~/.config, Windows %APPDATA%), and
-//! its download cache `<cache>/mh4uport-installer/` (Linux ~/.cache, Windows %LOCALAPPDATA%).
+//! its download cache `<cache>/mh4uport-installer/<release>/` (Linux ~/.cache, Windows %LOCALAPPDATA%): only the
+//! installed release's zips stay (apply.rs prune_cache after each install).
 
 use crate::places::Custom;
 use serde::{Deserialize, Serialize};

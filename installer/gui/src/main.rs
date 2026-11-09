@@ -775,6 +775,8 @@ fn start_install(app: &mut App, ui: &AppWindow, remove_all: bool) {
                 apply::install(place, &m, state, plan, &zips, &|_, _, _| {}, &cancel)
                     .map_err(|e| trf("{}: {}", &[&place.name, &e]))?;
             }
+            // the zips of other releases are not needed any more
+            apply::prune_cache(&settings::cache_dir(), &m.release);
             // the saves, once the files of their release are in place; one failing does not stop the others
             let mut errors = vec![];
             let mut updated = 0;

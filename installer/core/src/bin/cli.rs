@@ -174,6 +174,7 @@ fn main() {
                     println!("{}: done", p.name);
                 }
             }
+            apply::prune_cache(&cache, &m.release);
             for (f, clean) in &save_jobs {
                 let done =
                     saves::apply(f, &steps, clean.as_ref().map(|(o, c)| (o, *c)), &saves::backup_dir(), &m.release)
