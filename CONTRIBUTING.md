@@ -98,6 +98,9 @@ and unequip that monster's gear before removing it. `module/build.py install` wi
 
 A monster's `build.py` runs its steps in order, one line each, with the step's own output in
 `dump/build_logs/<monster>/<step>.log`. `build.py STEP ...` re-runs only those steps; `build.py --list` lists them.
+A ported arena is a map package of its own (`maps/<map>/build.py`, same runner): build the map a monster `requires`
+(its `package.toml`) too; `module/build.py install` installs the required maps with the monster. A new arena = a new
+map package (`notes/porting-guide.md`, Phase 5).
 
 Feature and test switches are C `#ifdef`s: `GOG_DEFINES="NAME1 NAME2" python3 module/build.py` (PowerShell:
 `$env:GOG_DEFINES = "NAME1 NAME2"` first). Release builds use none. `python3 tools/release.py all` builds and packages a

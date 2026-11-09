@@ -47,11 +47,21 @@ monster's MH4U rank falls among MHGU's quests of the same species.
 
 ## Install
 
-1. Download every zip you want from **one** release on the [Releases](../../releases) page.
+**With the installer** (Windows, Linux): download the latest *MH4U Port Installer* from the
+[Releases](../../releases?q=installer) page (`.exe` for Windows, `.AppImage` for Linux) and run it. Tick where to
+install (Ryujinx, yuzu / Eden and their forks, an Atmosphère SD card, any folder) and the monsters you want: it
+downloads them with the arenas they need, updates them to new releases, removes them, and keeps your saves in step
+(a backup of every save first).
+
+**By hand:**
+
+1. Download every zip you want from **one** release on the [Releases](../../releases) page: `core`, the monsters,
+   and the maps (`map-...`) they need (the release text lists them).
 2. Open the game's mod folder:
    - Ryujinx: right-click MHGU > *Open Mods Directory*
    - Yuzu / Eden: right-click MHGU > *Open Mod Data Location*
-3. Extract `core` (always needed), then the monsters you want. They all merge into one single `MH4U Port` folder.
+3. Extract `core` (always needed), then the monsters and their maps. They all merge into one single `MH4U Port`
+   folder.
 
 > [!WARNING]
 > - **Never mix zips from different releases.** A release is one matched set. To update, delete `MH4U Port` and

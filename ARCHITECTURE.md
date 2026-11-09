@@ -20,10 +20,12 @@ A release is one mod folder, `MH4U Port/`, loaded by the emulator (Ryujinx) or A
 | `exefs/subsdk1` | `module/` (C) + each monster's `module/` | Code injected into GU: hooks and the ported monster classes |
 | `exefs/<build id>.ips` | `module/build.py` | Patch to GU's `main` that branches into the hooks (trampolines) |
 | `romfs/nativeNX/mh4uport/<name>.bin` | `monsters/<name>/gen/` (`tools/portdata.py`) | Per-monster data file read by the code at run time |
-| `romfs/nativeNX/...` (arcs, textures, sounds) | `monsters/<name>/romfs/` | Converted 4U assets (layeredFS) |
+| `romfs/nativeNX/...` (arcs, textures, sounds) | `monsters/<name>/romfs/`, `maps/<map>/romfs/` | Converted 4U assets (layeredFS) |
 
-Release = `core-<v>.zip` (exefs + data files) + one optional zip per monster (its assets), all merged into the same
-folder. A release's zips are one matched set: never mix versions.
+Release = `core-<v>.zip` (exefs + data files) + one optional zip per monster (its assets) + one per map (a ported
+arena, `map-<map>-<v>.zip`, needed by the monsters that `require` it), all merged into the same folder, with a
+`manifest.json` and `icons-<v>.zip` for the installer (notes/installer.md). A release's zips are one matched set:
+never mix versions.
 
 ## Repository layout
 
@@ -77,13 +79,19 @@ monsters/<name>/      One port each: gogmazios, dalamadur, stygian_zinogre, tige
   module/               the monster's C code (class, actions, shells, effects, stage gimmicks),
                         compiled into subsdk1 with the core
   notes/                study notes, behaviour notes, port checklist, release notes
+maps/<map>/           One ported arena each: battlequarters (m28), speartip_crag (m29), heavens_mount (m30)
+  package.toml          kind "map", version, folder (= the monsters' stage_alias), [stage] (compiled into the core)
+  build.py, tools/      its alias stage arcs, map UI, map_com, area streams (tools/steps.py)
+  notes/                links to the study notes (kept with the port that made the arena)
 weapons/magnet_spike/ WIP: MHF-ZZ weapon class on GU's weapon class slot 5 (tools/, gen/, romfs/)
 requirements.txt      Python packages (one .venv for every tool)
-installer/            Rust + Slint GUI installer (AppImage / exe via .github/workflows). Dormant:
-                      releases ship zips only.
+migrations.toml       save migration steps for the installer (empty: shipped IDs never move)
+installer/            MH4U Port Installer (Rust + Slint): core/ (releases, places, planner, install, saves),
+                      gui/, vendor/mhgu-save (MHGU_Editor's save parser), tests/, packaging/ (notes/installer.md)
 notes/                Project docs: porting-guide (start here), port, api-map, data, enemy-class,
                       registry, gear-weapons, items-append, assets, installer, release-news
-.github/workflows/    Manual installer build (a release itself cannot be built in CI: it needs ~15 GB of dumps)
+.github/workflows/    ci.yml (checks without game data), installer.yml (installer tests; builds and a draft
+                      release on installer-v* tags). A mod release cannot be built in CI: it needs ~15 GB of dumps
 ```
 
 ### Local only (gitignored)
@@ -93,6 +101,7 @@ dump/                 Game dumps and everything derived from them (detailed belo
 monsters/*/romfs*/    Converted assets of each monster (its assets package; romfs-<donor>/ = alternative or
                       experimental builds)
 monsters/*/gen/       Generated tables holding 4U text / records -> packed into <name>.bin
+maps/*/romfs/         Converted assets of each map package
 ryuroot/              Isolated Ryujinx data dir used by tools/ryutest.sh (keys, mods, test save)
 module/out/           Build output (subsdk1, IPS, alloc.h)
 installer/target|dist Rust build output
@@ -181,6 +190,7 @@ stay local; `notes/` records what came out of them.
 your 4U / GU dumps (dump/)
   -> python3 tools/setup.py        derived inputs in dump/ (once; tools/doctor.py checks everything)
   -> python3 monsters/<name>/build.py   converters write monsters/<name>/romfs/ and gen/
+  -> python3 maps/<map>/build.py        the arenas' converters write maps/<map>/romfs/
   -> python3 module/build.py       core + every monster's module/ -> subsdk1 + IPS (reads allocations.toml)
   -> python3 tools/release.py all  build + checks + zips into dump/release/v<core version>/
 ```
