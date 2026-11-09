@@ -350,10 +350,13 @@ component SettingRow inherits Rectangle {
 export component AppWindow inherits Window {
     title: @tr("MH4U Port Installer");
     icon: @image-url("../assets/icon-256.png");
+    // a fixed size (min = max): Hyprland and other tiling compositors open it floating, centered, at this size
     preferred-width: 1066px;
     preferred-height: 600px;
     min-width: 1066px;
     min-height: 600px;
+    max-width: 1066px;
+    max-height: 600px;
     background: Tok.page;
 
     // header
