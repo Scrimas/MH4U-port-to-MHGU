@@ -20,9 +20,8 @@ icon atlases micon_sd/hd.tex and hudicon_sd/hd.tex; <monster>-<v>.zip = MHGU Def
 monster's assets, optional); map-<map>-<v>.zip = a map package's RomFS (maps/<map>: a ported arena, installed with the
 monsters that require it). Every zip extracts into the game's mod directory ('<mods>/contents/<title>/' for Ryujinx,
 '<load>/<TITLE>/' for the yuzu family) and they merge into the one 'MHGU Definitive Edition' folder. NOTES.md (the
-release text): what the mod is, What's new (notes/release-news.md, one section per core version: write it before
-packaging), the monsters and their quests (read from the quest files), install / update / online play, files with
-sha256, warnings.
+release text): What's new (notes/release-news.md, one section per core version: write it before packaging), then how
+to install: the installer, or by hand (the maps each monster needs).
 manifest.json (schema 1) is what the MHGU Definitive Edition Installer reads (installer/core/src/manifest.rs,
 notes/installer.md): the release, every package with its zip, size, sha256, requires and every file (path below 'MHGU
 Definitive Edition/', size, sha256), the save migrations and cleaning data (empty until the installer migrates saves)
@@ -314,7 +313,7 @@ def package(out, pre=None):
         json.dump(manifest(rel, pre, c, pk, out, icons), f, indent=1, ensure_ascii=False)
         f.write('\n')
     with open(os.path.join(out, 'NOTES.md'), 'w', encoding='utf-8') as f:
-        f.write(notes(c, pk, out, rel, pre))
+        f.write(notes(c, pk, pre))
     for f in sorted(os.listdir(out)):
         print('%10d %s' % (os.path.getsize(os.path.join(out, f)), os.path.join(out, f)))
     return out
@@ -333,73 +332,29 @@ def news(version):
     return [l for l in text[i:j]]
 
 
-def quests(p):
-    """[(monster title, rank, quest title)] of a package's shipped quests: board from the ID (below 10000 = Village,
-    GU's numbering; questData +0x11 is a quest type, not the board: GU uses 0..10 on both), rank from questData +0x12
-    stars (Hub: 1..7 = Low / High Rank, 11.. = G1..; Village: the star count), title = the English GMD's first
-    string"""
-    sys.path.insert(0, paths.GU_PY)
-    import gmd
-    rf, out = p['romfs'], []
-    for m in p['entries']:
-        for q in m.get('quests', []):
-            qd = open(os.path.join(rf, 'nativeNX/loc/quest/questData/questData_%07d.ext' % q), 'rb').read()
-            star = qd[0x12]
-            if q < 10000:
-                board, rank = 'Village', '★%d' % star
-            else:
-                board = 'Hub'
-                rank = 'G★%d' % (star - 10) if star > 10 else '%s ★%d' % ('High Rank' if star >= 4 else 'Low Rank', star)
-            title = gmd.gmd_strings(open(os.path.join(rf, 'nativeNX/eng/quest/questData/questData_%07d_eng.gmd' % q),
-                                         'rb').read())[0]
-            out.append((m.get('title', p['title']), '%s %s' % (board, rank), title))
-    return out
-
-
-def notes(c, pk, out, rel=None, pre=None):
-    """release text: what the mod is, What's new (notes/release-news.md), the monsters and their quests, the maps,
-    install (the installer first) / update / online play, the files with their sha256, the warnings"""
+def notes(c, pk, pre=None):
+    """release text: What's new (notes/release-news.md), then how to install: the installer, or by hand"""
     v = c['version']
-    rel = rel or v
+    by = {p['name']: p for p in pk}
+    assert all(r in by for p in pk for r in p.get('requires', [])), 'requires a package that is not in the release'
+    need = ', '.join('`%s` for %s' % (zip_name(mp), ', '.join(p['title'] for p in pk if mp['name'] in p.get('requires', [])))
+                     for mp in pk if mp.get('kind') == 'map')
     lines = (['> **Pre-release**: a test build that may contain bugs; use it at your own discretion (the installer '
               'offers it only when pre-releases are switched on in its Settings).', ''] if pre else []) + \
-            ['MH4U monsters in MHGU (Switch 1.4): the monsters, their arenas, music, quests and gear. '
-             'Take zips from only one release (do not mix zips taken from different releases).', '',
-             "## What's new"] + '\n'.join(news(v)).strip().split('\n') + ['', '## Monsters and quests',
-             'On the Hub quest board (Village: on the village board):']
-    for p in pk:
-        qs = quests(p)
-        for t in dict.fromkeys(t for t, _, _ in qs):
-            mine = [(r.replace('Hub ', ''), q) for tt, r, q in qs if tt == t]
-            lines.append('- **%s**: %s' % (t, ' · '.join('%s: %s' % (r, ', '.join('*%s*' % q for rr, q in mine if rr == r))
-                                                          for r in dict.fromkeys(r for r, _ in mine))))
-    by = {p['name']: p for p in pk}
-    maps = [p for p in pk if p.get('kind') == 'map']
-    if maps:
-        lines += ['', '## Maps', 'The ported arenas, each a zip of its own, needed by the monsters fought there:']
-        for mp in maps:
-            need = [p['title'] for p in pk if mp['name'] in p.get('requires', [])]
-            lines.append('- **%s** (`%s`): needed by %s' % (mp['title'], zip_name(mp), ', '.join(need)))
+            ["## What's new"] + '\n'.join(news(v)).strip().split('\n')
     lines += ['', '## Install',
               '**With the installer** (Windows, Linux): download the [MHGU Definitive Edition Installer]'
               '(https://github.com/%s/releases/latest) and run it. Tick where to install (Ryujinx, the yuzu '
               'family, an SD card...) and the monsters you want: it downloads them with the maps they need, and '
               'updates or removes them later.' % REPO, '',
               '**By hand**:',
-              '1. Open the mod folder: Ryujinx: right-click MHGU > Open Mods Directory. yuzu / Eden and others: '
+              '1. Download the zips you want from this release only (never mix zips from different releases).',
+              '2. Open the mod folder: Ryujinx: right-click MHGU > Open Mods Directory. yuzu / Eden and others: '
               'right-click MHGU > Open Mod Data Location.',
-              '2. Extract **core** (always), then the monsters you want and the maps they need (`map-...` zips, '
-              'above). They all merge into one `%s` folder.' % MOD_NAME,
-              '3. To update: delete `%s` (and `%s`, its name before 2.0.0), then extract the new zips.'
-              % (MOD_NAME, LEGACY_NAME), '',
-              '- **Online**: everyone needs the same release and the same monsters.',
-              '- **Removing a monster**: unequip its armor and weapons first (their models leave with it).', '',
-              '<details><summary>Files (sha256)</summary>', '',
-              '- core-%s.zip `%s`' % (v, sha256(os.path.join(out, 'core-%s.zip' % v)))]
-    for z in [zip_name(p) for p in pk] + ['icons-%s.zip' % rel, 'manifest.json']:
-        lines.append('- %s `%s`' % (z, sha256(os.path.join(out, z))))
-    lines += ['', '</details>']
-    assert all(r in by for p in pk for r in p.get('requires', [])), 'requires a package that is not in the release'
+              '3. Extract **core** (always), then the monsters you want and the maps they need (%s). They all merge '
+              'into one `%s` folder.' % (need, MOD_NAME),
+              '4. To update: delete `%s` (and `%s`, its name before 2.0.0), then extract the new zips.'
+              % (MOD_NAME, LEGACY_NAME)]
     return '\n'.join(lines) + '\n'
 
 
