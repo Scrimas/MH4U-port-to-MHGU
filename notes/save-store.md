@@ -1,5 +1,9 @@
 # The mod's save store and per-quest slot leases (module/save.c)
 
+**Bits under a key** (Shrouded Nerscylla, 2026-11-06): a record whose first field is a key 0xf001.. instead of an em ID (no em ID is that high) holds 80 bits in its 5 other fields
+(save.c save_bits_get / save_bits_set, same seal). module/gear.c keeps there the armor "listed" bits past GU's 576 records per part, one key per part: GU's arrays are never touched. Nothing else
+reads these records: every reader looks a record up by em ID, the `loaded:` / `saving:` log lines print the key like an em ID, and a core without this code leaves them alone.
+
 2026-11-04, for issue #16 (Monoblos): every save slot is taken, and a monster without one crashes the game at quest
 end (maintainer). This is the smaller step of the save concept: new monsters borrow a slot for their quest, and their
 numbers go to a store of the mod's own inside the character's save data. The monsters shipped up to v1.8.0 keep their
@@ -126,11 +130,11 @@ captures plus the store's records (`loaded:` / `saving:`).
 
 ## Tests
 
-- `python3 tools/test_save.py`: save.c with the module's flags under unicorn (ARM), 12 tests on a fake character with
+- `python3 tools/test_save.py`: save.c with the module's flags under unicorn (ARM), 13 tests on a fake character with
   the real IDs of v1.8.0 and two test lessees: fixed slots write no byte; a lessee's quest (lease, dressing, writes
   and reads with GU's rules); an owner taking its slot back; the same-quest conflict; two lessees in one quest; data
   that is not a store, a damaged store, a newer version and a full store (never written); the 9999 cap; no
-  character; a character load; a record's crown and cm. Every test of the store checks every byte of the character
+  character; a character load; a record's crown and cm; bits under a key. Every test of the store checks every byte of the character
   outside it.
 - In game (Ryujinx, solo): a real hunt of Monoblos, quest 10784, 2026-11-05: `monoblos leases save slot 109 (id 1068)`,
   `monoblos +1 hunt(s) -> store 1 (slot 1068 untouched)`, `monoblos size 114: largest record new`, the `saving:` lines show

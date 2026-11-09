@@ -309,9 +309,35 @@ def area_multiply(word, rgba):
     return struct.unpack('<I', c.astype(np.uint32).astype(np.uint8).tobytes())[0]
 
 
-def unit_4u_to_gu(blk, utype, area=None, block_area=None):
+def intensity_word(word, n):
+    """a colour word (bytes R, G, B, A) at 4U's Intensity n: RGB x 2^n, clamped, alpha kept (UNIT_INTENSITY: PICA RGB scale, the alpha has none)"""
+    b = struct.pack('<I', word)
+    return struct.unpack('<I', bytes(min(255, c << n) for c in b[:3]) + b[3:])[0]
+
+
+def intensity_bake(out, n):
+    """unit bytes: 4U's Intensity n into its colour words and colour curve keys (opt-in, spec intensity). Without it a unit that 4U draws at 2x / 4x comes out at 1/2 / 1/4: Tidal
+    Najarala's snow dust em093_003 is ffa5a5a5 x the Frozen Seaway soil x 2 = white in 4U and a grey (136, 146, 150) in GU (user's test 2026-11-06: "die fehlen noch"). The clamp sits
+    on the colour here, in 4U on colour x texture, so GU never gets brighter than 4U. Particle units only (types 0, 1, 2: UNIT_INTENSITY's evidence)."""
+    for o in (0x48, 0x4c):
+        struct.pack_into('<I', out, o, intensity_word(struct.unpack_from('<I', out, o)[0], n))
+    a = struct.unpack_from('<I', out, 0x40)[0] >> 16
+    while a and a + 4 <= len(out):
+        h = struct.unpack_from('<I', out, a)[0]
+        if not h & 0xFF or (h >> 8) & 0xFF != 2:
+            break
+        if h >> 24 == 0:
+            for i in range(h & 0xFF):
+                for o in (a + 8 + 12 * i, a + 12 + 12 * i):
+                    struct.pack_into('<I', out, o, intensity_word(struct.unpack_from('<I', out, o)[0], n))
+        a += 4 + 12 * (h & 0xFF)
+
+
+def unit_4u_to_gu(blk, utype, area=None, block_area=None, intensity=False):
     """area: the colour baked into mode-5 units (None = none, 'code' = code-coloured file); block_area: the colour
-    baked into the mode-0 / mode-5 units of an area-block file (4U multiplies every one of them)."""
+    baked into the mode-0 / mode-5 units of an area-block file (4U multiplies every one of them); intensity: bake 4U's
+    Intensity into the colours (intensity_bake, opt-in)."""
+    level = (struct.unpack_from('<I', blk, 0x18)[0] & UNIT_INTENSITY) >> 12
     w = struct.unpack_from('<I', blk, 0x18)[0] & ~UNIT_INTENSITY
     if utype in (0, 1, 2):
         w |= UNIT_GU_B19
@@ -339,11 +365,14 @@ def unit_4u_to_gu(blk, utype, area=None, block_area=None):
                     for o in (a + 8 + 12 * i, a + 12 + 12 * i):
                         struct.pack_into('<I', out, o, area_multiply(struct.unpack_from('<I', blk, o)[0], area))
             a += 4 + 12 * (h & 0xFF)
+    if intensity and level and utype in (0, 1, 2):
+        intensity_bake(out, level)
     return bytes(out)
 
 
-def convert_efl(d, log=None, soil=M19A03_AREA_SOIL):
-    """soil = RGBA of the area colour 4U multiplies in (the stage's area_color_soil; default the Battlequarters')"""
+def convert_efl(d, log=None, soil=M19A03_AREA_SOIL, intensity=False):
+    """soil = RGBA of the area colour 4U multiplies in (the stage's area_color_soil; default the Battlequarters');
+    intensity: unit_4u_to_gu's (opt-in, spec intensity)"""
     p = efl_parse(d)
     out_blocks, newoff = [], {}
     pos = p['first']
@@ -353,7 +382,7 @@ def convert_efl(d, log=None, soil=M19A03_AREA_SOIL):
     for o, size, k in p['blocks']:
         blk = d[o:o + size]
         if k and k[0] == 1:
-            blk = unit_4u_to_gu(blk, k[1], area, block_area)
+            blk = unit_4u_to_gu(blk, k[1], area, block_area, intensity)
         if k == (1, 9):
             assert size == 0xC0, size
             blk = filter_4u_to_gu(blk)
@@ -430,10 +459,12 @@ EFX_GU, EFX_GU_STRIDE = 0x207D603B, 24      # GU effect format (S: 12k GU effect
                                             # f16 uv, u8 RGBA (sample normals decode to unit length, e.g. (0,0,-1))
 
 
-def convert_effect_mod(d, white_mats=()):
+def convert_effect_mod(d, white_mats=(), solid_fill=(255, 255, 255, 255)):
     """boneless 4U effect MOD (0xE6) -> GU MOD (0xD4), every mesh in GU's effect vertex format 0x207D603B
-    (4U vertex colour kept; the colourless 0x82917009 meshes get (0, 0, 0, 255), or white when their material index
-    is in white_mats; uv v -> 1 - v as mod4u2gu)."""
+    (4U vertex colour kept; the colourless 0x82917009 meshes get (0, 0, 0, 255), or solid_fill when their material
+    index is in white_mats; uv v -> 1 - v as mod4u2gu). solid_fill: a set can ask for (127, 127, 127, 255), vertex
+    RGB 127 = 1.0 in both games (stage4u2gu VCOL_FLOOR), where white draws at 2x (Tidal Najarala's scale, test
+    2026-11-06: a flat white block); the default stays white so that the shipped sets do not change."""
     import numpy as np
     m = modlib.parse(d)
     assert m['version'] == 0xE6 and m['bones'] == 0, 'effect models are boneless'
@@ -455,7 +486,7 @@ def convert_effect_mod(d, white_mats=()):
         # constant white colour (0 of 274 in 60 enemy arcs, 22 constant (0, 0, 0, 255)). The GU effect material
         # (FDiffuseVertexColorMD) doubles the vertex colour: the old white fill drew these meshes at 2x = saturated
         # white (test 10: ef_em089 heap disc em089_015 u1, explosion smoke)
-        fill = (255, 255, 255, 255) if x['material'] in white_mats else (0, 0, 0, 255)
+        fill = solid_fill if x['material'] in white_mats else (0, 0, 0, 255)
         col = v[:, 24:28] if st == 28 else np.tile(np.array(fill, np.uint8), (n, 1))
         q = np.clip(np.round((nrm + 1.0) * 0.5 * 1023), 0, 1023).astype(np.uint32)
         nw = q[:, 0] | (q[:, 1] << 10) | (q[:, 2] << 20) | (3 << 30)
@@ -507,9 +538,11 @@ def convert_effect_mod(d, white_mats=()):
     return hdr + groups + mats + b''.join(meshes) + b''.join(envs) + bytes(vb) + ib + b'\0' * 4
 
 
-def convert_model(path, mod4, mrl4):
+def convert_model(path, mod4, mrl4, solid_fill=(255, 255, 255, 255), solid_template=None):
     """effect MOD + MRL -> GU. Materials: GU effect template (efx_solid + the 4U CBMaterialStd constants for 4U
-    BSSolid materials, else efx_blend), 4U blend/depth/raster states, 4U textures."""
+    BSSolid materials, else efx_blend), 4U blend/depth/raster states, 4U textures. solid_template: a template key
+    used for the BSSolid materials with its own constants instead, when Capcom's conversion of the same 4U model
+    is known (Tidal Najarala's scale: GU's em068_00_001, 4U's em023_tuning)."""
     import mrl_anim
     r4 = mrl.read(mrl4)
     by_hash = {mm['name']: mm for mm in r4['mats']}
@@ -520,7 +553,7 @@ def convert_model(path, mod4, mrl4):
     names = modlib.parse(mod4)['material_names']
     white = {i for i, n in enumerate(names)
              if 'BSSolid' in by_hash.get(mrl_build.name_hash(n), {}).get('states', ())}
-    gmod = convert_effect_mod(mod4, white)
+    gmod = convert_effect_mod(mod4, white, solid_fill)
     # 4U texture table: (type, path), type 0 = reserved slot (LUT samplers); keep the real textures, renumber
     tex_paths, newidx = [], {}
     for i, (ty, p) in enumerate(r4['textures']):
@@ -533,7 +566,9 @@ def convert_model(path, mod4, mrl4):
         alb = [v for n, t, v in mm['params'] if n == 'tAlbedoMap']
         states = [s for s in mm['states'] if s and s[:2] in ('BS', 'DS', 'RS')]
         slots = {'tAlbedoMap': newidx.get(alb[0], 1) if alb else 1, 'tSpecularMap': 0}
-        if 'BSSolid' in states:
+        if 'BSSolid' in states and solid_template:
+            mats.append((name, solid_template, slots, states, {}))
+        elif 'BSSolid' in states:
             # 4U emission / diffuse / albedo colour; specular stays the template's 0 as in Capcom's em062 conversion:
             # with 4U's (0.98 / 0.5) and no specular map the tar wrap qe000_000 (PEL 7000 = qe008_026) drew white blobs
             # in its alpha shape (test 2026-10-23 20:06)
@@ -954,7 +989,8 @@ def effect_set(spec, log):
     pattern}, extra [(EFL path, record)] (records for code posts), lmts [(4U LMT path, GU PSL path)] (one PSL per motion
     list), pel (the GU PEL u path), soil (RGBA of the stage's area colour that 4U multiplies in), list2 (None = PEL
     list 2 holds our records too, or (count, record bytes) of a GU PEL's list 2: the GU class posts its own ids),
-    optional extra2 [(EFL path, record)] (code posts appended to that GU list 2 only)."""
+    optional extra2 [(EFL path, record)] (code posts appended to that GU list 2 only), solid_fill (convert_effect_mod),
+    solid_templates {model path: template key} (convert_model) and intensity (intensity_bake)."""
     S = sources(spec['arc'], spec['stage_unpacked'])
     mef = mef_records(S[(spec['mef'], T['MEF'])])
     efls = {p for (p, t) in S if t == T['EFL'] and p.startswith(spec['em_efl'])}
@@ -981,7 +1017,7 @@ def effect_set(spec, log):
     for p in sorted(efls):
         d4 = S[(p, T['EFL'])]
         l = []
-        conv['EFL'][p] = convert_efl(d4, l, spec['soil'])
+        conv['EFL'][p] = convert_efl(d4, l, spec['soil'], spec.get('intensity', False) and p.rsplit(chr(92), 1)[-1] not in spec.get('intensity_skip', ()))   # intensity_skip: EFL names kept at 1x (opt-in, Shrouded Nerscylla's ground dust)
         hide = spec.get('hide_grey_models', ())
         if hide == 'chunks':
             conv['EFL'][p] = hide_grey_models(conv['EFL'][p], d4, l, CHUNK_MODELS)
@@ -1003,7 +1039,8 @@ def effect_set(spec, log):
             elif t == T['MOD']:
                 mrl4 = S.get((p, T['MRL']))
                 try:
-                    gmod, gmrl, mtex = convert_model(p, S[(p, t)], mrl4)
+                    gmod, gmrl, mtex = convert_model(p, S[(p, t)], mrl4, spec.get('solid_fill', (255, 255, 255, 255)),
+                                                     spec.get('solid_templates', {}).get(p))
                 except (Exception, SystemExit) as e:
                     log.append('MODEL %s NOT converted: %s' % (p, e)); continue
                 conv['MOD'][p], conv['MRL'][p] = gmod, gmrl

@@ -71,8 +71,10 @@ NAMES += LIGHT_NAMES
 HASHNAME = {mrl.name_hash(s): s for s in NAMES}
 
 
-def material_anims(d):
-    """{material name hash: [entries]} of an MRL file (4U entry w12 = size, w14 = offset, as in GU)."""
+def material_anims(d, tail=b''):
+    """{material name hash: [entries]} of an MRL file (4U entry w12 = size, w14 = offset, as in GU). tail: bytes a file lacks at
+    its end (4U em093's last track, a texture swap, stops before its last key's frame, C)."""
+    d += tail
     ver = struct.unpack_from('<I', d, 4)[0]
     nmat = struct.unpack_from('<I', d, 8)[0]
     moff = struct.unpack_from('<I', d, 24)[0]
@@ -80,7 +82,7 @@ def material_anims(d):
     for i in range(nmat):
         w = struct.unpack_from('<15I', d, moff + 60 * i)
         if w[12]:
-            out[w[1]] = parse(d[w[14]:w[14] + w[12]])
+            out[w[1]] = parse(d[w[14]:w[14] + w[12] + len(tail)])
     return ver, out
 
 

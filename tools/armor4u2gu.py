@@ -3,7 +3,7 @@
 
   armor4u2gu.py index DIR4U OUT.pkl         material template index from Capcom's own conversions: every 4U armor
                                             arc DIR4U/data/pl_[mf]_*.arc that GU also has (same model number)
-  armor4u2gu.py convert IN.arc OUT.arc IDX.pkl [--no-ctc] [--xfs-from N] [--no-edges]
+  armor4u2gu.py convert IN.arc OUT.arc IDX.pkl [--no-ctc] [--xfs-from N] [--no-edges] [--opaque-tint]
   armor4u2gu.py check OUT.arc               parse every entry back (MOD index runs / vertex ranges, MRL texture
                                             references, TEX decode)
 
@@ -25,6 +25,18 @@ identical bones / bounding box / material names):
   texture-slot set and material type. GU material type (w6 bits 21-28) = 4U type >> 2 (sym 3, skin 2, else 0).
   Texture slots: tAlbedoMap = 4U albedo, tSphereMap = 4U tExtendMap, tSpecularMap = albedo or its BM+A, as in
   the template.
+- Tinted materials (GU type 3, 'sym'), opt-in --opaque-tint (Shrouded Nerscylla, 2026-11-09): GU draws the armor
+  colour (series mBaseCol -> equipBaseColorData) fully on a type-3 material whose function record FTransparency
+  selects plain 'FTransparency'; with 'FTransparencyAlpha' it barely shows (C, the user's smithy screenshots of
+  Nerscylla Z, Blademaster and Gunner: helm / waist / legs, FTransparency, dark as in 4U; body / arms,
+  FTransparencyAlpha, the raw cream texture; the five materials are otherwise equal byte for byte, texture indices
+  aside). S: GU then weights the colour by the albedo alpha, and a converted BM alpha is 4U's specular mask (about
+  0.1 under her tinted material). 4U's sym materials are BSSolid without a transparency function, so --opaque-tint
+  selects 'FTransparency' on every type-3 material whose 4U source is BSSolid and whose template selects another.
+  Capcom keeps FTransparencyAlpha on such materials (GU Nerscylla X 330 / 331 body and arms), where the dye is near
+  white (0x29). Off by default, so the other packages' armor is unchanged (type-3 FTransparencyAlpha pieces in
+  their arcs: Black Gravios, Dalamadur, Monoblos, Stygian Zinogre, Tidal Najarala, Tigerstripe's helm; not checked
+  in game).
 - CTC v0x16: header 0x40 copied, each 0x48-byte chain record gets 8 bytes (0xcd) at +0x10, node records copied
   (201 of 225 pairs equal, GU's 0xcdcdcdcd words = never-written padding; the other 24 differ in content).
 - XFS (helm only, every GU helm arc has one, 4U has none): 0x66c89ed2 v0x10, InfoType 0, mQuality 2,
@@ -201,7 +213,7 @@ def ctc4u2gu(a):
     return bytes(out + a[p:])
 
 
-def convert(src, idx, ctc=True, xfs_from=354, edges=True, log=print):
+def convert(src, idx, ctc=True, xfs_from=354, edges=True, opaque_tint=False, log=print):
     mm = ARC_RE.search(src)
     sex, part, n = mm.group(1), mm.group(2), int(mm.group(3))
     e4 = entries(open(src, 'rb').read())
@@ -258,6 +270,11 @@ def convert(src, idx, ctc=True, xfs_from=354, edges=True, log=print):
         if other: log('  warning: template slots %s set to the albedo' % sorted(other))
         mtype = ((m['words'][6] >> 21) & 0xFF) >> 2
         extra, states = {'mtype': mtype}, ()
+        if opaque_tint and mtype == 3 and 'BSSolid' in m['states']:    # tinted material: the colour drawn in full
+            ft = [mrl.rec_name(0x22, p[2]) for p in gmat['params'] if p[0] == 'FTransparency' and p[1] == 0]
+            if ft and ft[0] != 'FTransparency':
+                extra['functions'] = {'FTransparency': 'FTransparency'}
+                log('  %s: tinted material, template %s -> FTransparency (--opaque-tint)' % (names[m['name']], ft[0]))
         rs = [x for x in m['states'] if x and x.startswith('RSMeshBias')]
         if 'RS state from 4U' in how:     # GU w7 bits 16-19 = N of RSMeshBiasN (mrl_build W7_BIAS_SHIFT)
             states, extra['bias'] = (rs[0],), int(rs[0][len('RSMeshBias'):])
@@ -328,7 +345,7 @@ if __name__ == '__main__':
         a = sys.argv[2:]
         xf = int(a[a.index('--xfs-from') + 1]) if '--xfs-from' in a else 354
         data = convert(a[0], pickle.load(open(a[2], 'rb')), ctc='--no-ctc' not in a, xfs_from=xf,
-                       edges='--no-edges' not in a)
+                       edges='--no-edges' not in a, opaque_tint='--opaque-tint' in a)
         open(a[1], 'wb').write(data)
         print(len(data), 'bytes ->', a[1])
     elif cmd == 'check':

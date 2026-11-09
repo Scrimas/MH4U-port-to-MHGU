@@ -303,6 +303,66 @@ testable alone (the maintainer checks the smithy or one quest).
   its end is refused with only a log line, and a monster without its data keeps its donor's manifest: it spawns as the donor, with
   no items, gear or Notes of its own, while its hooks still run. The size lives in tools/alloc.py DATA_POOL and module/build.py refuses
   a build that does not fit. "Looks like the donor" = read the `data ... loaded` lines first.
+- **Tables that are full (Tidal Najarala, 2026-11-06).** Before a new monster with gear, read these: sharpness (mKireType is
+  a byte: GU 164 + the ports' rows = 256, so new rows are out: `kire_reuse` takes GU's equal row, `kire_near` the nearest one as the
+  fallback, and `build(spec, exact)` gives those weapons their 4U row anyway through the core, KIRX, since Shrouded Nerscylla,
+  notes/gear-weapons.md section 6; a 4U entry ending at 400 stays on GU's row of it); armor "listed"
+  bits (576 records per part, full on the head; past them module/gear.c keeps the bit in the mod's store, 20 records per part, since
+  Shrouded Nerscylla; weapons have 160 per class, the most is 105); monsterName's first-list dummies (second list: entries 222..225 left after Monoblos' 221,
+  tools/alloc.py NAME_DUMMY; a TXTA-appended name fails on the Notes page, which reads the entry as a byte, 0x5b2298); hub quests loaded (814 GU + 33 ports with Shrouded Nerscylla against the loader's cap 864, S: monsters/stygian_zinogre/notes/quests.md).
+- **Weapons on GU's balance (Shrouded Nerscylla).** GU's weapons level on past 4U's values, and a port's weapon has one level: 4U rarity 9 raw 180..260 stands against
+  GU's final levels of about 310. `weapons4u.gu_scale` gives a class's median of GU's final level / 4U over the weapons both games have by name; class spec `raw_scale`, `elem_scale`.
+  The earlier ports keep 4U's values (opt-in).
+- **Is every native reachable? (Shrouded Nerscylla).** Emulating the dispatcher can stop at the category function when it holds the case inline. Read the jump table of each category too: a number on the
+  table's default goes to the "no case" thunk 0xca10c. A native that only 4U's chains name is harmless there; one a script names is not.
+- **GU may have dropped a subspecies altogether (Shrouded Nerscylla).** Unlike Najarala's and Zamtrios' classes, GU's Nerscylla class reads its variant byte once. Then the list of 4U's species tests is the work list: most came out as data
+  (a shell subtype that differs only in its effect group is a PEL list 2 mapping), and the byte a handler uses for 4U's flag may have moved (W+0x42c -> rec+0x3b4).
+- **A hub quest moved to the village keeps 4 Maps (Shrouded Nerscylla, Tidal Najarala until 0.2.4).** GU's village boxes hold one Map and its hub boxes four, one per player (C: all 891 quests: village 0 or 1, hub 0 or 4); a 4U hub quest holds four as well. Count the Map slots of every box you build, not only "is anything else at the start".
+- **Hitzone rows do not always start at the same byte (Shrouded Nerscylla).** Nerscylla's dttune has them at file +0x8c, Najarala's at +0x8e. Find 4U's own row (etd word 7) in the file before reading columns: a row read 2 bytes late still looks like plausible numbers.
+- **A hosted monster on a map its donor has no data for (Tidal Najarala).** Read every area file for that map, not only next-area data: area_link has 3 kinds with different jobs (kind 4 = the way to the sleep
+  area, reason 1 at 0xb870c: a kind copied from another monster leads to that monster's sleep area), and area_eat with no row for the map means chance 0 of ever going to eat (0xb7e90). A 4U hop between two
+  areas is only usable if GU's stage has the exit point (monsters/tidal_najarala/tools/routes_em068_01.py gu_exits: flags bit 1, other area, variant 0, her Group). Dive movers surface at flags-0x20 points whichever
+  area they left; without an exit point they travel toward the last exit they knew.
+- **Shell families are data (Tidal Najarala).** GU's generic EmBase36 shells take their kinds from the family's def XFS, so new
+  launches are new ShellInfo objects with their sh files, and only the request needs a hook
+  (monsters/tidal_najarala/tools/build_em068_01_arc.py extend_def).
+- **A hosted subspecies: list all species tests.** Compare every 4U species test in the class with GU's variant tests, not only
+  the handlers' (Tidal Najarala: 71 in 4U; GU had dropped her launches, one speed and her reaction waits). Name a material
+  animation by brute force over the exe's strings before porting code for it: hers were all frenzy steps.
+- **A kept GU handler can have lost its shot (Tidal Najarala).** Comparing attack indexes and species tests is not enough: list
+  every shell post of each 4U handler and find its twin in GU. GU's twin of her water jet (actions 7/48-51, 7/62-65) kept the
+  motions but writes two fields where 4U posts the shell and chooses a scale, and the first comparison passed it anyway
+  (monsters/tidal_najarala/module/em068_01_jet.c).
+- **A shell family's def finds only what the arc has loaded (Tidal Najarala).** New kinds' ef / snd / hit / sh files go before
+  the def. Appended at the arc's end, those kinds had no effect, hit data or offset, with no error and a valid shell handle: log
+  the effect handle of every kind, not of the first.
+- **Effect models (Tidal Najarala).** Vertex RGB 127 = 1.0, so a colourless solid mesh filled white draws at 2x, a flat white
+  block (tools/efl4u2gu.py solid_fill; the shipped sets keep white, their grey chunks are hidden). Where GU has Capcom's
+  conversion of a sibling of the 4U model, take its material (solid_templates).
+- **Map a shell's effects by 4U's state table, not by a guess from the names.** uShell015's 0x102a938 has flight, planted, rattle,
+  blast and gone per species, and an EFL's mask 2 came only in a special state (S: frenzy): GU's class posts both masks for
+  Najarala, so that look drew over the plain one. Read what ends a shell per species as well: a rattle blast can be Najarala's alone.
+- **A subspecies' motions can be its parent's, and GU holds those finer (Tidal Najarala).** Compare tracks, not only frames: all 170 of
+  her shared slots were 4U em023's track for track, and GU's em068_00 stores the same animations at 11 / 9-bit rotation against 7. With
+  an equal skeleton take GU's tracks and keep the 4U event blocks (tools/lmt.py with_tracks). A long chain of bones adds up coarse rotations.
+- **"The ground effects are missing" can mean grey, at the joint (Tidal Najarala).** A 4U dust unit with Intensity 1 draws at 2x and with
+  the soil baked in it can be white in 4U and grey in GU (efl4u2gu spec `intensity`, opt-in; the shipped sets stay as they are). MEF flag bit
+  1 puts the effect on the owner's ground every frame, GU's tail places it at the joint, inside the body: a world record with the point from a
+  hook on the PSL post (monsters/tidal_najarala/module/em068_01_fx.c). The grey chunks hidden on brown stages are snow on a white one.
+- **GU's common dust cm202_* holds a set per ground, and 0x100 is the snow set (Tidal Najarala).** Sets by element ground word: 0x22 / 0x2 plain, 0x54
+  water, 0x4, 0x8 lava, 0x80 dark, 0x100 white; Capcom bakes 0x100 into the records of monsters of snow. A port on snow can play GU's file with that
+  set instead of 4U's dust, with GU's stage tint in the record (tools/build_em068_01_arc.py SNOW_EFL). The ground attribute does not tell snow (word 0 on the
+  Frozen Seaway), and how GU picks a set for its own -1 records was not found: name it in the request.
+- **A body as long as a snake needs more than 8 blend frames (Tidal Najarala).** A log line per sudden joint step found what the eye called a teleport: the
+  turn that cuts her slither short whips the body across, in both games' code. A log first, a theory second: I had blamed the coarse tracks.
+  Look for every one-frame step, not only the first: a handler may start the next motion of an attack with blend 0 (her spit 0x402 -> 0x403, GU f86708 = 4U
+  0x765e80), and a single motion after a two-layer pair drops layer 1 at once (0xafda4 -> 0x726dc(this, 0.0), 0x53a164: layer 1 -> 0xffff, blend 0).
+- **GU's common effects of a donor that lives elsewhere (Shrouded Nerscylla).** Taking the donor's cm* records for the shared animations took GU
+  Nerscylla's forest debris (cm200_067: green model units, ground word 0x20) onto the Dunes, since PEL c posts draw every set. Read each taken file's
+  elements (colour, models, ground word) against the port's stage, and check what 4U effect it replaces: GU's slot may hold nothing visible there (her
+  dig-in). monsters/shrouded_nerscylla/tools/build_em070_01_arc.py GU_FOREST / KEEP_4U.
+- **A 4U AI table can pick its selector by quest rank (Monoblos, Stygian).** Op 0x6a (GU 0x3a8d68: 3 HR, 5 G) chooses whole selectors: Monoblos burrows
+  16..24 % of picks at HR and 29..51 % at G. Count a behaviour per rank before calling a log's rate wrong; test both ranks.
 - **Gear models.** tools/armor4u2gu.py (player bones 0-19 identical in both games, 20+ = cloth bones driven by the
   CTC; MRL templates from Capcom's own 4U -> GU pairs) and tools/weapon4u2gu.py (same pipeline + material
   animations). Converted arcs go to monsters/<name>/romfs/nativeNX/arc/player/com/{m,f}/<model>/ and
@@ -469,3 +529,9 @@ Notes: monsters/tigerstripe_zamtrios/notes/ (plan, phase1-variant-map, missing-a
 - Gear converters: a GU template with a sphere map for a 4U material without an extend map now falls back to a
   template without one (tools/weapon4u2gu.py and tools/armor4u2gu.py pick_template; outputs that converted before
   are unchanged). Check that every armor model the records name is converted (Stygian's were missing).
+- Armor colour (Shrouded Nerscylla, 2026-11-09): 4U's piece colour (record +19) goes to the series' default dye, and GU
+  tints a piece's 'sym' material (type 3) with it, but in full only when that material's FTransparency function is
+  plain FTransparency. Capcom's conversions often give it FTransparencyAlpha (GU's own Nerscylla X body and arms,
+  dyed near white); then the colour nearly vanishes, and her chest and arms stayed the cream of the texture while
+  helm, waist and legs were dark. New ports with a dark or strong 4U colour: build the armor with
+  armor(ROMFS, ARMOR, '--opaque-tint') (tools/steps.py) and compare every piece in the smithy against 4U.

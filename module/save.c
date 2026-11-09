@@ -193,6 +193,29 @@ static uint16_t add_capped(uint16_t v, uint32_t n)    /* as 0x526d94: (u16)(v + 
     return (uint16_t)((s & 0xffffu) < CAP ? s : CAP);
 }
 
+/* a few bits under a key that is no em ID (0xf001.. gear.c): a record's 5 u16 words, 80 bits; a bit past them answers 0 and is not kept (logged once) */
+int save_bits_get(uint32_t key, uint32_t bit)
+{
+    uint8_t *b;
+    struct store_rec *r = store_check(&b) == ST_VALID ? store_find(b, key) : 0;
+    if (!r || bit >= 80u) return 0;
+    return FIELD(uint16_t, r, 2u + 2u * (bit / 16u)) >> (bit % 16u) & 1;
+}
+
+void save_bits_set(uint32_t key, uint32_t bit)
+{
+    static uint32_t s_n;
+    struct store_rec *r;
+    if (bit >= 80u) {
+        if (++s_n <= 8) logf("mh4uport: store bit %u of key %x past its record: not kept", bit, key);
+        return;
+    }
+    r = store_open(key);
+    if (!r) return;
+    FIELD(uint16_t, r, 2u + 2u * (bit / 16u)) |= (uint16_t)(1u << (bit % 16u));
+    store_seal();
+}
+
 /* ---- slot leases ---- */
 
 int port_lease(int m)                      /* 1 = no fixed save slot (allocations.toml save = "lease") */
