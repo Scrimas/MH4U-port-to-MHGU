@@ -301,3 +301,67 @@ int utf8_null_guard_c(uint32_t *regs)
                           port_quest_id());
     return 0;
 }
+
+/* MH4U's second intruder on our tours (D19; NEWSAVE_MAPREWORK.md C6c). GU keeps one intruder per quest (C): the
+ * quest start rolls one index into the quest manager's +0x165d (0x3ab588: a weighted pick, or 0xff = none) and its
+ * minute into +0x165f (minute +0xCD at the chance +0xCE, then +3 min and +10 % per miss, as MH4U), and the scheduler
+ * 0x3a08e8 brings it while +0x165e (intruders that came) is 0 and fewer than 2 large monsters are out. MH4U also rolls
+ * a second one from the remaining entries, whose checks start 5 minutes after the first came at 0 %, then every 3
+ * minutes at +10 % (C, 4U 0x69e0cc / 0x6a6d2c). Online, the host's roll reaches the guests with two u16 the host draws
+ * at quest start, +0x1550 / +0x1552 (0x3acb58, packet 0x3ad394 / 0x3ad71c): the second roll is a hash of them, so
+ * every machine computes the same one. Hook 0x3a1808 (r1 = the manager), in the scheduler's state 6 after an
+ * intruder slot's spawn, before GU counts it: our tours get the second intruder armed in GU's own fields (+0x165d
+ * the pick, +0x165f its minute, +0x165e left at 0); nonzero skips GU's count (build.py MID_EXIT -> 0x3a1814). */
+#define QM_SEED 0x1550u         /* 2 x u16, host random, synced */
+#define QM_INTR 0x165du         /* u8 intruder index 0..2 (boss slot 2..4), 0xff none */
+#define QM_INTR_N 0x165eu       /* u8 intruders that came */
+#define QM_INTR_MIN 0x165fu     /* u8 the quest minute it comes at */
+#define QM_LIMIT 0xccu          /* int the quest's minutes */
+#define QM_REC 0xa4u            /* the running quest's record: weights at +0xdc + index (questData +0xD2 + index) */
+
+static uint32_t intr_rand(uint32_t *s)
+{
+    *s ^= *s << 13; *s ^= *s >> 17; *s ^= *s << 5;
+    return *s;
+}
+
+int intruder_came_c(uint32_t *regs)
+{
+    static uint32_t s_done;     /* the seed of the quest whose second intruder was handled */
+    uint8_t *m = (uint8_t *)(uintptr_t)regs[R1];
+    uint32_t id = port_quest_id(), rec, seed, h = 2166136261u, i, pick = 3, r, minute, chance, limit;
+    if (!m || port_tour_of(id) < 0 || m[QM_INTR_N] != 0 || m[QM_INTR] > 2) return 0;
+    rec = FIELD(uint32_t, m, QM_REC);
+    seed = FIELD(uint32_t, m, QM_SEED);
+    if (!rec || seed == s_done) return 0;           /* the second intruder came (or there is none): GU counts it */
+    s_done = seed;
+    for (i = 0; i < 4; i++) h = (h ^ (id >> 8 * i & 0xffu)) * 16777619u;
+    for (i = 0; i < 4; i++) h = (h ^ (seed >> 8 * i & 0xffu)) * 16777619u;
+    h = (h ^ m[QM_INTR]) * 16777619u;
+    h = (h ^ m[QM_INTR_MIN]) * 16777619u;
+    if (!h) h = 1;
+    r = intr_rand(&h) % 100;                        /* MH4U's walk: weight <= r goes on, so weight 0 never comes */
+    for (i = 0; i < 3; i++) {
+        uint32_t w = FIELD(uint8_t, rec, 0xdc + i);
+        if (i == m[QM_INTR] || !w) continue;
+        if (w <= r) { r -= w; continue; }
+        pick = i;
+        break;
+    }
+    if (pick > 2) {
+        logf("mhgu-de: tour %u: intruder %u came at minute %u; no second intruder", id, m[QM_INTR] + 2u, m[QM_INTR_MIN]);
+        return 0;
+    }
+    limit = FIELD(uint32_t, m, QM_LIMIT);
+    for (minute = m[QM_INTR_MIN] + 5u, chance = 0; minute < limit; minute += 3, chance += 10)
+        if (intr_rand(&h) % 100 < chance) break;
+    if (minute >= limit || minute > 255) {
+        logf("mhgu-de: tour %u: second intruder (slot %u) would come after the time limit: none", id, pick + 2);
+        return 0;
+    }
+    logf("mhgu-de: tour %u: intruder %u came at minute %u; second intruder armed: slot %u at minute %u", id,
+         m[QM_INTR] + 2u, m[QM_INTR_MIN], pick + 2, minute);
+    m[QM_INTR] = (uint8_t)pick;
+    m[QM_INTR_MIN] = (uint8_t)minute;
+    return 1;                                       /* GU's count stays 0: its own check brings the second */
+}

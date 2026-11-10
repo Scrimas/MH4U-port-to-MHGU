@@ -106,6 +106,8 @@ HOOKS = [
     ('quest_clear_fix', 0x388D40),  # results-scene clear write: rename the freshly loaded quest list first
     ('quest_group_append', 0x39BB6C),  # quest_group parser exit (r4 = the list): append the quest_append quests
     ('tour_board', 0x3BB318),    # a listed quest onto its star board: our tours lead theirs (quest.c)
+    ('intruder_came', 0x3A1808), # scheduler state 6, an intruder slot spawned (r1 = the manager): MH4U's second
+                                 # intruder armed on our tours (quest.c)
     ('notes_unlock_check', 0x554DA4),  # Hunter's Notes unlock condition (talk action 6 / condition 44): log entry 123
     ('notes_list_visible', 0x5B0BD4), ('notes_list_new', 0x5B0A44),      # Notes list screen: an entry past the save map
     ('notes_new_clear', 0x5B0AD4), ('notes_em_unlocked', 0x524770),      # has no bit (notes.c; MID_EXIT below)
@@ -244,6 +246,7 @@ MID_EXIT = {
     'notes_em_unlocked': 0x524794,  # bx lr: returns the r0 notes_em_unlocked_c wrote
     'em005_01_pslgate': 0x7016C, # mov r0, #0; return: the PSL slot posts nothing (GU's own no-post path)
     'em005_01_laser': 0xD2DFE8,  # b 0xd2e03c: GU's laser shell not posted (4U's capsule instead, em005_01_shell016.c)
+    'intruder_came': 0x3A1814,   # ldrb r0, [r8, #0x55]: GU's intruder count skipped, the second intruder armed
 }
 # GU code that third-party Forge plugins check against v1.4 before hooking it (each plugin's table of main address +
 # v1.4 bytes, read with tools/plugin_sigs.py); a plugin whose check fails installs nothing. main() refuses a hook

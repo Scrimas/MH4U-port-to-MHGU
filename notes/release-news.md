@@ -11,7 +11,8 @@ written for players; write the section before `release.py package`.
   know, even without the mod. Your save moves over by itself the first time you save. Not tested on a real Switch:
   back up with JKSV or Checkpoint first.
 - Harvest Tours on Heaven's Mount: MH4U's three tours (Village ★8, Hub ★5, G★3), with MH4U's intruders at MH4U's
-  odds. On the Hub ★5 tour an intruder shows up half the time: Rathalos, Deviljho or, rarely, Savage Deviljho.
+  odds. On the Hub ★5 tour an intruder shows up half the time: Rathalos, Deviljho or, rarely, Savage Deviljho, and
+  sometimes a second one later, as in MH4U.
 - The installer has a Harvest Tours card: tick it to get every map with tours, even without its monster. A monster
   that needs one of those maps brings its tours too.
 
