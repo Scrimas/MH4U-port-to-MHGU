@@ -394,13 +394,16 @@ pub(crate) mod tests {
         assert_eq!(m.tickable().last().unwrap().name, "harvest_tours");
         assert_eq!(m.monsters().count(), 4, "a bundle is no monster");
         assert_eq!(m.closure(&w(&["harvest_tours"])), ["core", "speartip_crag", "battlequarters", "harvest_tours"]);
-        assert_eq!(m.closure(&w(&["dalamadur", "harvest_tours"])),
-                   ["core", "speartip_crag", "dalamadur", "battlequarters", "harvest_tours"]);
+        assert_eq!(
+            m.closure(&w(&["dalamadur", "harvest_tours"])),
+            ["core", "speartip_crag", "dalamadur", "battlequarters", "harvest_tours"]
+        );
         assert_eq!(m.needed_by("battlequarters").len(), 2, "gogmazios and the bundle");
         m.packages[2].requires = vec!["harvest_tours".into()];
         assert!(m.validate().is_err(), "a bundle is not a requirement");
         // an installer that does not know the kind: a dependency package nothing requires, so never installed
-        let json = serde_json::to_string(&sample_with_bundle()).unwrap().replace("\"kind\":\"bundle\"", "\"kind\":\"later\"");
+        let json =
+            serde_json::to_string(&sample_with_bundle()).unwrap().replace("\"kind\":\"bundle\"", "\"kind\":\"later\"");
         let old = Manifest::parse(json.as_bytes()).unwrap();
         assert_eq!(old.package("harvest_tours").unwrap().kind, Kind::Utility);
         assert!(!old.closure(&w(&["gogmazios"])).contains(&"harvest_tours".to_string()));

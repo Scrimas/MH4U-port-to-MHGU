@@ -437,7 +437,8 @@ fn refresh(app: &mut App, ui: &AppWindow) {
             monogram: monogram(&p.title).into(),
             progress: row_progress(app, &p.name),
         });
-        for r in p.requires.iter().filter(|_| p.kind != Kind::Bundle) {   // a bundle's card lists no maps
+        for r in p.requires.iter().filter(|_| p.kind != Kind::Bundle) {
+            // a bundle's card lists no maps
             let Some(d) = m.package(r) else { continue };
             if !shown.insert(r.clone()) {
                 continue;
