@@ -121,11 +121,13 @@ merges the same way: what is already there counts once.
   computed; its file is written when its content changed; then the slot is cleaned in place and its link record says
   "split". If the file can't be written whole, the slot stays complete and its link record says "full". GU then
   writes `system` (and next `system_backup`) and commits: the file is in the same commit.
-- GU's read of `system` (0x8778cc): each slot whose link says "split" has its file read into a cache.
+- GU's read of `system` or `system_backup` (0x8778cc; GU writes both from the same buffer and reads the backup when
+  `system` is damaged): each slot's file is read into a cache, which mirrors the file from then on (a write updates
+  it).
 - GU parses a slot (0x3e0db8): the file is merged into the slot's bytes first, and put back as read afterwards (a
   journal of the overwritten bytes), so a later write of that buffer is still clean.
-- A slot whose file could not be read or merged this session never gets its file overwritten: the next save leaves it
-  as it is.
+- A slot whose file could not be read, checked (a damaged file, or one of a newer format) or merged this session
+  never gets its file overwritten: every save until the game closes leaves slot and file as they are.
 
 ## Tools
 

@@ -9,11 +9,13 @@
  *   be written, the slot stays complete and its link record says "full" (today's layout; the next save tries again).
  *   One file per GU write at most: a second changed slot stays complete this time (the journal holds about 5 blocks
  *   past GU's own file).
- * - read (0x877b60, still mounted): after GU read `system`, each used slot's file goes to a cache; the image's marks
- *   are dropped (they never split bytes that came from disk).
+ * - read (0x877b60, still mounted): after GU read `system` (or `system_backup`, which GU writes from the same buffer
+ *   and reads when `system` is damaged), each slot's file goes to a cache, which then mirrors the file on disk (the
+ *   write updates it); the image's marks are dropped (they never split bytes that came from disk).
  * - parse (0x3e0db8 entry / 0x3e0e64): a slot whose link says "split" gets its cached file merged in before GU parses
  *   it, and is put back as read right after (the journal), so a later write of that buffer is still clean.
- * - A slot whose file exists but could not be read or merged this session never has that file overwritten. */
+ * - A slot whose file exists but could not be read, checked or merged this session never has that file overwritten
+ *   (s_keep stays set until the game closes, whatever a later read finds). */
 #include "port.h"
 #include "game.h"
 #include "util.h"
@@ -95,6 +97,22 @@ static uint32_t tick(void)
     return r0 ^ (r1 << 7);
 }
 
+static uint32_t us_since(uint32_t t0)      /* the system tick runs at 19.2 MHz */
+{
+    register uint32_t r0 __asm__("r0"), r1 __asm__("r1");
+    __asm__ volatile("svc #0x1e" : "=r"(r0), "=r"(r1) : : "memory");
+    (void)r1;
+    return (r0 - t0) / 192u * 10u;
+}
+
+static uint32_t tick0(void)
+{
+    register uint32_t r0 __asm__("r0"), r1 __asm__("r1");
+    __asm__ volatile("svc #0x1e" : "=r"(r0), "=r"(r1) : : "memory");
+    (void)r1;
+    return r0;
+}
+
 /* ---------------------------------------------------------------------------------------------- pack */
 
 /* 0x3e0ea4(scene, stream {vtable, bit, pointer, image}, flag): one character packed into its slot */
@@ -156,6 +174,7 @@ int save_write_c(uint32_t *regs)
         if (!ms_link(slot, &link, &gen, &state)) link = s_link[k], gen = s_gen[k];
         if (!link) link = (tick() * 2654435761u ^ (k + 1) * 0x9E3779B9u) | 1u;
         if (gen < s_gen[k]) gen = s_gen[k];
+        uint32_t t0 = tick0();
         int n = ms_split(slot, s_quests, MS_QUEST_N, link, gen + 1, s_aside[k], s_aside_n[k], s_out, MS_FILE_SIZE, 0, &left);
         if (n < 0) {
             logf("mhgu-de: save: slot %u: not split (the hunter holds an added weapon and the box has no room): full", k + 1);
@@ -183,14 +202,18 @@ int save_write_c(uint32_t *regs)
             continue;
         }
         written |= need;
+        if (need) {                                 /* the cache mirrors the file: a parse later this session merges it */
+            for (uint32_t i = 0; i < (uint32_t)n; i++) s_cache[k][i] = s_out[i];
+            s_cache_state[k] = 1;
+        }
         s_cache_n[k] = (uint32_t)n;
         s_body[k] = body;
         s_link[k] = link;
         s_gen[k] = gen + 1;
         s_aside_n[k] = 0;
-        logf("mhgu-de: save: slot %u split before %s: %u of %u bytes (link %x, generation %u), %u record(s) left in "
-             "the slot by the budget, file %s", k + 1, name, (uint32_t)n, MS_FILE_SIZE, link, gen + 1, left,
-             need ? "written" : "unchanged");
+        logf("mhgu-de: save: slot %u split before %s: %u of %u bytes (link %x, generation %u, slot hash %x), %u "
+             "record(s) left in the slot by the budget, file %s, %u us", k + 1, name, (uint32_t)n, MS_FILE_SIZE, link,
+             gen + 1, FIELD(uint32_t, s_out, 24), left, need ? "written" : "unchanged", us_since(t0));
     }
     return 0;
 }
@@ -207,7 +230,8 @@ int save_read_c(uint32_t *regs)
         for (int j = 0; j < SLOTS; j++) s_marked[j] = 0;
         s_marked_image = 0;
     }
-    if (FIELD(uint32_t, mgr, 0x24) || !name_is((const char *)(uintptr_t)(mgr + 0xe98), "system")) return 0;
+    const char *name = (const char *)(uintptr_t)(mgr + 0xe98);
+    if (FIELD(uint32_t, mgr, 0x24) || !(name_is(name, "system") || name_is(name, "system_backup"))) return 0;
     for (uint32_t k = 0; k < SLOTS; k++) {
         char path[40];
         fs_file h;
@@ -217,8 +241,11 @@ int save_read_c(uint32_t *regs)
         s_cache_n[k] = 0;
         s_cache_state[k] = 0;
         s_body[k] = 0;
-        s_keep[k] = 0;
-        if (fs_open(&h, path, 1)) continue;            /* no file */
+        uint32_t r = fs_open(&h, path, 1);
+        if (r) {                                       /* no file (a used slot's open result logged) */
+            if (base && FIELD(uint8_t, base, 4 + k)) logf("mhgu-de: save: %s: none after %s (open %x)", path, name, r);
+            continue;
+        }
         int ok = !fs_size(&size, h) && size >= MS_HEADER && size <= MS_FILE_SIZE &&
                  !fs_read(&got, h, 0, s_cache[k], (uint32_t)size) && got == (uint32_t)size;
         fs_close(h);
@@ -231,14 +258,17 @@ int save_read_c(uint32_t *regs)
         }
         if (ms_parse(s_cache[k], got, &used, &link, &gen, &hash)) {
             s_cache_state[k] = 2;
-            logf("mhgu-de: save: %s is damaged (check word or size): not merged", path);
+            s_keep[k] = 1;
+            logf("mhgu-de: save: %s is damaged or of a newer format (check word, size, version): not merged, kept as "
+                 "it is this session", path);
             continue;
         }
         s_cache_n[k] = used;
         s_cache_state[k] = 1;
         s_body[k] = ms_fnv(s_cache[k] + MS_HEADER, used - MS_HEADER, link);
         if (gen > s_gen[k]) s_gen[k] = gen;
-        logf("mhgu-de: save: %s read: %u bytes, link %x, generation %u", path, used, link, gen);
+        logf("mhgu-de: save: %s read after %s: %u bytes, link %x, generation %u, slot hash %x", path, name, used, link,
+             gen, hash);
     }
     return 0;
 }
@@ -281,7 +311,7 @@ int save_parse_c(uint32_t *regs)
         logf("mhgu-de: save: slot %u has no link but holds added things: merging its file too (D11)", k + 1);
     }
     struct ms_stats ms;
-    uint32_t jl = 0, al = 0;
+    uint32_t jl = 0, al = 0, t0 = tick0(), h0 = ms_fnv(slot, MS_SLOT_SIZE, 0x811C9DC5u);
     int r = ms_merge(slot, s_cache[k], s_cache_n[k], s_quests, MS_QUEST_N, s_journal, JOURNAL, &jl, s_aside[k],
                      ASIDE_CAP, &al, &ms);
     if (r) {
@@ -294,8 +324,9 @@ int save_parse_c(uint32_t *regs)
     s_merged_k = (uint32_t)k;
     s_jlen = jl;
     s_link[k] = flink;
-    logf("mhgu-de: save: slot %u merged (%s): %u placed, %u moved, %u kept as GU has them, %u aside", k + 1,
-         ms.exact ? "exact" : "careful", ms.placed, ms.moved, ms.kept, ms.aside);
+    logf("mhgu-de: save: slot %u merged (%s, slot hash %x): %u placed, %u moved, %u kept as GU has them, %u aside, "
+         "journal %u bytes, %u us", k + 1, ms.exact ? "exact" : "careful", h0,
+         ms.placed, ms.moved, ms.kept, ms.aside, jl, us_since(t0));
     return 0;
 }
 
