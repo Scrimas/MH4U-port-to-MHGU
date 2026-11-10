@@ -12,7 +12,7 @@ releases on MHGU-Definitive-Edition. Rust + Slint (Fluent), like MHGU_Editor.
 | `gui/` | the window: `ui/app.slint`, `src/main.rs`, `src/i18n.rs`, `src/desktop.rs` (the menu entry / Start Menu shortcut), `lang/` (gettext catalogs) |
 | `tools/i18n.py` | keeps `gui/lang/` in step with the strings (`@tr` in .slint, `tr` / `trf` / `trn` in Rust) |
 | `tests/cli_test.py` | end to end: a fake release of dummy files installed into every kind of place by `mhgu-de-cli` |
-| `packaging/build.py` | the release files: `.exe` (mingw-w64), `.AppImage` (zig, glibc 2.28), `SHA256SUMS-<v>` |
+| `packaging/build.py` | the release files, each for x86_64 and arm64: `.exe` (mingw-w64; llvm-mingw for arm64), `.AppImage` (zig, glibc 2.28), `SHA256SUMS-<v>` |
 
 ```sh
 cargo test --manifest-path installer/Cargo.toml --workspace
@@ -27,6 +27,6 @@ way), `MHGU_DE_CACHE`, `MHGU_DE_CONFIG`, `MHGU_DE_SNAPSHOT=<png>` (draw the wind
 
 Releases: every release of the mod has one of the installer with the same version (CONTRIBUTING.md, Releases):
 `version` in `installer/Cargo.toml` = the release's, then the tag `v<version>`: `.github/workflows/installer.yml`
-builds, tests the .exe on Windows and drafts "MHGU Definitive Edition <version>" on this repository;
+builds the four files, starts each on its system (Windows and Linux, x86_64 and ARM) and drafts "MHGU Definitive Edition <version>" on this repository;
 `tools/release.py publish` puts the zips on MHGU-Definitive-Edition-Packages and gives the draft its text
 (NOTES-main.md); the maintainer publishes the draft (it becomes Latest).

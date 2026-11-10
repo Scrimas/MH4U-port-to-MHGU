@@ -25,7 +25,7 @@ again, with the saves of those places migrated and cleaned. Decisions are the ma
 - Two repositories (2.0.0, the maintainer's choice: the list of monster releases would bury the installer):
   `release.py publish` puts the mod's releases on **MHGU-Definitive-Edition-Packages** (zips only, a README); the
   code repository **MHGU-Definitive-Edition** holds the installer's own releases (tag `v<installer version>` with its
-  .exe, AppImage and checksums, drafted by .github/workflows/installer.yml, Latest once published), so its release
+  .exe and AppImage for x86_64 and arm64 (2.1.0, issue #34) and checksums, drafted by .github/workflows/installer.yml, Latest once published), so its release
   page leads new players to the installer. Its older `v1.x` releases are the mod's from before the split (MH4U Port):
   the installer tells its own by their files. One release-list call per repository and start (no `releases/latest`).
   Each release: the tag `v<version>` on main drafts the installer's release (the maintainer publishes it),
@@ -114,7 +114,8 @@ enabled unless mods/load_order.txt marks it `# off:`): strong, not confirmed; th
   cleaning choice and the warnings: the gear warning on removal, online (once: the group needs the same release and
   monsters), pre-releases, the release's own warnings, an emulator running.
 - Self-update: the newest installer release of MHGU-Definitive-Edition with its `SHA256SUMS-<v>`, checked at start
-  (Settings switch), downloaded beside the running file and swapped in (Windows: the old .exe renamed aside, deleted
+  (Settings switch), the file of the running one's system and processor (`selfupdate.rs` SUFFIX: an x86_64 .exe run
+  by Windows on ARM's emulation stays x86_64), downloaded beside the running file and swapped in (Windows: the old .exe renamed aside, deleted
   at the next start; Linux: $APPIMAGE replaced), then restarted. Checksums catch a broken download, not a forged
   release.
 - The system's menu (`installer/gui/src/desktop.rs`, MHGU_Editor's desktop.rs for Linux): at each start the AppImage
@@ -129,8 +130,9 @@ enabled unless mods/load_order.txt marks it `# off:`): strong, not confirmed; th
 - Languages: MHGU_Editor's set (en, fr, de, es, it, zh_TW, zh_CN), gettext catalogs in `installer/gui/lang/`
   (`installer/tools/i18n.py`); English now, the other catalogs empty.
 - Tests: core unit tests (synthetic saves: zeros with valid slot pointers, no game data), `installer/tests/cli_test.py`
-  (a fake release of dummy files into every kind of place), CI on Linux and Windows; the Windows .exe is started on
-  the runner and draws its window (MHGU_DE_SNAPSHOT). Windows is tested by CI only.
+  (a fake release of dummy files into every kind of place), CI on Linux and Windows; each Windows .exe (x86_64 and
+  arm64) is started on its runner and draws its window (MHGU_DE_SNAPSHOT), each AppImage gives its `--version` on
+  Linux x86_64 and aarch64. Windows and ARM are tested by CI only.
 
 ## Not yet verified
 

@@ -5,9 +5,12 @@ name: Installer
 #   tests        every push / PR touching installer/: cargo fmt, cargo test, the catalogs, the end-to-end CLI test
 #                (installer/tests/cli_test.py, a fake release of dummy files) on Linux and Windows
 #   build        v* tags (and by hand): installer/packaging/build.py in an Arch Linux container (the editor's
-#                toolchain): MHGU-Definitive-Edition-Installer-<v>-x86_64.exe (mingw-w64), .AppImage (zig, glibc
-#                2.28, type 2 runtime) and SHA256SUMS-<v>
-#   windows      the shipped .exe started on Windows: it opens its window and draws it into a PNG, then quits
+#                toolchain), every file cross built there: MHGU-Definitive-Edition-Installer-<v>-x86_64.exe
+#                (mingw-w64), -arm64.exe (llvm-mingw), -x86_64.AppImage and -arm64.AppImage (zig, glibc 2.28, type 2
+#                runtime) and SHA256SUMS-<v> of the four
+#   windows      each shipped .exe started on Windows (x86_64, and Windows 11 on ARM): it opens its window and draws
+#                it into a PNG, then quits
+#   linux        each shipped AppImage started on Linux (x86_64, aarch64): --version
 #   release      a tag: a DRAFT release "MHGU Definitive Edition <v>" with the files, Latest once published
 #                (GitHub's default: the newest version); its text comes from tools/release.py (NOTES-main.md).
 #                This repository's releases are the installer's since 2.0.0; the mod's are on
@@ -69,16 +72,21 @@ jobs:
     outputs:
       ver: ${{ steps.ver.outputs.ver }}
     env:
-      # AppImage type 2 runtime, pinned by release and checksum (as MHGU_Editor's release.yml)
+      # AppImage type 2 runtimes, pinned by release and checksum (as MHGU_Editor's release.yml)
       RUNTIME_URL: https://github.com/AppImage/type2-runtime/releases/download/20251108/runtime-x86_64
       RUNTIME_SHA256: 2fca8b443c92510f1483a883f60061ad09b46b978b2631c807cd873a47ec260d
+      RUNTIME_ARM64_URL: https://github.com/AppImage/type2-runtime/releases/download/20251108/runtime-aarch64
+      RUNTIME_ARM64_SHA256: 00cbdfcf917cc6c0ff6d3347d59e0ca1f7f45a6df1a428a0d6d8a78664d87444
+      # the arm64 .exe's toolchain (clang, lld, llvm-windres for aarch64-pc-windows-gnullvm), pinned the same way
+      LLVM_MINGW_URL: https://github.com/mstorsjo/llvm-mingw/releases/download/20261020/llvm-mingw-20261020-ucrt-ubuntu-22.04-x86_64.tar.xz
+      LLVM_MINGW_SHA256: 55064b60b991a1e1e8090b8c2f84e82b22cfe5903d12c159d65064cf5e8ae335
     steps:
       - name: Toolchain
         run: |
           pacman -Syu --noconfirm --needed git github-cli rustup mingw-w64-gcc zig cargo-zigbuild squashfs-tools \
             fontconfig python
           rustup default stable
-          rustup target add x86_64-pc-windows-gnu
+          rustup target add x86_64-pc-windows-gnu aarch64-pc-windows-gnullvm aarch64-unknown-linux-gnu
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
@@ -93,12 +101,21 @@ jobs:
             exit 1
           fi
           echo "ver=$ver" >> "$GITHUB_OUTPUT"
-      - name: AppImage runtime
+      - name: AppImage runtimes, llvm-mingw
         run: |
           curl -fsSL -o "$RUNNER_TEMP/runtime-x86_64" "$RUNTIME_URL"
           echo "$RUNTIME_SHA256  $RUNNER_TEMP/runtime-x86_64" | sha256sum -c -
+          curl -fsSL -o "$RUNNER_TEMP/runtime-aarch64" "$RUNTIME_ARM64_URL"
+          echo "$RUNTIME_ARM64_SHA256  $RUNNER_TEMP/runtime-aarch64" | sha256sum -c -
+          curl -fsSL -o "$RUNNER_TEMP/llvm-mingw.tar.xz" "$LLVM_MINGW_URL"
+          echo "$LLVM_MINGW_SHA256  $RUNNER_TEMP/llvm-mingw.tar.xz" | sha256sum -c -
+          mkdir "$RUNNER_TEMP/llvm-mingw"
+          tar -xJf "$RUNNER_TEMP/llvm-mingw.tar.xz" -C "$RUNNER_TEMP/llvm-mingw" --strip-components=1
       - name: Build
-        run: APPIMAGE_RUNTIME="$RUNNER_TEMP/runtime-x86_64" python installer/packaging/build.py
+        # llvm-mingw stays off PATH: build.py puts it there for the arm64 .exe only
+        run: |
+          APPIMAGE_RUNTIME="$RUNNER_TEMP/runtime-x86_64" APPIMAGE_RUNTIME_ARM64="$RUNNER_TEMP/runtime-aarch64" \
+            LLVM_MINGW="$RUNNER_TEMP/llvm-mingw" python installer/packaging/build.py
       - uses: actions/upload-artifact@v4
         with:
           name: MHGU-Definitive-Edition-Installer-${{ steps.ver.outputs.ver }}
@@ -108,9 +125,16 @@ jobs:
 
   windows:
     needs: build
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x86_64, os: windows-latest }
+          - { arch: arm64, os: windows-11-arm }
+    runs-on: ${{ matrix.os }}
     env:
       VER: ${{ needs.build.outputs.ver }}
+      EXE: dist/MHGU-Definitive-Edition-Installer-${{ needs.build.outputs.ver }}-${{ matrix.arch }}.exe
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -118,21 +142,44 @@ jobs:
           path: dist
       - name: Start the .exe
         run: |
-          test "$("dist/MHGU-Definitive-Edition-Installer-$VER-x86_64.exe" --version | tr -d '\r')" = "$VER"
-          MHGU_DE_SNAPSHOT=window.png timeout 180 "dist/MHGU-Definitive-Edition-Installer-$VER-x86_64.exe"
+          test "$("$EXE" --version | tr -d '\r')" = "$VER"
+          MHGU_DE_SNAPSHOT=window.png timeout 180 "$EXE"
           test -s window.png
           # the Start Menu shortcut it wrote at start (gui/src/desktop.rs)
           test -s "$(cygpath "$APPDATA")/Microsoft/Windows/Start Menu/Programs/MHGU Definitive Edition Installer.lnk"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: windows-window-${{ needs.build.outputs.ver }}
+          name: windows-${{ matrix.arch }}-window-${{ needs.build.outputs.ver }}
           path: window.png
           if-no-files-found: ignore
           retention-days: 3
 
+  linux:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x86_64, os: ubuntu-latest }
+          - { arch: arm64, os: ubuntu-24.04-arm }
+    runs-on: ${{ matrix.os }}
+    env:
+      VER: ${{ needs.build.outputs.ver }}
+      APP: dist/MHGU-Definitive-Edition-Installer-${{ needs.build.outputs.ver }}-${{ matrix.arch }}.AppImage
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: MHGU-Definitive-Edition-Installer-${{ needs.build.outputs.ver }}
+          path: dist
+      - name: Start the AppImage
+        # the runner has no FUSE: the runtime unpacks it instead of mounting it
+        run: |
+          chmod +x "$APP"
+          test "$(APPIMAGE_EXTRACT_AND_RUN=1 "$APP" --version)" = "$VER"
+
   release:
-    needs: [build, windows]
+    needs: [build, windows, linux]
     if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     env:

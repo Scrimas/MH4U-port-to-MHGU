@@ -1,50 +1,84 @@
 """build.py : the installer's release files into installer/dist/ (MHGU_Editor's app/packaging/build.sh, in Python: the
 repo has no shell scripts):
   MHGU-Definitive-Edition-Installer-<v>-x86_64.exe        Windows 10/11, mingw-w64 cross build, one file
+  MHGU-Definitive-Edition-Installer-<v>-arm64.exe         Windows 11 on ARM, llvm-mingw cross build, one file
   MHGU-Definitive-Edition-Installer-<v>-x86_64.AppImage   Linux, glibc 2.28 (cargo-zigbuild), AppImage type 2 runtime
+  MHGU-Definitive-Edition-Installer-<v>-arm64.AppImage    Linux on ARM (aarch64), the same
   SHA256SUMS-<v>                            the files' sha256 (the installer's self-update checks them)
 
-  python3 installer/packaging/build.py [--appimage | --exe]
+  python3 installer/packaging/build.py [--exe | --appimage] [--arch x86_64 | --arch arm64]
 
-Needs: rustup target x86_64-pc-windows-gnu + mingw-w64-gcc (exe); cargo-zigbuild + zig (else the binary needs this
-machine's glibc or newer), mksquashfs (squashfs-tools) and APPIMAGE_RUNTIME=<the type 2 runtime file> (AppImage). CI:
-.github/workflows/installer.yml, in an Arch Linux container like the editor's.
+Needs:
+  x86_64 .exe       rustup target x86_64-pc-windows-gnu + mingw-w64-gcc
+  arm64 .exe        rustup target aarch64-pc-windows-gnullvm + LLVM_MINGW=<an llvm-mingw folder> (its bin/ is put on
+                    PATH for this build only: clang, lld, llvm-ar, llvm-windres; ring needs clang for Windows on ARM)
+  x86_64 AppImage   cargo-zigbuild + zig (else the binary needs this machine's glibc or newer), mksquashfs
+                    (squashfs-tools), APPIMAGE_RUNTIME=<the type 2 runtime-x86_64 file>
+  arm64 AppImage    rustup target aarch64-unknown-linux-gnu + cargo-zigbuild + zig (zig needed unless this machine is
+                    aarch64), mksquashfs, APPIMAGE_RUNTIME_ARM64=<the type 2 runtime-aarch64 file>; fontconfig is
+                    loaded at start (RUST_FONTCONFIG_DLOPEN: there is no aarch64 libfontconfig to link against when
+                    cross building), as Wayland and xkbcommon already are
+CI: .github/workflows/installer.yml, in an Arch Linux container like the editor's.
 """
-import hashlib, os, shutil, subprocess, sys, tempfile, tomllib
+import hashlib, os, platform, shutil, subprocess, sys, tempfile, tomllib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 INST = os.path.dirname(HERE)
 DIST = os.path.join(INST, 'dist')
 NAME = 'MHGU-Definitive-Edition-Installer'
+ARCHS = ('x86_64', 'arm64')            # the file names' arch (installer/core/src/selfupdate.rs ARCH)
+EXE_TARGET = {'x86_64': 'x86_64-pc-windows-gnu', 'arm64': 'aarch64-pc-windows-gnullvm'}
+LINUX_TARGET = {'x86_64': 'x86_64-unknown-linux-gnu', 'arm64': 'aarch64-unknown-linux-gnu'}
+RUNTIME_ENV = {'x86_64': 'APPIMAGE_RUNTIME', 'arm64': 'APPIMAGE_RUNTIME_ARM64'}
 
 
-def run(*a):
+def run(*a, env=None):
     print('$', ' '.join(a), flush=True)
-    subprocess.run(a, cwd=INST, check=True)
+    subprocess.run(a, cwd=INST, check=True, env=env)
 
 
 def has(cmd):
     return shutil.which(cmd) is not None
 
 
-def exe(ver):
-    run('cargo', 'build', '--release', '--locked', '-p', 'mhgu-de-installer', '--target', 'x86_64-pc-windows-gnu')
-    out = os.path.join(DIST, '%s-%s-x86_64.exe' % (NAME, ver))
-    shutil.copy(os.path.join(INST, 'target/x86_64-pc-windows-gnu/release/mhgu-de-installer.exe'), out)
+def host_arch():
+    return {'x86_64': 'x86_64', 'amd64': 'x86_64', 'aarch64': 'arm64', 'arm64': 'arm64'}.get(platform.machine().lower())
+
+
+def exe(ver, arch):
+    target, env = EXE_TARGET[arch], None
+    if arch == 'arm64':
+        lm = os.environ.get('LLVM_MINGW')
+        if not lm or not os.path.isfile(os.path.join(lm, 'bin', 'aarch64-w64-mingw32-clang')):
+            sys.exit('the arm64 .exe needs LLVM_MINGW=<an llvm-mingw folder> (bin/aarch64-w64-mingw32-clang)')
+        # llvm-mingw only for this build: its x86_64-w64-mingw32-* would replace mingw-w64-gcc in the x86_64 one
+        env = dict(os.environ, PATH=os.path.join(lm, 'bin') + os.pathsep + os.environ.get('PATH', ''))
+        cc = os.path.join(lm, 'bin', 'aarch64-w64-mingw32-clang')
+        env.setdefault('CARGO_TARGET_AARCH64_PC_WINDOWS_GNULLVM_LINKER', cc)
+        env.setdefault('CC_aarch64_pc_windows_gnullvm', cc)
+        env.setdefault('AR_aarch64_pc_windows_gnullvm', os.path.join(lm, 'bin', 'llvm-ar'))
+    run('cargo', 'build', '--release', '--locked', '-p', 'mhgu-de-installer', '--target', target, env=env)
+    out = os.path.join(DIST, '%s-%s-%s.exe' % (NAME, ver, arch))
+    shutil.copy(os.path.join(INST, 'target', target, 'release', 'mhgu-de-installer.exe'), out)
     return out
 
 
-def appimage(ver):
+def appimage(ver, arch):
+    target = LINUX_TARGET[arch]
+    env = dict(os.environ, RUST_FONTCONFIG_DLOPEN='1') if arch == 'arm64' else None
     if has('zig') and subprocess.run(['cargo', 'zigbuild', '--help'], capture_output=True).returncode == 0:
-        run('cargo', 'zigbuild', '--release', '--locked', '-p', 'mhgu-de-installer', '--target', 'x86_64-unknown-linux-gnu.2.28')
-        binary = os.path.join(INST, 'target/x86_64-unknown-linux-gnu/release/mhgu-de-installer')
-    else:
+        run('cargo', 'zigbuild', '--release', '--locked', '-p', 'mhgu-de-installer', '--target', target + '.2.28',
+            env=env)
+        binary = os.path.join(INST, 'target', target, 'release', 'mhgu-de-installer')
+    elif arch == host_arch():
         print('   (cargo-zigbuild not found: linking against this machine\'s glibc)')
-        run('cargo', 'build', '--release', '--locked', '-p', 'mhgu-de-installer')
+        run('cargo', 'build', '--release', '--locked', '-p', 'mhgu-de-installer', env=env)
         binary = os.path.join(INST, 'target/release/mhgu-de-installer')
-    runtime = os.environ.get('APPIMAGE_RUNTIME')
+    else:
+        sys.exit('the %s AppImage needs cargo-zigbuild and zig on this %s machine' % (arch, host_arch()))
+    runtime = os.environ.get(RUNTIME_ENV[arch])
     if not runtime or not os.path.isfile(runtime) or not has('mksquashfs'):
-        sys.exit('the AppImage needs APPIMAGE_RUNTIME=<type 2 runtime> and mksquashfs')
+        sys.exit('the %s AppImage needs %s=<type 2 runtime> and mksquashfs' % (arch, RUNTIME_ENV[arch]))
     with tempfile.TemporaryDirectory() as tmp:
         app = os.path.join(tmp, 'AppDir')
         for d in ('usr/bin', 'usr/share/applications', 'usr/share/icons/hicolor/256x256/apps'):
@@ -64,7 +98,7 @@ def appimage(ver):
         sq = os.path.join(tmp, 'app.squashfs')
         subprocess.run(['mksquashfs', app, sq, '-root-owned', '-noappend', '-comp', 'zstd', '-Xcompression-level', '19',
                         '-b', '1M', '-quiet', '-no-progress'], check=True)
-        out = os.path.join(DIST, '%s-%s-x86_64.AppImage' % (NAME, ver))
+        out = os.path.join(DIST, '%s-%s-%s.AppImage' % (NAME, ver, arch))
         with open(out, 'wb') as o:
             for part in (runtime, sq):
                 with open(part, 'rb') as i:
@@ -74,16 +108,17 @@ def appimage(ver):
 
 
 def main():
-    a = sys.argv[1:]
-    if a not in ([], ['--appimage'], ['--exe']):
+    a, archs = sys.argv[1:], list(ARCHS)
+    if '--arch' in a:
+        i = a.index('--arch')
+        archs = a[i + 1:i + 2]
+        del a[i:i + 2]
+    if a not in ([], ['--exe'], ['--appimage']) or len(archs) not in (1, len(ARCHS)) or set(archs) - set(ARCHS):
         sys.exit(__doc__)
+    kinds = [a[0][2:]] if a else ['exe', 'appimage']
     ver = tomllib.load(open(os.path.join(INST, 'Cargo.toml'), 'rb'))['workspace']['package']['version']
     os.makedirs(DIST, exist_ok=True)
-    built = []
-    if a != ['--appimage']:
-        built.append(exe(ver))
-    if a != ['--exe']:
-        built.append(appimage(ver))
+    built = [(exe if k == 'exe' else appimage)(ver, arch) for k in kinds for arch in archs]
     sums = os.path.join(DIST, 'SHA256SUMS-%s' % ver)
     with open(sums, 'w', newline='\n') as f:
         for p in built:
