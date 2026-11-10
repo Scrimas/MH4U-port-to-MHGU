@@ -1,11 +1,14 @@
-"""test_modsave.py : module/modsave.c against its reference tools/modsave.py, without the game.
+"""test_modsave.py : module/modsave.c and the installer's installer/core/src/modsave.rs against their reference
+tools/modsave.py, without the game.
 
 Compiles modsave.c with the module's flags (module/build.py CFLAGS), runs ms_split, ms_merge and ms_restore as ARM
 code under unicorn on a synthetic slot and on every slot of the GU `system` files given, and checks that:
 - C's file equals Python's, byte for byte, and so does the cleaned slot;
 - merging C's file back gives the slot as it was (byte for byte, the link record aside), exactly;
 - ms_restore puts the slot back as the merge found it;
-- a file cut short, a wrong check word and a full journal are refused, the slot untouched.
+- a file cut short, a wrong check word and a full journal are refused, the slot untouched;
+- the installer's Rust code (mhgu-de-cli modsave, built with cargo when it is there) writes the same file and cleaned
+  slot, merges it back exactly, and makes the same careful merge.
 Also refuses ARMv8 CRC instructions in modsave.c's code. Exit 1 on any failure.
 
   python3 tools/test_modsave.py [SYSTEM ...]
@@ -54,16 +57,86 @@ def call(uc, addr, *args):
     return r - (1 << 32) if r & 0x80000000 else r
 
 
+def rust_cli():
+    """the installer's mhgu-de-cli, built (debug), or None without cargo"""
+    inst = os.path.join(ROOT, 'installer')
+    try:
+        subprocess.run(['cargo', 'build', '--offline', '-q', '-p', 'mhgu-de-core', '--bin', 'mhgu-de-cli'], cwd=inst,
+                       check=True)
+    except (OSError, subprocess.CalledProcessError) as e:
+        print('no Rust comparison (%s)' % e)
+        return None
+    exe = os.path.join(inst, 'target', 'debug', 'mhgu-de-cli' + ('.exe' if os.name == 'nt' else ''))
+    return exe if os.path.exists(exe) else None
+
+
+def rust(exe, tmp, *args):
+    r = subprocess.run([exe, 'modsave'] + [a if isinstance(a, str) else str(a) for a in args], cwd=tmp,
+                       capture_output=True, text=True)
+    return r.returncode, r.stdout
+
+
 def main(paths):
     with tempfile.TemporaryDirectory() as t:
         img, syms = build_elf(t)
+    exe = rust_cli()
+    rtmp = tempfile.mkdtemp(prefix='test_modsave_rs')
     uc, log = emulator(img)
     for base, size in ((SLOT, 0x120000 + 0x1000), (FILE, 0x10000), (QTAB, 0x10000), (JRN, JCAP), (ASIDE, ACAP),
                        (OUT, 0x1000)):
         uc.mem_map(base, (size + 0xFFF) & ~0xFFF)
     quests = M.quest_bits()
     uc.mem_write(QTAB, b''.join(struct.pack('<II', i, q) for i, q in quests))
+    import json
+    with open(os.path.join(rtmp, 'quests.json'), 'w', encoding='utf-8') as f:
+        json.dump([[i, q] for i, q in quests], f)
     bad = []
+
+    def rust_one(name, slot, pf, ps):
+        """the installer's split and merge of `slot`, against Python's file `pf` and cleaned slot `ps`"""
+        with open(os.path.join(rtmp, 'slot'), 'wb') as f:
+            f.write(slot)
+        r, _ = rust(exe, rtmp, 'split', 'slot', 'quests.json', 0xC0FFEE, 7, 'f0', 's0', '--compute')
+        if pf is None:
+            if r != 5: bad.append('%s: Python refused the split, Rust exited %d' % (name, r))
+            return None
+        r, _ = rust(exe, rtmp, 'split', 'slot', 'quests.json', 0xC0FFEE, 7, 'rf', 'rs')
+        rf, rs = open(os.path.join(rtmp, 'rf'), 'rb').read(), open(os.path.join(rtmp, 'rs'), 'rb').read()
+        f0, s0 = open(os.path.join(rtmp, 'f0'), 'rb').read(), open(os.path.join(rtmp, 's0'), 'rb').read()
+        if r or rf != pf:
+            d = next((i for i in range(min(len(rf), len(pf))) if rf[i] != pf[i]), min(len(rf), len(pf)))
+            bad.append('%s: Rust file (%d B) != Python file (%d B), first difference at %d' % (name, len(rf), len(pf), d))
+            return None
+        if s0 != slot: bad.append('%s: Rust split without clean changed the slot' % name)
+        if f0[:12] != pf[:12] or f0[16:24] != pf[16:24] or f0[32:] != pf[32:]:
+            bad.append('%s: Rust compute-only file differs from the cleaning one' % name)
+        if rs != bytes(ps):
+            d = next(i for i in range(M.SLOT_SIZE) if rs[i] != ps[i])
+            bad.append('%s: Rust cleaned slot != Python cleaned slot at %#x' % (name, d))
+            return None
+        r, out = rust(exe, rtmp, 'merge', 'rs', 'rf', 'quests.json', 'rm')
+        st = json.loads(out) if r == 0 else {}
+        rm = open(os.path.join(rtmp, 'rm'), 'rb').read() if r == 0 else b''
+        lk = slice(M.RESERVED, M.RESERVED + M.LINK_N)
+        if r or rm[:lk.start] + rm[lk.stop:] != slot[:lk.start] + slot[lk.stop:]:
+            bad.append('%s: Rust merge(split) is not the slot (exit %d)' % (name, r))
+        elif not st['exact'] or st['aside'] or st['kept'] or st['moved']:
+            bad.append('%s: Rust merge not exact: %s' % (name, st))
+        return st
+
+    def rust_careful(name, van, cf, pv, pst):
+        with open(os.path.join(rtmp, 'van'), 'wb') as f:
+            f.write(bytes(van))
+        with open(os.path.join(rtmp, 'cf'), 'wb') as f:
+            f.write(cf)
+        r, out = rust(exe, rtmp, 'merge', 'van', 'cf', 'quests.json', 'rv')
+        if r or open(os.path.join(rtmp, 'rv'), 'rb').read() != bytes(pv):
+            bad.append('%s: careful merge: Rust (%d) and Python differ' % (name, r))
+            return
+        st = json.loads(out)
+        if (st['placed'], st['moved'], st['kept'], st['aside']) != (pst['placed'], pst['moved'], pst['kept'],
+                                                                     len(pst['aside'])):
+            bad.append('%s: careful merge counts: Rust %s, Python %s' % (name, st, pst))
 
     def one(name, slot):
         slot = bytes(slot)
@@ -78,6 +151,7 @@ def main(paths):
         n = call(uc, syms['ms_split'], SLOT, QTAB, len(quests), 0xC0FFEE, 7, 0, 0, FILE, M.FILE_SIZE, 1, OUT)
         cf = bytes(uc.mem_read(FILE, max(n, 0)))
         cs = bytes(uc.mem_read(SLOT, M.SLOT_SIZE))
+        if exe: rust_one(name, slot, pf, ps)
         if pf is None:
             if n != -1: bad.append('%s: Python refused the split, C returned %d' % (name, n))
             return
@@ -144,7 +218,8 @@ def main(paths):
                 bad.append('%s: careful merge counts: C %s, Python %s' % (name, cst, pst))
             elif not pst['moved']:
                 bad.append('%s: careful merge moved nothing' % name)
-        print('ok %s: %d bytes, %d placed' % (name, len(cf), placed) if not [b for b in bad if b.startswith(name)]
+            if exe: rust_careful(name, van, cf, pv, pst)
+        print('ok %s: %d bytes, %d placed%s' % (name, len(cf), placed, ', Rust the same' if exe else '') if not [b for b in bad if b.startswith(name)]
               else 'FAIL %s' % name)
 
     one('synthetic', synthetic(quests))
