@@ -90,28 +90,26 @@ static uint8_t *slot_ptr(uint32_t base, int k)
     return off && off + MS_SLOT_SIZE <= IMAGE_SIZE ? (uint8_t *)(uintptr_t)(base + off) : 0;
 }
 
-static uint32_t tick(void)
+/* svcGetSystemTick (19.2 MHz): r0:r1 out, and the svc clears r2, r3 and r12. T3 2026-11-10: without those clobbers
+ * the first save crashed (a static's address kept in r2 across the svc, read through as 0) and the link ID's
+ * multipliers kept in r2 / r3 came back 0 */
+static uint32_t systick(uint32_t *hi)
 {
     register uint32_t r0 __asm__("r0"), r1 __asm__("r1");
-    __asm__ volatile("svc #0x1e" : "=r"(r0), "=r"(r1) : : "memory");
-    return r0 ^ (r1 << 7);
-}
-
-static uint32_t us_since(uint32_t t0)      /* the system tick runs at 19.2 MHz */
-{
-    register uint32_t r0 __asm__("r0"), r1 __asm__("r1");
-    __asm__ volatile("svc #0x1e" : "=r"(r0), "=r"(r1) : : "memory");
-    (void)r1;
-    return (r0 - t0) / 192u * 10u;
-}
-
-static uint32_t tick0(void)
-{
-    register uint32_t r0 __asm__("r0"), r1 __asm__("r1");
-    __asm__ volatile("svc #0x1e" : "=r"(r0), "=r"(r1) : : "memory");
-    (void)r1;
+    __asm__ volatile("svc #0x1e" : "=r"(r0), "=r"(r1) : : "r2", "r3", "r12", "memory");
+    if (hi) *hi = r1;
     return r0;
 }
+
+static uint32_t tick(void)
+{
+    uint32_t hi, lo = systick(&hi);
+    return lo ^ (hi << 7);
+}
+
+static uint32_t tick0(void) { return systick(0); }
+
+static uint32_t us_since(uint32_t t0) { return (systick(0) - t0) / 192u * 10u; }
 
 /* ---------------------------------------------------------------------------------------------- pack */
 
