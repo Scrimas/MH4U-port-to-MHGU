@@ -27,18 +27,15 @@ wholemap_k = 1.0           # whole map: GU dims[24] / 4U m05 W = 60000 / 60000 (
 
 # Harvest Tours (allocations.toml [[map]] heavens_mount quests; tools/tour4u.py builds them into romfs/): GU's
 # Volcanic Hollow tours are the precedent (the maintainer, 2026-11-10): Village 8*, Hub 5*, G3; 4U's low-rank tours
-# q516 / q10314 are left out. A tour with several 4U intruder outcomes ships one quest per outcome: the board shows
-# `quest`, the host rolls 4U's weights at accept and loads that outcome's quest (module/quest.c tour_accept_c), the
-# variants stay off the boards and their clear is written to `quest`.
+# q516 / q10314 are left out. Each tour carries 4U's intruders (weight > 0, up to 3), chance and timing in GU's own
+# intruder fields (questData +0xCC.., tools/tour4u.py): GU rolls them, as in its own quests.
 [[tour]]
 quest = 841                # Village 8*
 from_4u = 806              # 4U caravan 8* tour
 template = 821             # GU's Volcanic Hollow Village 8* tour
 
 [[tour]]
-quest = 10547              # Hub 5* (High Rank)
-variants = [10548, 10549]
-weights = [40, 55, 5]      # 4U q10515 intruder list (header +0x30, C): Rathalos 40, Deviljho 55, Savage Deviljho 5
+quest = 10547              # Hub 5* (High Rank): 4U's 50 %, Rathalos 40, Deviljho 55, Savage Deviljho 5
 from_4u = 10515
 template = 10502           # GU's Volcanic Hollow Hub 5* tour
 

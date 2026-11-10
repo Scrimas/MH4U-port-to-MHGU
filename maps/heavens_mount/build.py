@@ -19,7 +19,7 @@ STEPS = [
     ('stage', 'stage m30 (alias of 24)', lambda: [py(os.path.join(T, 'build_heavens_mount.py'), flags=('-B',))]),
     ('ui', 'its area maps + whole map (after stage)', lambda: [py(os.path.join(T, 'build_heavens_mount_ui.py'),
                                                                   flags=('-I', '-B'))]),
-    ('tours', 'Harvest Tours 841 10547 (+ 10548 10549) 11372 (4U q806 q10515 q10907)',
+    ('tours', 'Harvest Tours 841 10547 11372 (4U q806 q10515 q10907)',
      lambda: [py('tools/tour4u.py', 'heavens_mount', flags=('-B',))]),
 ]
 

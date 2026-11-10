@@ -68,17 +68,9 @@ def maps(reg=None):
 
 
 def tours(reg=None):
-    """every tour quest, in quest-list order: [dict(quest, base, map, after, weight, spec)] (base = the quest the boards
-    show; a variant is one 4U intruder outcome of it, module/quest.c), from maps/<map>/package.toml [[tour]]"""
-    out = []
-    for mp in maps(reg):
-        for t in paths.package_toml(mp['name']).get('tour', []):
-            ids = [t['quest']] + list(t.get('variants', []))
-            ws = t.get('weights', [100])
-            for q, w in zip(ids, ws):
-                out.append(dict(quest=q, base=t['quest'], map=mp['name'], after=mp.get('append_after'), weight=w,
-                                spec=t))
-    return out
+    """every tour quest, in quest-list order: [dict(quest, map, after, spec)], from maps/<map>/package.toml [[tour]]"""
+    return [dict(quest=t['quest'], map=mp['name'], after=mp.get('append_after'), spec=t)
+            for mp in maps(reg) for t in paths.package_toml(mp['name']).get('tour', [])]
 
 
 def stages():
@@ -252,8 +244,7 @@ def check(reg=None, gu_main=paths.GU_MAIN):
 
 def check_maps(reg, seen):
     """[[map]] entries: a map package each, quests from the pool that no other entry takes, append_after a monster,
-    and its package.toml [[tour]] tables naming exactly those quests (a base and its variants, one 4U weight each,
-    summing to 100)"""
+    and its package.toml [[tour]] tables naming exactly those quests, one each"""
     errs, names = [], [m['name'] for m in monsters(reg)]
     pools = reg['pools']
     for mp in maps(reg):
@@ -269,15 +260,12 @@ def check_maps(reg, seen):
             if ('quests', q) in seen: errs.append('map %s: quest %d already taken by %s' % (name, q, seen['quests', q]))
             seen['quests', q] = name
         ts = paths.package_toml(name).get('tour', [])
-        listed = [q for t in ts for q in [t.get('quest')] + list(t.get('variants', []))]
+        listed = [t.get('quest') for t in ts]
         if sorted(listed) != sorted(mp.get('quests', [])):
             errs.append('map %s: quests %s, its package.toml tours name %s' % (name, mp.get('quests'), listed))
         for t in ts:
-            n = 1 + len(t.get('variants', []))
-            ws = t.get('weights', [100] if n == 1 else None)
-            if not ws or len(ws) != n or sum(ws) != 100 or min(ws) <= 0:
-                errs.append('map %s: tour %s: one weight > 0 per outcome (quest + variants), summing to 100' %
-                            (name, t.get('quest')))
+            extra = set(t) - {'quest', 'from_4u', 'template'}
+            if extra: errs.append('map %s: tour %s: unknown keys %s' % (name, t.get('quest'), sorted(extra)))
             for key in ('from_4u', 'template'):
                 if not isinstance(t.get(key), int): errs.append('map %s: tour %s: no %s' % (name, t.get('quest'), key))
     if len(maps(reg)) > len({mp.get('name') for mp in maps(reg)}):

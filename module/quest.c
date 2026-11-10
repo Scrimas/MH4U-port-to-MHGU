@@ -6,10 +6,8 @@
  * (12 B: +4 quest ID, +8 group byte, +9, +10 name colour row). The loader step 0x3b7de8 walks it and loads loose
  * questData_%07d.ext for Hub G-rank IDs, then 0x3bb318 sorts them onto the star boards. Nothing real is replaced.
  * A map's Harvest Tours (port_tours: allocations.toml [[map]], maps/<map>/package.toml [[tour]]) are appended too, right
- * after the quests of their append_after monster. A tour with several 4U intruder outcomes ships one quest per outcome:
- * the boards show the base (tour_board_c hides the variants), the accept rolls 4U's weights and takes the outcome's
- * quest (tour_accept_c: the host, so every hunter who joins loads the same one), and its clear is written to the
- * base's bit (quest_clear_fix_c). */
+ * after the quests of their append_after monster. A tour's intruders are GU's own (questData +0xCC.., tools/tour4u.py):
+ * GU rolls them, online as in its own quests. */
 #include <stdint.h>
 #include "util.h"
 #include "game.h"
@@ -69,14 +67,6 @@ int quest_clear_fix_c(uint32_t *regs)
     int t = port_tour_of(id);
     (void)regs;
     quest_group_rename();
-    /* a tour's variant: the write reads the running quest [mgr+0xe0] at 0x388d70 (C), after this hook: it names the
-     * base, whose bit the boards show (the variants' bits stay unset). The ID stays the base's until the quest end
-     * clears it (0x39f230); the variant's questData record (+0xa4) is unchanged. */
-    if (mgr && t >= 0 && port_tours[t].base != id && FIELD(uint32_t, mgr, 0xe0) == id) {
-        FIELD(uint32_t, mgr, 0xe0) = port_tours[t].base;
-        logf("mhgu-de: clear write for tour %u (outcome %u)", port_tours[t].base, id);
-        id = port_tours[t].base;
-    }
     if (mgr && (grp = FIELD(uint32_t, mgr, 0xb4)) && (port_quest_owner(id, 0) >= 0 || t >= 0)) {
         n = FIELD(uint32_t, grp, 0x64);
         e = FIELD(uint32_t, grp, 0x6c);
@@ -171,45 +161,10 @@ int quest_unlocked_c(uint32_t *regs)
     return 1;
 }
 
-/* ---- Harvest Tours with several intruder outcomes ---- */
-
-/* svcGetSystemTick (low word): the roll's randomness. The svc also overwrites r2 / r3 (test 2026-11-10: the
- * compiler kept the `% 100` reciprocal in r2 across it, so every roll was >= 100 and fell back to the board's
- * outcome: five Rathalos in a row): declared clobbered. */
-static uint32_t tick_low(void)
-{
-    register uint32_t r0 __asm__("r0"), r1 __asm__("r1");
-    __asm__ volatile("svc #0x1e" : "=r"(r0), "=r"(r1) : : "r2", "r3", "r12", "memory");
-    (void)r1;
-    return r0;
-}
-
-/* 0x784e94(board, quest ID, mode): the accept (callers 0x54c130: the board, mode 1; 0x77eb50: joining a posted quest,
- * mode 2); it stores the ID at [[0x188ae38]+0xd68], the quest the start loads (port.c, C). Entry hook: on the board,
- * a tour with variants takes one outcome by 4U's weights (port_tours weight). Joining keeps the host's ID: everyone
- * loads the host's outcome. The fee comes from the board's entry (+0x38 list), not the ID (C). */
-int tour_accept_c(uint32_t *regs)
-{
-    int t = port_tour_of(regs[R1]);
-    if (t < 0 || regs[R2] == 2 || port_tours[t].base != regs[R1] || t + 1 >= PORT_TOUR_N ||
-        port_tours[t + 1].base != regs[R1] || !port_tour_present(t))
-        return 0;
-    uint32_t tick = tick_low(), roll = tick % 100u, sum = 0;
-    int k = t;
-    for (; k < PORT_TOUR_N && port_tours[k].base == regs[R1]; k++) {
-        sum += port_tours[k].weight;
-        if (roll < sum) break;
-    }
-    if (k >= PORT_TOUR_N || port_tours[k].base != regs[R1] || !port_tour_present(k)) k = t;
-    logf("mhgu-de: tour %u accepted (mode %u): roll %u -> quest %u", regs[R1], regs[R2], roll, port_tours[k].quest);
-    regs[R1] = port_tours[k].quest;
-    return 0;
-}
-
 /* 0x3bb318(boards, quest ID, star, record) -> void: puts a quest on its star board, appended, unless the board already
  * holds that ID (C). Callers: the regular boards' builder 0x3bab28.. (per loaded quest, in quest-list order: record
  * = 0x39b848(0x3ba50c(boards, ID), 0), star = s8 record +14 = questData +0x12, C) and the event boards' 0x3bc234 /
- * 0x3bc458. A tour's variant is no board quest: skipped. GU's tours lead their boards (the maintainer, 2026-11-10),
+ * 0x3bc458. GU's tours lead their boards (the maintainer, 2026-11-10),
  * ours were appended last: before a board's first quest that is no tour (record +0x0c = questData +0x10 type, 3 =
  * Harvest Tour), our tours of that board go in first (the same calls the builder makes for them; its own call later
  * finds them there). */
@@ -227,12 +182,12 @@ int tour_board_c(uint32_t *regs)
     static uint32_t s_logged;                 /* bit k: tour k's first placement logged (the later calls are no-ops) */
     int t = port_tour_of(regs[R1]);
     const uint8_t *rec = (const uint8_t *)(uintptr_t)regs[R3];
-    if (t >= 0) return port_tours[t].base != regs[R1];
+    if (t >= 0) return 0;
     if (s_putting || !rec || regs[R1] >= 1000000u || rec[0x0c] == QD_TYPE_TOUR) return 0;   /* events, GU's tours */
     s_putting = 1;
     for (int k = 0; k < PORT_TOUR_N; k++) {
         const struct port_tour *pt = &port_tours[k];
-        if (pt->base != pt->quest || (pt->quest < 10000u) != (regs[R1] < 10000u) || !port_tour_present(k)) continue;
+        if ((pt->quest < 10000u) != (regs[R1] < 10000u) || !port_tour_present(k)) continue;
         void *res = qres_find((void *)(uintptr_t)regs[R0], pt->quest);
         uint8_t *r = res ? qres_record(res, 0) : 0;
         if (!r || FIELD(uint32_t, r, 8) != pt->quest || (uint8_t)r[14] != (uint8_t)regs[R2]) continue;

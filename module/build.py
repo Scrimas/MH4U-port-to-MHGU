@@ -98,8 +98,7 @@ HOOKS = [
     ('quest_unlocked', 0x3B2194),   # in 0x3b2174(_, id), before its check call: 1 for our quests (MID_EXIT)
     ('quest_clear_fix', 0x388D40),  # results-scene clear write: rename the freshly loaded quest list first
     ('quest_group_append', 0x39BB6C),  # quest_group parser exit (r4 = the list): append the quest_append quests
-    ('tour_accept', 0x784E94),   # quest accept (board, ID, mode): a tour with variants rolls its outcome (quest.c)
-    ('tour_board', 0x3BB318),    # a listed quest onto its star board: a tour's variants skipped (quest.c)
+    ('tour_board', 0x3BB318),    # a listed quest onto its star board: our tours lead theirs (quest.c)
     ('notes_unlock_check', 0x554DA4),  # Hunter's Notes unlock condition (talk action 6 / condition 44): log entry 123
     ('notes_list_visible', 0x5B0BD4), ('notes_list_new', 0x5B0A44),      # Notes list screen: an entry past the save map
     ('notes_new_clear', 0x5B0AD4), ('notes_em_unlocked', 0x524770),      # has no bit (notes.c; MID_EXIT below)
@@ -446,8 +445,8 @@ def monsters_c():
     out.append('};')
     out.append('const struct port_tour port_tours[] = {')
     for t in alloc.tours():                  # quest-list order (tools/alloc.py tours)
-        out.append('    {%d, %d, %d, %d, %d},   /* %s */' % (t['quest'], t['base'], stages.index(t['map']) + 1,
-                                                          port[t['after']], t['weight'], t['map']))
+        out.append('    {%d, %d, %d},   /* %s */' % (t['quest'], stages.index(t['map']) + 1, port[t['after']],
+                                                  t['map']))
     out.append('    {0}' if not alloc.tours() else '')
     out.append('};')
     out.append('const struct port_monster port_monsters[] = {')

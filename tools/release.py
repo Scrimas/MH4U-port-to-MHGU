@@ -123,8 +123,7 @@ def core():
 def packages():
     """one dict per package: its package.toml + romfs = its RomFS folder + entries = its allocations.toml entries (one
     data file each) + alloc = the first entry; monster packages in registry order, then the map packages
-    (maps/<name>: no entries, alloc None; tours = its Harvest Tour quests, allocations.toml [[map]], and boards = the
-    ones the boards show, without the variants)"""
+    (maps/<name>: no entries, alloc None; tours = boards = its Harvest Tour quests, allocations.toml [[map]])"""
     out = []
     for p in alloc.packages():
         ents = [m for m in alloc.monsters() if alloc.package(m) == p]
@@ -133,8 +132,7 @@ def packages():
     for mp in paths.maps():
         ts = [t for t in alloc.tours() if t['map'] == mp]
         out.append(dict(toml(os.path.join(paths.map_dir(mp), 'package.toml')), entries=[], alloc=None,
-                        romfs=paths.map_romfs(mp), tours=[t['quest'] for t in ts],
-                        boards=[t['quest'] for t in ts if t['quest'] == t['base']]))
+                        romfs=paths.map_romfs(mp), tours=[t['quest'] for t in ts], boards=[t['quest'] for t in ts]))
     for b in paths.bundles():               # bundles/<name>: no files (an empty zip), `requires` only
         out.append(dict(paths.package_toml(b), entries=[], alloc=None, romfs=None))
     return out

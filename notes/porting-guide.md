@@ -237,11 +237,11 @@ pairs where possible (tools/dt_vote.py, dt_map.py, snd4u2gu.py selftest), then a
 - Harvest Tours: if 4U has tours on the map, they belong to the map package (a monster requiring the map brings
   them, and so does the installer's Harvest Tours bundle, bundles/harvest_tours: add the map to its `requires`).
   Stars: the MHGU precedent of the closest GU map (ask the maintainer); IDs in allocations.toml `[[map]]` (quests,
-  append_after); `[[tour]]` in the map's package.toml (from_4u, template = GU's own tour of that board and rank,
-  variants + 4U weights when 4U's intruder list has several entries); `python3 tools/tour4u.py <map>` builds them
-  (a map build.py step). The core lists them after append_after's quests, rolls a tour's intruder outcome at accept
-  (the host's, so online players share it), keeps the variants off the boards and writes their clear to the board's
-  tour (module/quest.c).
+  append_after); `[[tour]]` in the map's package.toml (from_4u, template = GU's own tour of that board and rank);
+  `python3 tools/tour4u.py <map>` builds them (a map build.py step). 4U's intruders of weight > 0 (up to 3) go to
+  GU's own intruder system with 4U's chance and timing (questData +0xCC.., boss slots 2..4): GU rolls them, online
+  too. The core lists the tours after append_after's quests and puts them first on their star boards
+  (module/quest.c).
 
 ### Phase 5b: content (save, items, gear, Notes, quests)
 Order that worked: save slot -> materials -> carves / rewards -> second quest + subquests -> armor data on a GU

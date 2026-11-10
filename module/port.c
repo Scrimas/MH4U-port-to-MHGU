@@ -214,7 +214,8 @@ int port_tour_present(int t)
         const struct port_tour *pt = &port_tours[t];
         s_present[t] = questdata_present(pt->quest) && pt->stage && port_stage_installed(&port_stages[pt->stage - 1])
                        ? 1 : 2;
-        logf("mhgu-de: tour %u (board %u) %s", pt->quest, pt->base, s_present[t] == 1 ? "present" : "NOT present");
+        logf("mhgu-de: tour %u (%s) %s", pt->quest, port_stages[pt->stage ? pt->stage - 1 : 0].name,
+             s_present[t] == 1 ? "present" : "NOT present");
     }
     return s_present[t] == 1;
 }

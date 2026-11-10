@@ -31,12 +31,11 @@ struct port_stage {
 extern const struct port_stage port_stages[];       /* out/port_monsters.c */
 
 /* A map's Harvest Tour quest (allocations.toml [[map]] quests, maps/<map>/package.toml [[tour]]), in quest-list order.
- * A tour with several 4U intruder outcomes has one quest each: the board shows `base`; the others are its variants. */
+ * Its intruders are GU's own (questData +0xCC.., tools/tour4u.py). */
 struct port_tour {
-    uint32_t quest, base;
+    uint32_t quest;
     uint8_t stage;                        /* 1 + its map's port_stages index */
     int8_t after;                         /* allocations.toml append_after: listed right after this monster's quests */
-    uint8_t weight;                       /* 4U's weight (%) of this outcome */
 };
 extern const struct port_tour port_tours[];         /* out/port_monsters.c */
 #define PORT_LANGS 5          /* eng fre ger ita spa: text order in every data section */
