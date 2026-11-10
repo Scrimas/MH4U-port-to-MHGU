@@ -224,7 +224,7 @@ typedef void (*board_put_t)(void *boards, uint32_t id, uint32_t star, void *reco
 int tour_board_c(uint32_t *regs)
 {
     static int s_putting;
-    static uint32_t s_n;
+    static uint32_t s_logged;                 /* bit k: tour k's first placement logged (the later calls are no-ops) */
     int t = port_tour_of(regs[R1]);
     const uint8_t *rec = (const uint8_t *)(uintptr_t)regs[R3];
     if (t >= 0) return port_tours[t].base != regs[R1];
@@ -237,8 +237,8 @@ int tour_board_c(uint32_t *regs)
         uint8_t *r = res ? qres_record(res, 0) : 0;
         if (!r || FIELD(uint32_t, r, 8) != pt->quest || (uint8_t)r[14] != (uint8_t)regs[R2]) continue;
         board_put((void *)(uintptr_t)regs[R0], pt->quest, (uint16_t)(int16_t)(int8_t)r[14], r);
-        if (s_n < 12) {
-            s_n++;
+        if (k < 32 && !(s_logged >> k & 1)) {
+            s_logged |= 1u << k;
             logf("mhgu-de: tour %u put on star board %u before quest %u", pt->quest, regs[R2], regs[R1]);
         }
     }
