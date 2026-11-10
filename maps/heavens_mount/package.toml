@@ -4,7 +4,8 @@
 name = "heavens_mount"
 kind = "map"
 title = "Heaven's Mount"
-version = "1.0.0"          # bump on every published change of this map's files
+version = "1.0.1"          # bump on every published change of this map's files. 1.0.1: the gathering lists in
+                           # GU item IDs (1.0.0 copied 4U's IDs: wrong items; tools/items_heavens_mount.py)
 requires_core = "2.0.0"    # oldest core that knows map packages (module/port.c port_installed: a monster whose
                            # map is missing counts as not installed)
 folder = 30                # its RomFS stage folder m30 = allocations.toml stage_alias[1] of every monster

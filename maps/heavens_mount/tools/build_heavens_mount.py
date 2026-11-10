@@ -31,7 +31,8 @@ unchanged), GU area 9 is left over: no 4U SIS exit leads there (S: unreachable),
     collision files at their 4U paths in this arc (GU's KowareObj creator 0x4fe9c0 asks for k01..k04 of every area by
     file ID 0xbbdf + stage * 52 + area * 4 + k - 1). Area stream STQR bgm_m24d <- 4U str_m05 streams (sequence = area).
   map_com m30.arc (GU m24.arc): area collision (5 kinds x 9 areas; a missing 4U shell -> its main file, the m19 camp
-    rule), area info SIS (4U verbatim), item pops (4U m05d), stage effect lists m24_000 / m24_100 emptied (GU's own
+    rule), area info SIS (4U verbatim), item pops (4U m05d: the points verbatim, the Low / High / G item lists with
+    GU item IDs, gu_ipl; items_heavens_mount.py), stage effect lists m24_000 / m24_100 emptied (GU's own
     empty form), whole-map offsets = 4U m05's (aMap05 0x656778 literals: W 60000, 9 records), kowareObjData = 4U
     stage-5 state table A (0x6c55d8 -> [0xfcf4c4][5]: (6, 1, 0) (6, 2, 1) (6, 3, 2) (6, 4, 3)), monster navigation:
     relation\\m24\\m24aNN regenerated from the 4U floors (stage4u2gu relation_for), point_pos / way_point of areas
@@ -51,6 +52,7 @@ import paths                                         # noqa: E402
 sys.path.insert(0, paths.GU_PY)
 import arcpack, sbc, sdl, snd_area, snd_bgm, xfs     # noqa: E402
 import stage4u2gu as s4                              # noqa: E402
+import items_heavens_mount                           # noqa: E402
 
 A4 = 5                                               # 4U stage
 N4 = 9                                               # 4U areas (0xe087b4[5])
@@ -112,6 +114,68 @@ ITEM_POPS = {('stage\\%sd\\%sd' % (G, G), T_IPS): 'stage\\m05d\\m05d',
              ('stage\\%sd\\%sd_low' % (G, G), T_IPL): 'stage\\m05d\\m05d',
              ('stage\\%sd\\%sd_high' % (G, G), T_IPL): 'stage\\m05d\\m05d_high',
              ('stage\\%sd\\%sd_g' % (G, G), T_IPL): 'stage\\m05d\\m05d_g'}
+# The item lists (rItemPopList IPL v0x2003, tools/stage4u2gu.py): header 0x24 B (+0x10 n1, size1, off2 = size1, n2,
+# size2), sections at 0x24 / 0x24 + off2 = a table n x {u32 offset, u32 count} then the lists, each count x {u8 weight,
+# u8 count, u16 item} + {0xff, 0, 0, 0}; every list's weights sum to 100 (C, the 3 files of 4U m05d). They were copied
+# verbatim up to map 1.0.0, so GU read 4U item IDs as its own (wrong items in every quest on the map): now each item
+# goes through items_heavens_mount.item_map (GU name, or the closest GU item), a dropped item's weight goes to the
+# list's most likely kept item (first of the highest), as Dalamadur's gather lists (gather_em090.py gu_list).
+
+
+def ipl_sections(d):
+    """4U / GU IPL -> (header, [section 1 lists, section 2 lists]), each list [(weight, count, item)]; checked by a
+    rebuild of the same bytes"""
+    assert d[:4] == b'IPL\0' and struct.unpack_from('<2I', d, 4) == (0x2003, len(d) - 0x24), d[:12]
+    n1, size1, off2, n2, size2 = struct.unpack_from('<5I', d, 0x10)
+    assert off2 == size1 and 0x24 + size1 + size2 == len(d), (n1, size1, off2, n2, size2, len(d))
+    secs = []
+    for base, n in ((0x24, n1), (0x24 + off2, n2)):
+        lists = []
+        for i in range(n):
+            off, cnt = struct.unpack_from('<2I', d, base + 8 * i)
+            lists.append([struct.unpack_from('<BBH', d, base + off + 4 * k) for k in range(cnt)])
+        secs.append(lists)
+    assert ipl_build(d[:0x24], secs) == d, 'IPL round trip'
+    return d[:0x24], secs
+
+
+def ipl_section(lists):
+    tab, body = b'', b''
+    for ents in lists:
+        tab += struct.pack('<2I', 8 * len(lists) + len(body), len(ents))
+        body += b''.join(struct.pack('<BBH', *e) for e in ents) + b'\xff\0\0\0'
+    return tab + body
+
+
+def ipl_build(head, secs):
+    s1, s2 = (ipl_section(x) for x in secs)
+    h = bytearray(head)
+    struct.pack_into('<I', h, 8, len(s1) + len(s2))
+    struct.pack_into('<5I', h, 0x10, len(secs[0]), len(s1), len(s1), len(secs[1]), len(s2))
+    return bytes(h) + s1 + s2
+
+
+def gu_ipl(d4, gu_item):
+    """4U item lists -> GU item IDs: (bytes, report line)"""
+    head, secs = ipl_sections(d4)
+    out, dropped = [], 0
+    for lists in secs:
+        conv = []
+        for ents in lists:
+            assert sum(w for w, _, _ in ents) == 100, ents
+            keep = [(w, c, gu_item(k)) for w, c, k in ents if gu_item(k) is not None]
+            extra = 100 - sum(w for w, _, _ in keep)
+            assert keep, ents
+            if extra:
+                top = max(range(len(keep)), key=lambda i: (keep[i][0], -i))
+                keep[top] = (keep[top][0] + extra, keep[top][1], keep[top][2])
+                dropped += 1
+            conv.append(keep)
+        out.append(conv)
+    return ipl_build(head, out), '%d + %d lists in GU item IDs (%d with a dropped item)' % (
+        len(out[0]), len(out[1]), dropped)
+
+
 # Speartip's lighting rule (memory "stage lighting"): after port_filter, GU-only light objects that 4U's filter lacks
 # are switched off (Draw 0), the screen filters both games have take every 4U track; EM02-InfiniteLight stays on;
 # PL01..03 / StableShadow / StageDataSet stay GU's. AmbientLight stays ON (issue 7: with it off every surface out of
@@ -532,6 +596,15 @@ def point_pos_4u(a, graph):
             'point_pos: %d 4U points, entry / exit for areas %s + one fixed point' % (len(recs), ', '.join(what)))
 
 
+_GU_ITEM = []
+
+
+def gu_item():
+    """items_heavens_mount.item_map, built once"""
+    if not _GU_ITEM: _GU_ITEM.append(items_heavens_mount.item_map())
+    return _GU_ITEM[0]
+
+
 def build_map_com(rep):
     ver, ents = arcpack.read(gu_file('loc/arc/stage/map_com/%s.arc' % G))
     E = {(p, t): d for p, t, d in ents}
@@ -556,9 +629,12 @@ def build_map_com(rep):
             a = name[4:6]
             d, walk = exits_walkable(u4('stage\\m05d\\m05a%sd\\m05a%sd-info' % (a, a), T_SIS))
             rows.append((p, 'm05a%sd-info (verbatim: same area numbers%s)' % (a, walk)))
+        elif (p, t) in ITEM_POPS and t == T_IPL:
+            d, what = gu_ipl(u4(ITEM_POPS[(p, t)], t), gu_item())
+            rows.append((p, '%s: %s' % (ITEM_POPS[(p, t)], what)))
         elif (p, t) in ITEM_POPS:
             d = u4(ITEM_POPS[(p, t)], t)
-            rows.append((p, ITEM_POPS[(p, t)] + ' (4U item pops)'))
+            rows.append((p, ITEM_POPS[(p, t)] + ' (4U gather points, verbatim)'))
         elif t == T_PEL and re.match(r'effect\\pel\\st\\%s_[01]00$' % G, p):
             assert d[:16] == PEL_EMPTY[:16], p
             rows.append((p, 'emptied (%d Ruined Pinnacle stage effects; 4U m05 has no effect list)' %

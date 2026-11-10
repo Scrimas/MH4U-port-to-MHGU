@@ -10,6 +10,10 @@ written for players; write the section before `release.py package`.
   English, since MH4U was never released in Chinese.
 - The installer shows each monster's name and class in your language, the same names as in the game.
 
+**Fixed**
+- Gathering on Heaven's Mount gives the right items: MH4U's lists, with MHGU's closest item where MHGU lacks one
+  (Heaven's Mount 1.0.1).
+
 ## v2.0.0
 **New**
 - MH4U Port is now **MHGU Definitive Edition**, and so is its mod folder. The installer removes the old `MH4U Port`
