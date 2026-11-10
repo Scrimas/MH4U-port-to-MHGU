@@ -173,10 +173,13 @@ int quest_unlocked_c(uint32_t *regs)
 
 /* ---- Harvest Tours with several intruder outcomes ---- */
 
-static uint32_t tick_low(void)              /* svcGetSystemTick (low word): the roll's randomness */
+/* svcGetSystemTick (low word): the roll's randomness. The svc also overwrites r2 / r3 (test 2026-11-10: the
+ * compiler kept the `% 100` reciprocal in r2 across it, so every roll was >= 100 and fell back to the board's
+ * outcome: five Rathalos in a row): declared clobbered. */
+static uint32_t tick_low(void)
 {
     register uint32_t r0 __asm__("r0"), r1 __asm__("r1");
-    __asm__ volatile("svc #0x1e" : "=r"(r0), "=r"(r1) : : "memory");
+    __asm__ volatile("svc #0x1e" : "=r"(r0), "=r"(r1) : : "r2", "r3", "r12", "memory");
     (void)r1;
     return r0;
 }
@@ -191,7 +194,7 @@ int tour_accept_c(uint32_t *regs)
     if (t < 0 || regs[R2] == 2 || port_tours[t].base != regs[R1] || t + 1 >= PORT_TOUR_N ||
         port_tours[t + 1].base != regs[R1] || !port_tour_present(t))
         return 0;
-    uint32_t roll = tick_low() % 100u, sum = 0;
+    uint32_t tick = tick_low(), roll = tick % 100u, sum = 0;
     int k = t;
     for (; k < PORT_TOUR_N && port_tours[k].base == regs[R1]; k++) {
         sum += port_tours[k].weight;
@@ -203,12 +206,44 @@ int tour_accept_c(uint32_t *regs)
     return 0;
 }
 
-/* 0x3bb318(boards, quest ID, board, _) -> void: puts a listed quest on its star board (callers 0x3bc234 / 0x3bc458,
- * per quest_group entry, C). A tour's variant is no board quest: skipped. */
+/* 0x3bb318(boards, quest ID, star, record) -> void: puts a quest on its star board, appended, unless the board already
+ * holds that ID (C). Callers: the regular boards' builder 0x3bab28.. (per loaded quest, in quest-list order: record
+ * = 0x39b848(0x3ba50c(boards, ID), 0), star = s8 record +14 = questData +0x12, C) and the event boards' 0x3bc234 /
+ * 0x3bc458. A tour's variant is no board quest: skipped. GU's tours lead their boards (the maintainer, 2026-11-10),
+ * ours were appended last: before a board's first quest that is no tour (record +0x0c = questData +0x10 type, 3 =
+ * Harvest Tour), our tours of that board go in first (the same calls the builder makes for them; its own call later
+ * finds them there). */
+typedef void *(*qres_find_t)(void *boards, uint32_t id);
+typedef uint8_t *(*qres_record_t)(void *res, uint32_t k);
+typedef void (*board_put_t)(void *boards, uint32_t id, uint32_t star, void *record);
+#define qres_find FN(qres_find_t, 0x3ba50c)
+#define qres_record FN(qres_record_t, 0x39b848)
+#define board_put FN(board_put_t, 0x3bb318)
+#define QD_TYPE_TOUR 3
+
 int tour_board_c(uint32_t *regs)
 {
+    static int s_putting;
+    static uint32_t s_n;
     int t = port_tour_of(regs[R1]);
-    return t >= 0 && port_tours[t].base != regs[R1];
+    const uint8_t *rec = (const uint8_t *)(uintptr_t)regs[R3];
+    if (t >= 0) return port_tours[t].base != regs[R1];
+    if (s_putting || !rec || regs[R1] >= 1000000u || rec[0x0c] == QD_TYPE_TOUR) return 0;   /* events, GU's tours */
+    s_putting = 1;
+    for (int k = 0; k < PORT_TOUR_N; k++) {
+        const struct port_tour *pt = &port_tours[k];
+        if (pt->base != pt->quest || (pt->quest < 10000u) != (regs[R1] < 10000u) || !port_tour_present(k)) continue;
+        void *res = qres_find((void *)(uintptr_t)regs[R0], pt->quest);
+        uint8_t *r = res ? qres_record(res, 0) : 0;
+        if (!r || FIELD(uint32_t, r, 8) != pt->quest || (uint8_t)r[14] != (uint8_t)regs[R2]) continue;
+        board_put((void *)(uintptr_t)regs[R0], pt->quest, (uint16_t)(int16_t)(int8_t)r[14], r);
+        if (s_n < 12) {
+            s_n++;
+            logf("mhgu-de: tour %u put on star board %u before quest %u", pt->quest, regs[R2], regs[R1]);
+        }
+    }
+    s_putting = 0;
+    return 0;
 }
 
 /* 0x7ca340(out, const char *s, n): UTF-8 helper (8 callers), strlen(s) first. Abandoning the Gogmazios quest crashed
