@@ -61,6 +61,9 @@ def exe(ver, arch):
         # winresource runs a bare llvm-windres for a gnullvm target: x64 resources, which lld refuses in an arm64
         # .exe; the prefixed one takes its target from its name
         env.setdefault('WINDRES', os.path.join(lm, 'bin', 'aarch64-w64-mingw32-windres'))
+        # gnullvm links Rust's unwinder as libunwind.dll (llvm-mingw's, not on Windows: the .exe would not start)
+        # unless crt-static (library/unwind/src/lib.rs): libunwind.a goes into the .exe, one file as the x86_64 one
+        env.setdefault('CARGO_TARGET_AARCH64_PC_WINDOWS_GNULLVM_RUSTFLAGS', '-C target-feature=+crt-static')
     run('cargo', 'build', '--release', '--locked', '-p', 'mhgu-de-installer', '--target', target, env=env)
     out = os.path.join(DIST, '%s-%s-%s.exe' % (NAME, ver, arch))
     shutil.copy(os.path.join(INST, 'target', target, 'release', 'mhgu-de-installer.exe'), out)
