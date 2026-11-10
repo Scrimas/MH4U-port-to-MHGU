@@ -118,6 +118,32 @@ def main(paths):
                      OUT + 4, OUT + 0x100)
             if r == 0: bad.append('%s: %s merged' % (name, what))
             if bytes(uc.mem_read(SLOT, M.SLOT_SIZE)) != cs: bad.append('%s: %s changed the slot' % (name, what))
+        # a careful merge: vanilla things took the places of the first added item stack and gear entry since the
+        # split; Python and C must put the records in the same other places (and the worn gear must follow)
+        van = bytearray(cs)
+        recs = M.parse(cf)[1]
+        it = next((p for k, fl, p in recs if k == M.K_ITEM and p[0] == 0), None)
+        ge = next((p for k, fl, p in recs if k == M.K_GEAR), None)
+        if it:
+            i = struct.unpack_from('<H', it, 1)[0]
+            M.setbits(van, M.BOX, 19 * i, 12, 100); M.setbits(van, M.BOX, 19 * i + 12, 7, 1)
+        if ge:
+            i = struct.unpack_from('<H', ge, 0)[0]
+            struct.pack_into('<HH', van, M.EQBOX + M.ENTRY * i, 1, 5)
+        if it or ge:
+            pv = bytearray(van)
+            pst = M.merge(pv, cf, quests)
+            uc.mem_write(SLOT, bytes(van))
+            uc.mem_write(FILE, cf)
+            r = call(uc, syms['ms_merge'], SLOT, FILE, len(cf), QTAB, len(quests), JRN, JCAP, OUT, ASIDE, ACAP,
+                     OUT + 4, OUT + 0x100)
+            cst = struct.unpack('<5I', bytes(uc.mem_read(OUT + 0x100, 20)))
+            if r != 0 or bytes(uc.mem_read(SLOT, M.SLOT_SIZE)) != bytes(pv):
+                bad.append('%s: careful merge: C (%d) and Python differ' % (name, r))
+            elif (cst[1], cst[2], cst[3], cst[4]) != (pst['placed'], pst['moved'], pst['kept'], len(pst['aside'])):
+                bad.append('%s: careful merge counts: C %s, Python %s' % (name, cst, pst))
+            elif not pst['moved']:
+                bad.append('%s: careful merge moved nothing' % name)
         print('ok %s: %d bytes, %d placed' % (name, len(cf), placed) if not [b for b in bad if b.startswith(name)]
               else 'FAIL %s' % name)
 
