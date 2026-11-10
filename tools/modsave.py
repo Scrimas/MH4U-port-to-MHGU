@@ -691,7 +691,8 @@ def main(a):
             f, left = split(s, quests, int.from_bytes(os.urandom(4), 'little') | 1, 1)
             if f is None: print('slot %d: not split (nothing for the hunter to hold)' % (k + 1)); continue
             data[base:base + SLOT_SIZE] = s
-            open(os.path.join(a[2], 'mhgu_de_%d.bin' % (k + 1)), 'wb').write(f)
+            # padded to the size the game creates it at: its write fails past the end of the file
+            open(os.path.join(a[2], 'mhgu_de_%d.bin' % (k + 1)), 'wb').write(bytes(f) + bytes(max(0, FILE_SIZE - len(f))))
             print('slot %d: %d bytes, %d record(s) left in the slot by the budget' % (k + 1, len(f), left))
         open(os.path.join(a[2], 'system'), 'wb').write(data)
         return

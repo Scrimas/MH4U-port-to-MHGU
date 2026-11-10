@@ -95,9 +95,17 @@ enabled unless mods/load_order.txt marks it `# off:`): strong, not confirmed; th
   worn weapon swapped for another of the box since a hunter always holds one, My Sets entries cleared; nothing
   deleted) / Remove the worn pieces (data loss) / Remove all their items, decorations and gear (data loss) / leave the
   saves. Layered looks of their armor go back to the own look in every mode.
-- **Backups**: before any write, every copy of the save (Ryujinx `0/` `1/`, `system` and `system_backup`) is copied
-  into `<data>/mhgu-de-installer/save-backups/<save>-<hash>/<time>-<release>/` (not beside the save: there it would
-  sit inside the emulator's save file system). Never deleted by the installer.
+- **The mod's own save files** (installer 2.1.0, manifest schema 2 `save_format`, core 3.0.0; notes/mod-save-format.md,
+  `installer/core/src/modsave.rs`, the same split and merge as the core's): each character is read as the game sees
+  it, GU's slot with its `mhgu_de_<slot>.bin` merged in, and everything above (levels, steps, cleaning, the removal
+  popup's counts) works on that view. What changed, and a character whose GU bytes still hold the mod's things (a
+  save from before 3.0.0, a "full" one, a restored backup), is written split into every copy: the mod's files first,
+  then GU's (put back if GU's write fails). A character with nothing to do keeps both files. A damaged mod file, or
+  one of a newer release, makes the save one that cannot be migrated. A release without `save_format` (before 3.0.0)
+  keeps installer 2.0's behaviour: GU's file only. At removal the mod's files stay (the save is vanilla already).
+- **Backups**: before any write, every copy of the save (Ryujinx `0/` `1/`, `system` and `system_backup`, the mod's
+  `mhgu_de_<slot>.bin`) is copied into `<data>/mhgu-de-installer/save-backups/<save>-<hash>/<time>-<release>/` (not
+  beside the save: there it would sit inside the emulator's save file system). Never deleted by the installer.
 
 ## The window and the rest
 

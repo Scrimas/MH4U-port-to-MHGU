@@ -49,7 +49,8 @@ module/               Core C module (the shared engine of the port):
   save.c                  the mod's save store and per-quest leases of the save slots (notes/save-store.md)
   modsave.c savefile.c    the mod's own save files: the split and merge of a character's slot, and the hooks on
                           GU's save image and save thread (notes/mod-save-format.md; tools/modsave.py is the
-                          reference, tools/test_modsave.py compares them)
+                          reference, installer/core/src/modsave.rs the installer's copy, tools/test_modsave.py
+                          compares the three)
   stage_alias.c           maps 4U stages onto GU stage slots (port_stages: one per map package with a [stage])
   game.h util.c util.h    GU structures and helpers
   core.toml               core version and build config

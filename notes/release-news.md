@@ -8,8 +8,9 @@ written for players; write the section before `release.py package`.
 **New**
 - Your MHGU save stays clean: everything the mod adds (items, gear, jewels, quest clears, monster records) now
   lives in its own files next to it (`mhgu_de_1.bin` to `mhgu_de_3.bin`), so MHGU never meets an item it doesn't
-  know, even without the mod. Your save moves over by itself the first time you save. Not tested on a real Switch:
-  back up with JKSV or Checkpoint first.
+  know, even without the mod. Your save moves over by itself the first time you save, or when the installer (2.1.0,
+  it updates itself) installs this release: it backs your saves up first. Not tested on a real Switch: back up with
+  JKSV or Checkpoint first.
 - Harvest Tours on Heaven's Mount: MH4U's three tours (Village ★8, Hub ★5, G★3), with MH4U's intruders at MH4U's
   odds. On the Hub ★5 tour an intruder shows up half the time: Rathalos, Deviljho or, rarely, Savage Deviljho, and
   sometimes a second one later, as in MH4U.

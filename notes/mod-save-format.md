@@ -3,7 +3,8 @@
 Everything the mod adds to a character lives in a file of its own, `mhgu_de_<slot>.bin` (slot 1..3), next to GU's
 `system` and `system_backup` in the game's save. GU's files then hold vanilla data only, so removing the mod, an
 older core or a save editor can never meet an added ID there. The reference is `tools/modsave.py`; the module
-(module/modsave.c) and the installer follow it byte for byte, and the tests compare them.
+(module/modsave.c) and the installer (installer/core/src/modsave.rs) follow it byte for byte, and
+`tools/test_modsave.py` compares all three.
 
 C = confirmed in code or data, S = strong, G = guess. Offsets are relative to a character's base in GU's file
 (MHGU_Editor docs/11-save-map.md: the character's bytes, 0x11F8C4 of them, start at 0x24 + u32 [0x34 + 4 x slot]).
@@ -129,7 +130,20 @@ merges the same way: what is already there counts once.
 - A slot whose file could not be read, checked (a damaged file, or one of a newer format) or merged this session
   never gets its file overwritten: every save until the game closes leaves slot and file as they are.
 
+## In the installer (2.1.0)
+
+The release's manifest carries the quest list (schema 2 `save_format`, the core's list). Each character is read as
+the game sees it (its file merged in when the game would merge it: linked and "split", or beside a restored backup
+that still holds added things); migration steps and the cleaning of a monster that leaves work on that view. A
+character the installer changed, or whose GU bytes still hold the mod's things (a save from before 3.0.0, a "full"
+one, a restored backup), is written split, the file padded to `FILE_SIZE` (the game writes into it and never grows
+it), into every copy's folder, before GU's files; every copy of both is in the backup first. A character with
+nothing to do keeps both files as they are. A file that is damaged or of a newer format blocks its save (never
+overwritten). notes/installer.md "Saves".
+
 ## Tools
 
-`python3 tools/modsave.py check SYSTEM` lists the added things a GU file still holds; `unpack FILE` prints a mod file
+`python3 tools/test_modsave.py [SYSTEM ...]` runs the three implementations on a synthetic slot and on the saves given
+(the installer's through `mhgu-de-cli modsave`, built with cargo). `python3 tools/modsave.py check SYSTEM` lists the
+added things a GU file still holds; `unpack FILE` prints a mod file
 as text and `pack TEXT OUT` turns that text back into a file; `split` and `merge` work on copies.
