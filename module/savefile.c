@@ -177,6 +177,7 @@ int save_write_c(uint32_t *regs)
             int r = ms_merge(slot, s_out, (uint32_t)n, s_quests, MS_QUEST_N, s_journal, JOURNAL, &jl, s_aside[k],
                              ASIDE_CAP, &al, &st);
             ms_set_link(slot, link, gen, MS_FULL);
+            if (!r) s_aside_n[k] = al;
             logf("mhgu-de: save: slot %u: file not written before %s: the slot keeps everything (merge %d, %u placed, "
                  "%s)", k + 1, name, r, st.placed, st.exact ? "exact" : "NOT exact");
             continue;
@@ -269,9 +270,10 @@ int save_parse_c(uint32_t *regs)
         return 0;
     }
     if (!linked) {                                     /* a restored save of before the split (D11), or a new character */
-        uint32_t left;
-        int n = ms_split(slot, s_quests, MS_QUEST_N, flink, fgen, 0, 0, s_out, MS_FILE_SIZE, 0, &left);
-        if (n <= (int)MS_HEADER) {
+        uint8_t probe[64];                             /* any record (or one the tiny budget left) = added things */
+        uint32_t left = 0;
+        int n = ms_split(slot, s_quests, MS_QUEST_N, flink, fgen, 0, 0, probe, sizeof probe, 0, &left);
+        if (n >= 0 && n <= (int)MS_HEADER && !left) {   /* -1: an added weapon held: added things */
             logf("mhgu-de: save: slot %u has no link and nothing added: its file (link %x) is not this character's",
                  k + 1, flink);
             return 0;
