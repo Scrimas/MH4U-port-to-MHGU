@@ -183,10 +183,11 @@ hand).
    it needs the new core), and `installer/Cargo.toml` to the same version (the workflow refuses a tag that does not
    match it). Build the installer once so `installer/Cargo.lock` follows (CI builds `--locked`), and commit all of it.
 3. `python3 tools/release.py all`: builds everything without test switches, checks it and packages
-   `dump/release/v<version>/` (the zips, `manifest.json`, `NOTES.md` for -Packages, `NOTES-main.md` for this
-   repository). Test that folder in game through the installer (`MHGU_DE_RELEASES`, above).
+   `dump/release/v<version>/` (the zips, the all-in-one zip of them all, `manifest.json`, `NOTES.md` for -Packages,
+   `NOTES-main.md` for this repository). Test that folder in game through the installer (`MHGU_DE_RELEASES`, above).
 4. Tag `main`: `git tag v<version> && git push origin v<version>`. The Installer workflow builds the .exe and the
-   AppImage, starts the .exe on Windows and drafts the release "MHGU Definitive Edition <version>" here.
+   AppImage for x86_64 and arm64, starts each on its system (Windows, Windows 11 on ARM, Linux, Linux on ARM) and
+   drafts the release "MHGU Definitive Edition <version>" here.
 5. `python3 tools/release.py publish`: publishes the zips on -Packages (marked Latest), then gives this repository's
    draft `NOTES-main.md` as its text (`python3 tools/release.py main-notes` if the draft was not there yet).
 6. Check the draft, then publish it: it becomes this repository's Latest release.
