@@ -98,6 +98,8 @@ HOOKS = [
     ('quest_unlocked', 0x3B2194),   # in 0x3b2174(_, id), before its check call: 1 for our quests (MID_EXIT)
     ('quest_clear_fix', 0x388D40),  # results-scene clear write: rename the freshly loaded quest list first
     ('quest_group_append', 0x39BB6C),  # quest_group parser exit (r4 = the list): append the quest_append quests
+    ('tour_accept', 0x784E94),   # quest accept (board, ID, mode): a tour with variants rolls its outcome (quest.c)
+    ('tour_board', 0x3BB318),    # a listed quest onto its star board: a tour's variants skipped (quest.c)
     ('notes_unlock_check', 0x554DA4),  # Hunter's Notes unlock condition (talk action 6 / condition 44): log entry 123
     ('notes_list_visible', 0x5B0BD4), ('notes_list_new', 0x5B0A44),      # Notes list screen: an entry past the save map
     ('notes_new_clear', 0x5B0AD4), ('notes_em_unlocked', 0x524770),      # has no bit (notes.c; MID_EXIT below)
@@ -422,38 +424,70 @@ def monsters_c():
         if package(m)['code'] not in codes: codes.append(package(m)['code'])
     out += ['void %s_register_class(void);' % c for c in codes]
     own = [next(m for m in own if package(m)['code'] == c) for c in codes]
-    out.append('const struct port_monster port_monsters[] = {')
     port = {m['name']: k for k, m in enumerate(MONSTERS)}
+    stages = alloc.stages()                  # port_stages: one per map with [stage] (port.h)
+    board = {}                               # the stage's board name: a monster's [monster.append] stage_name
+    for m in MONSTERS:
+        if m.get('append', {}).get('stage_name'):
+            mp = alloc.stage_map(m)
+            assert mp and mp not in board, (m['name'], mp, 'one stage_name per map')
+            board[mp] = GU_QUEST_MESSAGE + alloc.offset(m['name'], 'stage_name')
+    out.append('const struct port_stage port_stages[] = {')
+    for mp in stages:
+        t = paths.package_toml(mp)
+        st = stage_alias_of(mp)
+        mr = st.get('maprec', []) + [[0, 0, 0]] * (4 - len(st.get('maprec', [])))
+        out.append('    {"%s", %d, %d, 0x%x, 0x%x, %d, {%s}, {%s}, {%s}, %sf, %d},' % (
+            mp, t['gu_stage'], t['folder'], sum(1 << a for a in st.get('hold_kobj_areas', [])),
+            sum(1 << (k - 48) for k in st.get('kinds', [])), len(st.get('maprec', [])),
+            ', '.join('%rf' % float(r[0]) for r in mr), ', '.join('%d' % r[1] for r in mr),
+            ', '.join('%d' % r[2] for r in mr), repr(float(st.get('wholemap_k', 0))), board.get(mp, 0)))
+    out.append('    {0}' if not stages else '')
+    out.append('};')
+    out.append('const struct port_tour port_tours[] = {')
+    for t in alloc.tours():                  # quest-list order (tools/alloc.py tours)
+        out.append('    {%d, %d, %d, %d, %d},   /* %s */' % (t['quest'], t['base'], stages.index(t['map']) + 1,
+                                                          port[t['after']], t['weight'], t['map']))
+    out.append('    {0}' if not alloc.tours() else '')
+    out.append('};')
+    out.append('const struct port_monster port_monsters[] = {')
     for m in MONSTERS:
         q, s = [(m.get(k, []) + [0] * QUESTS_PER_ENTRY)[:QUESTS_PER_ENTRY] for k in ('quests', 'quest_slots')]
-        sa, st = m.get('stage_alias', [0, 0]), stage_alias(m)
-        mr = st.get('maprec', []) + [[0, 0, 0]] * (4 - len(st.get('maprec', [])))
+        st = stage_alias(m)
+        stage = stages.index(alloc.stage_map(m)) + 1 if st else 0
         sz = package(m).get('size', {}).get(m['name'], [])
         assert len(sz) in (0, 1, 4) and all(v > 0 for v in sz), (m['name'], sz)   # [base] or [base, mini, silver, gold]
         sz = sz + [0] * (4 - len(sz))
         alt = m.get('standin_alt', [0])         # [stand-in ID, quest IDs...] (port.h standin_alt)
         assert not alt[0] or (len(alt) > 1 and set(alt[1:]) <= set(m.get('quests', []))), (m['name'], alt)
         alt_mask = sum(1 << m['quests'].index(qid) for qid in alt[1:])
-        sn = m.get('append', {}).get('stage_name', 0)   # the alias's board name (port.h stage_name)
+        sn = m.get('append', {}).get('stage_name', 0)   # the alias's board name (its stage's board_name)
         assert sn in (0, 1) and (not sn or 'stage_alias' in m), (m['name'], sn)
-        sn = GU_QUEST_MESSAGE + alloc.offset(m['name'], 'stage_name') if sn else 0
         si = m.get('save_index', 0)             # 0: save = "lease" (module/save.c)
         out.append('    {"%s", 0x%x, %d, %d, 0x%x, %d, 0x%x, %d, %d, {%s}, {%s}, %s, %d, '
-                   '%d, %d, 0x%x, 0x%x, %d, {%s}, {%s}, {%s}, %sf, {%s}, %d, 0x%x, 0x%x, %d, %d},' % (
+                   '%d, {%s}, %d, 0x%x, 0x%x, %d},' % (
             m['name'], m['em_id'], m['registry_index'], m['donor_index'], m.get('standin_id', 0), si,
             0x1064 + si - 105 if si else 0, m['name_entry'], m.get('notes_entry', 0),
             ', '.join('%d' % v for v in q), ', '.join('%d' % v for v in s),
             '%s_register_class' % package(m)['code'] if m in own else '0', port.get(m.get('companion_of'), -1),
-            sa[0], sa[1], sum(1 << a for a in st.get('hold_kobj_areas', [])),
-            sum(1 << (k - 48) for k in st.get('kinds', [])), len(st.get('maprec', [])),
-            ', '.join('%rf' % float(r[0]) for r in mr), ', '.join('%d' % r[1] for r in mr),
-            ', '.join('%d' % r[2] for r in mr), repr(float(st.get('wholemap_k', 0))),
-            ', '.join('%rf' % float(v) for v in sz), int(m.get('quest_append', False)), alt[0], alt_mask, sn,
+            stage, ', '.join('%rf' % float(v) for v in sz), int(m.get('quest_append', False)), alt[0], alt_mask,
             int(m.get('save') == 'lease')))
     return '\n'.join(out + ['};']) + '\n'
 
 
 GU_QUEST_MESSAGE = 120   # GU's questMessage strings (resident_eng.arc GUI\06_msg): stage names 4..28, 114..119
+
+
+def stage_alias_of(mp):
+    """[stage] of map package mp, checked (module/stage_alias.c port_stages)"""
+    st = paths.package_toml(mp).get('stage')
+    if not st or not st.get('kinds'):
+        sys.exit('maps/%s/package.toml: [stage] needs kinds' % mp)
+    assert all(48 <= k < 80 for k in st['kinds']) and all(0 <= a < 8 for a in st.get('hold_kobj_areas', [])), st
+    assert (49 in st['kinds']) == bool(st.get('maprec')) and len(st.get('maprec', [])) <= 4, st
+    assert (55 in st['kinds']) == bool(st.get('wholemap_k')), st
+    assert isinstance(paths.package_toml(mp).get('gu_stage'), int), (mp, 'no gu_stage')
+    return st
 
 
 def stage_alias(m):

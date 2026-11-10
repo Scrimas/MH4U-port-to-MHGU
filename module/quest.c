@@ -4,7 +4,12 @@
  * DUMMY); quest_append = its quests are new entries after GU's (quest_group_append, monsters/stygian_zinogre/notes/
  * quests.md 3). quest_group (loc/arc/village/common.arc) in memory: [[0x188ad90]+0xb4], count +0x64, entries +0x6c
  * (12 B: +4 quest ID, +8 group byte, +9, +10 name colour row). The loader step 0x3b7de8 walks it and loads loose
- * questData_%07d.ext for Hub G-rank IDs, then 0x3bb318 sorts them onto the star boards. Nothing real is replaced. */
+ * questData_%07d.ext for Hub G-rank IDs, then 0x3bb318 sorts them onto the star boards. Nothing real is replaced.
+ * A map's Harvest Tours (port_tours: allocations.toml [[map]], maps/<map>/package.toml [[tour]]) are appended too, right
+ * after the quests of their append_after monster. A tour with several 4U intruder outcomes ships one quest per outcome:
+ * the boards show the base (tour_board_c hides the variants), the accept rolls 4U's weights and takes the outcome's
+ * quest (tour_accept_c: the host, so every hunter who joins loads the same one), and its clear is written to the
+ * base's bit (quest_clear_fix_c). */
 #include <stdint.h>
 #include "util.h"
 #include "game.h"
@@ -61,9 +66,18 @@ int quest_group_fix_c(uint32_t *regs)
 int quest_clear_fix_c(uint32_t *regs)
 {
     uint32_t mgr = *(volatile uint32_t *)MAIN(0x188ad90u), grp, id = port_quest_id(), n, e, i;
+    int t = port_tour_of(id);
     (void)regs;
     quest_group_rename();
-    if (mgr && (grp = FIELD(uint32_t, mgr, 0xb4)) && port_quest_owner(id, 0) >= 0) {
+    /* a tour's variant: the write reads the running quest [mgr+0xe0] at 0x388d70 (C), after this hook: it names the
+     * base, whose bit the boards show (the variants' bits stay unset). The ID stays the base's until the quest end
+     * clears it (0x39f230); the variant's questData record (+0xa4) is unchanged. */
+    if (mgr && t >= 0 && port_tours[t].base != id && FIELD(uint32_t, mgr, 0xe0) == id) {
+        FIELD(uint32_t, mgr, 0xe0) = port_tours[t].base;
+        logf("mhgu-de: clear write for tour %u (outcome %u)", port_tours[t].base, id);
+        id = port_tours[t].base;
+    }
+    if (mgr && (grp = FIELD(uint32_t, mgr, 0xb4)) && (port_quest_owner(id, 0) >= 0 || t >= 0)) {
         n = FIELD(uint32_t, grp, 0x64);
         e = FIELD(uint32_t, grp, 0x6c);
         for (i = 0; e && i < n && *(volatile uint32_t *)(uintptr_t)(e + 12 * i + 4) != id; i++) ;
@@ -79,7 +93,7 @@ typedef void (*qg_delete_t)(void *block);
 #define qg_ctor FN(qg_entry_t, 0x37a654)     /* entry ctor: vtable, +4 / +8..+10 = 0 */
 #define qg_dtor FN(qg_entry_t, 0x37a684)     /* entry dtor */
 #define qg_delete FN(qg_delete_t, 0x37a628)  /* delete[](entries - 8) */
-#define QG_MAX (PORT_N * PORT_QUESTS)
+#define QG_MAX (PORT_N * PORT_QUESTS + PORT_TOUR_N)
 #define QG_PLACEHOLDER 1111010u              /* a vanilla DUMMY entry (index 1460, group 127, +10 = 1): in no
                                                 quest_slots list (tools/alloc.py QUEST_PLACEHOLDER) */
 
@@ -89,21 +103,28 @@ typedef void (*qg_delete_t)(void *block);
  * the cookie {12, n + N} before them, ctor each), GU's copied and ours after; the old block is freed as the release
  * 0x39b9a8 frees it (dtor from the last, delete[]), and the game frees ours later the same way. The block = every
  * quest_append entry's quests in registry order, installed or not: a quest whose monster or questData file is missing
- * takes the placeholder, so no quest's index (its cleared / failed bit) ever moves. */
+ * takes the placeholder, so no quest's index (its cleared / failed bit) ever moves. A map's tours follow the quests
+ * of their append_after monster (a tour not present takes the placeholder too). */
 int quest_group_append_c(uint32_t *regs)
 {
     static uint32_t s_logged;
     uint8_t *grp = (uint8_t *)(uintptr_t)regs[R4], g[QG_MAX], c[QG_MAX], *e, *blk, *ne;
     uint32_t id[QG_MAX], n, N = 0, i;
     for (int m = 0; m < PORT_N; m++) {
-        if (!port_monsters[m].quest_append) continue;
-        for (int k = 0; k < PORT_QUESTS; k++) {
+        for (int k = 0; port_monsters[m].quest_append && k < PORT_QUESTS; k++) {
             uint32_t q = port_monsters[m].quests[k];
             if (!q) continue;
             int on = port_installed(m) && port_quest_present(m, k);
             id[N] = on ? q : QG_PLACEHOLDER;
             g[N] = on ? 0 : 127;                       /* group: regular / DUMMY */
             c[N++] = on ? qg_colour(q) : 1;
+        }
+        for (int t = 0; t < PORT_TOUR_N; t++) {        /* the tours listed after this monster's quests */
+            if (port_tours[t].after != m) continue;
+            int on = port_tour_present(t);
+            id[N] = on ? port_tours[t].quest : QG_PLACEHOLDER;
+            g[N] = on ? 0 : 127;
+            c[N++] = on ? qg_colour(port_tours[t].quest) : 1;
         }
     }
     n = FIELD(uint32_t, grp, 0x64);
@@ -144,10 +165,50 @@ int quest_group_append_c(uint32_t *regs)
  * MID_EXIT). Not at the entry: the Forge plugin Key Quest Markers checks its first 0x20 bytes (issue #10). */
 int quest_unlocked_c(uint32_t *regs)
 {
-    int m = port_quest_owner(regs[R2], 0);
-    if (m < 0 || !port_installed(m)) return 0;
+    int m = port_quest_owner(regs[R2], 0), t = port_tour_of(regs[R2]);
+    if (m >= 0 ? !port_installed(m) : !port_tour_present(t)) return 0;
     *(uint8_t *)(uintptr_t)regs[R1] = 1;
     return 1;
+}
+
+/* ---- Harvest Tours with several intruder outcomes ---- */
+
+static uint32_t tick_low(void)              /* svcGetSystemTick (low word): the roll's randomness */
+{
+    register uint32_t r0 __asm__("r0"), r1 __asm__("r1");
+    __asm__ volatile("svc #0x1e" : "=r"(r0), "=r"(r1) : : "memory");
+    (void)r1;
+    return r0;
+}
+
+/* 0x784e94(board, quest ID, mode): the accept (callers 0x54c130: the board, mode 1; 0x77eb50: joining a posted quest,
+ * mode 2); it stores the ID at [[0x188ae38]+0xd68], the quest the start loads (port.c, C). Entry hook: on the board,
+ * a tour with variants takes one outcome by 4U's weights (port_tours weight). Joining keeps the host's ID: everyone
+ * loads the host's outcome. The fee comes from the board's entry (+0x38 list), not the ID (C). */
+int tour_accept_c(uint32_t *regs)
+{
+    int t = port_tour_of(regs[R1]);
+    if (t < 0 || regs[R2] == 2 || port_tours[t].base != regs[R1] || t + 1 >= PORT_TOUR_N ||
+        port_tours[t + 1].base != regs[R1] || !port_tour_present(t))
+        return 0;
+    uint32_t roll = tick_low() % 100u, sum = 0;
+    int k = t;
+    for (; k < PORT_TOUR_N && port_tours[k].base == regs[R1]; k++) {
+        sum += port_tours[k].weight;
+        if (roll < sum) break;
+    }
+    if (k >= PORT_TOUR_N || port_tours[k].base != regs[R1] || !port_tour_present(k)) k = t;
+    logf("mhgu-de: tour %u accepted (mode %u): roll %u -> quest %u", regs[R1], regs[R2], roll, port_tours[k].quest);
+    regs[R1] = port_tours[k].quest;
+    return 0;
+}
+
+/* 0x3bb318(boards, quest ID, board, _) -> void: puts a listed quest on its star board (callers 0x3bc234 / 0x3bc458,
+ * per quest_group entry, C). A tour's variant is no board quest: skipped. */
+int tour_board_c(uint32_t *regs)
+{
+    int t = port_tour_of(regs[R1]);
+    return t >= 0 && port_tours[t].base != regs[R1];
 }
 
 /* 0x7ca340(out, const char *s, n): UTF-8 helper (8 callers), strlen(s) first. Abandoning the Gogmazios quest crashed

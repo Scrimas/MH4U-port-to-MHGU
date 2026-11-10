@@ -119,15 +119,18 @@ def core():
 def packages():
     """one dict per package: its package.toml + romfs = its RomFS folder + entries = its allocations.toml entries (one
     data file each) + alloc = the first entry; monster packages in registry order, then the map packages
-    (maps/<name>: no entries, alloc None)"""
+    (maps/<name>: no entries, alloc None; tours = its Harvest Tour quests, allocations.toml [[map]], and boards = the
+    ones the boards show, without the variants)"""
     out = []
     for p in alloc.packages():
         ents = [m for m in alloc.monsters() if alloc.package(m) == p]
         out.append(dict(toml(os.path.join(paths.monster(p), 'package.toml')), entries=ents, alloc=ents[0],
                         romfs=paths.romfs(p)))
     for mp in paths.maps():
+        ts = [t for t in alloc.tours() if t['map'] == mp]
         out.append(dict(toml(os.path.join(paths.map_dir(mp), 'package.toml')), entries=[], alloc=None,
-                        romfs=paths.map_romfs(mp)))
+                        romfs=paths.map_romfs(mp), tours=[t['quest'] for t in ts],
+                        boards=[t['quest'] for t in ts if t['quest'] == t['base']]))
     return out
 
 
@@ -209,7 +212,7 @@ def check():
             if m:                    # boss record +0x69 = HP row: test builds use rows 0..9 (5 % HP)
                 qd = open(os.path.join(rf, rel), 'rb').read()
                 qid = int(m.group(1))
-                if qid not in [q for m in p['entries'] for q in m.get('quests', [])]:
+                if qid not in [q for m in p['entries'] for q in m.get('quests', [])] + p.get('tours', []):
                     bad.append('%s: quest %d is not in its allocations' % (name, qid))
                 if qd[0x69] < 10:
                     bad.append('%s: quest %d has HP row %d (a test build?)' % (name, qid, qd[0x69]))
@@ -428,7 +431,8 @@ def quests(p):
     sys.path.insert(0, paths.GU_PY)
     import gmd
     rf, out = p['romfs'], []
-    for m in p['entries']:
+    for m in p['entries'] + ([{'title': p['title'] + ' (Harvest Tours)', 'quests': p['boards']}] if p.get('boards')
+                             else []):
         for q in m.get('quests', []):
             qd = open(os.path.join(rf, 'nativeNX/loc/quest/questData/questData_%07d.ext' % q), 'rb').read()
             star = qd[0x12]

@@ -8,6 +8,8 @@ version = "1.0.1"          # bump on every published change of this map's files.
                            # GU item IDs (1.0.0 copied 4U's IDs: wrong items; tools/items_heavens_mount.py)
 requires_core = "2.0.0"    # oldest core that knows map packages (module/port.c port_installed: a monster whose
                            # map is missing counts as not installed)
+gu_stage = 24              # the GU stage it is an alias of (the Ruined Pinnacle): = allocations.toml
+                           # stage_alias[0] of every monster requiring it (tools/alloc.py checks it)
 folder = 30                # its RomFS stage folder m30 = allocations.toml stage_alias[1] of every monster
                            # requiring it (tools/alloc.py checks it)
 stage_4u = 5               # 4U stage m05: its quest-board name per language is 4U's mapName[5] (the installer's title)
@@ -21,3 +23,25 @@ maprec = [[2.8, 0, 0], [1.6, 4, -12], [1.8, 0, 10], [1.3, -4, 16]]   # area maps
                            # (4U table 0xeebe0c + 0x18 * 5, checked by tools/build_heavens_mount_ui.py); the core
                            # holds 4: areas 4..8 keep GU's m24 records, their pictures are resampled to them
 wholemap_k = 1.0           # whole map: GU dims[24] / 4U m05 W = 60000 / 60000 (build_heavens_mount_ui.py)
+
+# Harvest Tours (allocations.toml [[map]] heavens_mount quests; tools/tour4u.py builds them into romfs/): GU's
+# Volcanic Hollow tours are the precedent (the maintainer, 2026-11-10): Village 8*, Hub 5*, G3; 4U's low-rank tours
+# q516 / q10314 are left out. A tour with several 4U intruder outcomes ships one quest per outcome: the board shows
+# `quest`, the host rolls 4U's weights at accept and loads that outcome's quest (module/quest.c tour_accept_c), the
+# variants stay off the boards and their clear is written to `quest`.
+[[tour]]
+quest = 841                # Village 8*
+from_4u = 806              # 4U caravan 8* tour
+template = 821             # GU's Volcanic Hollow Village 8* tour
+
+[[tour]]
+quest = 10547              # Hub 5* (High Rank)
+variants = [10548, 10549]
+weights = [40, 55, 5]      # 4U q10515 intruder list (header +0x30, C): Rathalos 40, Deviljho 55, Savage Deviljho 5
+from_4u = 10515
+template = 10502           # GU's Volcanic Hollow Hub 5* tour
+
+[[tour]]
+quest = 11372              # Hub G3
+from_4u = 10907            # 4U G2 tour
+template = 11343           # GU's Volcanic Hollow G3 tour

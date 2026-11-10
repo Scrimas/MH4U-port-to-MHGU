@@ -4,7 +4,7 @@
  * A package's converted stage arcs keep the GU stage's INTERNAL paths (stage\m26d\..., stage\m18d\...), so every file
  * ID the game computes for that stage resolves (by path hash, 0x152960) to them; they ship at new RomFS paths (folder
  * m<NN>, allocations.toml stage_alias = [GU stage, folder]) and the GU stage's own files stay untouched. While a quest
- * of that monster runs, the arc path builder writes the folder number for the GU stage number (stage_path_c) for the
+ * of that monster (or a Harvest Tour of that map, maps/<map>/package.toml [[tour]]) runs, the arc path builder writes the folder number for the GU stage number (stage_path_c) for the
  * kinds the package lists (package.toml [stage] kinds), and GU's quest-start KowareObj command 0 is held for the
  * areas it lists (hold_kobj_areas: 4U stages start with their breakables intact, GU opens every one).
  *
@@ -29,22 +29,13 @@ enum { R0, R1, R2, R3, R4, R5, R12, LR, SP0 };   /* SP0 = first stack argument (
 #define KOBJ_AREA 0x182u                         /* uKowareObj u8 mAreaNo (0x516b34) */
 #define KOBJ_ID   0x188u                         /* u8 mId */
 
-/* the running quest's monster when it has a stage alias, else -1 */
-static int alias_port(void)
-{
-    int m = port_running_quest(0);
-    return m >= 0 && port_monsters[m].stage_folder ? m : -1;
-}
-
 int stage_path_c(uint32_t *regs)
 {
     uint32_t kind = regs[R2];
-    int m = alias_port();
-    if (m < 0 || regs[R3] != port_monsters[m].stage_from || kind < 48 || kind >= 80 ||
-        !(port_monsters[m].stage_kinds >> (kind - 48) & 1)) return 0;
-    regs[R3] = port_monsters[m].stage_folder;
-    logf("port: %s stage path kind %u area %u -> m%u (quest %u)", port_monsters[m].name, kind, regs[SP0],
-         regs[R3], port_quest_id());
+    const struct port_stage *s = port_running_stage();
+    if (!s || regs[R3] != s->from || kind < 48 || kind >= 80 || !(s->kinds >> (kind - 48) & 1)) return 0;
+    regs[R3] = s->folder;
+    logf("port: %s stage path kind %u area %u -> m%u (quest %u)", s->name, kind, regs[SP0], regs[R3], port_quest_id());
     return 0;
 }
 
@@ -52,15 +43,16 @@ int stage_kobj_bcast_c(uint32_t *regs)
 {
     static uint32_t s_n;
     uint8_t *k = (uint8_t *)(uintptr_t)regs[R0];
-    int m = alias_port();
-    if (!k || m < 0 || k[KOBJ_AREA] >= 8 || !(port_monsters[m].stage_hold >> k[KOBJ_AREA] & 1)) return 0;
+    const struct port_stage *s = port_running_stage();
+    if (!k || !s || k[KOBJ_AREA] >= 8 || !(s->hold >> k[KOBJ_AREA] & 1)) return 0;
     regs[R1] = 1;                     /* command 1: no case in 0x514f9c (returns) */
     if (++s_n <= 8) logf("port: %s stage: quest-start command 0 held for area-%u KowareObj %x (mId %u)",
-                         port_monsters[m].name, k[KOBJ_AREA], (uint32_t)k, k[KOBJ_ID]);
+                         s->name, k[KOBJ_AREA], (uint32_t)k, k[KOBJ_ID]);
     return 0;
 }
 
-/* Stage name on the boards / quest info (allocations.toml [monster.append] stage_name, its TXTA string). GU's only
+/* Stage name on the boards / quest info (allocations.toml [monster.append] stage_name, its TXTA string: the stage's
+ * board_name, for the quests of every monster using that stage and for its map's tours). GU's only
  * readers of the stage-name table 0x1634f74 (questMessage index per stage, 24 -> 116 "Ruined Pinnacle"; word
  * 0x183ff9c) store the index at this+0xf8 (C, xref of the word):
  *   stage_name_list @0x614840 `str r0, [r4, #0xf8]`: r5 = a quest record (stage +0x10 via `ldrsb [r5, #16]`);
@@ -68,15 +60,23 @@ int stage_kobj_bcast_c(uint32_t *regs)
  *     stage +0x10 the same way).
  * Record +8 = quest ID (questData file +12; the setup 0x3ade34 copies it to [[0x188ad90]+0xe0], port.c), +0x10 = s8
  * stage (file +20). S for the record layout, C for the reads. */
+static const struct port_stage *quest_stage(uint32_t id)  /* a listed quest's stage while its owner is installed */
+{
+    int m = port_quest_owner(id, 0), t;
+    if (m >= 0) return port_monsters[m].stage && port_installed(m) ? &port_stages[port_monsters[m].stage - 1] : 0;
+    t = port_tour_of(id);
+    return t >= 0 && port_tour_present(t) ? &port_stages[port_tours[t].stage - 1] : 0;
+}
+
 static void stage_name_swap(uint32_t *regs, uint32_t rec, const char *site)
 {
     static uint32_t s_n;
-    int m;
-    if (!rec || (m = port_quest_owner(FIELD(uint32_t, rec, 8), 0)) < 0 || !port_monsters[m].stage_name ||
-        FIELD(int8_t, rec, 0x10) != port_monsters[m].stage_from || !port_installed(m)) return;
-    if (++s_n <= 8) logf("port: %s stage name %s quest %u: %u -> %u", port_monsters[m].name, site,
-                         FIELD(uint32_t, rec, 8), regs[R0], port_monsters[m].stage_name);
-    regs[R0] = port_monsters[m].stage_name;
+    const struct port_stage *s;
+    if (!rec || !(s = quest_stage(FIELD(uint32_t, rec, 8))) || !s->board_name || FIELD(int8_t, rec, 0x10) != s->from)
+        return;
+    if (++s_n <= 8) logf("port: %s stage name %s quest %u: %u -> %u", s->name, site, FIELD(uint32_t, rec, 8), regs[R0],
+                         s->board_name);
+    regs[R0] = s->board_name;
 }
 
 int stage_name_list_c(uint32_t *regs)
@@ -128,16 +128,15 @@ int stage_maprec_c(uint32_t *regs)
 {
     uint32_t stage = FIELD(uint32_t, regs[R4], 0x94), area = FIELD(uint32_t, regs[R4], 0x98), i;
     const uint32_t *src = (const uint32_t *)(uintptr_t)regs[R0];
-    int m = alias_port();
-    if (m < 0 || stage != port_monsters[m].stage_from || area >= port_monsters[m].map_n || !src) return 0;
+    const struct port_stage *s = port_running_stage();
+    if (!s || stage != s->from || area >= s->map_n || !src) return 0;
     for (i = 0; i < MAPREC_SIZE / 4; i++) s_maprec[area][i] = src[i];
-    FIELD(float, s_maprec[area], 0x2c) = port_monsters[m].map_k[area];
-    FIELD(int16_t, s_maprec[area], 0x30) = port_monsters[m].map_x[area];
-    FIELD(int16_t, s_maprec[area], 0x32) = port_monsters[m].map_y[area];
+    FIELD(float, s_maprec[area], 0x2c) = s->map_k[area];
+    FIELD(int16_t, s_maprec[area], 0x30) = s->map_x[area];
+    FIELD(int16_t, s_maprec[area], 0x32) = s->map_y[area];
     regs[R0] = (uint32_t)(uintptr_t)s_maprec[area];
-    logf("port: %s area map record area %u -> k %d/100 off (%d, %d)", port_monsters[m].name, area,
-         (int)(port_monsters[m].map_k[area] * 100.0f + 0.5f), port_monsters[m].map_x[area],
-         port_monsters[m].map_y[area]);
+    logf("port: %s area map record area %u -> k %d/100 off (%d, %d)", s->name, area,
+         (int)(s->map_k[area] * 100.0f + 0.5f), s->map_x[area], s->map_y[area]);
     return 0;
 }
 
@@ -156,16 +155,15 @@ int stage_wholerec_c(uint32_t *regs)
 {
     const uint32_t *src = (const uint32_t *)(uintptr_t)regs[R0];
     uint32_t i;
-    int m = alias_port();
-    if (m < 0 || FIELD(uint32_t, regs[R4], 0x94) != port_monsters[m].stage_from || !port_monsters[m].whole_k || !src)
+    const struct port_stage *s = port_running_stage();
+    if (!s || FIELD(uint32_t, regs[R4], 0x94) != s->from || !s->whole_k || !src)
         return 0;
     for (i = 0; i < WHOLEREC_SIZE / 4; i++) s_wholerec[i] = src[i];
-    FIELD(float, s_wholerec, 0x34) = port_monsters[m].whole_k;
-    FIELD(float, s_wholerec, 0x38) = port_monsters[m].whole_k;
+    FIELD(float, s_wholerec, 0x34) = s->whole_k;
+    FIELD(float, s_wholerec, 0x38) = s->whole_k;
     FIELD(float, s_wholerec, 0x3c) = 0.0f;
     FIELD(float, s_wholerec, 0x40) = 0.0f;
     regs[R0] = (uint32_t)(uintptr_t)s_wholerec;
-    logf("port: %s whole map record -> k %d/1000", port_monsters[m].name,
-         (int)(port_monsters[m].whole_k * 1000.0f + 0.5f));
+    logf("port: %s whole map record -> k %d/1000", s->name, (int)(s->whole_k * 1000.0f + 0.5f));
     return 0;
 }

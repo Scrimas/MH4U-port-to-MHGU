@@ -24,7 +24,7 @@ notes_entry = [123, 159]                # Hunter's Notes: 123..127 = free bits o
 quests = [11491, 11492, 11493, 11494, 10790, 10791, 10792, 11495, 11496,   # checked free (no file, no list
           10775, 10776, 10777, 10778, 10779, 11426, 11427, 11428, 11429, 1023, 1024, 10780, 11430, 10781, 1025,
           1056, 10782, 10783, 11451, 1057, 1058, 1059, 10784, 10785, 11452, 11368, 11453,
-          1062, 11370, 11371]
+          1062, 11370, 11371, 841, 10547, 10548, 10549, 11372]
                                         # entry; v1.0 RomFS); 107NN = Hub HR 7, 114NN = Hub G4 (the ID's digits decide
                                         # which hub loads it, the questData bytes the rank: plan.md Dalamadur 6.),
                                         # 10NN = village ★10 (Stygian Zinogre, 2026-10-28); 10780 / 11430 / 10781 /
@@ -38,7 +38,9 @@ quests = [11491, 11492, 11493, 11494, 10790, 10791, 10792, 11495, 11496,   # che
                                         # (Shrouded Nerscylla's, 2026-11-06, the same check). Only the quests 4U has: 4U's
                                         # caravan quests go to the village, its guild quests to the hub (the user,
                                         # 2026-11-08; Monoblos' hub copies were the exception: 4U has no multiplayer quest
-                                        # of his), and no Arena quests (the user, 2026-11-08: Tidal's 11497 = 4U m11016 gone)
+                                        # of his), and no Arena quests (the user, 2026-11-08: Tidal's 11497 = 4U m11016 gone).
+                                        # 841 / 10547 / 10548 / 10549 / 11372 (Heaven's Mount's Harvest Tours, 2026-11-10: no
+                                        # q%07d.arc, no loose questData, no quest_group entry in the v1.4 RomFS, C)
 quest_slots = [1011009, 1011003, 1011048, 1011049, 1010007, 1010177, 1110009, 1110114, 1110115]
                                         # quest_group group-127 entries renamed in memory. 1010007 / 1010177 / 1110009 /
                                         # 1110114 / 1110115 (indexes 1307 / 1329 / 1314 / 1393 / 1394, 2026-10-21):
@@ -589,3 +591,16 @@ w09 = 2
 w10 = 2
 w13 = 3
 w14 = 3
+
+# ---- maps (maps/<name>): the IDs a map package owns, never a registry index ---------------------------------------
+# A map's Harvest Tours (maps/<map>/package.toml [[tour]]) ship in its package: a monster requiring the map brings them,
+# and so does the Harvest Tours bundle (bundles/harvest_tours). Appended to the quest list (module/quest.c) right after
+# the quests of `append_after`, so a later monster never moves their indexes (their cleared bits).
+
+[[map]]
+name = "heavens_mount"                  # maps/heavens_mount (4U m05)
+quests = [841, 10547, 10548, 10549, 11372]
+                                        # Harvest Tours as GU's Volcanic Hollow ones (the maintainer, 2026-11-10): Village
+                                        # 8* 841 (4U q806), Hub 5* 10547 (4U q10515) + its hidden variants 10548 / 10549 (one
+                                        # quest per 4U intruder outcome), G3 11372 (4U q10907, 4U G2)
+append_after = "shrouded_nerscylla"

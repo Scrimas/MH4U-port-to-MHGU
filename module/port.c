@@ -164,20 +164,59 @@ int port_installed(int m)
     put(p, ".arc");
     uint32_t r = fs_entry_type(&type, path);
     s_installed[m] = !r && type == 1 ? 1 : 2;        /* DirectoryEntryType_File */
-    uint32_t f = port_monsters[m].stage_folder;      /* 28..99 (allocations.toml pool stage_folder) */
-    if (s_installed[m] == 1 && f) {
-        char map[64], a = (char)('0' + f / 10 % 10), b = (char)('0' + f % 10);
-        p = put(map, "app:/nativeNX/arc/stage/m");
-        *p++ = a; *p++ = b; p = put(p, "d/m"); *p++ = a; *p++ = b; put(p, "d.arc");
-        type = 0;
-        if (fs_entry_type(&type, map) || type != 1) {
-            s_installed[m] = 2;
-            logf("mhgu-de: %s NOT installed (its map is missing: %s)", port_monsters[m].name, map);
-            return 0;
-        }
+    const struct port_stage *st = port_monsters[m].stage ? &port_stages[port_monsters[m].stage - 1] : 0;
+    if (s_installed[m] == 1 && st && !port_stage_installed(st)) {
+        s_installed[m] = 2;
+        logf("mhgu-de: %s NOT installed (its map %s is missing)", port_monsters[m].name, st->name);
+        return 0;
     }
     logf("mhgu-de: %s %s (%s)", port_monsters[m].name, s_installed[m] == 1 ? "installed" : "NOT installed", path);
     return s_installed[m] == 1;
+}
+
+/* the map's stage arc nativeNX/arc/stage/m<folder>d/m<folder>d.arc (kind 56 of the folder) */
+int port_stage_installed(const struct port_stage *s)
+{
+    static uint8_t s_state[PORT_STAGE_N + 1];        /* 0 not checked, 1 yes, 2 no */
+    int k = (int)(s - port_stages);
+    if (k < 0 || k >= PORT_STAGE_N) return 0;
+    if (s_state[k]) return s_state[k] == 1;
+    uint32_t f = s->folder, type = 0;                /* 28..99 (allocations.toml pool stage_folder) */
+    char map[64], a = (char)('0' + f / 10 % 10), b = (char)('0' + f % 10), *p = put(map, "app:/nativeNX/arc/stage/m");
+    *p++ = a; *p++ = b; p = put(p, "d/m"); *p++ = a; *p++ = b; put(p, "d.arc");
+    s_state[k] = !fs_entry_type(&type, map) && type == 1 ? 1 : 2;
+    logf("mhgu-de: map %s %s (%s)", s->name, s_state[k] == 1 ? "installed" : "NOT installed", map);
+    return s_state[k] == 1;
+}
+
+static int questdata_present(uint32_t id)
+{
+    uint32_t type = 0;
+    char path[64], *p = put(path, "app:/nativeNX/loc/quest/questData/questData_");
+    for (uint32_t d = 1000000; d; d /= 10) *p++ = (char)('0' + id / d % 10);
+    put(p, ".ext");
+    return !fs_entry_type(&type, path) && type == 1;
+}
+
+int port_tour_of(uint32_t quest_id)
+{
+    for (int t = 0; quest_id && t < PORT_TOUR_N; t++)
+        if (port_tours[t].quest == quest_id) return t;
+    return -1;
+}
+
+/* a tour ships in its map's package: its questData file and the map's stage arc */
+int port_tour_present(int t)
+{
+    static uint8_t s_present[PORT_TOUR_N + 1];       /* 0 not checked, 1 yes, 2 no */
+    if (t < 0 || t >= PORT_TOUR_N) return 0;
+    if (!s_present[t]) {
+        const struct port_tour *pt = &port_tours[t];
+        s_present[t] = questdata_present(pt->quest) && pt->stage && port_stage_installed(&port_stages[pt->stage - 1])
+                       ? 1 : 2;
+        logf("mhgu-de: tour %u (board %u) %s", pt->quest, pt->base, s_present[t] == 1 ? "present" : "NOT present");
+    }
+    return s_present[t] == 1;
 }
 
 /* present = nativeNX/loc/quest/questData/questData_%07d.ext exists */
@@ -258,6 +297,15 @@ int port_running_quest(int *which)
 {
     int m = port_quest_owner(port_quest_id(), which);
     return m >= 0 && port_installed(m) ? m : -1;
+}
+
+const struct port_stage *port_running_stage(void)
+{
+    uint32_t id = port_quest_id();
+    int m = port_quest_owner(id, 0), t;
+    if (m >= 0) return port_monsters[m].stage && port_installed(m) ? &port_stages[port_monsters[m].stage - 1] : 0;
+    t = port_tour_of(id);
+    return t >= 0 && port_tour_present(t) ? &port_stages[port_tours[t].stage - 1] : 0;
 }
 
 uint16_t port_standin(int m, int k)
