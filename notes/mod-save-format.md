@@ -129,6 +129,9 @@ merges the same way: what is already there counts once.
   journal of the overwritten bytes), so a later write of that buffer is still clean.
 - A slot whose file could not be read, checked (a damaged file, or one of a newer format) or merged this session
   never gets its file overwritten: every save until the game closes leaves slot and file as they are.
+- The first split of a character from before 3.0.0 (no link, no file) first copies GU's `system` as it is on disk to
+  `system_premigration`, once (D10; an existing copy is kept). GU imports no free-space call, so the copy is tried:
+  where the save's size is enforced (a Switch) creating it is expected to fail (G), and the split goes on without it.
 
 ## In the installer (2.1.0)
 

@@ -15,7 +15,9 @@
  * - parse (0x3e0db8 entry / 0x3e0e64): a slot whose link says "split" gets its cached file merged in before GU parses
  *   it, and is put back as read right after (the journal), so a later write of that buffer is still clean.
  * - A slot whose file exists but could not be read, checked or merged this session never has that file overwritten
- *   (s_keep stays set until the game closes, whatever a later read finds). */
+ *   (s_keep stays set until the game closes, whatever a later read finds).
+ * - D10: the first split of a character from before 3.0.0 first copies GU's file as it is on disk (the save before
+ *   the split) to `system_premigration`, once (premigration_copy). */
 #include "port.h"
 #include "game.h"
 #include "util.h"
@@ -32,6 +34,7 @@ typedef uint32_t (*fs_read_t)(uint32_t *out, fs_file f, int64_t offset, void *bu
 typedef uint32_t (*fs_write_t)(fs_file f, int64_t offset, const void *buf, uint32_t size, const int *option);
 typedef uint32_t (*fs_flush_t)(fs_file f);
 typedef void (*fs_close_t)(fs_file f);
+typedef uint32_t (*fs_delete_t)(const char *path);
 #define fs_open FN(fs_open_t, 0x13f04b4)       /* nn::fs::OpenFile (1 read, 2 write) */
 #define fs_create FN(fs_create_t, 0x13f04a8)   /* nn::fs::CreateFile(path, size) */
 #define fs_size FN(fs_size_t, 0x13f043c)
@@ -39,6 +42,7 @@ typedef void (*fs_close_t)(fs_file f);
 #define fs_write FN(fs_write_t, 0x13f0454)     /* nn::fs::WriteFile(handle, offset, buf, size, const WriteOption &) */
 #define fs_flush FN(fs_flush_t, 0x13f0460)
 #define fs_close FN(fs_close_t, 0x13f046c)
+#define fs_delete FN(fs_delete_t, 0x13f0424)   /* nn::fs::DeleteFile (GU's own import table, as the six above) */
 
 #define IMAGE_SIZE 0x4EB898u
 #define SLOTS 3
@@ -149,6 +153,66 @@ static int write_file(uint32_t k, const uint8_t *f, uint32_t n)
     return !r;
 }
 
+#define PREMIGRATION "savedata:\\system_premigration"
+
+/* D10: GU's file as it is on disk, the save from before the first split, copied to system_premigration, once (an
+ * existing copy is kept). GU imports no free-space call, so the copy is tried: where the save's size is enforced (a
+ * Switch: GU's two files and about 170 KB, NEWSAVE A2) CreateFile is expected to refuse it (G: untested) and the
+ * split goes on without it. A copy that breaks halfway is deleted. s_out is the buffer: the split fills it next. */
+static void premigration_copy(void)
+{
+    static int s_tried;
+    fs_file in, out;
+    int64_t size = 0, at = 0;
+    int opt = 0;
+    if (s_tried) return;
+    s_tried = 1;
+    if (!fs_open(&out, PREMIGRATION, 1)) {
+        fs_close(out);
+        logf("mhgu-de: save: %s is there already: kept", PREMIGRATION);
+        return;
+    }
+    uint32_t r = fs_open(&in, "savedata:\\system", 1);
+    if (r) {
+        logf("mhgu-de: save: system could not be opened for the copy (%x): migrating without it", r);
+        return;
+    }
+    if ((r = fs_size(&size, in)) || size <= 0) {
+        fs_close(in);
+        logf("mhgu-de: save: system's size unknown (%x): migrating without the copy", r);
+        return;
+    }
+    if ((r = fs_create(PREMIGRATION, size))) {
+        fs_close(in);
+        logf("mhgu-de: save: no room for %s (%x): migrating without it", PREMIGRATION, r);
+        return;
+    }
+    if ((r = fs_open(&out, PREMIGRATION, 2))) {
+        fs_close(in);
+        fs_delete(PREMIGRATION);
+        logf("mhgu-de: save: %s could not be opened (%x): deleted, migrating without it", PREMIGRATION, r);
+        return;
+    }
+    uint32_t t0 = tick0();
+    while (!r && at < size) {
+        uint32_t n = size - at > (int64_t)MS_FILE_SIZE ? MS_FILE_SIZE : (uint32_t)(size - at), got = 0;
+        r = fs_read(&got, in, at, s_out, n);
+        if (!r && got != n) r = 0xFFFFFFFFu;
+        if (!r) r = fs_write(out, at, s_out, n, &opt);
+        at += n;
+    }
+    if (!r) r = fs_flush(out);
+    fs_close(out);
+    fs_close(in);
+    if (r) {
+        fs_delete(PREMIGRATION);
+        logf("mhgu-de: save: the copy to %s failed (%x): deleted, migrating without it", PREMIGRATION, r);
+        return;
+    }
+    logf("mhgu-de: save: %s written: GU's file before the first split (%u bytes, %u us)", PREMIGRATION,
+         (uint32_t)size, us_since(t0));
+}
+
 /* 0x877c58 (r4 = the save manager, savedata mounted): GU is about to write its fields to the file named at +0xe98 */
 int save_write_c(uint32_t *regs)
 {
@@ -169,7 +233,8 @@ int save_write_c(uint32_t *regs)
             logf("mhgu-de: save: slot %u: its file could not be read this session: slot and file left as they are", k + 1);
             continue;
         }
-        if (!ms_link(slot, &link, &gen, &state)) link = s_link[k], gen = s_gen[k];
+        int linked = ms_link(slot, &link, &gen, &state);
+        if (!linked) link = s_link[k], gen = s_gen[k];
         if (!link) link = (tick() * 2654435761u ^ (k + 1) * 0x9E3779B9u) | 1u;
         if (gen < s_gen[k]) gen = s_gen[k];
         uint32_t t0 = tick0();
@@ -187,6 +252,7 @@ int save_write_c(uint32_t *regs)
             ms_set_link(slot, link, gen, MS_FULL);
             continue;
         }
+        if (!linked && !has_file && n > (int)MS_HEADER) premigration_copy();   /* D10, before the slot is cleaned */
         n = ms_split(slot, s_quests, MS_QUEST_N, link, gen + 1, s_aside[k], s_aside_n[k], s_out, MS_FILE_SIZE, 1, &left);
         if (need && !write_file(k, s_out, (uint32_t)n)) {
             struct ms_stats st;                     /* everything back into the slot: it stays full */
