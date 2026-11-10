@@ -1,6 +1,6 @@
 """ci_compile.py : compile every C file of the module (core + each monster's module/) the way module/build.py does,
-without GU's main: no hooks, tables or link (those need dump/gu_main/mem.bin). For CI and quick checks; exit 1 on the
-first compile error.
+without GU's files: no hooks, tables or link (those need dump/gu_main/mem.bin), and the tables generated from GU's
+RomFS (board places, the save's quest list) left empty. For CI and quick checks; exit 1 on the first compile error.
 
   python3 tools/ci_compile.py
 """
@@ -14,7 +14,7 @@ with tempfile.TemporaryDirectory() as out:
     errs = build.alloc.check()
     if errs: sys.exit('allocations.toml:\n  ' + '\n  '.join(errs))
     open(os.path.join(out, 'alloc.h'), 'w').write(build.alloc.header())
-    open(os.path.join(out, 'port_monsters.c'), 'w').write(build.monsters_c())
+    open(os.path.join(out, 'port_monsters.c'), 'w').write(build.monsters_c(stub=True))
     open(os.path.join(out, 'modsave_quests.h'), 'w').write(build.modsave_quests_h(stub=True))
     open(os.path.join(out, 'gear_hooks.inc'), 'w').write(
         ''.join('GEAR_HOOK(%s)\n' % l.split()[0] for l in open(build._GEAR_HOOKS) if l.strip()))
