@@ -11,7 +11,8 @@ repo has no shell scripts):
 Needs:
   x86_64 .exe       rustup target x86_64-pc-windows-gnu + mingw-w64-gcc
   arm64 .exe        rustup target aarch64-pc-windows-gnullvm + LLVM_MINGW=<an llvm-mingw folder> (its bin/ is put on
-                    PATH for this build only: clang, lld, llvm-ar, llvm-windres; ring needs clang for Windows on ARM)
+                    PATH for this build only: clang, lld, llvm-ar, aarch64-w64-mingw32-windres; ring needs clang for
+                    Windows on ARM)
   x86_64 AppImage   cargo-zigbuild + zig (else the binary needs this machine's glibc or newer), mksquashfs
                     (squashfs-tools), APPIMAGE_RUNTIME=<the type 2 runtime-x86_64 file>
   arm64 AppImage    rustup target aarch64-unknown-linux-gnu + cargo-zigbuild + zig (zig needed unless this machine is
@@ -57,6 +58,9 @@ def exe(ver, arch):
         env.setdefault('CARGO_TARGET_AARCH64_PC_WINDOWS_GNULLVM_LINKER', cc)
         env.setdefault('CC_aarch64_pc_windows_gnullvm', cc)
         env.setdefault('AR_aarch64_pc_windows_gnullvm', os.path.join(lm, 'bin', 'llvm-ar'))
+        # winresource runs a bare llvm-windres for a gnullvm target: x64 resources, which lld refuses in an arm64
+        # .exe; the prefixed one takes its target from its name
+        env.setdefault('WINDRES', os.path.join(lm, 'bin', 'aarch64-w64-mingw32-windres'))
     run('cargo', 'build', '--release', '--locked', '-p', 'mhgu-de-installer', '--target', target, env=env)
     out = os.path.join(DIST, '%s-%s-%s.exe' % (NAME, ver, arch))
     shutil.copy(os.path.join(INST, 'target', target, 'release', 'mhgu-de-installer.exe'), out)
