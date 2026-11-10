@@ -125,12 +125,26 @@ _GU_CHARS = {}
 
 
 def gu_chars(lang):
-    """every character GU's own text of lang (chT / chS) uses (resident arc GMDs)"""
+    """every character GU's own text of lang (chT / chS) uses: its resident arc, its loose GMDs and every quest's"""
     if lang not in _GU_CHARS:
         import portdata
         sys.path.insert(0, paths.GU_PY)
+        import gmd
+        from arc import arc_entries, arc_read
         from romfs import RomFS
-        _GU_CHARS[lang] = portdata.zh_text(RomFS(paths.GU_ROMFS), lang)[1]
+        rom = RomFS(paths.GU_ROMFS)
+        chars = set(portdata.zh_text(rom, lang)[1])
+        for name in rom.files:
+            if name.startswith('/nativeNX/%s/' % lang) and name.endswith('.gmd'):
+                for s in gmd.gmd_strings(rom.read(name)): chars.update(s)
+            elif name.startswith('/nativeNX/loc/arc/quest/q') and name.endswith('.arc'):
+                d = rom.read(name)
+                for e in arc_entries(d):
+                    if e[0].startswith(lang + '\\quest\\questData\\'):
+                        b = arc_read(d, e)
+                        if b[:4] == b'GMD\0':
+                            for s in gmd.gmd_strings(b): chars.update(s)
+        _GU_CHARS[lang] = chars
     return _GU_CHARS[lang]
 
 
