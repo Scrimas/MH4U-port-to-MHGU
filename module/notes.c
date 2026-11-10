@@ -99,8 +99,10 @@ int notes_unlock_check_c(uint32_t *regs)
  * Unlocked = any quest of the monster cleared (the cleared map S+0x42c, written by GU for every quest), as the entry
  * would be after talking to the NPC; no NEW mark. Nothing here writes. */
 #define NOTES_SAVE_BITS 128u
-#define NOTES_ZERO_WORD 49u                /* (S+0x3684 - S+0x35c0) / 4: the reserved block's start, never written
-                                            * (notes/save-store.md); read as "no NEW mark" */
+#define NOTES_ZERO_WORD 79u                /* (S+0x36fc - S+0x35c0) / 4: a word of the reserved block's free part
+                                            * (+0x3694..+0x36ff: past the save link record, modsave.h MS_LINK_N, and
+                                            * before items.c's bits at +0x3700), never written (notes/save-store.md);
+                                            * read as "no NEW mark" */
 
 static int notes_live(uint32_t e)
 {
