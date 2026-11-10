@@ -164,10 +164,14 @@ int quest_unlocked_c(uint32_t *regs)
 /* 0x3bb318(boards, quest ID, star, record) -> void: puts a quest on its star board, appended, unless the board already
  * holds that ID (C). Callers: the regular boards' builder 0x3bab28.. (per loaded quest, in quest-list order: record
  * = 0x39b848(0x3ba50c(boards, ID), 0), star = s8 record +14 = questData +0x12, C) and the event boards' 0x3bc234 /
- * 0x3bc458. GU's tours lead their boards (the maintainer, 2026-11-10),
- * ours were appended last: before a board's first quest that is no tour (record +0x0c = questData +0x10 type, 3 =
- * Harvest Tour), our tours of that board go in first (the same calls the builder makes for them; its own call later
- * finds them there). */
+ * 0x3bc458. A board shows its quests in the order they are put, so a quest put early keeps that place: the builder's
+ * own call later finds it there.
+ * - GU's tours lead their boards (the maintainer, 2026-11-10): before a board's first quest that is no tour (record
+ *   +0x0c = questData +0x10 type, 3 = Harvest Tour), our tours of that board go in first.
+ * - Each ported quest follows its anchor, a GU quest of its board (port_boards, tools/board_order.py: GU's own block
+ *   order, NEWSAVE_MAPREWORK.md C10): before the builder puts the first regular quest listed after the anchor, the
+ *   ported quests anchored before it go in, in anchor order. A locked anchor or a locked next quest doesn't matter:
+ *   list indexes decide. A ported quest whose anchor is not in the list keeps its place at the end. */
 typedef void *(*qres_find_t)(void *boards, uint32_t id);
 typedef uint8_t *(*qres_record_t)(void *res, uint32_t k);
 typedef void (*board_put_t)(void *boards, uint32_t id, uint32_t star, void *record);
@@ -175,6 +179,86 @@ typedef void (*board_put_t)(void *boards, uint32_t id, uint32_t star, void *reco
 #define qres_record FN(qres_record_t, 0x39b848)
 #define board_put FN(board_put_t, 0x3bb318)
 #define QD_TYPE_TOUR 3
+#define REGULAR_MAX 20000u                    /* board quest IDs: village < 10000, hub 10000..19999 */
+#define BOARD_MAX 64
+
+/* the quest list's entries (quest_group in memory): count, entry k's ID */
+static uint32_t qg_list(uint32_t *e)
+{
+    uint32_t mgr = *(volatile uint32_t *)MAIN(0x188ad90u), grp;
+    if (!mgr || !(grp = FIELD(uint32_t, mgr, 0xb4)) || !(*e = FIELD(uint32_t, grp, 0x6c))) return 0;
+    return FIELD(uint32_t, grp, 0x64);
+}
+#define QG_ID(e, k) (*(volatile uint32_t *)(uintptr_t)((e) + 12 * (k) + 4))
+
+/* the ported quest b's board record in this pass (looked up once per pass: 0 = not on any board here, i.e. not
+ * installed, not present or not loaded) */
+static uint8_t *s_brec[BOARD_MAX];
+static uint64_t s_bseen;
+static uint8_t *board_rec(void *boards, int b)
+{
+    const struct port_board *pb = &port_boards[b];
+    if (!(s_bseen >> b & 1)) {
+        s_bseen |= 1ull << b;
+        s_brec[b] = 0;
+        if (port_installed(pb->monster) && port_quest_present(pb->monster, pb->k)) {
+            void *res = qres_find(boards, pb->quest);
+            uint8_t *r = res ? qres_record(res, 0) : 0;
+            if (r && FIELD(uint32_t, r, 8) == pb->quest) s_brec[b] = r;
+        }
+    }
+    return s_brec[b];
+}
+
+static void board_place_ported(void *boards, uint32_t id, uint32_t star)
+{
+    static uint32_t s_e, s_n, s_cur, s_last;  /* the list the anchors were found in; cursor; last call's index */
+    static uint32_t s_aidx[BOARD_MAX];        /* each anchor's list index (0xffffffff = not listed) */
+    static uint8_t s_order[BOARD_MAX];        /* port_boards rows by anchor index */
+    static uint64_t s_done, s_logged;
+    static void *s_boards;
+    uint32_t e, n = qg_list(&e), idx, k;
+    int nb = port_board_n < BOARD_MAX ? port_board_n : BOARD_MAX;
+    if (!n || !nb) return;
+    if (e != s_e || n != s_n) {               /* a new list: find the anchors (60k reads, once per load) */
+        s_e = e, s_n = n, s_cur = 0, s_last = 0xffffffffu;
+        for (int b = 0; b < nb; b++) {
+            s_aidx[b] = 0xffffffffu;
+            for (k = 0; k < n; k++)
+                if (QG_ID(e, k) == port_boards[b].after) { s_aidx[b] = k; break; }
+            if (s_aidx[b] == 0xffffffffu)
+                logf("mhgu-de: board: quest %u's anchor %u is not listed (stays last)", port_boards[b].quest,
+                     port_boards[b].after);
+            int j = b;                        /* insertion by anchor index, ties in table order */
+            while (j > 0 && s_aidx[s_order[j - 1]] > s_aidx[b]) { s_order[j] = s_order[j - 1]; j--; }
+            s_order[j] = (uint8_t)b;
+        }
+    }
+    for (k = 0; k < n; k++) {                 /* this quest's index: the builder walks the list in order */
+        uint32_t c = (s_cur + k) % n;
+        if (QG_ID(e, c) == id) break;
+    }
+    if (k == n) return;                       /* not listed (an event board's quest) */
+    idx = (s_cur + k) % n;
+    s_cur = idx;
+    if (boards != s_boards || idx < s_last || s_last == 0xffffffffu) s_done = s_bseen = 0;   /* a new pass */
+    s_boards = boards, s_last = idx;
+    for (int o = 0; o < nb; o++) {
+        int b = s_order[o];
+        if (s_aidx[b] >= idx) break;          /* anchors in order: the rest come later */
+        if (s_done >> b & 1 || (port_boards[b].quest < 10000u) != (id < 10000u)) continue;
+        uint8_t *r = board_rec(boards, b);
+        if (r && (uint8_t)r[14] != (uint8_t)star) continue;             /* another board's turn: its next quest */
+        s_done |= 1ull << b;
+        if (!r) continue;
+        board_put(boards, port_boards[b].quest, (uint16_t)(int16_t)(int8_t)r[14], r);
+        if (!(s_logged >> b & 1)) {
+            s_logged |= 1ull << b;
+            logf("mhgu-de: board: quest %u put after %u (list %u), before quest %u (list %u, star %u)",
+                 port_boards[b].quest, port_boards[b].after, s_aidx[b], id, idx, star);
+        }
+    }
+}
 
 int tour_board_c(uint32_t *regs)
 {
@@ -183,20 +267,22 @@ int tour_board_c(uint32_t *regs)
     int t = port_tour_of(regs[R1]);
     const uint8_t *rec = (const uint8_t *)(uintptr_t)regs[R3];
     if (t >= 0) return 0;
-    if (s_putting || !rec || regs[R1] >= 1000000u || rec[0x0c] == QD_TYPE_TOUR) return 0;   /* events, GU's tours */
+    if (s_putting || !rec || regs[R1] >= REGULAR_MAX) return 0;          /* events */
     s_putting = 1;
-    for (int k = 0; k < PORT_TOUR_N; k++) {
-        const struct port_tour *pt = &port_tours[k];
-        if ((pt->quest < 10000u) != (regs[R1] < 10000u) || !port_tour_present(k)) continue;
-        void *res = qres_find((void *)(uintptr_t)regs[R0], pt->quest);
-        uint8_t *r = res ? qres_record(res, 0) : 0;
-        if (!r || FIELD(uint32_t, r, 8) != pt->quest || (uint8_t)r[14] != (uint8_t)regs[R2]) continue;
-        board_put((void *)(uintptr_t)regs[R0], pt->quest, (uint16_t)(int16_t)(int8_t)r[14], r);
-        if (k < 32 && !(s_logged >> k & 1)) {
-            s_logged |= 1u << k;
-            logf("mhgu-de: tour %u put on star board %u before quest %u", pt->quest, regs[R2], regs[R1]);
+    if (rec[0x0c] != QD_TYPE_TOUR)                                       /* GU's tours lead, then ours */
+        for (int k = 0; k < PORT_TOUR_N; k++) {
+            const struct port_tour *pt = &port_tours[k];
+            if ((pt->quest < 10000u) != (regs[R1] < 10000u) || !port_tour_present(k)) continue;
+            void *res = qres_find((void *)(uintptr_t)regs[R0], pt->quest);
+            uint8_t *r = res ? qres_record(res, 0) : 0;
+            if (!r || FIELD(uint32_t, r, 8) != pt->quest || (uint8_t)r[14] != (uint8_t)regs[R2]) continue;
+            board_put((void *)(uintptr_t)regs[R0], pt->quest, (uint16_t)(int16_t)(int8_t)r[14], r);
+            if (k < 32 && !(s_logged >> k & 1)) {
+                s_logged |= 1u << k;
+                logf("mhgu-de: tour %u put on star board %u before quest %u", pt->quest, regs[R2], regs[R1]);
+            }
         }
-    }
+    if (port_quest_owner(regs[R1], 0) < 0) board_place_ported((void *)(uintptr_t)regs[R0], regs[R1], regs[R2]);
     s_putting = 0;
     return 0;
 }

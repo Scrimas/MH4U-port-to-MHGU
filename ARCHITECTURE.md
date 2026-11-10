@@ -61,6 +61,8 @@ tools/                ~60 Python scripts (shared by every port):
   sound               snd_bgm.py (BGM -> Opus + STQR) snd_area.py (area sounds)
   4U data readers     quest4u items4u weapons4u gear4u emdata4u notes4u extdata4u (DLC quests)
   tour4u.py           a map's Harvest Tours from 4U's (maps/<map>/package.toml [[tour]], allocations.toml [[map]])
+  board_order.py      each ported quest's place on its star board, from GU's own block order (module/build.py
+                      generates port_boards; `show` / `html OUT` preview it)
                       hagi4u (carve tables -> GU carve files) hsum4u (summarise a 4U action handler)
   enemy data          dt_convert dt_map dt_vote fieldmap: build GU dtbase / dtbparts / dttune from 4U records
   GU study            gu.py gu_enemy.py gu_schema.py guemu.py (runs GU loaders under unicorn) arctypes.py

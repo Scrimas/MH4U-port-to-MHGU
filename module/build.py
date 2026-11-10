@@ -449,6 +449,15 @@ def monsters_c():
                                                   t['map']))
     out.append('    {0}' if not alloc.tours() else '')
     out.append('};')
+    import board_order                       # tools/board_order.py: each ported quest's anchor on its board (C10)
+    rows = board_order.plan()[1]
+    out.append('const struct port_board port_boards[] = {')
+    for m, q, a, why in rows:
+        out.append('    {%d, %d, %d, %d},   /* %s: %s */' % (q['qid'], a, port[m['name']], m['quests'].index(q['qid']),
+                                                          m['name'], why.replace('*/', '')))
+    out.append('    {0}' if not rows else '')
+    out.append('};')
+    out.append('const int port_board_n = %d;' % len(rows))
     out.append('const struct port_monster port_monsters[] = {')
     for m in MONSTERS:
         q, s = [(m.get(k, []) + [0] * QUESTS_PER_ENTRY)[:QUESTS_PER_ENTRY] for k in ('quests', 'quest_slots')]

@@ -38,6 +38,15 @@ struct port_tour {
     int8_t after;                         /* allocations.toml append_after: listed right after this monster's quests */
 };
 extern const struct port_tour port_tours[];         /* out/port_monsters.c */
+
+/* A ported quest's place on its star board (module/quest.c tour_board_c): it follows the GU quest `after`, chosen by
+ * tools/board_order.py from GU's own block order (NEWSAVE_MAPREWORK.md C10), in registry then quest order. */
+struct port_board {
+    uint32_t quest, after;
+    uint8_t monster, k;                   /* port_monsters index, its quests[] index */
+};
+extern const struct port_board port_boards[];       /* out/port_monsters.c */
+extern const int port_board_n;
 #define PORT_LANGS 5          /* eng fre ger ita spa: text order in every data section */
 #define PORT_QUESTS 12        /* quests per entry (module/build.py QUESTS_PER_ENTRY) */
 

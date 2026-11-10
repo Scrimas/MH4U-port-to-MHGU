@@ -242,6 +242,11 @@ pairs where possible (tools/dt_vote.py, dt_map.py, snd4u2gu.py selftest), then a
   GU's own intruder system with 4U's chance and timing (questData +0xCC.., boss slots 2..4): GU rolls them, online
   too. The core lists the tours after append_after's quests and puts them first on their star boards
   (module/quest.c).
+- Board place: a ported quest shows among GU's quests of its star board, not last. tools/board_order.py picks the GU
+  quest it follows from GU's own block order: after the last regular quest of its base species (its stand-in), an
+  elder dragon after Kushala Daora / Chameleos / Teostra, a multi-monster quest after the last multi-monster one,
+  else the end of the single-monster block. `python3 tools/board_order.py show` lists them; a monster entry's
+  `board_after = [[quest, GU quest]]` in allocations.toml overrides one.
 
 ### Phase 5b: content (save, items, gear, Notes, quests)
 Order that worked: save slot -> materials -> carves / rewards -> second quest + subquests -> armor data on a GU
