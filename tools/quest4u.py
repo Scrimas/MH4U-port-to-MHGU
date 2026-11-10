@@ -219,8 +219,9 @@ def assemble(res, link, gmds, qd, sid):
     """quest arc + loose files -> {RomFS path under nativeNX: bytes}. res = [(path, type, data)] of the resources
     questLink names. v1.4 positional layout: questData = arc entry [count-1] (0x3ba6dc), questLink = [count-9]
     (0x3ba840, path must contain "Link"; v1.0 used [count-7]): questLink, the 7 QLANGS GMDs, questData, as GU's own
-    v1.4 quests (without the 9 entries questLink is null and 0x3ade34 skips the whole quest setup). Loose GMDs: the 5
-    LANGS only (v1.4 has no loose chT / chS quest text)."""
+    v1.4 quests (without the 9 entries questLink is null and 0x3ade34 skips the whole quest setup). Loose GMDs: all 7
+    QLANGS: the boards load each quest's text as loose <lang>\\quest\\questData\\questData_<ID>_<lang> in every language
+    (C, test 2026-11-10 log); without the chT / chS files a Chinese game showed the ported quests in English."""
     ents = res + [('loc\\quest\\questLink\\questLink_' + sid, T_LINK, link)]
     ents += [('%s\\quest\\questData\\questData_%s_%s' % (l, sid, l), T_GMD, gmds[l]) for l in QLANGS]
     assert len(qd) == QD_SIZE
@@ -231,7 +232,7 @@ def assemble(res, link, gmds, qd, sid):
     files = {'loc/arc/quest/q%s.arc' % sid: arc,
              'loc/quest/questData/questData_%s.ext' % sid: qd,
              'loc/quest/questLink/questLink_%s.qdl' % sid: link}
-    files.update({'%s/quest/questData/questData_%s_%s.gmd' % (l, sid, l): gmds[l] for l in LANGS})
+    files.update({'%s/quest/questData/questData_%s_%s.gmd' % (l, sid, l): gmds[l] for l in QLANGS})
     return files
 
 
