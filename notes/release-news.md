@@ -4,22 +4,26 @@ tools/release.py puts the section of the core version being packaged into the re
 groups, **New** (something added) and **Fixed** (what works now, not what was broken), one short plain line each,
 written for players; write the section before `release.py package`.
 
-## v2.2.0
+## v3.0.0
 **New**
+- Your MHGU save stays clean: everything the mod adds (items, gear, jewels, quest clears, monster records) now
+  lives in its own files next to it (`mhgu_de_1.bin` to `mhgu_de_3.bin`), so MHGU never meets an item it doesn't
+  know, even without the mod. Your save moves over by itself the first time you save. Not tested on a real Switch:
+  back up with JKSV or Checkpoint first.
 - Harvest Tours on Heaven's Mount: MH4U's three tours (Village ★8, Hub ★5, G★3), with MH4U's intruders at MH4U's
   odds. On the Hub ★5 tour an intruder shows up half the time: Rathalos, Deviljho or, rarely, Savage Deviljho.
 - The installer has a Harvest Tours card: tick it to get every map with tours, even without its monster. A monster
   that needs one of those maps brings its tours too.
+
+**Fixed**
+- Gathering on Heaven's Mount gives the right items: MH4U's lists, with MHGU's closest item where MHGU lacks one
+  (Heaven's Mount 1.0.1).
 
 ## v2.1.0
 **New**
 - The ported monsters have Chinese names in MHGU's two Chinese languages (Traditional and Simplified). They were in
   English, since MH4U was never released in Chinese.
 - The installer shows each monster's name and class in your language, the same names as in the game.
-
-**Fixed**
-- Gathering on Heaven's Mount gives the right items: MH4U's lists, with MHGU's closest item where MHGU lacks one
-  (Heaven's Mount 1.0.1).
 
 ## v2.0.0
 **New**
