@@ -637,9 +637,12 @@ def hookwin_asm(entries, windows):
     return '\n'.join(out) + '\n'
 
 
-def modsave_quests_h():
+def modsave_quests_h(stub=False):
     """savefile.c: the quest list indexes that are the mod's and their quests (tools/modsave.py quest_bits, the same
-    table the Python reference and the installer use)"""
+    table the Python reference and the installer use). stub: no quest, for a compile without GU's files (the list
+    needs GU's quest_group: tools/ci_compile.py)"""
+    if stub:
+        return '#pragma once\n#define MS_QUEST_N 0u\n#define MS_QUESTS { { 0xFFFFFFFFu, 0u } }\n'
     sys.path.insert(0, os.path.join(ROOT, 'tools'))
     import modsave
     q = modsave.quest_bits()

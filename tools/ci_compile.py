@@ -15,6 +15,7 @@ with tempfile.TemporaryDirectory() as out:
     if errs: sys.exit('allocations.toml:\n  ' + '\n  '.join(errs))
     open(os.path.join(out, 'alloc.h'), 'w').write(build.alloc.header())
     open(os.path.join(out, 'port_monsters.c'), 'w').write(build.monsters_c())
+    open(os.path.join(out, 'modsave_quests.h'), 'w').write(build.modsave_quests_h(stub=True))
     open(os.path.join(out, 'gear_hooks.inc'), 'w').write(
         ''.join('GEAR_HOOK(%s)\n' % l.split()[0] for l in open(build._GEAR_HOOKS) if l.strip()))
     mods = [os.path.join(build.paths.monster(p), 'module') for p in build.alloc.packages()]
