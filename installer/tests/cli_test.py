@@ -62,7 +62,7 @@ def write_save(d, b):
             open(os.path.join(d, c, f), 'wb').write(b)
 
 
-def make_release(root, tag, version, pre=False, change=(), migrations=(), cleaning=None):
+def make_release(root, tag, version, pre=False, change=(), migrations=(), cleaning=None, save_format=None):
     """a release folder root/<tag>/ with the zips + manifest.json; `change`: packages whose files differ"""
     d = os.path.join(root, tag)
     os.makedirs(d)
@@ -85,6 +85,8 @@ def make_release(root, tag, version, pre=False, change=(), migrations=(), cleani
         pkgs.append(p)
     m = dict(schema=1, release=version, prerelease=pre, installer_min='1.0.0', title_id=TID, mod_folder=MOD,
              packages=pkgs, migrations=list(migrations), cleaning=cleaning or {}, warnings=[])
+    if save_format:
+        m.update(schema=2, save_format=save_format)
     json.dump(m, open(os.path.join(d, 'manifest.json'), 'w'), indent=1)
     for f in sorted(os.listdir(d)):
         assets.append(dict(name=f, browser_download_url='%s/%s' % (tag, f), size=os.path.getsize(os.path.join(d, f))))
@@ -240,6 +242,21 @@ def main():
         check('cannot be migrated' in r.stdout, 'a save that cannot be migrated stops the install')
         cli('install', *ry, '--monsters', 'gamma', '--yes', '--anyway')
         check(open(os.path.join(sd_, '0/system'), 'rb').read() == bytes(b), '--anyway installs and leaves that save alone')
+        # the mod's own save files (schema 2, core 3.0.0): a save from before them is split, once
+        sd3 = os.path.join(ryu, 'bis/user/save/0000000000000003')
+        b3 = blank_save()
+        set_bits(b3, SLOT1 + ITEM_BOX, 0, 12, 2991); set_bits(b3, SLOT1 + ITEM_BOX, 12, 7, 2)
+        write_save(sd3, bytes(b3))
+        v300 = make_release(rel, 'v3.0.0', '3.0.0', migrations=[step1, step2], cleaning=clean,
+                            save_format=dict(version=1, quests=[[1509, 10542]]))
+        publish(rel, [v200, v210, pre, v240, v250, v300])
+        r = cli('install', *ry, '--monsters', 'gamma', '--yes', '--anyway')
+        check('split [1]' in r.stdout, "a save from before the mod's files is listed for the split")
+        check(all(os.path.getsize(os.path.join(sd3, c, 'mhgu_de_1.bin')) == 0x8000
+                  and get_bits(open(os.path.join(sd3, c, 'system'), 'rb').read(), SLOT1 + ITEM_BOX, 0, 12) == 0
+                  for c in '01'), "split: the item in the mod's file of each copy, out of GU's box")
+        r = cli('install', *ry, '--monsters', 'gamma', '--anyway', ok=(0, 1))
+        check('split' not in r.stdout, 'split once')
         # removal
         cli('remove', *places, '--yes', '--anyway')
         check(all(not os.path.exists(d) for d in mods.values()), 'removed from every mod folder')

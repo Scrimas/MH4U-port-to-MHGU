@@ -269,6 +269,11 @@ msgstr ""
 
 #: core/src/saves.rs
 #. placeholders: {} in order, {0} {1} by position
+msgid "character {}: the mod's save file is damaged or from a newer release"
+msgstr ""
+
+#: core/src/saves.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "character {} holds another tool's data where the mod keeps its own"
 msgstr ""
 
@@ -541,6 +546,11 @@ msgstr ""
 
 #: gui/src/main.rs
 #. placeholders: {} in order, {0} {1} by position
+msgid "{}: what the mod adds moves into its own save file, MHGU's keeps the rest"
+msgstr ""
+
+#: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "{} cannot be migrated: {}"
 msgstr ""
 
@@ -650,7 +660,7 @@ msgid "Updating the save {}"
 msgstr ""
 
 #: gui/src/main.rs
-msgid "The mod was removed."
+msgid "The mod was removed. Your saves keep its own files (mhgu_de_1.bin …) beside MHGU's, for a reinstall."
 msgstr ""
 
 #: gui/src/main.rs

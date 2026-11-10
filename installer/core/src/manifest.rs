@@ -1,4 +1,4 @@
-//! `manifest.json`, the release asset tools/release.py writes (schema 1): the release, every package (core, monsters,
+//! `manifest.json`, the release asset tools/release.py writes (schema 2: `save_format` from core 3.0.0): the release, every package (core, monsters,
 //! maps, later shared utility packages) with its zip, size, sha256, requirements and every file it installs.
 
 use crate::i18n::{tr, trf};
@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 /// The newest manifest schema this installer reads; a newer one asks for an installer update.
-pub const SCHEMA: u32 = 1;
+pub const SCHEMA: u32 = 2;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -120,6 +120,10 @@ pub struct Manifest {
     /// Per package: its item / gear IDs, for the save cleaning on removal.
     #[serde(default)]
     pub cleaning: serde_json::Map<String, serde_json::Value>,
+    /// The mod's own save files (core 3.0.0, schema 2): `{"version": 1, "quests": [[list index, quest ID], ...]}`, the
+    /// quest list entries that are the mod's (saves.rs `format`, modsave.rs). Absent before 3.0.0.
+    #[serde(default)]
+    pub save_format: Option<serde_json::Value>,
     /// Release-specific warnings, shown in the review popup (English; `warnings_i18n` from release 2.1.0).
     #[serde(default)]
     pub warnings: Vec<String>,
@@ -289,6 +293,7 @@ pub(crate) mod tests {
             ],
             migrations: vec![],
             cleaning: Default::default(),
+            save_format: None,
             warnings: vec![],
             warnings_i18n: vec![],
         }
@@ -343,7 +348,7 @@ pub(crate) mod tests {
     #[test]
     fn a_newer_schema_asks_for_an_update() {
         let mut m = serde_json::to_value(sample()).unwrap();
-        m["schema"] = 2.into();
+        m["schema"] = 3.into();
         assert!(Manifest::parse(m.to_string().as_bytes()).unwrap_err().contains("newer installer"));
     }
 

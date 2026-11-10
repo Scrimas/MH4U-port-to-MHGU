@@ -28,11 +28,12 @@ release text on PACKAGES_REPO): What's new (notes/release-news.md, one section p
 packaging), then how to install: the installer, or by hand (the maps each monster needs). NOTES-main.md (the text of
 REPO's release, the page players land on): what the mod is, What's new, the monsters and their quests (read from the
 quest files), how to install (the installer's files, or the zips on PACKAGES_REPO), online play and removals.
-manifest.json (schema 1) is what the MHGU Definitive Edition Installer reads (installer/core/src/manifest.rs,
+manifest.json (schema 2) is what the MHGU Definitive Edition Installer reads (installer/core/src/manifest.rs,
 notes/installer.md): the release, every package with its zip, size, sha256, requires and every file (path below 'MHGU
 Definitive Edition/', size, sha256), its name in each installer language as the game shows it (titles; class and with:
-GU's class name and the package's other monsters, the subtitle; English subtitle for older installers), the save migrations and cleaning data (empty until the installer migrates saves)
-and extra warnings. The releases before 2.0.0 (MH4U Port v1.x, on REPO) have none: the installer supports 2.0.0 and
+GU's class name and the package's other monsters, the subtitle; English subtitle for older installers), the save migrations and cleaning data (empty until the installer migrates saves),
+the save format (schema 2, core 3.0.0: the quest list entries that are the mod's, for its own save files) and extra
+warnings. The releases before 2.0.0 (MH4U Port v1.x, on REPO) have none: the installer supports 2.0.0 and
 later.
 """
 import glob, hashlib, io, json, os, re, struct, subprocess, sys, tomllib, zipfile
@@ -44,8 +45,9 @@ import alloc, paths, portdata, ui_icons
 ROOT = paths.ROOT
 TITLE_ID = '0100770008DD8000'
 MOD_NAME = 'MHGU Definitive Edition'
-MANIFEST_SCHEMA = 1        # bump on a change an older installer would misread (installer/core/src/manifest.rs)
-INSTALLER_MIN = '2.0.0'    # oldest installer that installs this release (it asks for its own update otherwise)
+MANIFEST_SCHEMA = 2        # bump on a change an older installer would misread (installer/core/src/manifest.rs);
+                           # 2: save_format, the mod's own save files (core 3.0.0)
+INSTALLER_MIN = '2.1.0'    # oldest installer that installs this release (it asks for its own update otherwise)
 LEGACY_NAME = 'MH4U Port'  # the mod's folder before 2.0.0 (installer/core/src/places.rs LEGACY_FOLDER)
 REPO = 'Scrimas/MHGU-Definitive-Edition'                    # the code and the installer's releases
 PACKAGES_REPO = 'Scrimas/MHGU-Definitive-Edition-Packages'  # the mod's releases (installer/core/src/lib.rs)
@@ -364,6 +366,13 @@ def moved_ids():
     return [b + ' (shipped IDs never move: a migration step in migrations.toml if it must)' for b in bad]
 
 
+def save_format():
+    """the mod's own save files (core 3.0.0, notes/mod-save-format.md): the quest list entries that are the mod's,
+    the list the core carries too (module/build.py modsave_quests_h, from tools/modsave.py quest_bits)"""
+    import modsave
+    return dict(version=1, quests=[[i, q] for i, q in modsave.quest_bits()])
+
+
 def manifest(rel, pre, c, pk, out, icons):
     """manifest.json of the release in out (the zips written): what the installer reads"""
     def pkg(name, kind, title, version, zname, **more):
@@ -387,7 +396,7 @@ def manifest(rel, pre, c, pk, out, icons):
         ps.append(pkg(p['name'], p.get('kind', 'monster'), p['title'], p['version'], zip_name(p), **more))
     return dict(schema=MANIFEST_SCHEMA, release=rel, prerelease=bool(pre), installer_min=INSTALLER_MIN,
                 title_id=TITLE_ID, mod_folder=MOD_NAME, icons='icons-%s.zip' % rel, packages=ps,
-                migrations=migrations(rel),
+                migrations=migrations(rel), save_format=save_format(),
                 cleaning={p['name']: cleaning(p) for p in pk if p.get('kind') not in ('map', 'bundle')},
                 warnings=[w if isinstance(w, str) else w['en'] for w in c.get('warnings', [])],
                 warnings_i18n=[{'en': w} if isinstance(w, str) else w for w in c.get('warnings', [])])

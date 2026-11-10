@@ -275,6 +275,11 @@ msgstr "{} kann nicht gelesen werden ({})"
 
 #. placeholders: {} in order, {0} {1} by position
 #: core/src/saves.rs
+msgid "character {}: the mod's save file is damaged or from a newer release"
+msgstr "Charakter {}: Die Speicherdatei der Mod ist beschädigt oder stammt aus einem neueren Release"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/saves.rs
 msgid "character {} holds another tool's data where the mod keeps its own"
 msgstr "Charakter {} enthält Daten eines anderen Tools, wo die Mod ihre eigenen ablegt"
 
@@ -547,6 +552,11 @@ msgstr "{}: Umstellung auf die IDs dieses Release, Bereinigung der Ausrüstung d
 
 #. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+msgid "{}: what the mod adds moves into its own save file, MHGU's keeps the rest"
+msgstr "{}: Was die Mod hinzufügt, kommt in ihre eigene Speicherdatei, die von MHGU behält den Rest"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
 msgid "{} cannot be migrated: {}"
 msgstr "{} kann nicht migriert werden: {}"
 
@@ -656,8 +666,8 @@ msgid "Updating the save {}"
 msgstr "Spielstand {} wird aktualisiert"
 
 #: gui/src/main.rs
-msgid "The mod was removed."
-msgstr "Die Mod wurde entfernt."
+msgid "The mod was removed. Your saves keep its own files (mhgu_de_1.bin …) beside MHGU's, for a reinstall."
+msgstr "Die Mod wurde entfernt. Deine Spielstände behalten ihre eigenen Dateien (mhgu_de_1.bin …) neben denen von MHGU, für eine Neuinstallation."
 
 #. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs

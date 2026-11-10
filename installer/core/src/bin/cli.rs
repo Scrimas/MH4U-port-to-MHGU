@@ -125,6 +125,7 @@ fn main() {
             }
             // saves: migrations of the release, cleaning of the monsters that leave
             let steps = saves::steps(&m).unwrap_or_else(|e| fail(e));
+            let fmt = saves::format(&m);
             let clean = match values("--clean").first().map(String::as_str) {
                 None | Some("unequip") => Some(Clean::Unequip),
                 Some("worn") => Some(Clean::RemoveWorn),
@@ -141,14 +142,28 @@ fn main() {
                 }
                 let held = std::collections::BTreeMap::from([("leaving".to_string(), leaving.clone())]);
                 for f in saves::find(p) {
-                    let need = saves::need(&f.file, &steps);
-                    let cleans = clean.is_some() && !leaving.is_empty() && !saves::holds(&f.file, &held).is_empty();
+                    let need = saves::need(&f.file, &steps, fmt.as_deref());
+                    let cleans = clean.is_some()
+                        && !leaving.is_empty()
+                        && !saves::holds(&f.file, &held, fmt.as_deref()).is_empty();
                     match &need {
                         Need::Blocked(why) => {
                             println!("  save {}: cannot be migrated ({why})", f.label);
                             blocked += 1;
                         }
-                        Need::Migrate(v) => println!("  save {}: migrate {v:?}", f.label),
+                        Need::Migrate(v) => {
+                            let steps: Vec<(usize, &Vec<u32>)> =
+                                v.iter().filter(|w| !w.steps.is_empty()).map(|w| (w.slot, &w.steps)).collect();
+                            let split: Vec<usize> = v.iter().filter(|w| w.split).map(|w| w.slot).collect();
+                            let mut what = String::new();
+                            if !steps.is_empty() {
+                                what += &format!(" migrate {steps:?}");
+                            }
+                            if !split.is_empty() {
+                                what += &format!(" split {split:?}");
+                            }
+                            println!("  save {}:{what}", f.label)
+                        }
                         Need::Nothing if cleans => println!("  save {}: clean", f.label),
                         Need::Nothing => {}
                     }
@@ -180,9 +195,15 @@ fn main() {
             }
             apply::prune_cache(&cache, &m.release);
             for (f, clean) in &save_jobs {
-                let done =
-                    saves::apply(f, &steps, clean.as_ref().map(|(o, c)| (o, *c)), &saves::backup_dir(), &m.release)
-                        .unwrap_or_else(|e| fail(format!("{}: {e}", f.label)));
+                let done = saves::apply(
+                    f,
+                    &steps,
+                    clean.as_ref().map(|(o, c)| (o, *c)),
+                    &saves::backup_dir(),
+                    &m.release,
+                    fmt.as_deref(),
+                )
+                .unwrap_or_else(|e| fail(format!("{}: {e}", f.label)));
                 let backup = done.backup.map(|b| b.display().to_string()).unwrap_or_default();
                 println!("save {}: {} change(s), backup {backup}", f.label, done.counts.total());
             }

@@ -275,6 +275,11 @@ msgstr "無法讀取 {}（{}）"
 
 #. placeholders: {} in order, {0} {1} by position
 #: core/src/saves.rs
+msgid "character {}: the mod's save file is damaged or from a newer release"
+msgstr "角色 {}：模組的存檔檔案已損壞，或來自更新的版本"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/saves.rs
 msgid "character {} holds another tool's data where the mod keeps its own"
 msgstr "角色 {} 在模組存放資料的位置有其他工具的資料"
 
@@ -547,6 +552,11 @@ msgstr "{}：已轉換為此版本的 ID，並清理被移除魔物的裝備"
 
 #. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+msgid "{}: what the mod adds moves into its own save file, MHGU's keeps the rest"
+msgstr "{}：模組新增的內容移入它自己的存檔檔案，MHGU 的存檔保留其餘內容"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
 msgid "{} cannot be migrated: {}"
 msgstr "無法遷移 {}：{}"
 
@@ -656,8 +666,8 @@ msgid "Updating the save {}"
 msgstr "正在更新存檔 {}"
 
 #: gui/src/main.rs
-msgid "The mod was removed."
-msgstr "模組已移除。"
+msgid "The mod was removed. Your saves keep its own files (mhgu_de_1.bin …) beside MHGU's, for a reinstall."
+msgstr "模組已移除。你的存檔保留它自己的檔案（mhgu_de_1.bin …），位於 MHGU 的存檔旁，可供重新安裝。"
 
 #. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
