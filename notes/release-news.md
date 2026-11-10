@@ -4,6 +4,14 @@ tools/release.py puts the section of the core version being packaged into the re
 groups, **New** (something added) and **Fixed** (what works now, not what was broken), one short plain line each,
 written for players; write the section before `release.py package`.
 
+## v2.2.0
+**New**
+- Harvest Tours on Heaven's Mount: MH4U's three tours (Village ★8, Hub ★5, G★3), with MH4U's intruders. On the Hub
+  ★5 tour the intruder is rolled when the quest is accepted, as in MH4U: Rathalos, Deviljho or, rarely, Savage
+  Deviljho; everyone who joins meets the same one.
+- The installer has a Harvest Tours card: tick it to get every map with tours, even without its monster. A monster
+  that needs one of those maps brings its tours too.
+
 ## v2.1.0
 **New**
 - The ported monsters have Chinese names in MHGU's two Chinese languages (Traditional and Simplified). They were in

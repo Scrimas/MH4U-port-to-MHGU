@@ -4,8 +4,9 @@
 name = "heavens_mount"
 kind = "map"
 title = "Heaven's Mount"
-version = "1.0.1"          # bump on every published change of this map's files. 1.0.1: the gathering lists in
-                           # GU item IDs (1.0.0 copied 4U's IDs: wrong items; tools/items_heavens_mount.py)
+version = "1.1.0"          # bump on every published change of this map's files. 1.1.0: its Harvest Tours
+                           # (core 2.2.0 lists them; an older core leaves the files unused); 1.0.1: the gathering
+                           # lists in GU item IDs (1.0.0 copied 4U's IDs: wrong items; tools/items_heavens_mount.py)
 requires_core = "2.0.0"    # oldest core that knows map packages (module/port.c port_installed: a monster whose
                            # map is missing counts as not installed)
 gu_stage = 24              # the GU stage it is an alias of (the Ruined Pinnacle): = allocations.toml

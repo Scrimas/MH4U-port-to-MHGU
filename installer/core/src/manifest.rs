@@ -17,6 +17,10 @@ pub enum Kind {
     Monster,
     /// A ported arena, installed with the monsters that require it.
     Map,
+    /// A package the player ticks like a monster, with no files of its own: what it brings is its `requires` (the
+    /// Harvest Tours: every map with tours). Shown after the monsters, without its maps under it. An installer that
+    /// does not know the kind reads it as Utility, installed only when something requires it: nothing does.
+    Bundle,
     /// Any other package a monster requires (shared utilities, later): installed like a map.
     #[serde(other)]
     Utility,
@@ -176,7 +180,7 @@ impl Manifest {
             }
             for r in &p.requires {
                 match self.package(r) {
-                    Some(q) if q.kind != Kind::Core && q.kind != Kind::Monster => {}
+                    Some(q) if !matches!(q.kind, Kind::Core | Kind::Monster | Kind::Bundle) => {}
                     _ => return err(trf("{} requires {}", &[&p.name, r])),
                 }
             }
@@ -204,6 +208,11 @@ impl Manifest {
         self.packages.iter().filter(|p| p.kind == Kind::Monster)
     }
 
+    /// What the player ticks: the monsters, then the bundles.
+    pub fn tickable(&self) -> impl Iterator<Item = &Package> {
+        self.monsters().chain(self.packages.iter().filter(|p| p.kind == Kind::Bundle))
+    }
+
     /// Every package that `wanted` (monster names) needs, the core first, then the dependencies before what needs
     /// them; unknown names are left out.
     pub fn closure(&self, wanted: &BTreeSet<String>) -> Vec<String> {
@@ -218,15 +227,15 @@ impl Manifest {
             out.push(n.to_string());
         }
         let mut out = vec![self.core().name.clone()];
-        for p in self.monsters().filter(|p| wanted.contains(&p.name)) {
+        for p in self.tickable().filter(|p| wanted.contains(&p.name)) {
             add(self, &p.name, &mut out);
         }
         out
     }
 
-    /// The monsters that require package `name` (a map: the monsters fought there), titles.
+    /// The ticked packages that require package `name` (a map: the monsters fought there, the Harvest Tours).
     pub fn needed_by(&self, name: &str) -> Vec<&Package> {
-        self.monsters().filter(|p| p.requires.iter().any(|r| r == name)).collect()
+        self.tickable().filter(|p| p.requires.iter().any(|r| r == name)).collect()
     }
 }
 
@@ -369,5 +378,32 @@ pub(crate) mod tests {
         assert_eq!(m.closure(&w(&[])), ["core"]);
         assert_eq!(m.closure(&w(&["dalamadur", "shah", "nobody"])), ["core", "speartip_crag", "dalamadur", "shah"]);
         assert_eq!(m.needed_by("speartip_crag").len(), 2);
+    }
+
+    #[test]
+    fn a_bundle_is_ticked_after_the_monsters_and_brings_its_maps() {
+        let mut m = sample();
+        m.packages.insert(1, pkg("harvest_tours", Kind::Bundle, &["speartip_crag", "battlequarters"], &[]));
+        m.validate().unwrap();
+        let w = |n: &[&str]| n.iter().map(|s| s.to_string()).collect::<BTreeSet<_>>();
+        assert_eq!(m.tickable().last().unwrap().name, "harvest_tours");
+        assert_eq!(m.monsters().count(), 4, "a bundle is no monster");
+        assert_eq!(m.closure(&w(&["harvest_tours"])), ["core", "speartip_crag", "battlequarters", "harvest_tours"]);
+        assert_eq!(m.closure(&w(&["dalamadur", "harvest_tours"])),
+                   ["core", "speartip_crag", "dalamadur", "battlequarters", "harvest_tours"]);
+        assert_eq!(m.needed_by("battlequarters").len(), 2, "gogmazios and the bundle");
+        m.packages[2].requires = vec!["harvest_tours".into()];
+        assert!(m.validate().is_err(), "a bundle is not a requirement");
+        // an installer that does not know the kind: a dependency package nothing requires, so never installed
+        let json = serde_json::to_string(&sample_with_bundle()).unwrap().replace("\"kind\":\"bundle\"", "\"kind\":\"later\"");
+        let old = Manifest::parse(json.as_bytes()).unwrap();
+        assert_eq!(old.package("harvest_tours").unwrap().kind, Kind::Utility);
+        assert!(!old.closure(&w(&["gogmazios"])).contains(&"harvest_tours".to_string()));
+    }
+
+    fn sample_with_bundle() -> Manifest {
+        let mut m = sample();
+        m.packages.push(pkg("harvest_tours", Kind::Bundle, &["battlequarters"], &[]));
+        m
     }
 }

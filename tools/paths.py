@@ -75,9 +75,19 @@ def map_romfs(name):
     return os.path.join(map_dir(name), 'romfs')
 
 
+BUNDLES = os.path.join(ROOT, 'bundles')
+
+
+def bundles():
+    """bundle package names (bundles/<name>/package.toml: no files, `requires` only, the installer's Harvest Tours)"""
+    return sorted(os.path.basename(os.path.dirname(p)) for p in glob.glob(os.path.join(BUNDLES, '*', 'package.toml')))
+
+
 def package_dir(name):
-    """the folder of any package: maps/<name> for a map, else monsters/<package of name>"""
-    return map_dir(name) if os.path.exists(os.path.join(map_dir(name), 'package.toml')) else monster(name)
+    """the folder of any package: maps/<name> for a map, bundles/<name> for a bundle, else monsters/<package of name>"""
+    if os.path.exists(os.path.join(map_dir(name), 'package.toml')): return map_dir(name)
+    if os.path.exists(os.path.join(BUNDLES, name, 'package.toml')): return os.path.join(BUNDLES, name)
+    return monster(name)
 
 
 def package_toml(name):

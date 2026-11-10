@@ -1,0 +1,28 @@
+# Harvest Tours bundle: no files of its own. Ticked in the installer like a monster (the last card, its maps not
+# listed under it), it installs every map that has Harvest Tours (`requires`), and with each map its tours (they ship
+# in the map's package: a monster requiring that map brings them too). Battlequarters and Speartip Crag have none
+# (4U has no tour there). A new map with tours goes into `requires` (tools/alloc.py checks it).
+name = "harvest_tours"
+kind = "bundle"
+title = "Harvest Tours"
+version = "1.0.0"          # bump on every published change of `requires` or of its texts
+requires_core = "2.2.0"    # the core that lists a map's tours (module/quest.c, port_tours)
+requires = ["heavens_mount"]
+
+[titles]                   # the card's title per installer language: 4U's own word (its tours' titles), GU's in Chinese
+en = "Harvest Tours"
+fr = "Visites"
+de = "Erntetouren"
+it = "Tour"
+es = "Visitas"
+zh_TW = "採集之旅"
+zh_CN = "采集之旅"
+
+[subtitles]                # the card's second line per installer language
+en = "MH4U's Harvest Tours, on the maps that have them"
+fr = "Les visites de MH4U, sur les cartes qui en ont"
+de = "Die Erntetouren aus MH4U, auf den Karten, die welche haben"
+it = "I tour di MH4U, sulle mappe che li hanno"
+es = "Las visitas de MH4U, en los mapas que las tienen"
+zh_TW = "MH4U的採集之旅，在有採集之旅的地圖上"
+zh_CN = "MH4U的采集之旅，在有采集之旅的地图上"

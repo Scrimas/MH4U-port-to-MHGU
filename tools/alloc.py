@@ -309,6 +309,17 @@ def check_packages(reg=None):
             errs.append('maps/%s/package.toml: name = its folder, kind = "map" and a folder number' % mp)
         if mp not in used:
             errs.append('map %s is required by no monster' % mp)
+    toured = {e['name'] for e in globals()['maps'](reg) if e.get('quests')}
+    brought = set()
+    for b in paths.bundles():
+        t = paths.package_toml(b)
+        if t.get('name') != b or t.get('kind') != 'bundle' or not t.get('requires'):
+            errs.append('bundles/%s/package.toml: name = its folder, kind = "bundle" and requires' % b)
+        for r in t.get('requires', []):
+            if r not in maps: errs.append('bundle %s: requires %r, which is no map package' % (b, r))
+        brought |= set(t.get('requires', []))
+    if toured - brought:
+        errs.append('maps with Harvest Tours in no bundle (bundles/harvest_tours requires): %s' % sorted(toured - brought))
     return errs
 
 

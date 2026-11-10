@@ -24,7 +24,9 @@ A release is one mod folder, `MHGU Definitive Edition/`, loaded by the emulator 
 | `romfs/nativeNX/...` (arcs, textures, sounds) | `monsters/<name>/romfs/`, `maps/<map>/romfs/` | Converted 4U assets (layeredFS) |
 
 Release = `core-<v>.zip` (exefs + data files) + one optional zip per monster (its assets) + one per map (a ported
-arena, `map-<map>-<v>.zip`, needed by the monsters that `require` it), all merged into the same folder, with a
+arena, `map-<map>-<v>.zip`, needed by the monsters that `require` it, with its Harvest Tours) + one per bundle (an
+empty `bundle-<name>-<v>.zip`: the installer's Harvest Tours card, `bundles/<name>/package.toml`, which only
+`require`s the maps with tours), all merged into the same folder, with a
 `manifest.json` and `icons-<v>.zip` for the installer (notes/installer.md). A release's zips are one matched set:
 never mix versions.
 
@@ -45,7 +47,7 @@ module/               Core C module (the shared engine of the port):
   items.c                 items appended to GU's tables
   bgm.c icons.c notes.c   music, UI icons, Hunter's Notes
   save.c                  the mod's save store and per-quest leases of the save slots (notes/save-store.md)
-  stage_alias.c           maps 4U stages onto GU stage slots
+  stage_alias.c           maps 4U stages onto GU stage slots (port_stages: one per map package with a [stage])
   game.h util.c util.h    GU structures and helpers
   core.toml               core version and build config
   build.py                builds subsdk1 + IPS; `build.py install` installs into the Ryujinx mod folder
@@ -58,6 +60,7 @@ tools/                ~60 Python scripts (shared by every port):
                       sis.py (stage area info) mrl_build mrl_check mrl_anim (GU material lists from templates)
   sound               snd_bgm.py (BGM -> Opus + STQR) snd_area.py (area sounds)
   4U data readers     quest4u items4u weapons4u gear4u emdata4u notes4u extdata4u (DLC quests)
+  tour4u.py           a map's Harvest Tours from 4U's (maps/<map>/package.toml [[tour]], allocations.toml [[map]])
                       hagi4u (carve tables -> GU carve files) hsum4u (summarise a 4U action handler)
   enemy data          dt_convert dt_map dt_vote fieldmap: build GU dtbase / dtbparts / dttune from 4U records
   GU study            gu.py gu_enemy.py gu_schema.py guemu.py (runs GU loaders under unicorn) arctypes.py
@@ -80,7 +83,9 @@ monsters/<name>/      One port each: gogmazios, dalamadur, stygian_zinogre, tige
   module/               the monster's C code (class, actions, shells, effects, stage gimmicks),
                         compiled into subsdk1 with the core
   notes/                study notes, behaviour notes, port checklist, release notes
-maps/<map>/           One ported arena each: battlequarters (m28), speartip_crag (m29), heavens_mount (m30)
+maps/<map>/           One ported arena each: battlequarters (m28), speartip_crag (m29), heavens_mount (m30, with its
+                      Harvest Tours)
+bundles/<name>/       Installer packages with no files, only `requires`: harvest_tours (every map with tours)
   package.toml          kind "map", version, folder (= the monsters' stage_alias), [stage] (compiled into the core)
   build.py, tools/      its alias stage arcs, map UI, map_com, area streams (tools/steps.py)
   notes/                links to the study notes (kept with the port that made the arena)

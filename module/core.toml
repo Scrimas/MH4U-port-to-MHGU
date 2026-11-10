@@ -3,7 +3,11 @@
 # version (tools/release.py). Bump on every published change of the module or of any data file.
 name = "core"
 title = "MHGU Definitive Edition core"
-version = "2.1.0"          # 2.1.0: every ported text in GU's two Chinese languages too (data file format 2:
+version = "2.2.0"          # 2.2.0: Harvest Tours: a map's tours (allocations.toml [[map]], maps/<map>/
+                           #        package.toml [[tour]]) listed after their append_after monster, one quest per
+                           #        4U intruder outcome rolled at accept (online: the host's), the stage alias
+                           #        moved to the maps (port_stages); Heaven's Mount's 3 tours;
+                           # 2.1.0: every ported text in GU's two Chinese languages too (data file format 2:
                            #        7 languages, lang/zh_TW.toml, zh_CN.toml; 4U has none: English before), the
                            #        ported arenas' map UI in chT / chS (GU's copies of the English);
                            # 2.0.0: the mod is MHGU Definitive Edition (was MH4U Port: mod folder renamed, data

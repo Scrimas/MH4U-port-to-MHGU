@@ -101,9 +101,13 @@ def map_titles(p):
 
 def shown_names(p):
     """(titles, class, with) of a package for the manifest: its name, class (GU's) and the other named entries
-    (Shah Dalamadur), each {installer language: text}; a map has its quest-board names (map_titles)"""
+    (Shah Dalamadur), each {installer language: text}; a map has its quest-board names (map_titles); a bundle its
+    package.toml [titles], and [subtitles] as its class (the installer shows the class in its language as the card's
+    second line)"""
     if p.get('kind') == 'map':
         return map_titles(p), {}, []
+    if p.get('kind') == 'bundle':
+        return dict(p.get('titles', {'en': p['title']})), dict(p.get('subtitles', {})), []
     names = [n for n in (entry_names(m['name']) for m in p['entries']) if n]
     return names[0], gu_classes()[p['class']], names[1:]
 
@@ -131,12 +135,15 @@ def packages():
         out.append(dict(toml(os.path.join(paths.map_dir(mp), 'package.toml')), entries=[], alloc=None,
                         romfs=paths.map_romfs(mp), tours=[t['quest'] for t in ts],
                         boards=[t['quest'] for t in ts if t['quest'] == t['base']]))
+    for b in paths.bundles():               # bundles/<name>: no files (an empty zip), `requires` only
+        out.append(dict(paths.package_toml(b), entries=[], alloc=None, romfs=None))
     return out
 
 
 def zip_name(p):
-    """<monster>-<v>.zip, map-<map>-<v>.zip"""
-    return ('map-%s-%s.zip' if p.get('kind') == 'map' else '%s-%s.zip') % (p['name'], p['version'])
+    """<monster>-<v>.zip, map-<map>-<v>.zip, bundle-<bundle>-<v>.zip (empty)"""
+    return ({'map': 'map-%s-%s.zip', 'bundle': 'bundle-%s-%s.zip'}.get(p.get('kind'), '%s-%s.zip')) % (
+        p['name'], p['version'])
 
 
 def clean_env():
@@ -186,7 +193,7 @@ def check():
                 bad.append('%s: data file version %x != package.toml %s' % (e, hdr['version'], p['version']))
             if os.path.getmtime(data) < os.path.getmtime(os.path.join(paths.monster(e), 'package.toml')):
                 bad.append('%s: data file older than package.toml (repack)' % e)
-        if p.get('kind') != 'map' and all(os.path.exists(os.path.join(paths.gen(m['name']), m['name'] + '.bin'))
+        if p.get('kind') not in ('map', 'bundle') and all(os.path.exists(os.path.join(paths.gen(m['name']), m['name'] + '.bin'))
                                           for m in p['entries']):
             if p.get('class') not in gu_classes():
                 bad.append('%s: class %r is not one of GU\'s (%s)' % (name, p.get('class'), ', '.join(gu_classes())))
@@ -196,6 +203,12 @@ def check():
                     bad.append('%s: package.toml title %r, the game shows %r' % (name, p['title'], titles['en']))
                 if p.get('zh') and titles['zh_CN'] != p['zh'][p['entries'][0]['name']][1]:
                     bad.append('%s: data file has no Chinese name (rebuild its name step)' % name)
+        if p.get('kind') == 'bundle':        # no files: its requires are checked by tools/alloc.py
+            codes = {code for code, _ in SHOWN}
+            for key in ('titles', 'subtitles'):
+                if set(p.get(key, {})) != codes:
+                    bad.append('%s: package.toml [%s] needs %s' % (name, key, ', '.join(sorted(codes))))
+            continue
         if p.get('kind') == 'map':
             zh = [z for z in ('chT', 'chS') if not os.path.isdir(os.path.join(p['romfs'], 'nativeNX', z, 'arc', 'stage'))]
             if zh:
@@ -209,13 +222,15 @@ def check():
                 bad.append('RomFS path %s shipped by %s and %s' % (rel, owner[rel], name))
             owner[rel] = name
             m = re.search(r'questData_(\d{7})\.ext$', rel)
-            if m:                    # boss record +0x69 = HP row: test builds use rows 0..9 (5 % HP)
-                qd = open(os.path.join(rf, rel), 'rb').read()
+            if m:                    # boss record +5 = HP row: test builds use rows 0..9 (5 % HP); the first boss
+                qd = open(os.path.join(rf, rel), 'rb').read()   # used (a Harvest Tour's intruder sits in slot 2)
                 qid = int(m.group(1))
+                hp = next((qd[0x64 + 13 * k + 5] for k in range(5) if struct.unpack_from('<H', qd, 0x64 + 13 * k)[0]),
+                          qd[0x69])
                 if qid not in [q for m in p['entries'] for q in m.get('quests', [])] + p.get('tours', []):
                     bad.append('%s: quest %d is not in its allocations' % (name, qid))
-                if qd[0x69] < 10:
-                    bad.append('%s: quest %d has HP row %d (a test build?)' % (name, qid, qd[0x69]))
+                if hp < 10:
+                    bad.append('%s: quest %d has HP row %d (a test build?)' % (name, qid, hp))
     import translate
     for code, r in translate.check().items():
         if r['missing'] or r['stale']:
@@ -366,13 +381,16 @@ def manifest(rel, pre, c, pk, out, icons):
         if cls: more.update({'class': cls, 'with': also})
         if p.get('kind') == 'map':
             more['folder'] = p['folder']
+        elif p.get('kind') == 'bundle':
+            more['subtitle'] = p.get('subtitles', {}).get('en', '')
         else:
             more['entries'] = [m['name'] for m in p['entries']]
             if p['name'] in icons: more['icon'] = p['name'] + '.png'
         ps.append(pkg(p['name'], p.get('kind', 'monster'), p['title'], p['version'], zip_name(p), **more))
     return dict(schema=MANIFEST_SCHEMA, release=rel, prerelease=bool(pre), installer_min=INSTALLER_MIN,
                 title_id=TITLE_ID, mod_folder=MOD_NAME, icons='icons-%s.zip' % rel, packages=ps,
-                migrations=migrations(rel), cleaning={p['name']: cleaning(p) for p in pk if p.get('kind') != 'map'},
+                migrations=migrations(rel),
+                cleaning={p['name']: cleaning(p) for p in pk if p.get('kind') not in ('map', 'bundle')},
                 warnings=[w if isinstance(w, str) else w['en'] for w in c.get('warnings', [])],
                 warnings_i18n=[{'en': w} if isinstance(w, str) else w for w in c.get('warnings', [])])
 
@@ -393,9 +411,9 @@ def package(out, pre=None):
     core_zip = 'core-%s.zip' % c['version']
     write_zip(os.path.join(out, core_zip), [(MOD_NAME + '/' + a, s) for a, s in members])
     for p in pk:
-        rf = p['romfs']
+        rf = p['romfs']                     # None: a bundle, an empty zip
         mem = [(MOD_NAME + '/romfs/' + os.path.relpath(os.path.join(d, f), rf).replace(os.sep, '/'), os.path.join(d, f))
-               for d, _, fs in os.walk(rf) for f in fs]
+               for d, _, fs in (os.walk(rf) if rf else []) for f in fs]
         write_zip(os.path.join(out, zip_name(p)), mem)
     icons = write_icons(os.path.join(out, 'icons-%s.zip' % rel))
     with open(os.path.join(out, 'manifest.json'), 'w', encoding='utf-8') as f:

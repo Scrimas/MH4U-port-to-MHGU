@@ -105,16 +105,20 @@ def item_texts(body, lang):
 
 
 def quest_texts():
-    """[('quests', '<ID>.<field>', English)] of every shipped quest arc's English questData GMD"""
+    """[('quests', '<ID>.<field>', English)] of every shipped quest arc's English questData GMD (the monsters' and the
+    maps' Harvest Tours; a tour's variant carries its board quest's text and keys, tools/tour4u.py)"""
     sys.path.insert(0, paths.GU_PY)
-    import gmd
+    import alloc, gmd
     from arc import arc_entries, arc_read
+    variant = {t['quest'] for t in alloc.tours() if t['quest'] != t['base']}
     out = []
-    for p in sorted(glob.glob(os.path.join(ROOT, 'monsters', '*', 'romfs', 'nativeNX', 'loc', 'arc', 'quest', 'q*.arc'))):
+    for p in sorted(glob.glob(os.path.join(ROOT, 'monsters', '*', 'romfs', 'nativeNX', 'loc', 'arc', 'quest', 'q*.arc')) +
+                    glob.glob(os.path.join(ROOT, 'maps', '*', 'romfs', 'nativeNX', 'loc', 'arc', 'quest', 'q*.arc'))):
         d = open(p, 'rb').read()
         for e in arc_entries(d):
             if e[0].startswith('eng\\quest\\questData\\questData_'):
                 qid = int(e[0].rsplit('_', 2)[-2])
+                if qid in variant: continue
                 for f, en in zip(QUEST_FIELDS, gmd.gmd_strings(arc_read(d, e))):
                     if en: out.append(('quests', '%d.%s' % (qid, f), en))
     return out

@@ -217,8 +217,9 @@ pairs where possible (tools/dt_vote.py, dt_map.py, snd4u2gu.py selftest), then a
 - Quest: tools/build_gog_quest.py (G-rank Hub extra quest 11491 via the quest_group_fix / quest_unlocked hooks).
   Copy it for a new quest ID and boss.
 - Arena: if GU lacks it, it becomes a map package `maps/<map>/` (copy `maps/speartip_crag/`): `package.toml` with
-  `kind = "map"`, `folder` = the monster's allocations.toml `stage_alias[1]` and the `[stage]` table the core
-  compiles in (module/build.py stage_alias), a `build.py` with the alias steps, and `requires = ["<map>"]` in the
+  `kind = "map"`, `gu_stage` / `folder` = the monster's allocations.toml `stage_alias` and the `[stage]` table the
+  core compiles into port_stages (module/build.py stage_alias_of; module/stage_alias.c), a `build.py` with the alias
+  steps, and `requires = ["<map>"]` in the
   monster's `package.toml` (checked by tools/alloc.py). Several monsters may require one map: the installer adds it
   with the first monster that needs it and removes it with the last, and the core counts a monster whose map is
   missing as not installed (module/port.c port_installed). Then follow notes/stage.md (alias build, collision, SIS,
@@ -229,6 +230,18 @@ pairs where possible (tools/dt_vote.py, dt_map.py, snd4u2gu.py selftest), then a
   section 7).
 - Map UI: tools/mapui4u2gu.py (area maps + whole map, transforms in its docstring); maps/speartip_crag/tools/
   build_speartip_ui.py.
+- Gathering: a map's item lists (rItemPopList IPL Low / High / G) name items by ID: convert them to GU IDs, never copy
+  4U's (Heaven's Mount shipped 4U's IDs up to 1.0.0: wrong items). By English name, the earlier ports' substitutes,
+  and the closest GU item for a 4U-only one (no item is added for a map; maps/heavens_mount/tools/
+  items_heavens_mount.py, build_heavens_mount.py gu_ipl).
+- Harvest Tours: if 4U has tours on the map, they belong to the map package (a monster requiring the map brings
+  them, and so does the installer's Harvest Tours bundle, bundles/harvest_tours: add the map to its `requires`).
+  Stars: the MHGU precedent of the closest GU map (ask the maintainer); IDs in allocations.toml `[[map]]` (quests,
+  append_after); `[[tour]]` in the map's package.toml (from_4u, template = GU's own tour of that board and rank,
+  variants + 4U weights when 4U's intruder list has several entries); `python3 tools/tour4u.py <map>` builds them
+  (a map build.py step). The core lists them after append_after's quests, rolls a tour's intruder outcome at accept
+  (the host's, so online players share it), keeps the variants off the boards and writes their clear to the board's
+  tour (module/quest.c).
 
 ### Phase 5b: content (save, items, gear, Notes, quests)
 Order that worked: save slot -> materials -> carves / rewards -> second quest + subquests -> armor data on a GU

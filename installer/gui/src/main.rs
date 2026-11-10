@@ -412,7 +412,7 @@ fn refresh(app: &mut App, ui: &AppWindow) {
         monogram: "C".into(),
         progress: row_progress(app, &core.name),
     });
-    for p in m.monsters() {
+    for p in m.tickable() {
         let (v, tone, removed) = status(app, &p.name, &p.version);
         let mut sub =
             if removed { tr("Will be removed · take off its gear in game first") } else { p.shown_subtitle() };
@@ -437,7 +437,7 @@ fn refresh(app: &mut App, ui: &AppWindow) {
             monogram: monogram(&p.title).into(),
             progress: row_progress(app, &p.name),
         });
-        for r in &p.requires {
+        for r in p.requires.iter().filter(|_| p.kind != Kind::Bundle) {   // a bundle's card lists no maps
             let Some(d) = m.package(r) else { continue };
             if !shown.insert(r.clone()) {
                 continue;
@@ -1067,10 +1067,13 @@ fn main() {
             let mut k = 0;
             let mut shown = BTreeSet::new();
             let mut hit = None;
-            for p in m.monsters() {
+            for p in m.tickable() {
                 k += 1;
                 if k == i as usize {
                     hit = Some(p.name.clone());
+                }
+                if p.kind == Kind::Bundle {
+                    continue;
                 }
                 k += p.requires.iter().filter(|r| m.package(r).is_some() && shown.insert(r.to_string())).count();
             }
