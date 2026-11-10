@@ -14,7 +14,11 @@ again, with the saves of those places migrated and cleaned. Decisions are the ma
   `MHGU Definitive Edition` folder, so extracting by hand keeps working.
 - `manifest.json` schema 1 (`installer/core/src/manifest.rs`): the release, `prerelease`, `installer_min`, every
   package (name, kind core / monster / map, title, subtitle, version, requires, zip, size, sha256, every file with
-  size and sha256; a monster's entries and icon, a map's folder), `migrations` (migrations.toml), `cleaning` (per
+  size and sha256; a monster's entries and icon, a map's folder; from 2.1.0 `titles`, `class` and `with`: its name,
+  GU's class name and the package's other monsters per installer language, as the game shows them (data file NAME,
+  GU's monsterName; a map: its quest-board name, 4U's mapName and lang/zh_*.toml [maps]), English where one is
+  missing; older installers show `title` and the English `subtitle`), `warnings_i18n` (the warnings per language;
+  core.toml `warnings` entries are strings or {en = ..., fr = ...} tables), `migrations` (migrations.toml), `cleaning` (per
   monster package: its item ranges, armor series and weapons), `warnings`. A newer schema asks for a newer installer.
 - Pre-releases: `release.py package --pre N` = `<core>-pre.N`, published as a GitHub pre-release; the installer offers
   them only when its Settings switch is on (with a warning). A release is published marked Latest.

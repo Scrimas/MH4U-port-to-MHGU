@@ -32,7 +32,8 @@ sys.path.insert(0, paths.GU_PY)
 import arcpack
 
 LANGS = ['eng', 'fre', 'ger', 'ita', 'spa']
-QLANGS = LANGS + ['chT', 'chS']     # quest text languages of v1.4 (questData refs + arc GMDs); 4U has no Chinese: English
+QLANGS = LANGS + ['chT', 'chS']     # quest text languages of v1.4 (questData refs + arc GMDs); 4U has no Chinese:
+                                    # lang/zh_TW.toml / zh_CN.toml [quests] (tools/translate.py), else English
 QD_SIZE = 369                      # v1.4 questData (the templates come from the v1.4 RomFS)
 LANG4U = {'eng': 0, 'fre': 1, 'spa': 2, 'ger': 3, 'ita': 4}    # order of a 4U quest's language tables (+0xBC)
 T_SET, T_ESL, T_REM, T_SUPP, T_PLUS, T_LINK, T_GMD, T_QD = (
@@ -200,11 +201,17 @@ def quest_gmds(tpl, tpl_id, sid, t4):
         d = tpl['%s\\quest\\questData\\questData_%07d_%s' % (lang, tpl_id, lang)][1]
         name, strs, unk = gmd_unpack(d)
         assert gmd(name, [s.decode('utf-8') for s in strs], unk) == d, lang
-    gmds = {}
+    import translate
+    gmds, missing = {}, []
     for lang in QLANGS:
         title, obj, fail, desc, other, client, sub = t4[lang if lang in LANGS else 'eng']
+        strs = [title, client, desc, other, obj, fail, sub]       # translate.QUEST_FIELDS order
+        if lang not in LANGS:
+            strs = [translate.game_text(lang, 'quests', '%d.%s' % (int(sid), f), s, missing) if s else s
+                    for f, s in zip(translate.QUEST_FIELDS, strs)]
         unk = gmd_unpack(tpl['%s\\quest\\questData\\questData_%07d_%s' % (lang, tpl_id, lang)][1])[2]
-        gmds[lang] = gmd('questData_' + sid, [title, client, desc, other, obj, fail, sub], unk)
+        gmds[lang] = gmd('questData_' + sid, strs, unk)
+    if missing: print('quest %s: %d strings without a translation (English shown; tools/translate.py check)' % (sid, len(missing)))
     return gmds
 
 

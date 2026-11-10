@@ -2,8 +2,9 @@
 name = "monoblos"
 kind = "monster"
 title = "Monoblos"
-subtitle = "Flying Wyvern"
-version = "1.0.0"       # bump on every published change of this monster's files (data, assets or code); 1.0.0:
+class = "Flying Wyvern"    # its class, GU's name (monsterName 253..267): the installer's subtitle in every language
+version = "1.0.1"       # bump on every published change of this monster's files (data, assets or code); 1.0.1:
+                        # its Chinese text (lang/zh_TW.toml, zh_CN.toml; core 2.1.0); 1.0.0:
                         # first release (core 1.9.0); 0.4.9:
                         # every turn of his (unaware, engaged, enraged) is the quick turn, the maintainer confirmed after
                         # viewing 4U footage (4U's code: the slow one; a deviation); 0.4.8:

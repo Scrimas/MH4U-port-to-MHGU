@@ -103,6 +103,7 @@ pub fn system() -> usize {
 pub fn set(i: usize) {
     mhgu_de_core::i18n::set_lookup(lookup);
     let i = i.min(LANGS.len() - 1);
+    mhgu_de_core::i18n::set_lang(LANGS[i].0);
     if let Ok(mut c) = CATALOG.write() {
         *c = Some(parse(PO[i]));
     }

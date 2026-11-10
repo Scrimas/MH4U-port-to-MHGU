@@ -45,6 +45,7 @@ MAP_ROMFS = paths.map_romfs('battlequarters')
 MAPCOM = os.path.join(MAP_ROMFS, 'nativeNX/loc/arc/stage/map_com/m28.arc')   # stage4u2gu.py alias output
 OUT = os.environ.get('UI_OUT', os.path.join(MAP_ROMFS, 'nativeNX'))
 LANGS = ('eng', 'fre', 'ger', 'ita', 'spa')
+ZH = ('chT', 'chS')                     # GU's Chinese map arcs are byte copies of its English ones (all 226 of v1.4)
 AREAS = ((0, 0), (1, 1), (2, 3))        # alias area -> 4U m19 area (stage4u2gu.py alias: 0 -> 0, 1 -> 1, 3 -> 2)
 STAGE4U = 19
 MAPTAB4U = 0xeebe0c                     # 0x5a5f40 literal: 0x18-byte entries per 4U stage, +0xc = record array
@@ -383,6 +384,23 @@ def wholemap(preview=None):
 
 # ---------------------------------------------------------------- build
 
+def zh_copies(romfs, folder):
+    """the English mapUI/m<folder>d/*.arc and map_com/m<folder>_eng.arc under romfs copied to chT / chS, as GU ships
+    its own (a Chinese game finds no area map of the stage otherwise)"""
+    import shutil
+    n = 0
+    for sub, pat in (('mapUI/m%02dd' % folder, '_ui_eng.arc'), ('map_com', 'm%02d_eng.arc' % folder)):
+        src = os.path.join(romfs, 'nativeNX', 'eng', 'arc', 'stage', sub)
+        for f in sorted(os.listdir(src)):
+            if not f.endswith(pat): continue
+            for z in ZH:
+                dst = os.path.join(romfs, 'nativeNX', z, 'arc', 'stage', sub, f[:-len('eng.arc')] + z + '.arc')
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
+                shutil.copyfile(os.path.join(src, f), dst)
+                n += 1
+    print('copied %d English map arcs of m%02d to %s' % (n, folder, ' / '.join(ZH)))
+
+
 def blank_like(t):
     h = tex.parse(t)
     img = np.zeros((h['height'], h['width'], 4), np.uint8)
@@ -436,6 +454,7 @@ def main(preview=None):
             open(dst_path, 'wb').write(arcpack.build(out))
     print('wrote', os.path.join(OUT, '<lang>/arc/stage/mapUI/m28d/a0N_ui_<lang>.arc'), 'for', ' '.join(LANGS))
     wholemap(preview)
+    zh_copies(os.path.dirname(OUT), 28)
 
 
 if __name__ == '__main__':

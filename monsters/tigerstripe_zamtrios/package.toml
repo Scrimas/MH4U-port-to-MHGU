@@ -2,8 +2,9 @@
 name = "tigerstripe_zamtrios"
 kind = "monster"
 title = "Tigerstripe Zamtrios"
-subtitle = "Amphibian"
-version = "1.1.4"       # bump on every published change of this monster's files (data, assets or code)
+class = "Amphibian"        # its class, GU's name (monsterName 253..267): the installer's subtitle in every language
+version = "1.1.5"       # bump on every published change of this monster's files (data, assets or code); 1.1.5:
+                        # its Chinese text (lang/zh_TW.toml, zh_CN.toml; core 2.1.0)
 requires_core = "1.6.0"    # oldest core module (exefs) that runs this version: its quest's board icon (byte 202)
                            # is the core's own atlas
 requires = []              # packages it needs besides the core (maps/<name>; later shared utilities)

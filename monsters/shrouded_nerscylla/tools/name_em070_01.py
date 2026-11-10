@@ -6,6 +6,7 @@ monsterName_<lang>.gmd entry k = registry index k, but entry 137 already starts 
 an unused 'dummyN' entry, which module/items.c renames in the loaded GMD and the name_index hook returns for index 147 (and for a
 save slot she leases, module/save.c). Hers is the second list's dummy6, entry 226 (a string past GU's 268 would not do: the Notes
 detail page reads the entry as a byte, 0x5b2298, C). Names = 4U emName[96] per language.
+Chinese (chT, chS): lang/zh_TW.toml / zh_CN.toml [monsters], added by portdata.pack (4U has none).
 """
 import os, sys
 
@@ -32,9 +33,7 @@ def main():
         n = msg4u(lang)['emName'][EM4U]
         assert n and '\0' not in n and '\n' not in n, (lang, n)
         names.append(n)
-    sec = portdata.Section('NAME')
-    sec.u32(entry)
-    for n in names: sec.str(n)
+    sec = portdata.name_section(NAME, entry, names, rom)
     print('wrote', portdata.write_section(NAME, sec, 'ui'), '(name entry %d = %s)' % (entry, ' / '.join(names)))
 
 

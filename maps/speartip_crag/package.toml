@@ -9,6 +9,7 @@ requires_core = "2.0.0"    # oldest core that knows map packages (module/port.c 
                            # map is missing counts as not installed)
 folder = 29                # its RomFS stage folder m29 = allocations.toml stage_alias[1] of every monster
                            # requiring it (tools/alloc.py checks it)
+stage_4u = 8               # 4U stage m08: its quest-board name per language is 4U's mapName[8] (the installer's title)
 
 [stage]                    # Speartip Crag as an alias of the Sanctuary (allocations.toml stage_alias,
                            # module/stage_alias.c)

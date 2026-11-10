@@ -3,13 +3,26 @@
 //! `tr("...")` / `trf("...", ...)` of core/src and gui/src.
 
 use std::fmt::Display;
-use std::sync::OnceLock;
+use std::sync::{OnceLock, RwLock};
 
 static LOOKUP: OnceLock<fn(&str) -> Option<String>> = OnceLock::new();
+static LANG: RwLock<String> = RwLock::new(String::new());
 
 /// Set once by the window, before any message is made.
 pub fn set_lookup(f: fn(&str) -> Option<String>) {
     let _ = LOOKUP.set(f);
+}
+
+/// The window's language (a gui/src/i18n.rs LANGS code), for the names the manifest carries per language.
+pub fn set_lang(code: &str) {
+    if let Ok(mut l) = LANG.write() {
+        *l = code.to_string();
+    }
+}
+
+/// The window's language code, "en" until the window sets one (the command line, tests).
+pub fn lang() -> String {
+    LANG.read().ok().filter(|l| !l.is_empty()).map_or_else(|| "en".to_string(), |l| l.clone())
 }
 
 /// The translation of `s`, else `s`.

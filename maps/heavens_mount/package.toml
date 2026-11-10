@@ -9,6 +9,7 @@ requires_core = "2.0.0"    # oldest core that knows map packages (module/port.c 
                            # map is missing counts as not installed)
 folder = 30                # its RomFS stage folder m30 = allocations.toml stage_alias[1] of every monster
                            # requiring it (tools/alloc.py checks it)
+stage_4u = 5               # 4U stage m05: its quest-board name per language is 4U's mapName[5] (the installer's title)
 
 [stage]                    # Heaven's Mount (4U m05) as an alias of the Ruined Pinnacle (allocations.toml stage_alias,
                            # module/stage_alias.c; tools/build_heavens_mount.py)

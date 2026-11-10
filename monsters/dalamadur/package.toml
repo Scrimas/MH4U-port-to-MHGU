@@ -4,8 +4,9 @@
 name = "dalamadur"
 kind = "monster"
 title = "Dalamadur"
-subtitle = "Elder Dragon, with Shah Dalamadur"
-version = "1.0.5"       # bump on every published change of this package's files (data, assets or code)
+class = "Elder Dragon"     # its class, GU's name (monsterName 253..267): the installer's subtitle in every language
+version = "1.0.6"       # bump on every published change of this package's files (data, assets or code); 1.0.6:
+                        # its Chinese text (lang/zh_TW.toml, zh_CN.toml; core 2.1.0)
 requires_core = "1.6.0"    # oldest core module (exefs) that runs this version: its quests' board icon (byte 200)
                            # is the core's own atlas
 requires = ["speartip_crag"]  # packages it needs besides the core (maps/<name>; later shared utilities)

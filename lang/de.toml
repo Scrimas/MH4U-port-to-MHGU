@@ -1,0 +1,7 @@
+# German: the maps' full names (unused for now: the installer and the game show 4U's quest-board names, which
+# the build reads from 4U). Every other German text of the mod comes from 4U itself (tools/translate.py).
+
+[maps]                     # full names: 4U's own text (= its board names; kiranico.com/de/mh4u/karte)
+battlequarters = { full = "Fallengründe" }
+heavens_mount = { full = "Himmelsberg" }
+speartip_crag = { full = "Lanzenfels" }

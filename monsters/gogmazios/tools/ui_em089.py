@@ -90,9 +90,7 @@ def main():
     for lang in LANGS:
         s0 = gmd.gmd_strings(rom.read('/nativeNX/%s/GUI/06_msg/monsterName_%s.gmd' % (lang, lang)))
         assert s0[NAME_ENTRY] == 'dummy1', (lang, s0[NAME_ENTRY])
-    sec = portdata.Section('NAME')
-    sec.u32(NAME_ENTRY)
-    for lang in LANGS: sec.str(NAME)
+    sec = portdata.name_section('gogmazios', NAME_ENTRY, [NAME] * len(LANGS), rom)
     print('wrote', portdata.write_section('gogmazios', sec, 'ui'), '(name entry %d = %r)' % (NAME_ENTRY, NAME))
     if preview:
         atlas, x, y = gu_icon_cell(ICON_UI_INDEX)

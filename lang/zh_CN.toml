@@ -1,0 +1,21 @@
+# Simplified Chinese: the mod's own translation for GU's chS text (zh_CN), the text 4U cannot give (4U has no
+# Chinese). Keys are stable IDs, never the English they translate (tools/translate.py: the format, the worksheet,
+# the checks). Names carry their source: official = a Capcom Chinese release, community = fan usage; every other
+# string is this project's translation (unofficial), using GU's own chS terms.
+
+[monsters]                 # data file NAME, per allocations.toml entry
+black_gravios = "黑铠龙"   # chS official: MH Stories 3; chT its character form; GU Gravios = 鎧龍 / 铠龙
+dalamadur = "蛇王龙"       # community (4G fan name, monsterhunterwiki.org): no Chinese release names it
+shah_dalamadur = "蛇帝龙"  # community (monsterhunterwiki.org): no Chinese release names it
+gogmazios = "巨戟龙"       # official: MH Wilds title update 4 (2025-12-16)
+monoblos = "一角龙"        # official: MH Stories 2
+shrouded_nerscylla = "骸蜘蛛" # official: MH Stories 2
+stygian_zinogre = "狱狼龙" # official: MH World: Iceborne
+tidal_najarala = "水蛇龙"  # community (monsterhunterwiki.org): no Chinese release names it
+tigerstripe_zamtrios = "变形虎鲨" # community (monsterhunterwiki.org), GU's own Zamtrios pattern (冰鮫鯊 / 变形冰鲨)
+
+[maps]                     # board = the quest board's and the installer's name (4U has none in Chinese),
+                           # full = the full name; community (no Chinese release names them): 天空山 the 4G kanji; 千剑山 moegirl, 战斗街 baike.baidu.com
+battlequarters = { board = "战斗街", full = "战斗街" }
+heavens_mount = { board = "天空山", full = "天空山" }
+speartip_crag = { board = "千剑山", full = "千剑山" }

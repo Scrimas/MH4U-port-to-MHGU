@@ -88,14 +88,16 @@ fn later(f: impl FnOnce(&mut App, &AppWindow) + Send + 'static) {
     });
 }
 
+/// A size in the window's language: its unit words ("{} MB", "{} KB") and decimal separator (tr(".")).
 fn human(n: u64) -> String {
     let mb = n as f64 / 1_000_000.0;
+    let num = |s: String| s.replace('.', &tr("."));
     if mb >= 100.0 {
-        format!("{mb:.0} MB")
+        trf("{} MB", &[&format!("{mb:.0}")])
     } else if mb >= 1.0 {
-        format!("{mb:.1} MB")
+        trf("{} MB", &[&num(format!("{mb:.1}"))])
     } else {
-        format!("{} KB", (n / 1000).max(1))
+        trf("{} KB", &[&(n / 1000).max(1)])
     }
 }
 
@@ -120,7 +122,8 @@ fn monogram(title: &str) -> String {
     s.to_uppercase()
 }
 
-/// A package's name on screen: the core's is the window's own translated word, the others are names (monsters, maps).
+/// A package's name on screen: the core's is the window's own translated word, the others are names (monsters, maps:
+/// the manifest's, in the window's language).
 fn shown_title(kind: &Kind, title: &str) -> String {
     if matches!(kind, Kind::Core) { tr("Core") } else { title.to_string() }
 }
@@ -412,7 +415,7 @@ fn refresh(app: &mut App, ui: &AppWindow) {
     for p in m.monsters() {
         let (v, tone, removed) = status(app, &p.name, &p.version);
         let mut sub =
-            if removed { tr("Will be removed · take off its gear in game first") } else { p.subtitle.clone() };
+            if removed { tr("Will be removed · take off its gear in game first") } else { p.shown_subtitle() };
         let mut sub_tone = if removed { 2 } else { 0 };
         if app.busy && app.progress.package == p.name {
             sub = app.progress.text.clone();
@@ -420,7 +423,7 @@ fn refresh(app: &mut App, ui: &AppWindow) {
         }
         let icon = p.icon.as_ref().and_then(|_| app.icons.get(&p.name)).cloned();
         rows.push(PkgRow {
-            title: p.title.clone().into(),
+            title: p.shown_title().into(),
             sub: sub.into(),
             sub_tone,
             size: human(p.size).into(),
@@ -441,11 +444,11 @@ fn refresh(app: &mut App, ui: &AppWindow) {
             }
             let (v, tone, _) = status(app, &d.name, &d.version);
             let others: Vec<String> =
-                m.needed_by(r).into_iter().filter(|o| o.name != p.name).map(|o| o.title.clone()).collect();
+                m.needed_by(r).into_iter().filter(|o| o.name != p.name).map(|o| o.shown_title()).collect();
             let kind = if d.kind == Kind::Map { tr("map") } else { tr("shared files") };
             let sub = if others.is_empty() { kind } else { trf("{} · also for {}", &[&kind, &others.join(", ")]) };
             rows.push(PkgRow {
-                title: d.title.clone().into(),
+                title: d.shown_title().into(),
                 sub: if app.busy && app.progress.package == d.name {
                     app.progress.text.clone().into()
                 } else {
@@ -668,8 +671,8 @@ fn review(app: &mut App, ui: &AppWindow, remove_all: bool) {
     if !app.settings.warned_online {
         lines.push(line(tr("Online, everyone in the group needs the same release and the same monsters."), 0, false));
     }
-    for w in &m.warnings {
-        lines.push(line(w.clone(), 2, false));
+    for w in m.shown_warnings() {
+        lines.push(line(w, 2, false));
     }
     let running = places::running_emulators();
     if !running.is_empty() {
@@ -768,8 +771,10 @@ fn start_install(app: &mut App, ui: &AppWindow, remove_all: bool) {
                         b.0 = pkg.to_string();
                     }
                     let all = b.1 + done;
-                    let (pkg, title) =
-                        (pkg.to_string(), m.package(pkg).map_or_else(String::new, |p| shown_title(&p.kind, &p.title)));
+                    let (pkg, title) = (
+                        pkg.to_string(),
+                        m.package(pkg).map_or_else(String::new, |p| shown_title(&p.kind, &p.shown_title())),
+                    );
                     later(move |app, ui| {
                         app.progress = Progress {
                             package: pkg,

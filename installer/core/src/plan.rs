@@ -80,13 +80,13 @@ fn up_to_date(r: &Record, m: &Manifest, name: &str) -> bool {
 pub fn plan(m: &Manifest, wanted: &BTreeSet<String>, state: &State, remove_all: bool) -> PlacePlan {
     let keep = if remove_all { vec![] } else { m.closure(wanted) };
     let needed_by = |n: &str| -> Vec<String> {
-        m.needed_by(n).into_iter().filter(|p| wanted.contains(&p.name)).map(|p| p.title.clone()).collect()
+        m.needed_by(n).into_iter().filter(|p| wanted.contains(&p.name)).map(|p| p.shown_title()).collect()
     };
     let change = |n: &str, action: Action| {
         let p = m.package(n);
         Change {
             package: n.to_string(),
-            title: p.map_or_else(|| n.to_string(), |p| p.title.clone()),
+            title: p.map_or_else(|| n.to_string(), |p| p.shown_title()),
             kind: p.map_or(Kind::Utility, |p| p.kind),
             size: if matches!(action, Action::Remove { .. }) { 0 } else { p.map_or(0, |p| p.size) },
             version: p.map_or_else(String::new, |p| p.version.clone()),
