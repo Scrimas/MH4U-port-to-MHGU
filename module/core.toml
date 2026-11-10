@@ -3,7 +3,10 @@
 # version (tools/release.py). Bump on every published change of the module or of any data file.
 name = "core"
 title = "MHGU Definitive Edition core"
-version = "2.2.0"          # 2.2.0: Harvest Tours: a map's tours (allocations.toml [[map]], maps/<map>/
+version = "3.0.0"          # 3.0.0: the mod's own save files (notes/mod-save-format.md): everything added to a
+                           #        character moves from GU's save to mhgu_de_N.bin next to it (savefile.c,
+                           #        modsave.c); GU's save keeps vanilla data only;
+                           # 2.2.0: Harvest Tours: a map's tours (allocations.toml [[map]], maps/<map>/
                            #        package.toml [[tour]]) listed after their append_after monster, one quest per
                            #        4U intruder outcome rolled at accept (online: the host's), the stage alias
                            #        moved to the maps (port_stages); Heaven's Mount's 3 tours;
