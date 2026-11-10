@@ -2560,6 +2560,7 @@ name = "mhgu-de-installer"
 version = "2.1.0"
 dependencies = [
  "dirs",
+ "fontique",
  "image",
  "mhgu-de-core",
  "rfd",

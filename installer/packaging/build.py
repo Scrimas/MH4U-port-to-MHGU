@@ -17,8 +17,8 @@ Needs:
                     (squashfs-tools), APPIMAGE_RUNTIME=<the type 2 runtime-x86_64 file>
   arm64 AppImage    rustup target aarch64-unknown-linux-gnu + cargo-zigbuild + zig (zig needed unless this machine is
                     aarch64), mksquashfs, APPIMAGE_RUNTIME_ARM64=<the type 2 runtime-aarch64 file>; fontconfig is
-                    loaded at start (RUST_FONTCONFIG_DLOPEN: there is no aarch64 libfontconfig to link against when
-                    cross building), as Wayland and xkbcommon already are
+                    loaded at start (gui/Cargo.toml: fontique fontconfig-dlopen on aarch64 Linux, there is no
+                    aarch64 libfontconfig to link against when cross building), as Wayland and xkbcommon already are
 CI: .github/workflows/installer.yml, in an Arch Linux container like the editor's.
 """
 import hashlib, os, platform, shutil, subprocess, sys, tempfile, tomllib
@@ -69,14 +69,12 @@ def exe(ver, arch):
 
 def appimage(ver, arch):
     target = LINUX_TARGET[arch]
-    env = dict(os.environ, RUST_FONTCONFIG_DLOPEN='1') if arch == 'arm64' else None
     if has('zig') and subprocess.run(['cargo', 'zigbuild', '--help'], capture_output=True).returncode == 0:
-        run('cargo', 'zigbuild', '--release', '--locked', '-p', 'mhgu-de-installer', '--target', target + '.2.28',
-            env=env)
+        run('cargo', 'zigbuild', '--release', '--locked', '-p', 'mhgu-de-installer', '--target', target + '.2.28')
         binary = os.path.join(INST, 'target', target, 'release', 'mhgu-de-installer')
     elif arch == host_arch():
         print('   (cargo-zigbuild not found: linking against this machine\'s glibc)')
-        run('cargo', 'build', '--release', '--locked', '-p', 'mhgu-de-installer', env=env)
+        run('cargo', 'build', '--release', '--locked', '-p', 'mhgu-de-installer')
         binary = os.path.join(INST, 'target/release/mhgu-de-installer')
     else:
         sys.exit('the %s AppImage needs cargo-zigbuild and zig on this %s machine' % (arch, host_arch()))
