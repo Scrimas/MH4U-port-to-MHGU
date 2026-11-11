@@ -5,6 +5,8 @@ monsters/*/romfs/
 monsters/*/romfs-*/
 # generated tables holding 4U text / records (monsters/<name>/tools/*.py -> monsters/<name>/gen/)
 monsters/*/gen/
+# map packages (maps/<name>): their converted RomFS
+maps/*/romfs/
 # ported weapon classes: converted RomFS files and generated tables (weapons/<name>/tools -> romfs/, gen/)
 weapons/*/romfs/
 weapons/*/gen/

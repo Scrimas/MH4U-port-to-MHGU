@@ -2,7 +2,7 @@
 
   build.py            build into module/out/
   build.py install    also install into the Ryujinx mod folder: exefs/, every monster's data file
-                      (romfs/nativeNX/mh4uport/<name>.bin, always) and the monsters' assets (romfs/...); PORT_ASSETS =
+                      (romfs/nativeNX/mhgu_de/<name>.bin, always) and the monsters' assets (romfs/...); PORT_ASSETS =
                       comma-separated packages whose assets to install (default: all, "none" = none)
 
 Hooks: (name, main offset of the hooked instruction). The two instructions at the site
@@ -63,8 +63,10 @@ def main_ref(off):
     return '(__module_start - 0x%x)' % (MAIN_GAP - off) if off <= MAIN_GAP else '(__module_start + 0x%x)' % (off - MAIN_GAP)
 # install target: the test data dir by default (tools/ryutest.sh); GOG_MOD_ROOT=~/.config/Ryujinx/mods for the real one
 MOD_ROOT = os.path.expanduser(os.environ.get('GOG_MOD_ROOT', os.path.join(ROOT, 'ryuroot', 'mods')))
-MOD_NAME = 'MH4U Port'
+MOD_NAME = 'MHGU Definitive Edition'
 MOD_DIR = os.path.join(MOD_ROOT, 'contents', '0100770008dd8000', MOD_NAME)
+# the mod's folder before 2.0.0 (MH4U Port): removed by install(), or the emulator loads the module twice
+LEGACY_DIR = os.path.join(MOD_ROOT, 'contents', '0100770008dd8000', 'MH4U Port')
 
 HOOKS = [
     ('em_create', 0x4EBCC),    # monster factory (DTI table 0x1731e2c)
@@ -76,7 +78,15 @@ HOOKS = [
     ('stats_add', 0x3A75FC),   # quest-end tally: index from 0x50b64 (obj+0x114/0x116+index*8, no bound)
     ('stats_hunted', 0x3A3930),  # reads the same array (lost in a comment by 0815499, restored 2026-10-26)
     ('size_data', 0x6880C),    # em_size_scale_data cached (r0): the save slots' size records = the monsters' (main.c)
-    ('save_hunts', 0x523104),    # save hunts + captures by ID (bound 136): 0x59 -> its save slot 0x1064
+    ('save_hunts', 0x523104),    # save hunts + captures by ID (bound 136): 0x59 -> its save slot 0x1064 (save.c)
+    ('save_hunts_id', 0x526DD4),     # save hunts by ID (bound 136; 0x560418 and 5 more callers) (save.c)
+    ('save_captures_id', 0x526E44),  # save captures by ID (bound 136; the Hunter's Notes page's "captured") (save.c)
+    ('save_size_read', 0x526F48),    # save size record by ID, NO bound: a ported ID -> its slot or the store (save.c)
+    ('size_lookup', 0x67310),        # a size record's crown and cm by ID: a ported ID has no element of its own (save.c)
+    ('save_add_hunts', 0x526D94), ('save_add_captures', 0x526E00),  # quest-end writer 0x38d990 (one caller each): a
+    ('save_size_max', 0x526EB0), ('save_size_min', 0x526EF8),       # leased slot's numbers go to the store (save.c)
+    ('save_loaded', 0x3E77F0),   # after the character load 0x51dbb4 (caller 0x3e77b0): leases end, log (save.c)
+    ('save_writing', 0x3E7630),  # before the character save 0x51d0a0 (caller 0x3e75f8): log (save.c)
     ('set_action', 0x76154),   # enemy setAction(this, cat, num, mode): diagnostic log of em089 action changes
     ('set_target', 0xC6E14),   # enemy setTarget(this, kind, sub, param, slot): em089 arena points -> emd stage-19 table
     ('stage_path', 0x15339C),  # stage arc path builder: alias stage -> its folder while the quest runs (stage_alias.c)
@@ -85,17 +95,20 @@ HOOKS = [
     ('stage_name_list', 0x614840), ('stage_name_quest', 0x6149C8),  # stage-name index stores: the alias's name
     ('stage_name_board', 0x613410),                                 # for its quests (stage_alias.c)
     ('quest_group_fix', 0x3B7DE8),  # quest list loader step: placeholder 1011009 -> quest 11491 in memory
-    ('quest_unlocked', 0x3B2174),   # (_, id) -> 1 for quest 11491
+    ('quest_unlocked', 0x3B2194),   # in 0x3b2174(_, id), before its check call: 1 for our quests (MID_EXIT)
     ('quest_clear_fix', 0x388D40),  # results-scene clear write: rename the freshly loaded quest list first
     ('quest_group_append', 0x39BB6C),  # quest_group parser exit (r4 = the list): append the quest_append quests
     ('notes_unlock_check', 0x554DA4),  # Hunter's Notes unlock condition (talk action 6 / condition 44): log entry 123
+    ('notes_list_visible', 0x5B0BD4), ('notes_list_new', 0x5B0A44),      # Notes list screen: an entry past the save map
+    ('notes_new_clear', 0x5B0AD4), ('notes_em_unlocked', 0x524770),      # has no bit (notes.c; MID_EXIT below)
+    ('smithy_list', 0x6F9644),  # smithy list builder 0x6f9438's exit: ported entries by rarity, display only (gear.c)
+    ('gear_kire_slash', 0xF4724),  # LevelData slash getter (vt+0x80), the sharpness table's only reader: KIRX rows (gear.c)
     ('utf8_null_guard', 0x7CA340),  # (out, s, n) UTF-8 helper: s = NULL -> "" (abandon crash safety net, stage.c)
     ('stage_gimmicks', 0x50249C),   # stage gimmick shell spawner (Fortress st003/004/006/007/008): log only (stage.c)
     ('dmg_sub', 0x98AF4),      # diagnostic: enemy HP -= pending damage (main.c)
     ('dmg_special', 0x98AC4),  # diagnostic: damage diverted (0x8187c true), no HP subtraction
     ('set_hp', 0x9A764),       # diagnostic: enemy setHP(this, value)
     ('add_hp', 0x9A7B8),       # diagnostic: enemy addHP(this, delta)
-    ('dmg_recv', 0x9D6F8),     # diagnostic: monster damage receiver (monster, part, damage, kind)
     ('name_index', 0x55BDA4),  # (mgr, id) -> monsterName GMD entry (= 0x50b64(id)); 137 -> EM089_NAME_ENTRY
     ('bgm_select', 0x4E60D4),  # (ctl, boss entry, u8 *has, u32 *id): battle theme id -> a registered monster's (bgm.c)
     ('bgm_stqr', 0xB6D72C),    # (stqr, id) -> sequence: its bgm_ids looked up in its own STQR (bgm.c)
@@ -112,6 +125,7 @@ HOOKS = [
     ('em089_tar_dmg', 0x2F1C60), ('em089_tar_struggle', 0x2BBA74), ('em089_tar_mash', 0x2BBB00),
     ('em089_tar_webpost', 0x2826F4),  # em089_tarhunter.c: Gogmazios' tar on hunters on GU's web status
     ('em089_tar_shellpost', 0x44CDD0),  # em089_tarhunter.c: the player shell's post itself (vt+0x158)
+    ('em089_tar_hudicon', 0x634C60),  # em089_tarhunter.c: HUD status slot 2 before its cell store: web = 4U tar icon
     ('item_data_loaded', 0x19237C),  # rItemData load exit (r4 = this): Gogmazios materials in DUMMY items (items.c)
     ('item_text_loaded', 0xB83C48),  # rGUIMessage load exit (r4 = this): their names in itemData_<lang> (items.c)
     ('bui_record', 0x3A3874),  # (quest, em id) -> break reward record: em089's own for 0x59 (items.c)
@@ -136,6 +150,7 @@ HOOKS = [
     ('em057_01_atk', 0x7DC2C),     # GU attackEx: Stygian's attack indices in the GU handlers it keeps (em057_01_fix.c)
     ('em057_01_start', 0xEEFED0),  # uEm057_00 slot 129 action start: 4U's start work for variant 1 (em057_01_start.c)
     ('em057_01_glow', 0xEF3214),   # uEm057_00 slot 132 material charge glow (GU only): skipped for variant 1 (_fix.c)
+    ('em057_01_sndvar', 0xB1D1C),  # uFestaEnemy slot 282 sound-call condition getter: 4U's vars 30 / 100 (_fix.c)
     ('em057_01_efx', 0xF060C4),    # uEm057_00 slot 116 effect gateway: 4U Stygian's records for variant 1 (_efx.c)
     ('em057_01_pstance', 0xEF4484),  # mid hooks (return 0) at GU's pillar frame loops, whose posts GU removed: the 4U
     ('em057_01_pwalk1', 0xEF6450),   # posts for variant 1: charge stance 1/6.. (ef4280 step 1), charge walk 2/40 steps
@@ -144,6 +159,42 @@ HOOKS = [
     ('em057_01_volley1', 0xEFAA6C),  # at its frame-88 / frame-58 posts (GU posts no orb for variant 1): Stygian's orbs
     ('em057_01_volley2', 0xEFAAB4),  # (em057_01_posts.c, em057_01_shell046.c)
     ('em057_01_psl', 0x70028),     # uFestaEnemy slot 75 PSL post (uEm057_00's too): 4U's ground set for variant 1 (_efx.c)
+    ('em005_01_beam', 0xD2E3EC),   # uEm004_00 beam handler d2e0b4, step 1 every frame: 4U Black Gravios' heat burst
+                                   # (monsters/black_gravios/module/em005_01_beam.c)
+    ('em005_01_spit', 0xD2C734),   # uEm004_00 spit d2bd2c, step 1 every frame: 4U's gas puff at frame 150
+                                   # (monsters/black_gravios/module/em005_01_spit.c)
+    ('em005_01_laser', 0xD2DFE0),  # uEm004_00 7/57 / 7/71 d2da3c, before its frame-160 shell post: 4U's laser look
+                                   # em041_101 (monsters/black_gravios/module/em005_01_laser.c)
+    ('em005_01_act', 0xD31128),    # uEm004_00 slot 125 action dispatcher: Black Gravios (variant 1) action / motion
+                                   # log (monsters/black_gravios/module/em005_01_diag.c)
+    ('em005_01_pslgate', 0x70050), # uFestaEnemy slot 75 PSL post, after its request setup: Black Gravios' 4U effect
+                                   # records only under their 4U condition bit (monsters/black_gravios/module/em005_01_fx.c)
+    ('em005_01_objlog', 0x3A7ED8), # quest tally 0x3a75c8 after its objective loop: Black Gravios' objectives (log;
+                                   # em005_01_diag.c)
+    ('em005_01_eat_pre', 0xD27D58),   # uEm004_00 1/18 (d27c8c) around its 0x9cf7c(this, 1) call: Black Gravios'
+    ('em005_01_eat_post', 0xD27D64),  # 4U eating cost (em005_01_fx.c)
+    ('em007_01_act', 0xD35E58),    # uEm007_00 slot 125 action dispatcher: Monoblos (variant 1) action / motion log
+                                   # (monsters/monoblos/module/em007_01_diag.c)
+    ('em007_01_motion', 0xD38C0C), # uEm007_00 slot 130, every frame: his attacks tied to motions (em007_01_mv_j.c)
+    ('em007_01_parts', 0xD39FC8),  # uEm007_00 slot 132, every frame: GU's parts states, which skip variant 1: his mesh
+                                   # groups by his 4U rows (monsters/monoblos/module/em007_01_mat.c)
+    ('em068_01_act', 0xF8903C),    # uEm068_00 slot 125: Tidal Najarala (variant 1) log, 4U's 7/20 speed (monsters/tidal_najarala/module/em068_01.c)
+    ('em068_01_start', 0xF7CED8),  # uEm068_00 slot 129 action start: her water scales GU dropped
+    ('em068_01_fire', 0xF7D634),   # uEm068_00's scale request: her launches of 7/60 7/61 7/25
+    ('em068_01_blast', 0xF85944),  # 7/24's blast post: GU's variant-0 path for her (mid hooks, return 0)
+    ('em068_01_blast2', 0xF85AA4),
+    ('em068_01_rx', 0xA134C),      # the reaction runner: her reactions hold 60 frames longer, as 4U's tables
+    ('em068_01_drop', 0x41B1DC),   # EmBase36 when a scale's end time is out: her 3 % shiny drop
+    ('em068_01_psl', 0x700D4),     # uFestaEnemy slot 75 PSL post, its PEL u branch: her effects on the ground, her ground set (em068_01_fx.c)
+    ('em068_01_pslc', 0x70068),    # the same post, its PEL c branch: GU's common effects take her ground set (em068_01_fx.c)
+    ('em068_01_pair', 0xB0170),    # the pair motion start: a longer blend when her slither is cut short (em068_01.c)
+    ('em068_01_pair2', 0xB0230),   # the pair started again at a quadrant change, GU's blend 0: keeps that longer blend (em068_01.c)
+    ('em068_01_spit403', 0xF8672C),  # her spit f861b0, its start of 0x403 with blend 0: 8 frames (em068_01.c)
+    ('em070_01_act', 0xFAE550),    # uEm070_00 slot 125: Shrouded Nerscylla (variant 1) log (monsters/shrouded_nerscylla/module/em070_01.c)
+    ('em070_01_line', 0xF9F3EC),   # uEm070_00 slot 130's web line sound, GU's variant test: GU's variant-0 path for her (mid hooks, return 0)
+    ('em070_01_line2', 0xF9F534),
+    ('gear_listed_set', 0x524980), ('gear_listed_get', 0x5249F4),  # the smithy's armor "listed" save bits: a record past their 576 is kept in the mod's store (gear.c)
+    ('enemy_drop_log', 0xAC0EC),   # the item drop (shiny), entry: log only, ported monsters (port.c)
     ('dala_dmg_end', 0x98E44),     # enemy damage update 0x97ddc, after the rage add, before the reaction dispatcher
                                    # (r0 = this): Dalamadur tail rage -> head, shared reactions (dala_react.c)
     ('dala_heat_zone', 0x6A160),   # (mgr, area, pos) heat-aura zone test (Teostra only): 1 inside the Dalamadur
@@ -162,7 +213,8 @@ HOOKS = [
     ('icon_set', 0x56EF58),    # icon setter 0x56ef50 after its push: UI indexes 196.. = our atlas (icons.c)
     ('board_icon', 0x3A3178),  # (_, quest board byte) -> UI index + 1: bytes 200.. = our atlas (icons.c)
     ('board_byte', 0x6132E0),  # board loop before that call: no hyper badge for our bytes (icons.c)
-    ('tex_bind', 0xA4FAF0),    # sprite texture bind (sprite, ID): our icon sprites keep our atlas (icons.c)
+    ('tex_bind', 0xA4FB10),    # in sprite texture bind 0xa4faf0 (sprite, ID): our icon sprites keep our atlas
+                               # (icons.c, MID_EXIT)
     ('tex_entry', 0xB80FD0),   # .gui texture entry by ID: our IDs -> their entry copies (icons.c)
 ]
 # weapon / sharpness table load exits (gear.c GEAR_HOOK wrappers, out/gear_hooks.inc), "name 0xSITE", written by
@@ -173,6 +225,41 @@ if os.path.exists(_GEAR_HOOKS):
 # hooks whose C function always returns nonzero: the hooked function is replaced, its first two instructions
 # are never replayed (0x55bda4 is `mov r0, r1; b 0x50b64`: the branch cannot be displaced)
 REPLACE_HOOKS = {'name_index'}
+# mid-function hooks whose C function may return nonzero: the trampoline then jumps to this main offset (a point of
+# the same function, same stack frame) instead of returning to the caller. Third-party Forge plugins check the first
+# 0x20 bytes of the GU functions they hook against v1.4 (Key Quest Markers: 0x3b2174, 0xa4faf0; issue #10), so a hook
+# of ours on a function a plugin also hooks sits past those bytes.
+MID_EXIT = {
+    'quest_unlocked': 0x3B219C,  # ldrb r0, [sp, #7]: returns the result byte quest_unlocked_c wrote
+    'tex_bind': 0xA4FB34,        # pop {r4, pc}: the bind is skipped, the sprite keeps its texture
+    'notes_new_clear': 0x5B0AF4, # cmp r5, #7: the NEW mark of an entry past the save map is not written
+    'notes_em_unlocked': 0x524794,  # bx lr: returns the r0 notes_em_unlocked_c wrote
+    'em005_01_pslgate': 0x7016C, # mov r0, #0; return: the PSL slot posts nothing (GU's own no-post path)
+    'em005_01_laser': 0xD2DFE8,  # b 0xd2e03c: GU's laser shell not posted (4U's capsule instead, em005_01_shell016.c)
+}
+# GU code that third-party Forge plugins check against v1.4 before hooking it (each plugin's table of main address +
+# v1.4 bytes, read with tools/plugin_sigs.py); a plugin whose check fails installs nothing. main() refuses a hook
+# site, and the IPS writer any patched byte, inside these ranges. {main offset: bytes checked from it}
+PLUGIN_CHECKED = {
+    # Key Quest Markers r18 (issue #10): 0x20 bytes
+    **{f: 0x20 for f in (
+        0x3B1A18, 0x3B1D70, 0x3B2174, 0x3B57D0, 0x50CBD0, 0x523DA4, 0x540C08, 0x540C38, 0x5456E4, 0x546F28,
+        0x54AF8C, 0x54D030, 0x616CB0, 0x7AA47C, 0x7AEF68, 0xA38B58, 0xA38FFC, 0xA47950, 0xA47A04, 0xA47A94,
+        0xA47D2C, 0xA4844C, 0xA48668, 0xA494A0, 0xA4964C, 0xA4A9F4, 0xA4AA24, 0xA4AA5C, 0xA4AA94, 0xA4AAC8,
+        0xA4AAFC, 0xA4D0D8, 0xA4DC24, 0xA4DC54, 0xA4DCA0, 0xA4E0B8, 0xA4F60C, 0xA4F6A4, 0xA4F77C, 0xA4FA5C,
+        0xA4FAF0, 0xA4FB58, 0xA53324, 0xA53348, 0xA5350C, 0xA53528, 0xA53AA8, 0xA56AB8)},
+    # Damage Numbers r36 (issue #13): 0x40 bytes; 0x172E52C = main's build-id note
+    **{f: 0x40 for f in (
+        0x09978C, 0x09D6F8, 0x0A2664, 0x0AAC54, 0x16DC6C, 0x16DD7C, 0x170968, 0x178660, 0x276278, 0x285C6C,
+        0x2A87A8, 0x885844, 0xB8909C, 0xBC0B74, 0x172E52C)},
+}
+
+
+def plugin_checked(site, size):
+    """the PLUGIN_CHECKED function whose checked bytes [site, site + size) overlaps, or None"""
+    for f, n in PLUGIN_CHECKED.items():
+        if site < f + n and f < site + size: return f
+    return None
 
 # Registry relocation (notes/registry.md): module copies of the per-index tables with one entry per ported monster
 # (indexes 137.., allocations.toml), and the code that addresses them repointed.
@@ -211,6 +298,8 @@ NOTES_COUNT = 123 + sum('notes_entry' in m for m in alloc.monsters())
 # 0x55FF3C: entry 0, then pairs (i + 1, i + 2) until i == bound, so entries 0..bound and the bound must be even:
 # GU 123 entries -> 122; an even count -> the count (entries 0..count: the last is the padding record notes.c keeps)
 NOTES_PAIR_BOUND = NOTES_COUNT - NOTES_COUNT % 2
+# the two talk loops write and test the save map S+0x35b0 (128 bits, S+0x35c0 follows): entries past it have no bit
+NOTES_SAVE_COUNT = min(NOTES_COUNT, 128)
 
 
 def cmp_imm(word, imm):
@@ -223,8 +312,8 @@ WORD_PATCHES = [
     (0x50B94, 0xE3530089, cmp_imm(0xE3530089, REG_COUNT)),    # id -> index search: cmp r3, #137 -> #REG_COUNT
     (0x50C10, 0xE3510089, cmp_imm(0xE3510089, REG_COUNT)),    # index -> id search: cmp r1, #137 -> #REG_COUNT
     # Hunter's Notes list loops, 123 -> NOTES_COUNT entries (notes.c)
-    (0x24588C, 0xE354007B, cmp_imm(0xE354007B, NOTES_COUNT)),  # talk condition 44: an entry is due
-    (0x247B2C, 0xE354007B, cmp_imm(0xE354007B, NOTES_COUNT)),  # talk action 6: unlock every due entry
+    (0x24588C, 0xE354007B, cmp_imm(0xE354007B, NOTES_SAVE_COUNT)),  # talk condition 44: an entry is due
+    (0x247B2C, 0xE354007B, cmp_imm(0xE354007B, NOTES_SAVE_COUNT)),  # talk action 6: unlock every due entry
     (0x5246BC, 0xE352007B, cmp_imm(0xE352007B, NOTES_COUNT)),  # em ID -> unlocked? (unrolled by 2: an even count reads the padding)
     (0x524750, 0xE35C007B, cmp_imm(0xE35C007B, NOTES_COUNT)),  # em ID -> unlocked? (0x524728, same shape)
     (0x55FF3C, 0xE352007A, cmp_imm(0xE352007A, NOTES_PAIR_BOUND)),  # count by type (unrolled by two, see above)
@@ -233,19 +322,21 @@ WORD_PATCHES = [
 ]
 
 # Items appended past GU's 2991 (allocations.toml [monster.append] items; notes/items-append.md): the code that bounds
-# item IDs by the count is raised by the appended count, the per-item buffers grow with it, and the items-obtained
-# set / clear / test are replaced (items.c: IDs from 3008 use a reserved save block). Nothing changes without them.
+# item IDs by the count is raised by the appended count, the per-item heap buffer grows with it, the item box sort and
+# the items-obtained set / clear / test are replaced (items.c: IDs from 3008 use a reserved save block). Nothing
+# changes without them.
 ITEMS_APPENDED = alloc.item_count() - alloc.GU_ITEMS
 ITEM_BOUND_SITES = [            # movw rX, #0xbad / #0xbae / #0xbaf: `id - 1 <= 2989` checks and one loop over all IDs
     0x6F3DF8, 0x6F90F4, 0x6FA504, 0x6FA7EC, 0x6FBA28, 0x6FCEBC, 0x6FCF98, 0x6FCFB0, 0x6FD020, 0x6FD0E0, 0x6FD19C,
     0x7054E8, 0x709438, 0x7094EC, 0x7094F4, 0x72F2B0, 0x72F890, 0x72FA24, 0x72FBF4, 0x744394, 0x78D9E4,
-    0x199C08,                   # item box sort / merge 0x199ae4: loop over its u32[2991] stack array
     0x383F14, 0x383F38, 0x383F78, 0x383F88, 0x383F9C, 0x383FD8]    # 0x3839bc: per-item byte buffer (size, count)
-ITEM_ARRAY_SIZE = 0x199B78      # movw r1, #0x2ebc: memset of that stack array (4 x 2991)
-ITEM_SORT_FRAME = (0x199AE8, 0x199D4C)    # sub / add sp, sp, #708 (+ #11264): the array is sp+8 .. the frame top
 if ITEMS_APPENDED:
-    HOOKS += [('obtained_set', 0x1943D4), ('obtained_clear', 0x194408), ('obtained_test', 0x19443C)]
-    REPLACE_HOOKS |= {'obtained_set', 'obtained_clear', 'obtained_test'}
+    HOOKS += [('obtained_set', 0x1943D4), ('obtained_clear', 0x194408), ('obtained_test', 0x19443C),
+              ('item_box_sort', 0x199AE4)]   # GU's u32[count] stack array overran on IDs past the table (items.c)
+    REPLACE_HOOKS |= {'obtained_set', 'obtained_clear', 'obtained_test', 'item_box_sort'}
+if 'EM089_DMG_RECV_DIAG' in os.environ.get('GOG_DEFINES', '').split():   # diagnostic: monster damage receiver
+    HOOKS += [('dmg_recv', 0x9D6F8)]   # (monster, part, damage, kind) log (em089_diag.c). Its entry is checked by
+    PLUGIN_CHECKED.pop(0x9D6F8)        # Damage Numbers: test builds only (that plugin then installs nothing)
 if 'TEST_QUEST_RANK' in os.environ.get('GOG_DEFINES', ''):   # test: Stygian's quests at that rank (em057_01_ai.c)
     HOOKS += [('em057_01_rank', 0x3A8D68)]                   # GU quest rank getter (4U 0x69ae70)
 
@@ -371,14 +462,6 @@ def movw_imm(word, imm):
     return (word & 0xFFF0F000) | (imm & 0xF000) << 4 | (imm & 0xFFF)
 
 
-def arm_imm(v):
-    """ARM modified immediate (rot << 8 | imm8) for v, None when v has no encoding"""
-    for rot in range(16):
-        x = ((v << 2 * rot) | (v >> (32 - 2 * rot))) & 0xFFFFFFFF if rot else v
-        if x < 256: return rot << 8 | x
-    return None
-
-
 def item_patches(img):
     """(site, old, new) words for ITEMS_APPENDED items past 2991 (none without)"""
     if not ITEMS_APPENDED: return []
@@ -389,14 +472,6 @@ def item_patches(img):
         w = word(site)
         assert imm16(w) in (0xBAD, 0xBAE, 0xBAF), 'item bound %x: %x' % (site, w)
         out.append((site, w, movw_imm(w, imm16(w) + n)))
-    w = word(ITEM_ARRAY_SIZE)
-    assert imm16(w) == 0x2EBC, hex(w)
-    out.append((ITEM_ARRAY_SIZE, w, movw_imm(w, 0x2EBC + 4 * n)))
-    grow = next(d for d in range(4 * n, 4 * n + 1024, 8) if arm_imm(708 + d) is not None)   # keeps 8-byte alignment
-    for site, op in zip(ITEM_SORT_FRAME, (0xE24DDF00, 0xE28DDF00)):       # sub / add sp, sp, #708 (0xb1 ror 30)
-        w = word(site)
-        assert w == op | 0xB1, 'item sort frame %x: %x' % (site, w)
-        out.append((site, w, (w & ~0xFFF) | arm_imm(708 + grow)))
     return out
 
 
@@ -440,7 +515,7 @@ def reg_tables_asm(img):
                     vals.append(str(m['ui_icon']))     # own icon cell (tools/ui_icons.py), else the donor's
                 else:
                     vals.append(vals[donor])
-                if sym == 'reg_icon' and 'companion_of' not in m:
+                if sym == 'reg_icon' and 'companion_of' not in m and 'save_index' in m:   # (a lessee: save.c)
                     # the save slot (an unused 'dummy' index, main.c stats_add) shows the monster's icon: the quest
                     # result's size records name the slot's ID (icon accessor 0x560ca4(mgr, id) = table[index of id]),
                     # GU's dummies have the filler cell 109 (user 2026-10-26: "the icons are all rocks")
@@ -477,17 +552,19 @@ def monsters_c():
         sn = m.get('append', {}).get('stage_name', 0)   # the alias's board name (port.h stage_name)
         assert sn in (0, 1) and (not sn or 'stage_alias' in m), (m['name'], sn)
         sn = GU_QUEST_MESSAGE + alloc.offset(m['name'], 'stage_name') if sn else 0
+        si = m.get('save_index', 0)             # 0: save = "lease" (module/save.c)
         out.append('    {"%s", 0x%x, %d, %d, 0x%x, %d, 0x%x, %d, %d, {%s}, {%s}, %s, %d, '
-                   '%d, %d, 0x%x, 0x%x, %d, {%s}, {%s}, {%s}, %sf, {%s}, %d, 0x%x, 0x%x, %d},' % (
-            m['name'], m['em_id'], m['registry_index'], m['donor_index'], m.get('standin_id', 0), m['save_index'],
-            0x1064 + m['save_index'] - 105, m['name_entry'], m.get('notes_entry', 0),
+                   '%d, %d, 0x%x, 0x%x, %d, {%s}, {%s}, {%s}, %sf, {%s}, %d, 0x%x, 0x%x, %d, %d},' % (
+            m['name'], m['em_id'], m['registry_index'], m['donor_index'], m.get('standin_id', 0), si,
+            0x1064 + si - 105 if si else 0, m['name_entry'], m.get('notes_entry', 0),
             ', '.join('%d' % v for v in q), ', '.join('%d' % v for v in s),
             '%s_register_class' % package(m)['code'] if m in own else '0', port.get(m.get('companion_of'), -1),
             sa[0], sa[1], sum(1 << a for a in st.get('hold_kobj_areas', [])),
             sum(1 << (k - 48) for k in st.get('kinds', [])), len(st.get('maprec', [])),
             ', '.join('%rf' % float(r[0]) for r in mr), ', '.join('%d' % r[1] for r in mr),
             ', '.join('%d' % r[2] for r in mr), repr(float(st.get('wholemap_k', 0))),
-            ', '.join('%rf' % float(v) for v in sz), int(m.get('quest_append', False)), alt[0], alt_mask, sn))
+            ', '.join('%rf' % float(v) for v in sz), int(m.get('quest_append', False)), alt[0], alt_mask, sn,
+            int(m.get('save') == 'lease')))
     return '\n'.join(out + ['};']) + '\n'
 
 
@@ -495,13 +572,19 @@ GU_QUEST_MESSAGE = 120   # GU's questMessage strings (resident_eng.arc GUI\06_ms
 
 
 def stage_alias(m):
-    """package.toml [stage] of an entry with allocations.toml stage_alias (module/stage_alias.c): kinds = arc path kinds
+    """[stage] of the map an entry with allocations.toml stage_alias requires (maps/<map>/package.toml, alloc.stage_map;
+    module/stage_alias.c): kinds = arc path kinds
     redirected to the folder (49 mapUI, 54 map_com, 55 language map_com, 56 stage, 58 area), hold_kobj_areas = areas
     whose KowareObjs keep GU's quest-start command 0 from playing, maprec = the area map records [k, x, y] per area
     (with kind 49), wholemap_k = the whole-map record scale (with kind 55)"""
     if 'stage_alias' not in m: return {}
-    st = package(m).get('stage')
-    if not st or not st.get('kinds'): sys.exit('%s: stage_alias needs package.toml [stage] kinds' % m['name'])
+    try:
+        mp = alloc.stage_map(m)
+    except KeyError as e:
+        sys.exit(str(e))
+    st = paths.package_toml(mp).get('stage')
+    if not st or not st.get('kinds'):
+        sys.exit('%s: stage_alias needs [stage] kinds in maps/%s/package.toml' % (m['name'], mp))
     assert all(48 <= k < 80 for k in st['kinds']) and all(0 <= a < 8 for a in st.get('hold_kobj_areas', [])), st
     assert (49 in st['kinds']) == bool(st.get('maprec')) and len(st.get('maprec', [])) <= 4, st
     assert (55 in st['kinds']) == bool(st.get('wholemap_k')), st
@@ -530,6 +613,8 @@ def displaced_ok(w):
     if (w & 0x0FFFFFF0) == 0x012FFF10: return False              # bx
     if (w & 0x0F8003F0) == 0x06800070:                           # sxt*/uxt*: Rn = 15 means no accumulate
         return ((w >> 12) & 15) != 15 and (w & 15) != 15
+    if (w & 0x0FB00000) == 0x03000000:                           # movw / movt: bits 16-19 are imm4, not Rn
+        return ((w >> 12) & 15) != 15
     if ((w >> 16) & 15) == 15 and (w & 0x0C000000) in (0x04000000, 0x00000000): return False  # Rn = pc
     if ((w >> 12) & 15) == 15: return False                      # Rd = pc
     if (w & 0x0F000000) == 0x0D000000 and ((w >> 16) & 15) == 15: return False  # vldr [pc]
@@ -552,8 +637,19 @@ def branch_into(img, site):
     return None
 
 
+def jump_main(name, tag, off):
+    """asm jumping to main + off through an rtld-relocated data word (no absolute address in text, which rtld cannot
+    relocate); every register, the flags and lr are preserved. -> (text lines, .data.hookret lines)"""
+    lab = '%s_%s' % (name, tag)
+    return (['    sub     sp, sp, #4', '    push    {r0}', '    ldr     r0, .L%soff' % lab, '.L%spc:' % lab,
+             '    add     r0, pc, r0', '    ldr     r0, [r0]', '    str     r0, [sp, #4]', '    pop     {r0, pc}',
+             '.L%soff: .word %s - (.L%spc + 8)' % (lab, lab, lab)],
+            ['%s: .word %s' % (lab, main_ref(off))])
+
+
 def trampoline(img, name, site):
-    """asm for one entry hook: call name_c(regs); nonzero -> return to the caller with the saved r0/r1."""
+    """asm for one hook: call name_c(regs); nonzero -> return to the caller with the saved r0/r1 (entry hook) or
+    jump to MID_EXIT[name] (mid-function hook)."""
     out = ['    .global %s_tramp' % name, '    .hidden %s_tramp' % name, '    .hidden %s_c' % name,
            '    .align 2', '%s_tramp:' % name,
            '    push    {r0-r5, r12, lr}', '    vpush   {d0-d7}', '    add     r0, sp, #64',
@@ -561,11 +657,24 @@ def trampoline(img, name, site):
            '    pop     {r0-r5, r12, lr}', '    bxne    lr']
     if name in REPLACE_HOOKS:
         return '\n'.join(out[:-1] + ['    bx      lr'])
-    lits = []
+    lits, data = [], []
+    if name in MID_EXIT:
+        out[-1] = '    bne     .L%s_exit' % name
+        t, d = jump_main(name, 'exit', MID_EXIT[name])
+        lits += ['.L%s_exit:' % name] + t
+        data += d
     for k in range(2):
         a = site + 4 * k
         w = struct.unpack_from('<I', img, a)[0]
-        if is_ldr_pc_lit(w):
+        if (w & 0xFF000000) == 0xEB000000:          # bl (AL): called through ip, free at a call (AAPCS)
+            off = w & 0xFFFFFF
+            if off & 0x800000: off -= 0x1000000
+            lab = '%s_call%d' % (name, k)
+            out += ['    ldr     ip, .L%soff' % lab, '.L%spc:' % lab, '    add     ip, pc, ip', '    ldr     ip, [ip]',
+                    '    blx     ip']
+            lits.append('.L%soff: .word %s - (.L%spc + 8)' % (lab, lab, lab))
+            data.append('%s: .word %s' % (lab, main_ref(a + 8 + 4 * off)))
+        elif is_ldr_pc_lit(w):
             imm = w & 0xFFF
             val = struct.unpack_from('<I', img, a + 8 + (imm if w & (1 << 23) else -imm))[0]
             lab = '.L%s_lit%d' % (name, k)
@@ -575,14 +684,9 @@ def trampoline(img, name, site):
             out.append('    .word   0x%08x' % w)
         else:
             sys.exit('hook %s: instruction %08x at %x cannot be displaced' % (name, w, a))
-    # back to main at site + 8 through an rtld-relocated data word (no absolute address in text, which rtld
-    # cannot relocate); every register, the flags and lr are preserved
-    out += ['    sub     sp, sp, #4', '    push    {r0}', '    ldr     r0, .L%s_retoff' % name,
-            '.L%s_retpc:' % name, '    add     r0, pc, r0', '    ldr     r0, [r0]', '    str     r0, [sp, #4]',
-            '    pop     {r0, pc}',
-            '.L%s_retoff: .word %s_ret - (.L%s_retpc + 8)' % (name, name, name)] + lits
-    out += ['    .pushsection .data.hookret, "aw"', '    .align 2', '%s_ret: .word %s' % (name, main_ref(site + 8)),
-            '    .popsection']
+    t, d = jump_main(name, 'ret', site + 8)          # back to main at site + 8
+    out += t + lits
+    out += ['    .pushsection .data.hookret, "aw"', '    .align 2'] + d + data + ['    .popsection']
     return '\n'.join(out)
 
 
@@ -596,6 +700,19 @@ def hookwin_asm(entries, windows):
     return '\n'.join(out) + '\n'
 
 
+def check_data_pool():
+    """every monster's data file must fit the module's pool (port.c load: each rounded up to 16 B). One that does not is refused
+    at run time with only a log line, and its monster then runs on its donor's manifest. A file not built yet counts 0:
+    tools/release.py and the install step ask for all of them"""
+    used = 0
+    for m in MONSTERS:
+        p = os.path.join(paths.gen(m['name']), m['name'] + '.bin')
+        used += (os.path.getsize(p) + 15) & ~15 if os.path.exists(p) else 0
+    if used > alloc.DATA_POOL:
+        sys.exit('data files: %d bytes do not fit the module\'s pool of %d: raise tools/alloc.py DATA_POOL' % (used, alloc.DATA_POOL))
+    print('data files: %d of %d bytes' % (used, alloc.DATA_POOL))
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     img = open(MAIN_IMG, 'rb').read()
@@ -603,12 +720,17 @@ def main():
     for name, site in HOOKS:
         hit = branch_into(img, site)
         if hit is not None: sys.exit('hook %s: branch at %x targets %x (inside the patch)' % (name, hit, site + 4))
+        f = plugin_checked(site, 4)
+        if f is not None:
+            sys.exit('hook %s at %x: inside the first 0x%x bytes of %x, checked by a Forge plugin (PLUGIN_CHECKED)'
+                     % (name, site, PLUGIN_CHECKED[f], f))
         inc.append(trampoline(img, name, site))
     open(os.path.join(OUT, 'hooks.inc'), 'w').write('\n'.join(inc) + '\n')
     open(os.path.join(OUT, 'layout.inc'), 'w').write('    .equ MAIN_GAP, 0x%x\n' % MAIN_GAP)
     open(os.path.join(OUT, 'tables.S'), 'w').write(reg_tables_asm(img))
     errs = alloc.check()
     if errs: sys.exit('allocations.toml:\n  ' + '\n  '.join(errs))
+    check_data_pool()
     open(os.path.join(OUT, 'alloc.h'), 'w').write(alloc.header())
     open(os.path.join(OUT, 'port_monsters.c'), 'w').write(monsters_c())
     open(os.path.join(OUT, 'gear_hooks.inc'), 'w').write(           # gear.c: one wrapper per table class hook
@@ -618,7 +740,7 @@ def main():
     mods = [os.path.join(paths.monster(p), 'module') for p in alloc.packages()]   # once per package
     incs = ['-I', OUT, '-I', HERE] + [a for d in mods for a in ('-I', d)]
     srcs = [os.path.join(HERE, f) for f in ('crt0.S', 'main.c', 'util.c', 'port.c', 'quest.c', 'items.c', 'gear.c',
-                                            'notes.c', 'stage_alias.c', 'bgm.c', 'icons.c')]
+                                            'notes.c', 'stage_alias.c', 'bgm.c', 'icons.c', 'save.c')]
     for d in mods:                                     # every registered monster's code, registry order
         srcs += sorted(glob.glob(os.path.join(d, '*.c')))
     if MS_SLICE:                                       # the Magnet Spike's code and its generated action tables
@@ -687,13 +809,20 @@ def main():
     for site, old, new in WORD_PATCHES + item_patches(img) + ms_patches(img):
         if struct.unpack_from('<I', img, site)[0] != old: sys.exit('word patch %x: unexpected original' % site)
         recs += struct.pack('>IH', site + 0x100, 4) + struct.pack('<I', new)
+    p = 0
+    while p < len(recs):                               # every patched byte, hooks or not, off the plugins' checks
+        off, size = struct.unpack_from('>IH', recs, p); p += 6 + size
+        f = plugin_checked(off - 0x100, size)
+        if f is not None:
+            sys.exit('IPS record %x (+%d): inside the first 0x%x bytes of %x, checked by a Forge plugin (PLUGIN_CHECKED)'
+                     % (off - 0x100, size, PLUGIN_CHECKED[f], f))
     open(os.path.join(OUT, MAIN_BUILD_ID + '.ips'), 'wb').write(b'IPS32' + recs + b'EEOF')
 
     with open(os.path.join(OUT, 'symbols.txt'), 'w') as f:
         for k, v in sorted(syms.items(), key=lambda kv: kv[1]):
             f.write('%08x %08x %s\n' % (MODULE_BASE + v, v, k))
     open(os.path.join(OUT, 'defines.txt'), 'w').write(' '.join(EXTRA_DEFINES) + '\n')   # tools/release.py: none
-    ui_icons.build(OUT)                                # the icon atlases (romfs nativeNX/mh4uport, icons.c)
+    ui_icons.build(OUT)                                # the icon atlases (romfs nativeNX/mhgu_de, icons.c)
     print('built', len(data), 'bytes; hooks', ', '.join('%s@%x' % h for h in HOOKS))
     for k in ('g_init_magic', 'g_hook_count'):
         if k in syms: print('  %s = 0x%x' % (k, MODULE_BASE + syms[k]))
@@ -710,19 +839,20 @@ def install():
         shutil.copy(os.path.join(OUT, f), os.path.join(ex, f))
     dst = os.path.join(MOD_DIR, 'romfs')
     shutil.rmtree(dst, ignore_errors=True)
-    os.makedirs(os.path.join(dst, 'nativeNX', 'mh4uport'))
+    os.makedirs(os.path.join(dst, 'nativeNX', 'mhgu_de'))
     for m in MONSTERS:
         src = os.path.join(paths.gen(m['name']), m['name'] + '.bin')
         if not os.path.exists(src): sys.exit('no data file %s: run monsters/%s/build.sh' % (src, alloc.package(m)))
-        shutil.copy(src, os.path.join(dst, 'nativeNX', 'mh4uport'))
-    for name, _, _ in ui_icons.ATLASES:
-        shutil.copy(os.path.join(OUT, name), os.path.join(dst, 'nativeNX', 'mh4uport'))
-    sel =os.environ.get('PORT_ASSETS', 'all')           # package names (an entry name selects its package)
+        shutil.copy(src, os.path.join(dst, 'nativeNX', 'mhgu_de'))
+    for name in ui_icons.FILES:
+        shutil.copy(os.path.join(OUT, name), os.path.join(dst, 'nativeNX', 'mhgu_de'))
+    sel = os.environ.get('PORT_ASSETS', 'all')          # package names (an entry name selects its package; a monster
     names = alloc.packages() if sel == 'all' else [] if sel == 'none' else \
-        list(dict.fromkeys(paths.package(n) for n in sel.split(',')))
+        list(dict.fromkeys(paths.package(n) for n in sel.split(',')))   # brings the maps it requires)
+    names = list(dict.fromkeys(r for n in names for r in paths.requires(n) + [n]))
     owner = {}
-    for name in names:                                 # monsters never ship the same RomFS path
-        src = paths.romfs(name)
+    for name in names:                                 # packages never ship the same RomFS path
+        src = paths.map_romfs(name) if name in paths.maps() else paths.romfs(name)
         for d, _, files in os.walk(src):
             for f in files:
                 rel = os.path.relpath(os.path.join(d, f), src)
@@ -745,6 +875,9 @@ def install():
         names = names + ['magnet_spike']
     print('installed into %s: data of %s, assets of %s' % (MOD_DIR, ', '.join(m['name'] for m in MONSTERS),
                                                            ', '.join(names) or 'none'))
+    if os.path.isdir(LEGACY_DIR):
+        shutil.rmtree(LEGACY_DIR)
+        print('removed %s (the mod before 2.0.0)' % LEGACY_DIR)
 
 
 if __name__ == '__main__':

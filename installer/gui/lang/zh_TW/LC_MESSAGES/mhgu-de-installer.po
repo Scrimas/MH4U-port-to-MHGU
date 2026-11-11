@@ -1,0 +1,714 @@
+# Strings of the MHGU Definitive Edition Installer, extracted by installer/tools/i18n.py.
+msgid ""
+msgstr ""
+"Project-Id-Version: mhgu-de-installer\n"
+"PO-Revision-Date: 2026-11-09 00:00+0000\n"
+"Last-Translator: Automatically generated\n"
+"Language-Team: none\n"
+"Language: zh_TW\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+#: gui/ui/app.slint
+msgid "MHGU Definitive Edition Installer"
+msgstr "MHGU Definitive Edition 安裝程式"
+
+#: gui/ui/app.slint
+msgid "What's new"
+msgstr "更新內容"
+
+#: gui/ui/app.slint
+msgid "Install into"
+msgstr "安裝到"
+
+#: gui/ui/app.slint
+msgid "Add a folder…"
+msgstr "新增資料夾…"
+
+#: gui/ui/app.slint
+msgid "Update"
+msgstr "更新"
+
+#: gui/ui/app.slint
+msgid "✓ Ready to play"
+msgstr "✓ 可以開始遊戲"
+
+#: gui/ui/app.slint
+msgid "Cancel"
+msgstr "取消"
+
+#: gui/ui/app.slint
+msgid "OK"
+msgstr "確定"
+
+#: gui/ui/app.slint
+msgid "Monsters"
+msgstr "魔物"
+
+#: gui/ui/app.slint
+msgid "Monster"
+msgstr "魔物"
+
+#: gui/ui/app.slint
+msgid "Size"
+msgstr "大小"
+
+#: gui/ui/app.slint
+msgid "Version"
+msgstr "版本"
+
+#: gui/ui/app.slint
+msgid "Gear of the monsters that leave:"
+msgstr "被移除魔物的裝備："
+
+#: gui/ui/app.slint
+msgid "Close"
+msgstr "關閉"
+
+#: gui/ui/app.slint
+msgid "Settings"
+msgstr "設定"
+
+#: gui/src/main.rs gui/ui/app.slint
+msgid "Offer pre-releases"
+msgstr "提供預覽版"
+
+#: gui/ui/app.slint
+msgid "Test builds of the next release: they may contain bugs."
+msgstr "下一個版本的測試版：可能含有錯誤。"
+
+#: gui/ui/app.slint
+msgid "Look for a new installer at start"
+msgstr "啟動時檢查新版安裝程式"
+
+#: gui/ui/app.slint
+msgid "Language"
+msgstr "語言"
+
+#: gui/ui/app.slint
+msgid "Folders you added"
+msgstr "你新增的資料夾"
+
+#: gui/src/main.rs gui/ui/app.slint
+msgid "Remove"
+msgstr "移除"
+
+#: gui/ui/app.slint
+msgid "Remove the mod from the ticked places…"
+msgstr "從勾選的位置移除模組…"
+
+#: gui/ui/app.slint
+msgid "About"
+msgstr "關於"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/ui/app.slint
+msgid "MHGU Definitive Edition Installer {}"
+msgstr "MHGU Definitive Edition 安裝程式 {}"
+
+#: gui/ui/app.slint
+msgid "Installs the MHGU Definitive Edition mod for Monster Hunter Generations Ultimate from its GitHub releases. Free software under the GNU GPL v3 or later."
+msgstr "從 GitHub 發行版本安裝 Monster Hunter Generations Ultimate 的 MHGU Definitive Edition 模組。自由軟體，採用 GNU GPL v3 或更新版本授權。"
+
+#: core/src/apply.rs core/src/source.rs gui/src/main.rs
+msgid "Cancelled"
+msgstr "已取消"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/apply.rs
+msgid "{} is not in this release"
+msgstr "此版本中沒有 {}"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/apply.rs
+msgid "The release has no {}"
+msgstr "該版本沒有 {}"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/apply.rs
+msgid "The download of {} does not match the release's checksum"
+msgstr "{} 的下載檔案與該版本的校驗和不符"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/apply.rs core/src/record.rs core/src/saves.rs
+#: core/src/selfupdate.rs core/src/source.rs
+msgid "Could not write {} ({})"
+msgstr "無法寫入 {}（{}）"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/apply.rs core/src/source.rs
+msgid "Could not read {} ({})"
+msgstr "無法讀取 {}（{}）"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/apply.rs
+msgid "{} holds {}, which its release does not list"
+msgstr "{} 含有 {}，但其版本並未列出"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/apply.rs
+msgid "{} in {} does not match the release"
+msgstr "{1} 中的 {0} 與版本不符"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/apply.rs
+msgid "{} lacks {}"
+msgstr "{} 缺少 {}"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/apply.rs
+msgid "Could not copy {} ({})"
+msgstr "無法複製 {}（{}）"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/apply.rs
+msgid "Could not remove {} ({})"
+msgstr "無法移除 {}（{}）"
+
+#: core/src/apply.rs
+msgid "The mod folder has no parent folder"
+msgstr "模組資料夾沒有上層資料夾"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/apply.rs
+msgid "{} was not downloaded"
+msgstr "{} 未下載"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/apply.rs core/src/selfupdate.rs
+msgid "Could not replace {} ({})"
+msgstr "無法取代 {}（{}）"
+
+#: core/src/i18n.rs
+msgid "..."
+msgstr "..."
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/manifest.rs
+msgid "Unreadable manifest ({})"
+msgstr "無法讀取的清單（{}）"
+
+#: core/src/manifest.rs
+msgid "This release needs a newer installer: update the installer first"
+msgstr "此版本需要較新的安裝程式：請先更新安裝程式"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/manifest.rs core/src/saves.rs
+msgid "Invalid manifest: {}"
+msgstr "無效的清單：{}"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/places.rs
+msgid "{} (Flatpak)"
+msgstr "{}（Flatpak）"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/places.rs
+msgid "SD card ({})"
+msgstr "SD 卡（{}）"
+
+#: core/src/places.rs
+msgid "Ryujinx (portable)"
+msgstr "Ryujinx（可攜版）"
+
+#: core/src/places.rs
+msgid "yuzu family (folder)"
+msgstr "yuzu 系列（資料夾）"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/record.rs
+msgid "{} was written by a newer installer"
+msgstr "{} 由較新的安裝程式寫入"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/record.rs
+msgid "{} is damaged ({})"
+msgstr "{} 已損壞（{}）"
+
+#: core/src/saves.rs
+msgid "The hunter holds a weapon that leaves, and the box has no other weapon"
+msgstr "獵人裝備的武器將被移除，而裝備箱中沒有其他武器"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/saves.rs
+msgid "{} cannot be read ({})"
+msgstr "無法讀取 {}（{}）"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/saves.rs
+msgid "character {} holds another tool's data where the mod keeps its own"
+msgstr "角色 {} 在模組存放資料的位置有其他工具的資料"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/saves.rs
+msgid "character {} was migrated by a newer release"
+msgstr "角色 {} 已由較新的版本遷移"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/saves.rs
+msgid "step {} needs a newer installer"
+msgstr "步驟 {} 需要較新的安裝程式"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/saves.rs
+msgid "character {}: {}"
+msgstr "角色 {}：{}"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/saves.rs
+msgid "Could not back up {} ({})"
+msgstr "無法備份 {}（{}）"
+
+#: core/src/saves.rs
+msgid "The backup folder has no parent folder"
+msgstr "備份資料夾沒有上層資料夾"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/selfupdate.rs
+msgid "{} is not in {}"
+msgstr "{} 不在 {} 中"
+
+#: core/src/selfupdate.rs
+msgid "The running file has no usable name"
+msgstr "正在執行的檔案沒有可用的名稱"
+
+#: core/src/selfupdate.rs
+msgid "The download does not match the release's checksum"
+msgstr "下載的檔案與該版本的校驗和不符"
+
+#: core/src/source.rs
+msgid "GitHub refused the request (too many in the last hour), try later"
+msgstr "GitHub 拒絕了請求（最近一小時內請求過多），請稍後再試"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/source.rs
+msgid "GitHub answered HTTP {}"
+msgstr "GitHub 回應 HTTP {}"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/source.rs
+msgid "Could not reach GitHub ({})"
+msgstr "無法連線至 GitHub（{}）"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/source.rs
+msgid "Unexpected answer from GitHub ({})"
+msgstr "GitHub 傳回了非預期的回應（{}）"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/source.rs
+msgid "Download failed ({})"
+msgstr "下載失敗（{}）"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/zipread.rs
+msgid "Damaged zip file ({})"
+msgstr "損壞的 zip 檔案（{}）"
+
+#: gui/src/main.rs
+msgid "Core"
+msgstr "核心"
+
+#: gui/src/main.rs
+msgid "The release has no manifest.json"
+msgstr "該版本沒有 manifest.json"
+
+#: gui/src/main.rs
+msgid "Looking for the latest release…"
+msgstr "正在尋找最新版本…"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "Release {} needs installer {} or newer: update the installer first."
+msgstr "版本 {} 需要安裝程式 {} 或更新版本：請先更新安裝程式。"
+
+#: gui/src/main.rs
+msgid "No release of the mod can be installed by this installer yet."
+msgstr "此安裝程式目前還無法安裝任何版本的模組。"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "Could not read the releases: {}"
+msgstr "無法讀取版本列表：{}"
+
+#: gui/src/main.rs
+msgid "Untested"
+msgstr "未經測試"
+
+#: gui/src/main.rs
+msgid "Not found"
+msgstr "未找到"
+
+#: gui/src/main.rs
+msgid "Found · nothing installed"
+msgstr "已找到 · 尚未安裝"
+
+#: gui/src/main.rs
+msgid "Extracted by hand: replaced when you install"
+msgstr "手動解壓縮：安裝時會被取代"
+
+#: gui/src/main.rs
+msgid "Its install record is unreadable"
+msgstr "其安裝紀錄無法讀取"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "Release {} · {}"
+msgstr "版本 {} · {}"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "new · {}"
+msgstr "新增 · {}"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "repair · {}"
+msgstr "修復 · {}"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{} → none"
+msgstr "{} → 無"
+
+#: gui/src/main.rs
+msgid "System language"
+msgstr "系統語言"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "Installer {} is out"
+msgstr "安裝程式 {} 已推出"
+
+#: gui/src/main.rs
+msgid "No release"
+msgstr "沒有版本"
+
+#: gui/src/main.rs
+msgid "Install"
+msgstr "安裝"
+
+#: gui/src/main.rs
+msgid "pre-release"
+msgstr "預覽版"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "Release {}"
+msgstr "版本 {}"
+
+#: gui/src/main.rs
+msgid "Needed by every monster"
+msgstr "所有魔物都需要"
+
+#: gui/src/main.rs
+msgid "Will be removed · take off its gear in game first"
+msgstr "將被移除 · 請先在遊戲中卸下其裝備"
+
+#: gui/src/main.rs
+msgid "map"
+msgstr "地圖"
+
+#: gui/src/main.rs
+msgid "shared files"
+msgstr "共用檔案"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{} · also for {}"
+msgstr "{} · 也供 {} 使用"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{} in this release · each brings the map it needs"
+msgstr "此版本有 {} · 每個都會附帶所需的地圖"
+
+#: gui/src/main.rs
+msgid "Nothing ticked"
+msgstr "未勾選任何項目"
+
+#: gui/src/main.rs
+msgid "· tick where to install"
+msgstr "· 請勾選安裝位置"
+
+#: gui/src/main.rs
+msgid "Up to date"
+msgstr "已是最新"
+
+#: gui/src/main.rs
+msgid "An MHGU Definitive Edition folder extracted by hand is there: it is removed, then installed fresh."
+msgstr "這裡有手動解壓縮的 MHGU Definitive Edition 資料夾：會先移除，再重新安裝。"
+
+#: gui/src/main.rs
+msgid "The mod from before 2.0.0, when it was called MH4U Port, is there: it is removed."
+msgstr "這裡有 2.0.0 之前、名為 MH4U Port 時期的模組：將會移除。"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "+ {} {} (new)"
+msgstr "+ {} {}（新增）"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "↻ {} {} (repaired: files were missing)"
+msgstr "↻ {} {}（已修復：缺少檔案）"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "↑ {} {} → {}"
+msgstr "↑ {} {} → {}"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "− {} {} (removed)"
+msgstr "− {} {}（已移除）"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{} · for {}"
+msgstr "{} · 供 {} 使用"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "Moves to release {} (nothing to download)"
+msgstr "切換到版本 {}（無需下載）"
+
+#: gui/src/main.rs
+msgid "Saves"
+msgstr "存檔"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{}: moved to this release's IDs"
+msgstr "{}：已轉換為此版本的 ID"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{}: the gear of the monsters that leave is cleaned"
+msgstr "{}：清理被移除魔物的裝備"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{}: moved to this release's IDs, the gear of the monsters that leave cleaned"
+msgstr "{}：已轉換為此版本的 ID，並清理被移除魔物的裝備"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{} cannot be migrated: {}"
+msgstr "無法遷移 {}：{}"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "Every save is backed up first, into {}"
+msgstr "每個存檔都會先備份到 {}"
+
+#: gui/src/main.rs
+msgid "Unequip only (nothing deleted)"
+msgstr "僅卸下（不刪除任何東西）"
+
+#: gui/src/main.rs
+msgid "Remove the worn pieces (data loss)"
+msgstr "刪除身上穿戴的部位（資料遺失）"
+
+#: gui/src/main.rs
+msgid "Remove all their items and gear (data loss)"
+msgstr "刪除其所有道具與裝備（資料遺失）"
+
+#: gui/src/main.rs
+msgid "Leave the saves as they are"
+msgstr "保持存檔原樣"
+
+#: gui/src/main.rs
+msgid "Before you go on"
+msgstr "繼續之前"
+
+#: gui/src/main.rs
+msgid "A monster you remove takes its armor and weapon models with it: take its gear off in game first."
+msgstr "移除的魔物會一併帶走其防具與武器模型：請先在遊戲中卸下其裝備。"
+
+#: gui/src/main.rs
+msgid "This is a pre-release: it may contain bugs. Use it at your own discretion."
+msgstr "這是預覽版：可能含有錯誤。請自行斟酌使用。"
+
+#: gui/src/main.rs
+msgid "Online, everyone in the group needs the same release and the same monsters."
+msgstr "連線時，隊伍中的每個人都需要相同的版本與相同的魔物。"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "Close {} first: the game must not run while its files change."
+msgstr "請先關閉 {}：遊戲檔案變更時，遊戲不能在執行中。"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "Download: {}"
+msgstr "下載：{}"
+
+#: gui/src/main.rs
+msgid "Remove the mod"
+msgstr "移除模組"
+
+#: gui/src/main.rs
+msgid "Install these changes?"
+msgstr "要安裝這些變更嗎？"
+
+#: gui/src/main.rs
+msgid "Close the game first"
+msgstr "請先關閉遊戲"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{} is running: close it, then install again."
+msgstr "{} 正在執行：請將其關閉，然後重新安裝。"
+
+#: gui/src/main.rs
+msgid "The install failed"
+msgstr "安裝失敗"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{}: {}"
+msgstr "{}：{}"
+
+#: gui/src/main.rs
+msgid "Installing anyway leaves these saves as they are, which may break their ported items and gear. Close this, check them (another tool's data, a newer release, the game running), then install again to go on without them."
+msgstr "若仍要安裝，這些存檔將保持原樣，其移植的道具與裝備可能會損壞。請關閉此視窗並檢查它們（其他工具的資料、較新的版本、遊戲正在執行），然後重新安裝以略過它們繼續。"
+
+#: gui/src/main.rs
+msgid "Some saves cannot be migrated"
+msgstr "部分存檔無法遷移"
+
+#: gui/src/main.rs
+msgid "Starting…"
+msgstr "正在開始…"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "Downloading · {} / {}"
+msgstr "正在下載 · {} / {}"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "Downloading {} · {} / {}"
+msgstr "正在下載 {} · {} / {}"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "Installing into {} ({} of {})"
+msgstr "正在安裝到 {}（第 {} 個，共 {} 個）"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "Updating the save {}"
+msgstr "正在更新存檔 {}"
+
+#: gui/src/main.rs
+msgid "The mod was removed."
+msgstr "模組已移除。"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "Start MHGU in {}"
+msgstr "在 {} 中啟動 MHGU"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "The mod is installed; these saves were left as they were. Backups: {}"
+msgstr "模組已安裝；這些存檔保持原樣。備份：{}"
+
+#: gui/src/main.rs
+msgid "Some saves could not be updated"
+msgstr "部分存檔無法更新"
+
+#: gui/src/main.rs
+msgid "Nothing was changed in the places not yet reached; a place being installed keeps its old files."
+msgstr "尚未處理的位置沒有任何變更；正在安裝的位置會保留其舊檔案。"
+
+#: gui/src/main.rs
+msgid "Where to install"
+msgstr "安裝位置"
+
+#: gui/src/main.rs
+msgid "The mod has never been tested in MHGU PC Recomp: it is installed into its mods folder, use it at your own discretion."
+msgstr "模組從未在 MHGU PC Recomp 中測試過：會安裝到其 mods 資料夾，請自行斟酌使用。"
+
+#: gui/src/main.rs
+msgid "Update the installer"
+msgstr "更新安裝程式"
+
+#: gui/src/main.rs
+msgid "This copy cannot replace itself: download the new installer from its release page."
+msgstr "此副本無法自我取代：請從其發行頁面下載新的安裝程式。"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "Installed: start {}"
+msgstr "已安裝：請啟動 {}"
+
+#: gui/src/main.rs
+msgid "Cancelling…"
+msgstr "正在取消…"
+
+#: gui/src/main.rs
+msgid "Offer pre-releases?"
+msgstr "要提供預覽版嗎？"
+
+#: gui/src/main.rs
+msgid "Pre-releases are test builds of the next release. They may contain bugs, and they can change your save in ways a later release does not: use them at your own discretion."
+msgstr "預覽版是下一個版本的測試版。它們可能含有錯誤，也可能以之後的正式版本不會採用的方式修改你的存檔：請自行斟酌使用。"
+
+#: gui/src/main.rs
+msgid "While this is on, the installer installs the newest pre-release when there is one."
+msgstr "啟用時，若有預覽版，安裝程式會安裝最新的預覽版。"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{} monster"
+msgstr "{}個魔物"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{} monsters"
+msgstr "{}個魔物"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{} removal"
+msgstr "{} 項移除"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{} removals"
+msgstr "{} 項移除"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{} change"
+msgstr "{} 項變更"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{} changes"
+msgstr "{} 項變更"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "Install {} change"
+msgstr "安裝 {} 項變更"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "Install {} changes"
+msgstr "安裝 {} 項變更"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{} save updated (backed up first)"
+msgstr "已更新 {} 個存檔（已先備份）"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{} saves updated (backed up first)"
+msgstr "已更新 {} 個存檔（已先備份）"

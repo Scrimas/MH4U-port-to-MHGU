@@ -39,7 +39,7 @@ static void quest_group_rename(void)
                 *(volatile uint32_t *)(p + 4) = pm->quests[k];
                 p[8] = 0;                              /* group: regular */
                 p[10] = qg_colour(pm->quests[k]);      /* the DUMMY slot's 1 -> GU's row for the quest's rank */
-                logf("mh4uport: quest_group entry %u: %u -> %u (%s)", i, pm->quest_slots[k], pm->quests[k], pm->name);
+                logf("mhgu-de: quest_group entry %u: %u -> %u (%s)", i, pm->quest_slots[k], pm->quests[k], pm->name);
             }
     }
 }
@@ -67,7 +67,7 @@ int quest_clear_fix_c(uint32_t *regs)
         n = FIELD(uint32_t, grp, 0x64);
         e = FIELD(uint32_t, grp, 0x6c);
         for (i = 0; e && i < n && *(volatile uint32_t *)(uintptr_t)(e + 12 * i + 4) != id; i++) ;
-        logf("mh4uport: clear write for quest %u: list index %u of %u", id, i, n);
+        logf("mhgu-de: clear write for quest %u: list index %u of %u", id, i, n);
     }
     return 0;
 }
@@ -114,7 +114,7 @@ int quest_group_append_c(uint32_t *regs)
     if (n >= N && i == N) return 0;
     blk = qg_new(12 * (n + N) + 8, 16);
     if (!blk) {
-        logf("mh4uport: quest_group: new[] failed, %u quests not appended", N);
+        logf("mhgu-de: quest_group: new[] failed, %u quests not appended", N);
         return 0;
     }
     FIELD(uint32_t, blk, 0) = 12;
@@ -135,16 +135,18 @@ int quest_group_append_c(uint32_t *regs)
     qg_delete(e - 8);
     FIELD(uint32_t, grp, 0x6c) = (uint32_t)(uintptr_t)ne;
     FIELD(uint32_t, grp, 0x64) = n + N;
-    if (s_logged++ < 4) logf("mh4uport: quest_group: %u entries + %u appended (indexes %u..%u)", n, N, n, n + N - 1);
+    if (s_logged++ < 4) logf("mhgu-de: quest_group: %u entries + %u appended (indexes %u..%u)", n, N, n, n + N - 1);
     return 0;
 }
 
-/* 0x3b2174(_, id) -> bool: "quest unlocked?" (script check_quest_unlocked has no rule for our IDs) */
+/* 0x3b2174(_, id) -> bool: "quest unlocked?" (script check_quest_unlocked has no rule for our IDs). Mid hook 0x3b2194,
+ * before its check call 0x3d7e90: r1 = &result byte, r2 = id; nonzero -> 0x3b219c returns the byte (build.py
+ * MID_EXIT). Not at the entry: the Forge plugin Key Quest Markers checks its first 0x20 bytes (issue #10). */
 int quest_unlocked_c(uint32_t *regs)
 {
-    int m = port_quest_owner(regs[R1], 0);
+    int m = port_quest_owner(regs[R2], 0);
     if (m < 0 || !port_installed(m)) return 0;
-    regs[R0] = 1;
+    *(uint8_t *)(uintptr_t)regs[R1] = 1;
     return 1;
 }
 
@@ -158,7 +160,7 @@ int utf8_null_guard_c(uint32_t *regs)
     static uint32_t s_n;
     if (regs[R1]) return 0;
     regs[R1] = (uint32_t)(uintptr_t)empty;
-    if (++s_n <= 20) logf("mh4uport: null string to 0x7ca340 from lr=%x (quest %u)", regs[LR] - MAIN_BASE,
+    if (++s_n <= 20) logf("mhgu-de: null string to 0x7ca340 from lr=%x (quest %u)", regs[LR] - MAIN_BASE,
                           port_quest_id());
     return 0;
 }

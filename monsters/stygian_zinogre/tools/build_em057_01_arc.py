@@ -84,6 +84,15 @@ MODELS = (('em049', 'em057_01', 0), ('em049_tail', 'em057_01_tail', 1))    # 4U 
 # 4U has none), so the roles follow GU. Lights keep 4U's 1 / 2 (GU has one light, type 2 = 4U's light_01 m02); head 4
 # has no GU counterpart.
 MTYPE = {'XfB_N__E_m03_body': 0, 'XfBAN__IW_0__m00_effect_': 3}
+# 4U's lights ('XfB__m01_light_02', 'XfB__m02_light_01': BSAddAlpha, DSZTest, RSMeshBias12, IAFilter2, no
+# CBMaterialStd = an unlit additive filter) are Capcom's GU light preset in GU's own Zinogre ('XfB__m02_light':
+# BSAddAlpha, FAlbedoMapConstant, FConstantOutputLite, IASwing2HighPrecision on vertex format 0x14d40022 = ours, C).
+# The 'add' template is lit (FDiffuse, FLighting): the marks dimmed in shade (issue #8). em057_00's light has an
+# animation block (its class's charge glow), so the template is the same preset without one, Brachydios em063_00
+# mat 2 (BSAddAlpha, DSZTest, RSMeshBias12: 4U's states).
+LIGHT_TEMPLATE = ('/nativeNX/arc/enemy/em063_00.arc', 'enemy\\em063\\em063_00\\mod\\em063_00', 2)
+mrl_build.TEMPLATES.setdefault('light', LIGHT_TEMPLATE)
+assert mrl_build.TEMPLATES['light'] == LIGHT_TEMPLATE
 # 4U groups 50 (eye), 51, 52 (light_01): 4U rows show them only under condition 10 / state bit 128 (the same rows as
 # Zinogre em048; G: frenzy, as Tigerstripe's group 50); GU's Zinogre model has none, so no GU state names them: hidden
 # in the base state, as GU Zinogre never shows them.
@@ -348,6 +357,8 @@ def model(S, rom, src_name, dst_name, gu_tex, notes):
         emissive = max(std[0:3]) > 0 and max(std[4:7]) == 0
         key = 'add' if 'BSAddAlpha' in states or 'BSBlendAlpha' in states else \
               ('solid_nm' if 'tNormalMap' in slots else 'unlit' if emissive else 'solid')
+        if 'IAFilter2' in states:
+            key = 'light'           # the body-mark lights: see LIGHT_TEMPLATE (issue #8, muted glow)
         alpha_test = 'BSSolid' in states and mm['words'][7] & mrl_build.W7_ALPHATEST
         if alpha_test:
             key = 'solid_at' if 'tNormalMap' not in slots else 'tar'
@@ -855,7 +866,10 @@ def main():
     for b in BANKS:
         ents.append((P + 'mot\\em057_01_%d' % b, T['LMT'], motion_bank(S, gu_banks, b, notes)))
         own[4 + b] = (P + 'mot\\em057_01_%d' % b, T['LMT'])
-    ents.append((P + 'mot\\em057_01_cam', T['LCM'], lcm4u2gu.convert(S[(P48 + 'mot\\e048_cam', T['LCM'])])))
+    # 4U e048_cam + GU em057_00's own cameras 40..42 (lcm4u2gu.GU_ONLY_IDS: no 4U LCM has ids >= 40, 62 of GU's 67
+    # monster LCMs carry 40 / 41; issue #8: no kill cam on any ported monster; confirmed in game)
+    ents.append((P + 'mot\\em057_01_cam', T['LCM'],
+                 lcm4u2gu.add_records(lcm4u2gu.convert(S[(P48 + 'mot\\e048_cam', T['LCM'])]), gfile(11))))
     own[11] = (P + 'mot\\em057_01_cam', T['LCM'])
     gu_cmd = [d for p, t, d in gents if p.startswith('enemy\\cmd_tbl\\em057_00') and t == T['EMC']]
     assert len(gu_cmd) == 1

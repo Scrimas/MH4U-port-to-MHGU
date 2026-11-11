@@ -1,0 +1,21 @@
+# Heaven's Mount map package: 4U m05 as an alias of GU stage 24 (the Ruined Pinnacle), loaded from folder m30 while
+# the quests of a monster requiring it run (module/stage_alias.c): stage arcs, area maps, map_com, area streams.
+# Notes: monsters/stygian_zinogre/notes/heavens-mount.md (maps/heavens_mount/notes/README.md).
+name = "heavens_mount"
+kind = "map"
+title = "Heaven's Mount"
+version = "1.0.0"          # bump on every published change of this map's files
+requires_core = "2.0.0"    # oldest core that knows map packages (module/port.c port_installed: a monster whose
+                           # map is missing counts as not installed)
+folder = 30                # its RomFS stage folder m30 = allocations.toml stage_alias[1] of every monster
+                           # requiring it (tools/alloc.py checks it)
+
+[stage]                    # Heaven's Mount (4U m05) as an alias of the Ruined Pinnacle (allocations.toml stage_alias,
+                           # module/stage_alias.c; tools/build_heavens_mount.py)
+kinds = [49, 54, 55, 56, 58]   # arc paths -> m30: mapUI, map_com, language map_com, stage, area
+hold_kobj_areas = [6]      # area 6: the four hit-breakable rocks (GU's quest-start command 0 would break them);
+                           # area 8's s00 scheduler has no action 0 (ids 3..14), and the core's mask holds areas 0..7
+maprec = [[2.8, 0, 0], [1.6, 4, -12], [1.8, 0, 10], [1.3, -4, 16]]   # area maps 0..3: 4U m05 records {k, x, y}
+                           # (4U table 0xeebe0c + 0x18 * 5, checked by tools/build_heavens_mount_ui.py); the core
+                           # holds 4: areas 4..8 keep GU's m24 records, their pictures are resampled to them
+wholemap_k = 1.0           # whole map: GU dims[24] / 4U m05 W = 60000 / 60000 (build_heavens_mount_ui.py)

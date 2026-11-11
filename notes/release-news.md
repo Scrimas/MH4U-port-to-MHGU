@@ -4,6 +4,73 @@ tools/release.py puts the section of the core version being packaged into the re
 groups, **New** (something added) and **Fixed** (what works now, not what was broken), one short plain line each,
 written for players; write the section before `release.py package`.
 
+## v2.0.0
+**New**
+- MH4U Port is now **MHGU Definitive Edition**, and so is its mod folder. The installer removes the old `MH4U Port`
+  folder; if you extract the zips by hand, delete `MH4U Port` first, or the game loads the mod twice.
+- The MHGU Definitive Edition Installer (Windows, Linux): it downloads the monsters you tick into Ryujinx, the yuzu
+  family or an SD card, with the maps they need, and updates or removes them. Get it from
+  [MHGU-Definitive-Edition](https://github.com/Scrimas/MHGU-Definitive-Edition/releases/latest).
+- The zips now have a repository of their own,
+  [MHGU-Definitive-Edition-Packages](https://github.com/Scrimas/MHGU-Definitive-Edition-Packages/releases).
+- Tidal Najarala, ported by @Rukasu1609, with her water jet and scales, 2 hub quests from MH4U, her armor, weapons and
+  a Hunter's Notes page.
+- Shrouded Nerscylla, ported by @Rukasu1609, with her MH4U bite, 3 quests from MH4U, her armor, weapons and a Hunter's
+  Notes page.
+- The ported arenas are downloads of their own: Battlequarters (Gogmazios), Speartip Crag (Dalamadur) and Heaven's
+  Mount (Stygian Zinogre). A monster whose arena is missing stays off instead of loading a missing stage.
+
+**Fixed**
+- Sorting the item box works when it holds items from a newer release of the mod: they stay at the end of the box.
+
+## v1.9.0
+**New**
+- Monoblos, ported by @Rukasu1609, with his MH4U AI and attacks, 6 quests from MH4U (High and G rank, village and
+  hub), his Mono S / Mono X armor, 14 weapons in 5 lines and a Hunter's Notes page.
+- Black Gravios now has his Hunter's Notes page.
+- Ported monsters that MHGU has no record slot for keep their own hunt and capture counts and crown sizes in your save.
+
+**Fixed**
+- Ported weapons and armor are listed in the smithy among MHGU's gear of the same rarity.
+
+## v1.8.0
+**New**
+- Black Gravios, ported by @Rukasu1609, with his 8 quests from MH4U, his Gravios U / Gravios Z armor and 6 weapon
+  lines. He has no Hunter's Notes page yet.
+- The mod can now be built on Windows as well as Linux.
+
+**Fixed**
+- The mod no longer stops the Damage Numbers plugin (Forge) from showing its numbers.
+- Gogmazios' tar now shows MH4U's tar icon on the HUD instead of MHGU's web icon.
+- Gogmazios no longer skips his second phase when a flinch interrupts his rage roar.
+- Dalamadur's fallen meteor scales now show, so you can mine Shattered Omen from them during the fight.
+
+## v1.7.3
+**Fixed**
+- The mod now works together with the Key Quest Markers plugin (Forge).
+- Gogmazios fights a hunter on the side walls as in MH4U: he stands up and uses his tar body shake, his sweeping
+  downward laser and his wing scrape, instead of repeating bites and wing slams at the wall.
+- Gogmazios' quests now have their full MH4U supply box (First-aid Med+, Rations, Cleansers, ammo and more), with
+  Quagmire Quarrel and Act of Gog each getting their own.
+- Gogmazios closes his eyes when he dies.
+- Stygian Zinogre howls on his charged roar and leaves no charged aura behind when he changes area.
+- Stygian Zinogre's quests give only their MH4U rewards (no MHGU tickets or Valstrax materials), and their texts
+  name the monsters you actually meet.
+- Stygian Zinogre's body marks glow brighter, as in MH4U.
+- Stygian Zinogre and Tigerstripe Zamtrios now get a kill cam when the hunt ends.
+
+## v1.7.2
+**New**
+- Building the mod yourself and contributing are now much easier: one setup script prepares everything from your
+  own game dumps, and CONTRIBUTING.md on GitHub walks you through it (what to dump, how to build and test, how to
+  report bugs or port a monster).
+
+**Fixed**
+- Every ported quest now uses the quest format of MHGU 1.4, the game version the mod is made for. With the game set
+  to Chinese, these quests show their English text.
+- Gogmazios no longer carries behaviour settings inherited from Kushala Daora (the MHGU monster his data is built
+  on) where MH4U has none of its own.
+
 ## v1.7.1
 **Fixed**
 - Gogmazios' tar now covers you in black tar, as in MH4U, instead of white spider web.

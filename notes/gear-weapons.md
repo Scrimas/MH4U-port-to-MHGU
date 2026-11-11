@@ -195,6 +195,39 @@ GU (C):
 - Data: mKireLevel is even 0..12; 12 on 407 rows means a full 450 bar.
 - Slash getter 0xf4724 = kireaji[vt+0x20()].mSlash[colour].
 
+Every reader of the table, traced (2026-11-08; built as KIRX below):
+- The table lives in the table manager [GOT 0x1838bcc] +0xfc (rKireajiData: count +0x64, 20-B elements at +0x6c, mSlash at +4). Its only
+  getter is 0x13f290 (manager+0xfc -> 0x12db78 element by index, bound = count); 0x13f290 has one caller, 0xf474c, and 0x12db78 only
+  0x13f290 (C). No other code loads manager+0xfc and then +0x64 / +0x6c (scan of all 446 loads of the manager, C).
+- 0xf474c sits in the slash getter 0xf4724 (vt slot +0x80 of the LevelData classes: r0 = the LevelData object, r1 = colour 0..6; it calls
+  vt+0x20 = mKireType, object +0xa). The colour-at-sharpness function 0xf4794 (slot +0x84) calls slot +0x80 for colours 0..6, the bar
+  length 0xf4760 (slot +0x7c) reads mKireLevel (vt+0x24, +0xb) and no table. So every read of a weapon's sharpness goes through 0xf4724 (C).
+- The objects: cWeaponNNLevelData records of the resource arrays, memory layout vtable +0, mIndex +4, mNo (= weapon ID) +8, mLevel +9,
+  mKireType +0xa, mKireLevel +0xb (C: the getters). Their vptrs (vt + 8), from the element constructors, each called once, by its
+  class's LevelData loader (C, all 11): w00 0x1737c24, w01 0x17381ac, w02 0x1738734, w03 0x1738cbc, w07 0x1739d54, w08 0x173a2dc,
+  w09 0x173a864, w11 0x173b374, w12 0x173b8fc, w13 0x173be84, w14 0x173c40c. 23 vtables hold 0xf4724 at +0x80: these 11, their XML
+  twins right after each (0x1737cec, ...) and the base 0x1737770.
+- 0x12db78 answers 0 past the count, and 0xf4724 then reads address 4 + 2 * colour: mKireType must name a row.
+- 0xf4794 (colour at a sharpness) answers the first colour whose mSlash reaches the value, and 7 past mSlash[6]. All 164 GU rows end
+  at 450, the bar's cap (C). 4U's HR entries 0..47 end at 400; GU's rows 0..47 are those entries (C: the first four values of all 48
+  equal, 47 equal up to 400; 42 lost its 380..400 purple), the end raised to 450.
+
+KIRX (built 2026-11-08, not played): exact 4U rows past the full table.
+- Data: tools/weapons4u.py build(spec, exact) gives every weapon whose 4U entry has a kire_near row a KIRX entry {class, weapon ID,
+  level, the GU row its record holds, the 4U entry's 7 mSlash} (tools/portdata.py). A 4U entry ending below 450 gets none: the tool
+  requires its GU row to equal it up to that end and keeps that row (Silent Eye, 4U 38 = GU 38: 4U's bar for it stops at 400 even
+  with Handicraft, so every bar 4U shows is GU's already); any other such entry stops the build.
+- Core: module/gear.c gear_kire_slash_c on 0xf4724 (module/build.py HOOKS). A record answers its entry's mSlash[colour] when its vptr
+  is one of the 11 classes, weapon ID +8, level +9 and mKireType +0xa equal the entry's, and the monster's LevelData block of that
+  class was appended by the latest load of the table (gear_tables_loaded -> kirx_level_loaded; a refused block clears it), so another
+  mod's weapon of that ID keeps GU's row. Everything else runs GU's code. A KIRX whose rows do not end at 450 or fall is not read.
+- Logs: `gear table\weaponNNLevelData: <monster>: own 4U sharpness rows (KIRX): n` at the load, `gear <monster> wNN weapon ID LvL: own
+  sharpness ... (KIRX), not GU row R` at each entry's first answer.
+- Users: Tidal Najarala 7 weapons (her 4 appended rows stay), Shrouded Nerscylla 14. The earlier ports have no kire_near and no KIRX:
+  their sections are byte for byte the same. Tested under unicorn with the real sections (a scratch harness, not in the repo): every
+  answer, the refusals (another row, level, ID, colour 7, the XML and base vtables, a class not loaded, a refused reload) and a
+  malformed section.
+
 4U (C):
 - The melee record's u16 at +2 is two bytes: **+2 = sharpness index, +3 = kire level**.
 - Table 0xf581e4: 119 x 7 cumulative u16, the same units as GU (end 400 or 450).

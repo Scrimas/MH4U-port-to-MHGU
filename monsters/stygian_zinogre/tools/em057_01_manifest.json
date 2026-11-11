@@ -499,9 +499,9 @@
  },
  "notes": [
   "em057_01 material XfB_N__E_m03_body: template solid_nm, type 0, ['em057_01_01_BM', 'em057_01_01_BM+A', 'em057_01_01_NM_MIRROR'], 4U specular mask type 2, 2 4U animations",
-  "em057_01 material XfB__m01_light_02: template add, type 1, ['em057_01_02_BM', 'em057_01_02_BM+A'], 4U specular mask type 1",
+  "em057_01 material XfB__m01_light_02: template light, type 1, ['em057_01_02_BM', 'em057_01_02_BM+A'], 4U specular mask type 1",
   "em057_01 material XfBAN__E0__m04_head: template tar, type 4, ['em057_01_04_BM', 'em057_01_04_BM+A', 'em057_01_04_NM_MIRROR'], 4U specular mask type 2, 2 4U animations",
-  "em057_01 material XfB__m02_light_01: template add, type 2, ['em057_01_02_BM', 'em057_01_02_BM+A'], 4U specular mask type 1",
+  "em057_01 material XfB__m02_light_01: template light, type 2, ['em057_01_02_BM', 'em057_01_02_BM+A'], 4U specular mask type 1",
   "em057_01 material XfBAN__E0__m05_hair: template tar, type 5, ['em057_01_04_BM', 'em057_01_04_BM+A', 'em057_01_04_NM_MIRROR'], 4U specular mask type 2, 2 4U animations",
   "em057_01 material XfB__m00_eye: template unlit, type 0, ['em057_01_04_BM', 'em057_01_04_BM+A'], 4U specular mask type 0",
   "em057_01 material XfBAN__IW_0__m00_effect_: template add, type 3, ['em057_01_03_BM', 'em057_01_03_BM+A'], 4U specular mask type 0, 1 4U animations",

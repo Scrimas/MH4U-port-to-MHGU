@@ -1,0 +1,43 @@
+# ci.yml : checks every PR and push to main can run without game files (CONTRIBUTING.md, Checks)
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: No game data or keys
+        run: python3 tools/check_repo.py --all
+      - name: IDs (allocations.toml)
+        run: python3 tools/alloc.py
+      - name: Python compiles
+        run: git ls-files -z '*.py' | xargs -0 python3 -m py_compile
+      - name: C compiles
+        run: |
+          sudo apt-get install -y -q clang
+          pip install -q numpy Pillow       # module/build.py imports tools/ui_icons.py
+          python3 tools/ci_compile.py
+  windows:                                # the build also runs on Windows (CONTRIBUTING.md: MSYS2 toolchain)
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash                       # Git Bash, for these CI lines only: the build itself needs no shell
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Python compiles
+        run: git ls-files -z '*.py' | xargs -0 python -m py_compile
+      - name: Build scripts list their steps
+        run: for b in monsters/*/build.py maps/*/build.py; do python -X utf8 "$b" --list > /dev/null || exit 1; done
+      - name: C compiles
+        run: |
+          pip install -q numpy Pillow
+          python tools/ci_compile.py      # LLVM's clang is preinstalled on the Windows runners

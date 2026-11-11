@@ -39,6 +39,10 @@ TEMPLATES = {
     # unlit/emissive (4U emission 1, diffuse 0: em089's eye material)
     'unlit':    ('/nativeNX/arc/enemy/em004_00.arc', 'enemy\\em004\\em004_00\\mod\\em004_00', 0),  # tAlbedo, tSpecular
     'add':      ('/nativeNX/arc/enemy/em037_00.arc', 'enemy\\em037\\em037_00\\mod\\em037_00', 3),  # BSAddAlpha: tAlbedo, tSpecular
+    # 4U BSBlendAlpha (alpha = albedo.a * fTransparency, painted over what is behind it, not added to it): GU em009_00
+    # mat 4 'XfBA0__m03_eye_add' (BSBlendAlpha, DSZTestWrite, RSMeshBias7, IASkinTB2wt). The parameter list is 'add''s
+    # word for word except the texture indices and fSpecularColor 0.1 (C, 2026-11-05), and no animation block.
+    'blend':    ('/nativeNX/arc/enemy/em009_00.arc', 'enemy\\em009\\em009_00\\mod\\em009_00', 4),  # tAlbedo, tSpecular
     # em089's tar (4U 'XfBAN__EW_1__m0N_liquid_*': alpha-tested overlay, w7 alpha test ref 75; tar-look agent
     # 2026-10-18). GU em082_04 mat 4 'XfBAN__EW_1__m52_far' = the same Capcom 'XfBAN__EW_1' overlay preset: BSSolid,
     # FTransparencyAlpha (alpha = albedo.a * fTransparency, alpha test), FAlbedoMap (alpha used), FBumpNormalMap,
@@ -99,6 +103,18 @@ def set_state(w, name):
     raise SystemExit('template has no %s* state' % name[:2])
 
 
+def set_function(w, block, rec, func):
+    """select function `func` for the template's function record `rec` (kind-0 descriptor, e.g. 'FTransparency' ->
+    'FTransparency' / 'FTransparencyAlpha'). The value is encoded like a state word (checked: GU m/330 helm / body
+    symenv hold 0x171dd572 = FTransparency, 0x8e54a573 = FTransparencyAlpha)."""
+    for k in range(w[6] & 0xFFF):
+        a, v, word = struct.unpack_from('<III', block, 12 * k)
+        if a & 0xF == 0 and mrl.rec_name(0x22, word) == rec:
+            struct.pack_into('<I', block, 12 * k + 4, state_word(func))
+            return
+    raise SystemExit('template has no %s record' % rec)
+
+
 def cb_words(romfs, key):
     """{constant buffer name: descriptor word} of a template (animation tracks name their buffer by this word)."""
     w, block = load_template(romfs, key)
@@ -130,7 +146,8 @@ def build(romfs, materials, textures):
     Optional constants overwrite template constants by name (see set_constant), e.g. a 4U material animation's
     first frame baked in. Optional 6th element {'anim': GU animation block bytes (mrl_anim.build), 'mtype':
     material type (the 'mNN' of the 4U name, w6 bits 21-28), 'alpha_ref': w7 alpha-test reference 0..255, 'bias':
-    w7 depth-bias nibble (W7_* above)}. textures: [path] (no extension). Returns MRL bytes."""
+    w7 depth-bias nibble (W7_* above), 'functions': {function record: function} (set_function)}. textures: [path]
+    (no extension). Returns MRL bytes."""
     tex_off = 0x1C
     mat_off = tex_off + 76 * len(textures)
     blk_off = mat_off + 60 * len(materials)
@@ -145,6 +162,8 @@ def build(romfs, materials, textures):
         block = bytearray(block)
         for (cbname, var), values in (mat[4] if len(mat) > 4 else {}).items():
             set_constant(w, block, cbname, var, values)
+        for rec, func in extra.get('functions', {}).items():
+            set_function(w, block, rec, func)
         for off, slot in texture_slots(block, w[6] & 0xFFF):
             idx = slots.get(slot, slots['tAlbedoMap'])
             struct.pack_into('<I', block, off + 4, idx)

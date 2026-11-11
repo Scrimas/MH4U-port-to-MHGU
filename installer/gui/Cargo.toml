@@ -1,0 +1,37 @@
+[package]
+name = "mhgu-de-installer"
+description = "MHGU Definitive Edition Installer: downloads and installs the MHGU Definitive Edition mod for MHGU"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+build = "build.rs"
+
+[[bin]]
+name = "mhgu-de-installer"
+path = "src/main.rs"
+
+[dependencies]
+mhgu-de-core = { path = "../core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sys-locale = "0.3"
+image = { version = "0.25", default-features = false, features = ["png"] }
+# the same Slint as MHGU_Editor (its look, its pins); Slint's defaults without system-tray and accessibility
+slint = { version = "=1.18.1", default-features = false, features = [
+    "std",
+    "backend-default",
+    "renderer-femtovg",
+    "renderer-software",
+    "compat-1-2",
+] }
+rfd = { version = "0.15", default-features = false, features = ["xdg-portal", "tokio"] }
+# the menu entry's folders (src/desktop.rs; core uses the same)
+dirs = "6"
+
+[target.'cfg(windows)'.dependencies]
+# the Start Menu shortcut (src/desktop.rs): the version sysinfo already brings
+windows = { version = "0.61", features = ["Win32_UI_Shell", "Win32_System_Com", "Win32_Storage_FileSystem"] }
+
+[build-dependencies]
+slint-build = "=1.18.1"
+winresource = "0.1"

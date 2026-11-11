@@ -11,8 +11,9 @@ Mark every fact you write down as C (confirmed in code or data), S (strong) or G
 | `module/` | core module: hook framework (build.py), `port.c` (monsters, data files, installed check, file IDs), `quest.c`, `items.c`, `gear.c`, `notes.c`, `main.c` (shared hooks) |
 | `tools/` | core converters and helpers; `paths.py` (GU scratch / MHGU_Editor locations, overridable), `portdata.py` (data file writer / reader), `alloc.py` |
 | `notes/` | core notes (this guide, registry, enemy-class, port, api-map, assets, data, gear-weapons, installer) |
-| `monsters/<name>/` | one monster: `module/` (its C code, compiled into the core module), `tools/`, `notes/`, `package.toml` (version, C prefix), `build.sh` (every generator, in order) |
+| `monsters/<name>/` | one monster: `module/` (its C code, compiled into the core module), `tools/`, `notes/`, `package.toml` (version, C prefix), `build.py` (every generator, in order) |
 | `monsters/<name>/gen/`, `romfs/` | gitignored game data: its data file `<name>.bin` (+ the `.sec` sections) and its converted RomFS (= its assets) |
+| `maps/<map>/` | one map package (since 2026-11, core 2.0.0): a ported 4U arena (stage arcs, map UI, map_com, area streams) with its `package.toml` (`kind = "map"`, `folder`, `[stage]`), `build.py`, `tools/`, `notes/`; `romfs/` is gitignored. Monsters name it in their `package.toml` `requires` |
 | `dump/scratch/<monster>-session/` | gitignored local archive of a session scratchpad (the one-off RE / check scripts and outputs notes call "scratchpad"); copy yours there before a reboot wipes /tmp |
 
 Gogmazios files named below as `tools/*_em089.py`, `tools/build_gog_quest.py`, `tools/gogreport.py`,
@@ -86,17 +87,22 @@ pairs where possible (tools/dt_vote.py, dt_map.py, snd4u2gu.py selftest), then a
 2. **Module** (subsdk1, `module/` + every `monsters/<name>/module/`, `python3 module/build.py [install]`): the class
    (DTI + a copy of uFestaEnemy's 286-slot vtable with overrides), the registry relocation (one entry per
    allocations.toml monster), hooks, and every behaviour / shell / effect / sound port. AArch32. Hooks displace two
-   instructions into a trampoline; these must not be pc-relative or branches (build.py checks). The trampoline saves
-   r0-r5, r12, lr at regs[0..7] and the caller's stack args start at regs[8]; a handler can rewrite them. A handler
-   returning nonzero replaces the function (REPLACE_HOOKS).
+   instructions into a trampoline; these must not be pc-relative or branches, except a `bl` (re-issued through ip)
+   (build.py checks). The trampoline saves r0-r5, r12, lr at regs[0..7] and the caller's stack args start at
+   regs[8]; a handler can rewrite them. A handler returning nonzero replaces the function (REPLACE_HOOKS), returns to
+   the caller (entry hook) or jumps to a point of the same function (MID_EXIT). Forge plugins check the v1.4 bytes
+   of the functions they hook and install nothing on a mismatch, often silently (Key Quest Markers: first 0x20
+   bytes, issue #10; Damage Numbers: first 0x40, issue #13). build.py PLUGIN_CHECKED lists those ranges and refuses
+   any hook site or IPS record inside them; a hook goes past them (MID_EXIT) or behind a test switch. For a new
+   plugin, `python3 tools/plugin_sigs.py <plugin>.nro` prints its checked offsets and width for PLUGIN_CHECKED.
 3. **RomFS additions** = the monster's assets (`monsters/<name>/romfs/...`): BGM (tools/snd_bgm.py), quest arc
-   (build_gog_quest.py), the stage alias arcs if the 4U arena is ported (tools/stage4u2gu.py), the map UI
-   (tools/mapui4u2gu.py), and the gear models (tools/armor4u2gu.py, tools/weapon4u2gu.py). Never a copy of a GU
+   (build_gog_quest.py) and the gear models (tools/armor4u2gu.py, tools/weapon4u2gu.py); a ported 4U arena is its
+   own map package (`maps/<map>/romfs/`, Phase 5). Never a copy of a GU
    file: another monster would ship the same path (build.py install refuses it); patch the loaded resource instead
    (the monster name is a NAME section applied to the loaded monsterName GMD).
 4. **Content** (Phase 5b): the monster's save slot, materials, carves / rewards, armor, weapons, skill and
    decorations, Hunter's Notes entry and quests. The tools write them into the data file
-   (`nativeNX/mh4uport/<name>.bin`, tools/portdata.py: sections ITEM, BUI, TBLA, TXTA, NOTE, NAME, SKIL, PWLF, FILE);
+   (`nativeNX/mhgu_de/<name>.bin`, tools/portdata.py: sections ITEM, BUI, TBLA, TXTA, NOTE, NAME, SKIL, PWLF, FILE);
    the core patches the loaded tables (module/items.c, gear.c, notes.c), never ships resident arcs: UI mods
    replace resident.arc / resident_<lang>.arc (the
    maintainer's HD UI v4 does), and shipping blacksmith.arc from the v1.0 RomFS could undo update changes.
@@ -203,23 +209,34 @@ pairs where possible (tools/dt_vote.py, dt_map.py, snd4u2gu.py selftest), then a
 ### Phase 5: quest, arena, UI
 - Quest: tools/build_gog_quest.py (G-rank Hub extra quest 11491 via the quest_group_fix / quest_unlocked hooks).
   Copy it for a new quest ID and boss.
-- Arena: if GU lacks it, follow notes/stage.md (alias build, collision, SIS, gimmicks, lighting: the 4U unlit
-  flag is MRL w6 bit 31, GU lighting comes from the template feature). Stage-specific engine tables matter
+- Arena: if GU lacks it, it becomes a map package `maps/<map>/` (copy `maps/speartip_crag/`): `package.toml` with
+  `kind = "map"`, `folder` = the monster's allocations.toml `stage_alias[1]` and the `[stage]` table the core
+  compiles in (module/build.py stage_alias), a `build.py` with the alias steps, and `requires = ["<map>"]` in the
+  monster's `package.toml` (checked by tools/alloc.py). Several monsters may require one map: the installer adds it
+  with the first monster that needs it and removes it with the last, and the core counts a monster whose map is
+  missing as not installed (module/port.c port_installed). Then follow notes/stage.md (alias build, collision, SIS,
+  gimmicks, lighting: the 4U unlit flag is MRL w6 bit 31, GU lighting comes from the template feature). Stage-specific engine tables matter
   (e.g. 4U arena point tables are per stage: 0x689f7c uses the em's emd +0x40 table except on stage 13).
-  Second example, smaller and more generic: monsters/dalamadur/tools/build_speartip.py (4U m08 on GU stage 18,
-  host audit and the GU stage files that carry another stage's look: notes/speartip-crag.md section 7).
-- Map UI: tools/mapui4u2gu.py (area maps + whole map, transforms in its docstring); Dalamadur's build_speartip_ui.py.
+  Second example, smaller and more generic: maps/speartip_crag/tools/build_speartip.py (4U m08 on GU stage 18,
+  host audit and the GU stage files that carry another stage's look: monsters/dalamadur/notes/speartip-crag.md
+  section 7).
+- Map UI: tools/mapui4u2gu.py (area maps + whole map, transforms in its docstring); maps/speartip_crag/tools/
+  build_speartip_ui.py.
 
 ### Phase 5b: content (save, items, gear, Notes, quests)
 Order that worked: save slot -> materials -> carves / rewards -> second quest + subquests -> armor data on a GU
 stand-in model -> weapon data -> descriptions / decorations / Notes -> gear models. Each step builds clean and is
 testable alone (the maintainer checks the smithy or one quest).
-- **Save slot.** The save arrays (hunts, captures, sizes) hold registry indexes 0..136 only and every accessor
-  bounds-checks, so a new index is silently not counted. Use an unused registry slot (dummy1..7 = indexes 105..111,
-  ids 0x1064..0x106a; Gogmazios = 105). Remap at the right place: the quest-end tally 0x3a75c8 compares the
-  monster ID with the hunt objective, so remap only the INDEX after `bl 0x50b64` (hook 0x3a75fc), never the ID at the
-  entry (test 10:24: kill tallied, quest never completed). Readers: stats_hunted 0x3a3930, save_hunts 0x523104
-  (Notes page, 8 more callers). Size records 0x526f48 index a pointer table without a bound: keep them off.
+- **Save slot.** The save arrays (hunts, captures, size records) and a quest's tally hold registry indexes 0..136,
+  and the quest-end tally 0x3a75c8 and the size reader 0x526f48 have no bound check (maintainer, issue #16): every
+  ported index is counted under one of GU's unused registry slots (dummy1..7 = indexes 105..111, ids
+  0x1064..0x106a). The monsters up to v1.8.0 own all 7 (allocations.toml save_index; they never move). A new monster
+  takes `save = "lease"` instead (module/save.c, notes/save-store.md): it borrows a free slot for its quest, and its
+  hunts, captures and size records go to the mod's store in the character's reserved save block; the slot owner's
+  GU record is never written. Remap at the right place: the quest-end tally 0x3a75c8 compares the monster ID with
+  the hunt objective, so remap only the INDEX after `bl 0x50b64` (hook 0x3a75fc), never the ID at the entry (test
+  10:24: kill tallied, quest never completed). The readers by ID (0x523104, 0x526dd4, 0x526e44, 0x526f48, 0x3a3930)
+  are hooked in save.c; `python3 tools/test_save.py` tests that file without the game.
 - **Items.** Free item IDs: the "DUMMY" materials 2977..2990 and DUMMY decorations 2889..2899 (type 3). Appending
   past 2990 needs ~24 code patches. items_em089.py -> section ITEM -> items.c patches the loaded rItemData
   (0x19237c) and the itemData_<lang> GMD strings (0xb83c48, every rGUIMessage load passes there: the TXTA text
@@ -262,8 +279,90 @@ testable alone (the maintainer checks the smithy or one quest).
   conditions 0x162d1f8, display order 0x1631ef4) copied from GU's at module_init with one entry per monster
   (notes_entry = 123 + registry position), 7 loop bounds patched (build.py WORD_PATCHES; two loops are unrolled by
   two and read one record past the end: a padding record follows; an odd total needs the unrolled 0x55FF3C
-  re-checked, build.py asserts), save bits 123..127 free (5 monsters at most). Texts: description = 4U emExp[em
-  number], tips page = 4U HunterNote tip under its title.
+  re-checked, build.py asserts), save bits 123..127 (all taken since Stygian Zinogre). Entries from 128 (Black Gravios,
+  Monoblos) have no bit: the talk loops stop at 128, the list screen and 0x524728 get the state from the monster's cleared quests
+  (notes.c, end of file), the NEW mark stays off and nothing is written. Texts: description = 4U emExp[em number], tips
+  page = 4U HunterNote tip under its title.
+- **Smithy order.** A ported record comes after GU's in its create table, so GU's list builder 0x6f9438 would list it
+  last. gear.c smithy_list_c, on the builder's exit, moves ported entries to their rarity among GU's (before GU's event
+  tail), in the list only: record numbers and the save's "listed" bits stay. Nothing to do per monster; see
+  monsters/monoblos/notes/plan.md. Check a vtable slot against a call GU itself makes (0x6f92ac): the first version took
+  the slot number from a table walk that stopped early and got a function returning 1 for everything.
+- **Attacks tied to motions.** A 4U class can start attacks per frame by motion, outside its action handlers (uEm101 slot
+  48: 24 calls). Porting the handlers misses them, and GU's twin slot may keep only some (Diablos' slot 130: 3 motions).
+  List every attack call in the class, not only those in the handlers: a monster that walks through a hunter is the sign.
+- **Blended materials.** A 4U BSBlendAlpha material is not additive: template 'blend' (mrl_build), with the 4U material's
+  own emission / diffuse / specular. A material whose animations the class starts (rage veins) needs that class code ported
+  and should start in the first frame of its resting animation, or it shows all the time. Look at the texture and the
+  animation list of every BA material. Among the shipped ports only Stygian's 'XfBAN__IW_0__m00_effect_' is one (shipped
+  additive through 'add'; not re-checked, scan of 2026-11-05).
+- **Shiny drops.** Same mechanic in both games, by single moments per monster, not by damage: monsters/monoblos/notes/
+  plan.md "Shiny drops". The table comes with the hagi tool; the triggers do not come by themselves when a handler is
+  ported (grep the 4U class for 0x911f58 and for op 24 in its reaction tables).
+- **Every data file must fit the module's pool.** module/port.c loads all `<name>.bin` into one pool in registry order. A file past
+  its end is refused with only a log line, and a monster without its data keeps its donor's manifest: it spawns as the donor, with
+  no items, gear or Notes of its own, while its hooks still run. The size lives in tools/alloc.py DATA_POOL and module/build.py refuses
+  a build that does not fit. "Looks like the donor" = read the `data ... loaded` lines first.
+- **Tables that are full (Tidal Najarala, 2026-11-06).** Before a new monster with gear, read these: sharpness (mKireType is
+  a byte: GU 164 + the ports' rows = 256, so new rows are out: `kire_reuse` takes GU's equal row, `kire_near` the nearest one as the
+  fallback, and `build(spec, exact)` gives those weapons their 4U row anyway through the core, KIRX, since Shrouded Nerscylla,
+  notes/gear-weapons.md section 6; a 4U entry ending at 400 stays on GU's row of it); armor "listed"
+  bits (576 records per part, full on the head; past them module/gear.c keeps the bit in the mod's store, 20 records per part, since
+  Shrouded Nerscylla; weapons have 160 per class, the most is 105); monsterName's first-list dummies (second list: entries 222..225 left after Monoblos' 221,
+  tools/alloc.py NAME_DUMMY; a TXTA-appended name fails on the Notes page, which reads the entry as a byte, 0x5b2298); hub quests loaded (814 GU + 33 ports with Shrouded Nerscylla against the loader's cap 864, S: monsters/stygian_zinogre/notes/quests.md).
+- **Weapons on GU's balance (Shrouded Nerscylla).** GU's weapons level on past 4U's values, and a port's weapon has one level: 4U rarity 9 raw 180..260 stands against
+  GU's final levels of about 310. `weapons4u.gu_scale` gives a class's median of GU's final level / 4U over the weapons both games have by name; class spec `raw_scale`, `elem_scale`.
+  The earlier ports keep 4U's values (opt-in).
+- **Is every native reachable? (Shrouded Nerscylla).** Emulating the dispatcher can stop at the category function when it holds the case inline. Read the jump table of each category too: a number on the
+  table's default goes to the "no case" thunk 0xca10c. A native that only 4U's chains name is harmless there; one a script names is not.
+- **GU may have dropped a subspecies altogether (Shrouded Nerscylla).** Unlike Najarala's and Zamtrios' classes, GU's Nerscylla class reads its variant byte once. Then the list of 4U's species tests is the work list: most came out as data
+  (a shell subtype that differs only in its effect group is a PEL list 2 mapping), and the byte a handler uses for 4U's flag may have moved (W+0x42c -> rec+0x3b4).
+- **A hub quest moved to the village keeps 4 Maps (Shrouded Nerscylla, Tidal Najarala until 0.2.4).** GU's village boxes hold one Map and its hub boxes four, one per player (C: all 891 quests: village 0 or 1, hub 0 or 4); a 4U hub quest holds four as well. Count the Map slots of every box you build, not only "is anything else at the start".
+- **Hitzone rows do not always start at the same byte (Shrouded Nerscylla).** Nerscylla's dttune has them at file +0x8c, Najarala's at +0x8e. Find 4U's own row (etd word 7) in the file before reading columns: a row read 2 bytes late still looks like plausible numbers.
+- **A hosted monster on a map its donor has no data for (Tidal Najarala).** Read every area file for that map, not only next-area data: area_link has 3 kinds with different jobs (kind 4 = the way to the sleep
+  area, reason 1 at 0xb870c: a kind copied from another monster leads to that monster's sleep area), and area_eat with no row for the map means chance 0 of ever going to eat (0xb7e90). A 4U hop between two
+  areas is only usable if GU's stage has the exit point (monsters/tidal_najarala/tools/routes_em068_01.py gu_exits: flags bit 1, other area, variant 0, her Group). Dive movers surface at flags-0x20 points whichever
+  area they left; without an exit point they travel toward the last exit they knew.
+- **Shell families are data (Tidal Najarala).** GU's generic EmBase36 shells take their kinds from the family's def XFS, so new
+  launches are new ShellInfo objects with their sh files, and only the request needs a hook
+  (monsters/tidal_najarala/tools/build_em068_01_arc.py extend_def).
+- **A hosted subspecies: list all species tests.** Compare every 4U species test in the class with GU's variant tests, not only
+  the handlers' (Tidal Najarala: 71 in 4U; GU had dropped her launches, one speed and her reaction waits). Name a material
+  animation by brute force over the exe's strings before porting code for it: hers were all frenzy steps.
+- **A kept GU handler can have lost its shot (Tidal Najarala).** Comparing attack indexes and species tests is not enough: list
+  every shell post of each 4U handler and find its twin in GU. GU's twin of her water jet (actions 7/48-51, 7/62-65) kept the
+  motions but writes two fields where 4U posts the shell and chooses a scale, and the first comparison passed it anyway
+  (monsters/tidal_najarala/module/em068_01_jet.c).
+- **A shell family's def finds only what the arc has loaded (Tidal Najarala).** New kinds' ef / snd / hit / sh files go before
+  the def. Appended at the arc's end, those kinds had no effect, hit data or offset, with no error and a valid shell handle: log
+  the effect handle of every kind, not of the first.
+- **Effect models (Tidal Najarala).** Vertex RGB 127 = 1.0, so a colourless solid mesh filled white draws at 2x, a flat white
+  block (tools/efl4u2gu.py solid_fill; the shipped sets keep white, their grey chunks are hidden). Where GU has Capcom's
+  conversion of a sibling of the 4U model, take its material (solid_templates).
+- **Map a shell's effects by 4U's state table, not by a guess from the names.** uShell015's 0x102a938 has flight, planted, rattle,
+  blast and gone per species, and an EFL's mask 2 came only in a special state (S: frenzy): GU's class posts both masks for
+  Najarala, so that look drew over the plain one. Read what ends a shell per species as well: a rattle blast can be Najarala's alone.
+- **A subspecies' motions can be its parent's, and GU holds those finer (Tidal Najarala).** Compare tracks, not only frames: all 170 of
+  her shared slots were 4U em023's track for track, and GU's em068_00 stores the same animations at 11 / 9-bit rotation against 7. With
+  an equal skeleton take GU's tracks and keep the 4U event blocks (tools/lmt.py with_tracks). A long chain of bones adds up coarse rotations.
+- **"The ground effects are missing" can mean grey, at the joint (Tidal Najarala).** A 4U dust unit with Intensity 1 draws at 2x and with
+  the soil baked in it can be white in 4U and grey in GU (efl4u2gu spec `intensity`, opt-in; the shipped sets stay as they are). MEF flag bit
+  1 puts the effect on the owner's ground every frame, GU's tail places it at the joint, inside the body: a world record with the point from a
+  hook on the PSL post (monsters/tidal_najarala/module/em068_01_fx.c). The grey chunks hidden on brown stages are snow on a white one.
+- **GU's common dust cm202_* holds a set per ground, and 0x100 is the snow set (Tidal Najarala).** Sets by element ground word: 0x22 / 0x2 plain, 0x54
+  water, 0x4, 0x8 lava, 0x80 dark, 0x100 white; Capcom bakes 0x100 into the records of monsters of snow. A port on snow can play GU's file with that
+  set instead of 4U's dust, with GU's stage tint in the record (tools/build_em068_01_arc.py SNOW_EFL). The ground attribute does not tell snow (word 0 on the
+  Frozen Seaway), and how GU picks a set for its own -1 records was not found: name it in the request.
+- **A body as long as a snake needs more than 8 blend frames (Tidal Najarala).** A log line per sudden joint step found what the eye called a teleport: the
+  turn that cuts her slither short whips the body across, in both games' code. A log first, a theory second: I had blamed the coarse tracks.
+  Look for every one-frame step, not only the first: a handler may start the next motion of an attack with blend 0 (her spit 0x402 -> 0x403, GU f86708 = 4U
+  0x765e80), and a single motion after a two-layer pair drops layer 1 at once (0xafda4 -> 0x726dc(this, 0.0), 0x53a164: layer 1 -> 0xffff, blend 0).
+- **GU's common effects of a donor that lives elsewhere (Shrouded Nerscylla).** Taking the donor's cm* records for the shared animations took GU
+  Nerscylla's forest debris (cm200_067: green model units, ground word 0x20) onto the Dunes, since PEL c posts draw every set. Read each taken file's
+  elements (colour, models, ground word) against the port's stage, and check what 4U effect it replaces: GU's slot may hold nothing visible there (her
+  dig-in). monsters/shrouded_nerscylla/tools/build_em070_01_arc.py GU_FOREST / KEEP_4U.
+- **A 4U AI table can pick its selector by quest rank (Monoblos, Stygian).** Op 0x6a (GU 0x3a8d68: 3 HR, 5 G) chooses whole selectors: Monoblos burrows
+  16..24 % of picks at HR and 29..51 % at G. Count a behaviour per rank before calling a log's rate wrong; test both ranks.
 - **Gear models.** tools/armor4u2gu.py (player bones 0-19 identical in both games, 20+ = cloth bones driven by the
   CTC; MRL templates from Capcom's own 4U -> GU pairs) and tools/weapon4u2gu.py (same pipeline + material
   animations). Converted arcs go to monsters/<name>/romfs/nativeNX/arc/player/com/{m,f}/<model>/ and
@@ -284,17 +383,17 @@ testable alone (the maintainer checks the smithy or one quest).
   request IDs come from 4U. mSndMaterial (bone / iron hit set) has no 4U source. `check` / `selftest` verify.
 
 ### Phase 6: test loop
-0. Rebuild the monster's data and assets from the dumps: `monsters/<name>/build.sh` (every generator in order, then
+0. Rebuild the monster's data and assets from the dumps: `python3 monsters/<name>/build.py` (every generator in order, then
    `tools/portdata.py pack`; one line per step).
 1. Build both variants and check for 0 warnings:
    `python3 module/build.py`, and with defines, e.g. `GOG_DEFINES="GOG_STAGE_ALIAS TEST_HP_PCT=55 TEST_RAGE=60"`.
 2. Install only on the maintainer's go:
    `GOG_DEFINES=... GOG_MOD_ROOT=$HOME/.config/Ryujinx/mods python3 module/build.py install` (exefs + every data
    file + the assets of PORT_ASSETS = comma-separated names, default all, `none` = none) into the mod folder
-   "MH4U Port".
+   "MHGU Definitive Edition".
 3. The maintainer plays and closes. Read the log with `python3 monsters/gogmazios/tools/gogreport.py` (extend it for the
-   new monster's lines; core lines start with `mh4uport:`) and ask only about visuals.
-4. Uninstall: `rm -rf ~/.config/Ryujinx/mods/contents/0100770008dd8000/"MH4U Port"`.
+   new monster's lines; core lines start with `mhgu-de:`) and ask only about visuals.
+4. Uninstall: `rm -rf ~/.config/Ryujinx/mods/contents/0100770008dd8000/"MHGU Definitive Edition"`.
 Automated smoke runs without the maintainer: tools/ryutest.sh. `build.py install` without GOG_MOD_ROOT installs into the
 isolated ryuroot/; `ryutest.sh gui` boots it windowed on hidden workspace 10 (headless `run` aborts ~1.5 s in) and
 its log (written to ~/.config/Ryujinx/Logs) shows the boot-time table patches (items, armor / skill / weapon /
@@ -374,6 +473,12 @@ Notes: monsters/tigerstripe_zamtrios/notes/ (plan, phase1-variant-map, missing-a
 - **Missing actions:** GU's dispatcher ends unknown actions through the base thunks 0xca118 / 0xca10c (slot 247).
   Hooking them works only with a return-address filter (the dispatcher's own no-case path): other callers use the
   same thunks to END actions, and running a move there left the AI with a null script pointer (crash).
+- **Mesh groups of a hosted variant:** every group starts drawn, only the class switches them (0xba258, slot 132), and a class
+  may do that for its own variants only: uEm007_00's slot 132 leaves every variant but 0 and 4 at once. Read the slot's
+  `#0xb5f5` tests before relying on a state, and read which states GU's 0x6f5a4 was given at slot 118. Numbers in a state
+  are not transferable either: Monoblos' eye is group 2, Diablos' 5. Take the roles from the species' own 4U rows
+  (`emdata4u.part_rows`). A red eye or a stump on a healthy monster means this (Monoblos 0.4.6; Stygian's issue #8 had the
+  same symptom when its slot 132 was skipped).
 - **Command table (EMC):** GU's AI interpreter reads 4U tables, but GU changed the language around them. Area moves
   are engine opcodes (0x94 setup, 0x95 start, 0x9e advance) that 4U tables never contain (4U's 0x03 / 0x06 / 0x36 /
   0x4d are no-ops in GU); map cases (`2a`) use GU stage ids (4U 17 Dunes -> 5, 4 -> 14); GU class code picks
@@ -407,7 +512,7 @@ Notes: monsters/tigerstripe_zamtrios/notes/ (plan, phase1-variant-map, missing-a
   IDs and DUMMY quest_group slots (only 11491 / 11492 and slots 1011009 / 1011003 are checked free: check more and
   extend the pools), and its gear tools: the Gogmazios ones compute IDs as the v1.0 counts, a second monster's must
   start at GU's count + alloc.offset(name, table) (allocations.toml [monster.append], frozen once released).
-- Its own folder monsters/<name>/ with a build.sh like Gogmazios'.
+- Its own folder monsters/<name>/ with a build.py like Gogmazios' (steps through tools/steps.py: Linux and Windows).
 
 ## Lessons from Stygian Zinogre's quests and gear (2026-10-28)
 - A quest with a real GU monster of the stand-in's own species (4U m10612: Zinogre + Stygian): name the port by a
@@ -424,3 +529,9 @@ Notes: monsters/tigerstripe_zamtrios/notes/ (plan, phase1-variant-map, missing-a
 - Gear converters: a GU template with a sphere map for a 4U material without an extend map now falls back to a
   template without one (tools/weapon4u2gu.py and tools/armor4u2gu.py pick_template; outputs that converted before
   are unchanged). Check that every armor model the records name is converted (Stygian's were missing).
+- Armor colour (Shrouded Nerscylla, 2026-11-09): 4U's piece colour (record +19) goes to the series' default dye, and GU
+  tints a piece's 'sym' material (type 3) with it, but in full only when that material's FTransparency function is
+  plain FTransparency. Capcom's conversions often give it FTransparencyAlpha (GU's own Nerscylla X body and arms,
+  dyed near white); then the colour nearly vanishes, and her chest and arms stayed the cream of the texture while
+  helm, waist and legs were dark. New ports with a dark or strong 4U colour: build the armor with
+  armor(ROMFS, ARMOR, '--opaque-tint') (tools/steps.py) and compare every piece in the smithy against 4U.

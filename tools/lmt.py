@@ -8,6 +8,7 @@ at load). Layout read off 4U em022 / em092 and GU em067_00 (tools/efl4u2gu.py lm
   event block 4 groups x 0x48 bytes: u16 remap[32], u32 count, u32 pointer to count x {u32 bits, u32 frames}
 
   splice(dst, src, [(src index, dst index)]) -> dst with those animations of src appended (dst slots must be empty)
+  with_tracks(dst, src, [(src index, dst index)]) -> dst rebuilt, those animations with src's tracks and dst's event block
 """
 import struct
 
@@ -97,4 +98,66 @@ def splice(dst, src, pairs):
         blocks(res, anims(res)[di])
     for i, o in enumerate(da):                 # the destination's own animations are untouched
         if o: assert _view(res, o) == _view(dst, o), i
+    return res
+
+
+def _track_keys(d, o):
+    """an animation's tracks as (usage, joint type, bone)"""
+    tr, tc = struct.unpack_from('<II', d, o)
+    return [d[tr + TRACK * k + 1:tr + TRACK * k + 4] for k in range(tc)]
+
+
+def with_tracks(dst, src, pairs):
+    """dst rebuilt from its parts: the animations of pairs [(src index, dst index)] take src's tracks (table, buffers, bounds), everything else stays dst's, event blocks too.
+    Nothing of the replaced tracks is left behind. The same motion in two forms: frames, loop and track keys must be equal (asserted). For a monster whose motions the other game
+    stores finer, Capcom's conversion of the same animation (Tidal Najarala: 4U 7-bit quaternions, GU 11-bit)."""
+    sa, da = anims(src), anims(dst)
+    use = {}
+    for si, di in pairs:
+        assert sa[si] and da[di], (si, di, 'empty slot')
+        assert src[sa[si] + 8:sa[si] + 16] == dst[da[di] + 8:da[di] + 16], (si, di, 'frames or loop differ')
+        assert _track_keys(src, sa[si]) == _track_keys(dst, da[di]), (si, di, 'track keys differ')
+        use[di] = si
+    out = bytearray(dst[:8 + 4 * len(da)])
+
+    def put(data):
+        out.extend(bytes(-len(out) % 16))
+        at = len(out)
+        out.extend(data)
+        return at
+
+    for i, o in enumerate(da):
+        if not o: continue
+        tab, so = (src, sa[use[i]]) if i in use else (dst, o)
+        a = put(dst[o:o + ANIM])
+        struct.pack_into('<I', out, 8 + 4 * i, a)
+        tr, tc = struct.unpack_from('<II', tab, so)
+        if tc:
+            t0 = put(tab[tr:tr + TRACK * tc])
+            struct.pack_into('<I', out, a, t0)
+            for k in range(tc):
+                t = t0 + TRACK * k
+                size, buf = struct.unpack_from('<II', out, t + 8)
+                bnd = struct.unpack_from('<I', out, t + 0x20)[0]
+                if buf: struct.pack_into('<I', out, t + 0xc, put(tab[buf:buf + size]))
+                if bnd: struct.pack_into('<I', out, t + 0x20, put(tab[bnd:bnd + BOUNDS]))
+        ev = struct.unpack_from('<I', dst, o + 0x34)[0]
+        if ev:
+            e0 = put(dst[ev:ev + GROUP * GROUPS])
+            struct.pack_into('<I', out, a + 0x34, e0)
+            for g in range(GROUPS):
+                cnt, ptr = struct.unpack_from('<II', dst, ev + GROUP * g + 0x40)
+                if ptr and cnt: struct.pack_into('<I', out, e0 + GROUP * g + 0x44, put(dst[ptr:ptr + 8 * cnt]))
+    out.extend(bytes(-len(out) % 16))
+    res = bytes(out)
+    ra = anims(res)
+    tracks = lambda v, n: v[1:1 + 3 * n]        # _view: header, 3 entries per track, then the event groups
+    for i, o in enumerate(da):                  # every animation reads back through its new pointers
+        if not o: continue
+        blocks(res, ra[i])
+        vr, vd = _view(res, ra[i]), _view(dst, o)
+        n = struct.unpack_from('<I', dst, o + 4)[0]
+        assert vr[0] == vd[0] and vr[1 + 3 * n:] == vd[1 + 3 * n:], (i, 'header or events changed')
+        want = _view(src, sa[use[i]]) if i in use else vd
+        assert tracks(vr, n) == tracks(want, n), (i, 'tracks')
     return res

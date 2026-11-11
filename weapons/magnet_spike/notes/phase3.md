@@ -569,3 +569,37 @@ gone (..., in manager, small, hp, area, hunter area)`; `msport: mhf effect ... m
 `msport: event-9 i-frame keep on in action A (frame F)` and `msport: event-9 i-frame keep off (action change |
 event 7 / 8 | GU action, next N) after T ticks of action A, GU timer G/60 s` (step H; G = what is left, 4 = 2 MHF
 ticks).
+
+## Merge of main (2026-11-11, WIP)
+main (e38a25d: installer, rebrand to MHGU Definitive Edition, maps) merged into the branch. No in-game test since.
+- Conflicts: `.gitignore` (both sides kept), `ARCHITECTURE.md` (main's maps block + the branch's weapon entry),
+  `module/gear.c` (main's `kirx_level_loaded` line, then the branch's `s_kire_cls` under `MS_SLICE`).
+- Main's sharpness hook (KIRX) matches classes 0-3, 7-9, 11-14 only: class 5 falls through to GU's code, which
+  reads the rows the Magnet Spike appends (C, read in the merged gear.c).
+- The 21 `ms_` hooks overlap no hook, literal or patch site of main. Two sit within 0x40 bytes of hooks main added
+  and are independent: `ms_box_loaded` 0x3e7804 / `save_loaded` 0x3e77f0, `ms_forge_create` 0x6f9658 /
+  `smithy_list` 0x6f9644.
+- The weapon's HUD textures moved from `nativeNX/mh4uport/` to `nativeNX/mhgu_de/` (ms_class.c `res_get` paths,
+  mshud.py): `mh4uport` is the pre-2.0 data folder, which the installer treats as a leftover. The four .tex are
+  byte-identical to before. Older test records above still say `mh4uport`.
+- Install: `GOG_MOD_ROOT=~/.config/Ryujinx/mods` now writes `contents/0100770008dd8000/MHGU Definitive Edition/`
+  and removes the old `MH4U Port` folder (the stale test 21 build is still in it until the next install; both
+  folders at once would load the module twice). The maps' romfs come along as dependencies.
+- `tools/xfs.py` (the branch's resource fields, type 128) against main's on every XFS file of the 627 built monster
+  and map arcs: 945 files without resource fields round-trip with both; 66 with resource fields only with the
+  branch's (main's raises on 13 and loops without end on 53: bound any such check in time and memory); 0 files
+  that main's handles and the branch's does not.
+- Checked after the merge: `msbuild.py` (effcheck 111 EFLs, 602 Model units, 0 problems), `fxplace.py` (hand piece
+  0.0 cm; median 0.00 / max 1.97 cm), `alloc.py`, `doctor.py`, `ci_compile.py`, the module without `MS_SLICE`
+  byte-identical to main's own build, then with `MS_SLICE` (the last build, as always).
+- `release.py check` says "not releasable" on the maintainer's local tree (gen data older than the versions in
+  main's `package.toml`, three local Heaven's Mount quests outside its allocations): local builds, not the merge.
+
+### Rarity (step R, static; the maintainer chose MHF's raw rarity)
+- GU stores u8 mRare = rarity - 1 at weapon record +0xf; "X" is mRare 10; the name-colour table 0x18994b4 has 11
+  entries and no bounds check (C).
+- MHF 2 and 6 can be stored as they are; 11 fits as X; 12 cannot be shown cleanly (the colour would be read past
+  the table: a wrong colour, no crash, S).
+- Least invasive traced option: store 11 and 12 as X, no patch. A true 11 / 12 needs a hook of 0x56e704 and a
+  13-entry colour table; box sort, price, save and LDN packets are not traced. The maintainer's decision; nothing
+  changed yet.

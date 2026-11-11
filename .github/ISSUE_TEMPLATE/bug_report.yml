@@ -1,0 +1,47 @@
+name: Bug report
+description: Something in the mod does not work, crashes, or differs from MH4U
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "Thanks! Never attach game files (arcs, saves, dumps). Logs and screenshots are fine."
+  - type: input
+    id: versions
+    attributes:
+      label: Release and how you installed it
+      description: With the installer, the release it shows at the top. By hand, every zip in your MHGU Definitive Edition folder (all from one release, never mixed).
+      placeholder: "2.0.0 with the installer / by hand: core-2.0.0, gogmazios-1.1.7, map-battlequarters-1.0.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Where you play
+      options: [Ryujinx, Yuzu / Eden, Switch (Atmosphère), MHGU PC Recomp, Other emulator / platform]
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Solo or online
+      options: [Solo, Online (everyone has the same release and monsters), Online (not sure about the others')]
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: What happened
+      description: The quest and monster, what you did, what happened, and what you expected (what MH4U does, if you know).
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: >-
+        Attach the log of the session (drag the file here).
+        Ryujinx: File > Open Logs Folder, the newest file.
+        Yuzu / Eden: File > Open the emulator's folder (yuzu / Eden Folder), then log/, the newest .txt.
+        Other: any log it writes. Screenshots or a clip help for anything visual.
+    validations:
+      required: true

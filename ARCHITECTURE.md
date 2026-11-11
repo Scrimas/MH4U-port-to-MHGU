@@ -1,9 +1,10 @@
 # Architecture
 
-MH4U Port adds Monster Hunter 4 Ultimate monsters (with their quests, armor, weapons and skills) to Monster Hunter
-Generations Ultimate (Switch, v1.4). Everything is **added**; no GU monster, quest or item is replaced.
-Ported so far: Gogmazios, Dalamadur / Shah Dalamadur, Tigerstripe Zamtrios, Stygian Zinogre. In progress: the
-Magnet Spike weapon class from MHF-ZZ.
+MHGU Definitive Edition (MH4U Port before 2.0.0) adds Monster Hunter 4 Ultimate monsters (with their quests, armor,
+weapons and skills) to Monster Hunter Generations Ultimate (Switch, v1.4). Everything is **added**; no GU monster,
+quest or item is replaced.
+Ported so far: Gogmazios, Dalamadur / Shah Dalamadur, Tigerstripe Zamtrios, Stygian Zinogre, Black Gravios, Monoblos,
+Tidal Najarala, Shrouded Nerscylla. In progress: the Magnet Spike weapon class from MHF-ZZ.
 
 **No game data is in git.** Every asset and every table holding 4U text or records is rebuilt locally from your own
 4U / GU dumps by the converters in `tools/` and `monsters/<name>/tools/`.
@@ -13,17 +14,19 @@ New contributor? Start with `CONTRIBUTING.md` (setup, quick start, workflow), th
 
 ## How it runs in the game
 
-A release is one mod folder, `MH4U Port/`, loaded by the emulator (Ryujinx) or Atmosphere:
+A release is one mod folder, `MHGU Definitive Edition/`, loaded by the emulator (Ryujinx) or Atmosphere:
 
 | Path in the mod | Built from | Role |
 |---|---|---|
 | `exefs/subsdk1` | `module/` (C) + each monster's `module/` | Code injected into GU: hooks and the ported monster classes |
 | `exefs/<build id>.ips` | `module/build.py` | Patch to GU's `main` that branches into the hooks (trampolines) |
-| `romfs/nativeNX/mh4uport/<name>.bin` | `monsters/<name>/gen/` (`tools/portdata.py`) | Per-monster data file read by the code at run time |
-| `romfs/nativeNX/...` (arcs, textures, sounds) | `monsters/<name>/romfs/` | Converted 4U assets (layeredFS) |
+| `romfs/nativeNX/mhgu_de/<name>.bin` | `monsters/<name>/gen/` (`tools/portdata.py`) | Per-monster data file read by the code at run time |
+| `romfs/nativeNX/...` (arcs, textures, sounds) | `monsters/<name>/romfs/`, `maps/<map>/romfs/` | Converted 4U assets (layeredFS) |
 
-Release = `core-<v>.zip` (exefs + data files) + one optional zip per monster (its assets), all merged into the same
-folder. A release's zips are one matched set: never mix versions.
+Release = `core-<v>.zip` (exefs + data files) + one optional zip per monster (its assets) + one per map (a ported
+arena, `map-<map>-<v>.zip`, needed by the monsters that `require` it), all merged into the same folder, with a
+`manifest.json` and `icons-<v>.zip` for the installer (notes/installer.md). A release's zips are one matched set:
+never mix versions.
 
 ## Repository layout
 
@@ -41,6 +44,7 @@ module/               Core C module (the shared engine of the port):
   gear.c gear_hooks.txt   armor, weapons, skills
   items.c                 items appended to GU's tables
   bgm.c icons.c notes.c   music, UI icons, Hunter's Notes
+  save.c                  the mod's save store and per-quest leases of the save slots (notes/save-store.md)
   stage_alias.c           maps 4U stages onto GU stage slots
   game.h util.c util.h    GU structures and helpers
   core.toml               core version and build config
@@ -63,27 +67,35 @@ tools/                ~60 Python scripts (shared by every port):
                       vtable slots to GU's, resolve 4U action dispatchers
   ids / packing       alloc.py portdata.py paths.py (every input / output path, overridable by environment)
   setup               setup.py (makes dump/ from your own dumps, step by step), doctor.py (checks the machine,
-                      inputs and outputs), gu_stage_files.txt (the GU stage files setup.py copies)
+                      inputs and outputs), gu_stage_files.txt (the GU stage files setup.py copies),
+                      steps.py (the step runner of every monsters/<name>/build.py: Linux and Windows, no shell)
   gulib/              GU readers vendored from MHGU_Editor: romfs (Ryujinx folder or image), arc, gmd, asm
                       (index of GU main's disassembly), vt, build_assets subset, monster-index.csv; tools put it
                       first on sys.path (paths.GU_PY), so its arc.py shadows tools/arc.py there
   pipeline            release.py (build, check, package, publish), ryutest.sh (isolated Ryujinx test run;
                       maintainer's machine: Hyprland, fixed NSP path)
 monsters/<name>/      One port each: gogmazios, dalamadur, stygian_zinogre, tigerstripe_zamtrios
-  build.sh              rebuilds every output of this monster from the dumps, step by step
+  build.py              rebuilds every output of this monster from the dumps, step by step (tools/steps.py)
   tools/                monster-specific generators (arc build, quests, gear, action tables)
   module/               the monster's C code (class, actions, shells, effects, stage gimmicks),
                         compiled into subsdk1 with the core
   notes/                study notes, behaviour notes, port checklist, release notes
+maps/<map>/           One ported arena each: battlequarters (m28), speartip_crag (m29), heavens_mount (m30)
+  package.toml          kind "map", version, folder (= the monsters' stage_alias), [stage] (compiled into the core)
+  build.py, tools/      its alias stage arcs, map UI, map_com, area streams (tools/steps.py)
+  notes/                links to the study notes (kept with the port that made the arena)
 weapons/magnet_spike/ WIP, branch magnet-spike: MHF-ZZ's Magnet Spike as GU weapon class 5, built only with the
                       MS_SLICE switch. tools/msbuild.py (MHF data from dump/mhf + GU templates) -> romfs/ and gen/
                       (gitignored); module/ = its C code (in subsdk1); notes/ = study, phases, test results
 requirements.txt      Python packages (one .venv for every tool)
-installer/            Rust + Slint GUI installer (AppImage / exe via .github/workflows). Dormant:
-                      releases ship zips only.
+migrations.toml       save migration steps for the installer (empty: shipped IDs never move)
+installer/            MHGU Definitive Edition Installer (Rust + Slint): core/ (releases, places, planner, install,
+                      saves), gui/, vendor/mhgu-save (MHGU_Editor's save parser), tests/, packaging/
+                      (notes/installer.md)
 notes/                Project docs: porting-guide (start here), port, api-map, data, enemy-class,
                       registry, gear-weapons, items-append, assets, installer, release-news
-.github/workflows/    Manual installer build (a release itself cannot be built in CI: it needs ~15 GB of dumps)
+.github/workflows/    ci.yml (checks without game data), installer.yml (installer tests; builds and a draft
+                      release on v* tags). A mod release cannot be built in CI: it needs ~15 GB of dumps
 ```
 
 ### Local only (gitignored)
@@ -93,6 +105,7 @@ dump/                 Game dumps and everything derived from them (detailed belo
 monsters/*/romfs*/    Converted assets of each monster (its assets package; romfs-<donor>/ = alternative or
                       experimental builds)
 monsters/*/gen/       Generated tables holding 4U text / records -> packed into <name>.bin
+maps/*/romfs/         Converted assets of each map package
 ryuroot/              Isolated Ryujinx data dir used by tools/ryutest.sh (keys, mods, test save)
 module/out/           Build output (subsdk1, IPS, alloc.h)
 installer/target|dist Rust build output
@@ -160,9 +173,10 @@ Intermediate data
   stage_alias_report.json   output of the stage alias check (module/stage_alias.c)
 
 Logs and outputs
-  build_logs/<monster>/ one log per build.sh step
+  build_logs/<monster>/ one log per build.py step
   install_logs/         one log per install.sh run (rebuilt steps, switches, targets)
-  release/v<x.y.z>/     packaged release zips + NOTES.md (tools/release.py); release_build.log
+  release/v<x.y.z>/     packaged release zips, manifest.json, NOTES.md (-Packages), NOTES-main.md (this repository's
+                        release) (tools/release.py); release_build.log
   scratch/              per-session working notes and throwaway scripts
 ```
 
@@ -182,9 +196,12 @@ stay local; `notes/` records what came out of them.
 ```
 your 4U / GU dumps (dump/)
   -> python3 tools/setup.py        derived inputs in dump/ (once; tools/doctor.py checks everything)
-  -> monsters/<name>/build.sh      converters write monsters/<name>/romfs/ and gen/
+  -> python3 monsters/<name>/build.py   converters write monsters/<name>/romfs/ and gen/
+  -> python3 maps/<map>/build.py        the arenas' converters write maps/<map>/romfs/
   -> python3 module/build.py       core + every monster's module/ -> subsdk1 + IPS (reads allocations.toml)
   -> python3 tools/release.py all  build + checks + zips into dump/release/v<core version>/
+  -> python3 tools/release.py publish   the zips on MHGU-Definitive-Edition-Packages, the text of this repository's
+                                   installer release (drafted by .github/workflows/installer.yml on the v<version> tag)
 ```
 
 Feature and test switches are C `#ifdef`s, enabled with `GOG_DEFINES="NAME1 NAME2" python3 module/build.py`;
@@ -194,7 +211,8 @@ release builds use none of the test switches.
 
 1. **Identify**: find the 4U class, its em number, files and quests; reserve IDs in `allocations.toml`.
 2. **Assets**: convert models, textures, animations, collision, effects, sounds into GU arcs.
-3. **Register**: add the class to the relocated registry (`module/port.c`), name, icon, save slots.
+3. **Register**: add the class to the relocated registry (`module/port.c`), name, icon, save slot (a new monster:
+   `save = "lease"`, `module/save.c`).
 4. **Behaviour**: reimplement the 4U AI / actions / shells in C under `monsters/<name>/module/`, mapping 4U engine
    calls to GU's (`tools/apimap*`).
 5. **Content**: quests (at the rank matching 4U), arena / stage, music, items, armor, weapons, skills, Hunter's

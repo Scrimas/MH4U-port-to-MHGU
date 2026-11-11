@@ -527,7 +527,12 @@ def main():
     for b in BANKS:
         ents.append((P + 'mot\\em067_01_%d' % b, T['LMT'], motion_bank(S, b, notes)))
         own[4 + b] = (P + 'mot\\em067_01_%d' % b, T['LMT'])
-    ents.append((P + 'mot\\em067_01_cam', T['LCM'], lcm4u2gu.convert(S[(P4 + 'mot\\e092_cam', T['LCM'])])))
+    # 4U e092_cam + GU em067_00's own cameras 40.. (lcm4u2gu.GU_ONLY_IDS: the kill cam; no 4U LCM has ids >= 40;
+    # issue #8, confirmed on Stygian Zinogre with GU em057_00's)
+    gu_cam = [d for p, t, d in gents if p == 'enemy\\em067\\em067_00\\mot\\em067_00_cam' and t == T['LCM']]
+    assert len(gu_cam) == 1, 'GU em067_00 camera list'
+    ents.append((P + 'mot\\em067_01_cam', T['LCM'],
+                 lcm4u2gu.add_records(lcm4u2gu.convert(S[(P4 + 'mot\\e092_cam', T['LCM'])]), gu_cam[0])))
     own[11] = (P + 'mot\\em067_01_cam', T['LCM'])
     gu_cmd = [d for p, t, d in gents if p.startswith('enemy\\cmd_tbl\\em067_00') and t == T['EMC']]
     assert len(gu_cmd) == 1

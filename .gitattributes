@@ -1,0 +1,4 @@
+# Text files keep LF line endings on every OS (Windows checkouts too: the C module, the tools and their text outputs
+# are compared byte for byte across machines); git detects binary files itself.
+* text=auto eol=lf
+*.png binary

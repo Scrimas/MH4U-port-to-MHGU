@@ -4,13 +4,21 @@ the command that fixes it; exit 1 if anything required fails. Run it first, and 
 
   python3 tools/doctor.py [--quick]        --quick: skip the SHA-256 checks
 """
-import ctypes.util, glob, hashlib, importlib, os, shutil, subprocess, sys
+import glob, hashlib, importlib, os, re, shutil, subprocess, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import paths  # noqa: E402
 
-VENV = 'python3 -m venv .venv && .venv/bin/pip install -r requirements.txt, then activate .venv'
-SETUP = 'python3 tools/setup.py'
+WINDOWS = os.name == 'nt'
+if WINDOWS:
+    VENV = r'py -m venv .venv && .venv\Scripts\pip install -r requirements.txt, then .venv\Scripts\activate'
+    SETUP = 'python tools/setup.py'
+    TOOLS_FIX = (r'MSYS2 UCRT64: pacman -S mingw-w64-ucrt-x86_64-{clang,lld,llvm-tools,ffmpeg,opus}, and '
+                 r'C:\msys64\ucrt64\bin on your PATH (CONTRIBUTING.md)')
+else:
+    VENV = 'python3 -m venv .venv && .venv/bin/pip install -r requirements.txt, then activate .venv'
+    SETUP = 'python3 tools/setup.py'
+    TOOLS_FIX = 'install it (Arch: clang lld llvm ffmpeg opus; Debian / Ubuntu: clang lld llvm ffmpeg libopus0)'
 # (path, SHA-256 or None = must exist, what it is, the fix). The hashes identify versions; they are not game data.
 INPUTS = [
     ('dump/base/*.3ds', None, 'MH4U (EUR) ROM, decrypted', 'dump your cartridge / eShop copy with GodMode9 into dump/base/'),
@@ -58,13 +66,23 @@ def main():
         except ImportError:
             good = False
         check('python module ' + m, good, VENV)
-    for b, why in (('clang', 'module/build.py'), ('ld.lld', 'module/build.py'), ('llvm-objdump', 'tools/setup.py gu_code'),
-                   ('ffmpeg', 'music, tools/snd_bgm.py')):
-        check('%s (%s)' % (b, why), shutil.which(b) is not None, 'install it (Arch: clang lld llvm ffmpeg)')
+    if WINDOWS:
+        check('Python in UTF-8 mode (setup.py, module/build.py; build.py steps set it themselves)', sys.flags.utf8_mode,
+              'run `setx PYTHONUTF8 1` once, then open a new terminal', required=False)
+    for b, why in (('clang', 'module/build.py'), ('ld.lld', 'module/build.py'), ('llvm-nm', 'module/build.py'),
+                   ('llvm-objdump', 'tools/setup.py gu_code'), ('ffmpeg', 'music, tools/snd_bgm.py')):
+        check('%s (%s)' % (b, why), shutil.which(b) is not None, TOOLS_FIX)
+    if shutil.which('clang'):
+        t = subprocess.run(['clang', '--print-targets'], capture_output=True, text=True).stdout
+        check('clang can build for ARM (the module targets the Switch)', re.search(r'^\s+arm\s', t, re.M) is not None,
+              'use an LLVM build with the ARM target (' + TOOLS_FIX + ')')
     if shutil.which('ffmpeg'):
         v = subprocess.run(['ffmpeg', '-hide_banner', '-version'], capture_output=True, text=True).stdout
-        check('ffmpeg built with libsoxr (resampler of tools/snd_bgm.py)', 'enable-libsoxr' in v, 'use a full ffmpeg build')
-    check('libopus (tools/snd_bgm.py encodes the music)', ctypes.util.find_library('opus') is not None, 'install opus')
+        check('ffmpeg built with libsoxr (resampler of tools/snd_bgm.py)', 'enable-libsoxr' in v,
+              'use a full ffmpeg build (' + TOOLS_FIX + ')')
+    import snd_bgm
+    check('libopus (tools/snd_bgm.py encodes the music)', snd_bgm.find_opus() is not None,
+          TOOLS_FIX + '; or set OPUS_LIB to the library file')
 
     import setup
     made = [(os.path.join(paths.ROOT, p), h, what, '%s %s' % (SETUP, step)) for step, outs, _ in setup.STEPS

@@ -189,7 +189,7 @@ Progress 2026-10-21 (built, not tested in game):
    (build_dalamadur_arc.py hagi_em090.files) and dala_break.c holds the same count in its LR / HR columns. Open:
    unlock gate (our hook answers 1); MP join / board / results traced statically only.
    Shattered Omen (user, 4U): mined from the fallen meteor scales during the fight (item 7 above, "meteors leaving
-   mining points"): no source in the port yet.
+   mining points"): the meteor scales below (dala_shell038.c), tested 2026-11-01.
    Meteor scale research (2026-10-21, C unless noted):
    - 4U: meteor kinds 3 / 6 -> 0x6626e8 -> uShell038; its init 0xc846c0 spawns the scale model (0xc08698, model by
      this+0xfd) and calls 0x9357ec(owner = shell+0x134 (the head), record 0x102fab4, pos shell+0x100, area
@@ -239,6 +239,18 @@ Progress 2026-10-21 (built, not tested in game):
    end = a ground probe under the point (y +- 100) standing in for 0x6c5e88. Head point offset (0, 350, 400): x = s16
    = 0.0 (0x77333c, C). Seen on the way (S): 4U slot 48 also moves the carcass carve point W+0x7a48 to joint 5 * (s17
    = 80.0 if unchanged since 0x7734dc, 150, 200) every frame (0x773cc8); dala_carve.c places it once.
+   Tested 2026-11-01 (user report "never seen a mining spot"; DALA_TEST_MINING build): scale, point, prompt, item,
+   30 s life and both sounds work. Findings:
+   - Rare by design (C): kind 3 is armed only by 1.9-1.11 (0x77274c callers 0x7740ac..0x774104, reached by the waits
+     1/64 / 1/65 in head selectors s4..s7 / s11..s14 = HP below ~62 %), only its 2nd meteor (count == 1,
+     0x76ddf4) drops a scale, 7200-frame cooldown; the 2.x area showers (kinds 4..9) never do.
+   - One gather per scale is 4U (C): record 0x102fab4 = {350, 200, type 29, +0x2e 4, u16 +0x30 1} and +0x32 stays 0
+     (0x5ab42c); 4U's gather 0x5b95d8 = GU's 0x31b228: +0x30 / GU +0x4e = gathers left, +0x32 / GU +0x50 = sure
+     gathers, then a roll may end the point.
+   - Effect: attached to the shell (dala_efx_post_on) em024_006 was posted with a valid handle but not drawn (2 of
+     27 shown, then none). Fix: posted as the beam (dala_efx_post_beam, world position + yaw) and placed every frame;
+     the end effect 2951 likewise. User: "All good now".
+   - DALA_TEST_MINING (test only): any impact drops a scale while none is alive.
    port_monster holds 2 quests / 2 board slots per entry (dalamadur: 11494 + 1, shah_dalamadur: 2). Quest IDs
    11495..11509 have no GU quest file; their quest_group DUMMY slots still need the event-catalog check
    (0x1595e98) that 1011048 / 1011049 passed.

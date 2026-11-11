@@ -1,6 +1,6 @@
 """mapui4u2gu.py : in-quest area maps (mapUI, kind 49) of the Battlequarters alias (stage 26 -> m28) from MH4U m19.
 
-  mapui4u2gu.py            write monsters/gogmazios/romfs/nativeNX/<lang>/arc/stage/mapUI/m28d/a0N_ui_<lang>.arc
+  mapui4u2gu.py            write maps/battlequarters/romfs/nativeNX/<lang>/arc/stage/mapUI/m28d/a0N_ui_<lang>.arc
                            (eng fre ger ita spa)
                            and the whole map <lang>/arc/stage/map_com/m28_<lang>.arc (kind 55, see wholemap())
   mapui4u2gu.py preview    also save the composed maps as PNG into the dir given by $UI_PREVIEW
@@ -41,14 +41,14 @@ import arcpack, sis, tex
 GU_ROMFS = paths.GU_ROMFS
 MEM4U = os.path.join(ROOT, 'dump/exefs_v11/mem.bin')       # 4U v1.1, flat from 0x100000
 SRC4U = os.path.join(ROOT, 'dump/romfs/eng/data')
-GOG_ROMFS = paths.romfs('gogmazios')
-MAPCOM = os.path.join(GOG_ROMFS, 'nativeNX/loc/arc/stage/map_com/m28.arc')   # stage4u2gu.py alias output
-OUT = os.environ.get('UI_OUT', os.path.join(GOG_ROMFS, 'nativeNX'))
+MAP_ROMFS = paths.map_romfs('battlequarters')
+MAPCOM = os.path.join(MAP_ROMFS, 'nativeNX/loc/arc/stage/map_com/m28.arc')   # stage4u2gu.py alias output
+OUT = os.environ.get('UI_OUT', os.path.join(MAP_ROMFS, 'nativeNX'))
 LANGS = ('eng', 'fre', 'ger', 'ita', 'spa')
 AREAS = ((0, 0), (1, 1), (2, 3))        # alias area -> 4U m19 area (stage4u2gu.py alias: 0 -> 0, 1 -> 1, 3 -> 2)
 STAGE4U = 19
 MAPTAB4U = 0xeebe0c                     # 0x5a5f40 literal: 0x18-byte entries per 4U stage, +0xc = record array
-# = monsters/gogmazios/package.toml [stage] maprec, which the module applies (both checked by main())
+# = maps/battlequarters/package.toml [stage] maprec, which the module applies (both checked by main())
 MAPREC = {0: (1.8, 17, 11), 1: (2.0, 0, -8), 2: (1.1, 0, -1)}
 GLYPH = {1: (128, 0, 8, 16), 2: (136, 0, 12, 16), 3: (148, 0, 12, 16)}   # ui299a00_1 / ui299a01_2 / ui299a00_3 UVs
 CAMP = (192, 127, 16, 16)               # ui299a01_camp UV (0.75, 0.248, 0.0625, 0.03125) on 4U cmn_icon 256x512
@@ -248,7 +248,7 @@ def gui_dump(path):
 # GU icon = 2 * (u - 64): texture = m19d_ID at 2x, no fit. GUI map26dn: the Fortress area highlights area01 / area02
 # take 4U's ui269_area01 / ui269_area03 panes (alias areas 1 / 2), the fort HP icon players go off-screen.
 WMAP_W4U, WMAP_WGU = 40000, 60000       # 4U 0x6596dc (W passed to 0x6c2ac8), GU dims[26] (0x5058d0)
-WMAP_K = WMAP_WGU / WMAP_W4U            # = monsters/gogmazios/package.toml [stage] wholemap_k (checked by main())
+WMAP_K = WMAP_WGU / WMAP_W4U            # = maps/battlequarters/package.toml [stage] wholemap_k (checked by main())
 WMAP_PANES = {1: 1, 2: 3}               # alias area -> 4U ui269_areaNN (GU GUI instance areaNN = alias area)
 # area labels baked into m19d_ID (4U numbering), as on the area maps: the arena's '3' -> the '2' glyph, the '2' of 4U a02
 # (area dropped by the alias, its piece stays as a passage) erased. Seed boxes of the white digit pixels (4U px).
@@ -394,7 +394,7 @@ def blank_like(t):
 def main(preview=None):
     r4 = rec4u()
     import tomllib
-    st = tomllib.load(open(os.path.join(paths.monster('gogmazios'), 'package.toml'), 'rb'))['stage']
+    st = tomllib.load(open(os.path.join(paths.map_dir('battlequarters'), 'package.toml'), 'rb'))['stage']
     for alias, a4 in AREAS:
         got = (round(r4[a4][0], 4), r4[a4][1], r4[a4][2])
         assert got == MAPREC[alias] == tuple(st['maprec'][alias]), ('4U record / MAPREC / package.toml', alias, got)

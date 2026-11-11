@@ -11,12 +11,18 @@
  *
  * Quest board: GU's mapper 0x3a3178(_, byte) gives 0 (no icon) for bytes > 186; hook board_icon maps bytes from
  * BOARD_FIRST to our cells. The board loop 0x6132d0 shows the hyper badge for bytes >= 142 (0x613318), so hook
- * board_byte hands it byte 0 and the mapper call right after it our byte. */
+ * board_byte hands it byte 0 and the mapper call right after it our byte.
+ *
+ * HUD status icons (icons_hud_own): GU's 0x63487c sets the cell of its status sprites with 0x56e6a8 (kind 6) on
+ * quest_eng.arc HD_hud_icon, never rebinding. A caller (em089_tarhunter.c: tar = GU's web, cell 22) points the
+ * sprite at a copy of its entry whose rTexture is our HUD atlas (tools/ui_icons.py HUD_ATLASES: GU's size, our art
+ * in GU's cells) and back with GU's bind 0xa4faf0 and the sprite's own ID. */
 #include <stdint.h>
 #include "game.h"
 #include "util.h"
+#include "icons.h"
 
-enum { R0, R1, R2, R3 };
+enum { R0, R1, R2, R3, R4 };
 
 #define ICON_PAGE2    196u          /* tools/alloc.py ICON_PAGE2 */
 #define ICON_CELLS    49u           /* tools/ui_icons.py CELLS */
@@ -30,35 +36,40 @@ enum { R0, R1, R2, R3 };
 
 typedef void *(*res_get_t)(void *mgr, void *dti, const char *path, uint32_t mode);
 #define gui_tex_entry FN(uint8_t *(*)(void *, uint32_t), 0xb80fd0)   /* (sprite +0x78, id) -> 64-byte entry */
+#define gui_bind      FN(void (*)(void *, uint32_t), 0xa4faf0)       /* (sprite, id): GU's texture bind */
 
-static const struct { uint32_t w, h; const char *path; } s_atlas[] = {
-    { 512, 512, "mh4uport\\micon_sd" },      /* GU's micon01 size */
-    { 1024, 1024, "mh4uport\\micon_hd" },    /* HD UI v4's */
+enum { ATLAS_MICON, ATLAS_HUD };
+static const struct { uint32_t w, h; const char *path; } s_atlas[2][2] = {
+    { { 512, 512, "mhgu_de\\micon_sd" },       /* GU's micon01 size */
+      { 1024, 1024, "mhgu_de\\micon_hd" } },   /* HD UI v4's */
+    { { 256, 256, "mhgu_de\\hudicon_sd" },     /* GU's HD_hud_icon size */
+      { 1024, 1024, "mhgu_de\\hudicon_hd" } }, /* HD UI v4's */
 };
-static void *s_tex[2];
-static uint8_t s_tried[2];
+static void *s_tex[2][2];
+static uint8_t s_tried[2][2];
 static uint8_t s_pool[POOL][64];            /* entry copies: kept for good, sprites point at them */
 static uint32_t s_pool_n;
 static uint8_t s_board;
 
-/* our atlas of micon01's size (rTexture +0xdc / +0xe0), loaded on first use; 0 until its GPU texture exists */
-static void *atlas(const uint8_t *micon)
+/* our atlas of set `set` with the size of GU's texture `ref` (rTexture +0xdc / +0xe0: micon01 / HD_hud_icon), loaded
+ * on first use; 0 until its GPU texture exists */
+static void *atlas(uint32_t set, const uint8_t *ref)
 {
-    uint32_t w = FIELD(uint32_t, micon, 0xdc), h = FIELD(uint32_t, micon, 0xe0);
+    uint32_t w = FIELD(uint32_t, ref, 0xdc), h = FIELD(uint32_t, ref, 0xe0);
     for (uint32_t k = 0; k < 2; k++) {
-        if (s_atlas[k].w != w || s_atlas[k].h != h) continue;
-        if (!s_tried[k]) {
-            s_tried[k] = 1;
+        if (s_atlas[set][k].w != w || s_atlas[set][k].h != h) continue;
+        if (!s_tried[set][k]) {
+            s_tried[set][k] = 1;
             void *mgr = *(void **)MAIN(RES_MGR);
             res_get_t get = (*(res_get_t **)mgr)[0x30 / 4];
-            s_tex[k] = get(mgr, (void *)MAIN(DTI_RTEXTURE), s_atlas[k].path, 1);
-            logf("mh4uport: icon atlas %s -> %x", s_atlas[k].path, (uint32_t)(uintptr_t)s_tex[k]);
+            s_tex[set][k] = get(mgr, (void *)MAIN(DTI_RTEXTURE), s_atlas[set][k].path, 1);
+            logf("mhgu-de: icon atlas %s -> %x", s_atlas[set][k].path, (uint32_t)(uintptr_t)s_tex[set][k]);
         }
-        uint8_t *t = s_tex[k];
+        uint8_t *t = s_tex[set][k];
         return t && FIELD(uint32_t, t, 0xdc) == w && FIELD(uint32_t, t, 0xe0) == h && FIELD(void *, t, 0xd0) ? t : 0;
     }
-    static uint8_t s_logged;
-    if (!s_logged++) logf("mh4uport: no icon atlas for a %ux%u micon01", w, h);
+    static uint8_t s_logged[2];
+    if (!s_logged[set]++) logf("mhgu-de: no icon atlas (set %u) for a %ux%u texture", set, w, h);
     return 0;
 }
 
@@ -93,8 +104,8 @@ static int own_find(const uint8_t *spr)
     return -1;
 }
 
-/* sprite (obj, kind) of a .gui, looked up as 0x546f48 does */
-static uint8_t *sprite(uint32_t ui, uint32_t obj, uint32_t kind)
+/* sprite (obj, kind) of a .gui, looked up as 0x546f48 / 0x546f84 do */
+uint8_t *icons_sprite(uint32_t ui, uint32_t obj, uint32_t kind)
 {
     uint8_t *gui = FIELD(uint8_t *, ui, 0x24);
     uint32_t n = FIELD(uint32_t, gui, 0x298);
@@ -109,7 +120,7 @@ int icon_set_c(uint32_t *regs)
 {
     uint32_t i = regs[R3];
     if (i >= ICON_PAGE2 + ICON_CELLS) return 0;
-    uint8_t *spr = sprite(regs[R0], regs[R1], regs[R2]);
+    uint8_t *spr = icons_sprite(regs[R0], regs[R1], regs[R2]);
     int o = spr ? own_find(spr) : -1;
     if (i < ICON_PAGE2) {                     /* GU's own icon: its bind goes through */
         if (o >= 0) s_own[o].spr = 0;
@@ -117,11 +128,11 @@ int icon_set_c(uint32_t *regs)
     }
     const uint32_t *ids = (const uint32_t *)regs[8 + 10];    /* saved r0-r5, r12, lr; then 24 + 16 bytes of frame */
     uint8_t *e = spr && FIELD(void *, spr, 0x78) ? gui_tex_entry(FIELD(void *, spr, 0x78), ids[1]) : 0;
-    void *t = e && FIELD(void *, e, 0x28) ? atlas(FIELD(uint8_t *, e, 0x28)) : 0;
+    void *t = e && FIELD(void *, e, 0x28) ? atlas(ATLAS_MICON, FIELD(uint8_t *, e, 0x28)) : 0;
     uint8_t *c = t ? entry_copy(e, t) : 0;
     if (!c) {
         static uint32_t s_n;
-        if (++s_n <= 10) logf("mh4uport: icon %u: no atlas (sprite %x entry %x), cell %u", i,
+        if (++s_n <= 10) logf("mhgu-de: icon %u: no atlas (sprite %x entry %x), cell %u", i,
                               (uint32_t)(uintptr_t)spr, (uint32_t)(uintptr_t)e, ICON_FALLBACK);
         regs[R3] = ICON_FALLBACK;
         return 0;
@@ -140,17 +151,19 @@ int icon_set_c(uint32_t *regs)
 
 /* hook 0xa4faf0 (sprite, texture ID): GU's bind. The quest board rebinds the micon01 ID after the setter (user
  * 2026-10-27: Tigerstripe's board icon = micon01 cell 2, Tidal Najarala), so a sprite of ours keeps our atlas
- * against its .gui's micon IDs; any other ID (or another .gui) goes through */
+ * against its .gui's micon IDs; any other ID (or another .gui) goes through. Mid hook 0xa4fb10, past the bind's
+ * early outs (no .gui table, same ID) and before its store: r4 = sprite, r1 = ID; nonzero -> 0xa4fb34 returns (build.py
+ * MID_EXIT). Not at the entry: the Forge plugin Key Quest Markers checks its first 0x20 bytes (issue #10). */
 int tex_bind_c(uint32_t *regs)
 {
-    uint8_t *spr = (uint8_t *)(uintptr_t)regs[R0];
+    uint8_t *spr = (uint8_t *)(uintptr_t)regs[R4];
     uint32_t id = regs[R1];
     if (!ours(FIELD(uint32_t, spr, 0x100)) || ours(id)) return 0;
     int o = own_find(spr);
     if (o < 0 || s_own[o].tab != FIELD(void *, spr, 0x78) || (id != s_own[o].id[0] && id != s_own[o].id[1]))
         return 0;
     static uint32_t s_n;
-    if (++s_n <= 20) logf("mh4uport: icon sprite %x: rebind of micon ID %x kept off", (uint32_t)(uintptr_t)spr, id);
+    if (++s_n <= 20) logf("mhgu-de: icon sprite %x: rebind of micon ID %x kept off", (uint32_t)(uintptr_t)spr, id);
     return 1;
 }
 
@@ -185,4 +198,35 @@ int board_byte_c(uint32_t *regs)
     s_board = regs[R1] & 0xff;
     regs[R1] = 0;
     return 0;
+}
+
+void icons_hud_own(uint8_t *spr, int on)
+{
+    uint32_t id = FIELD(uint32_t, spr, 0x100);
+    int o = own_find(spr);
+    if (!on) {
+        if (o < 0 || !ours(id)) return;
+        s_own[o].spr = 0;                    /* first: tex_bind_c would keep the bind off */
+        gui_bind(spr, s_own[o].id[0]);
+        return;
+    }
+    if (o >= 0 && ours(id)) return;
+    uint8_t *e = FIELD(void *, spr, 0x78) ? gui_tex_entry(FIELD(void *, spr, 0x78), id) : 0;
+    void *t = e && FIELD(void *, e, 0x28) ? atlas(ATLAS_HUD, FIELD(uint8_t *, e, 0x28)) : 0;
+    uint8_t *c = t ? entry_copy(e, t) : 0;
+    static uint32_t s_n;
+    if (!c) {
+        if (++s_n <= 10) logf("mhgu-de: HUD icon sprite %x: no atlas (ID %x entry %x)", (uint32_t)(uintptr_t)spr,
+                              id, (uint32_t)(uintptr_t)e);
+        return;
+    }
+    FIELD(uint32_t, spr, 0x100) = OUR_TEX_ID | (uint32_t)((c - s_pool[0]) / 64);
+    FIELD(uint8_t *, spr, 0x104) = c;
+    if (o < 0) {
+        o = (int)(s_own_next++ % OWN_MAX);
+        s_own[o].spr = spr;
+    }
+    s_own[o].tab = FIELD(void *, spr, 0x78);
+    s_own[o].id[0] = s_own[o].id[1] = id;
+    if (++s_n <= 10) logf("mhgu-de: HUD icon sprite %x: our atlas (GU ID %x)", (uint32_t)(uintptr_t)spr, id);
 }

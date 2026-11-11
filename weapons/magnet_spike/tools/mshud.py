@@ -8,9 +8,9 @@ dat/mhf_90c.bin.xbox, PNG 4, kept as dump/mhf/ui/mhf_90c_04.png) painted over th
 module points the gauge .gui's HD_hud00 entry at it while a Magnet Spike hunter owns the widget. The base is the HD UI
 mod's HD_hud00 when installed (the user's), else GU's.
 
-  mshud.py [OUT.tex]      default: weapons/magnet_spike/romfs/nativeNX/mh4uport/ms_hud00.tex
+  mshud.py [OUT.tex]      default: weapons/magnet_spike/romfs/nativeNX/mhgu_de/ms_hud00.tex
   mshud.py reticle [DIR]  MHF's aim reticle on GU's scope HUD (build_reticle): DIR/ms_reticle{0,1,2}.tex, default
-                          weapons/magnet_spike/romfs/nativeNX/mh4uport; prints the static check
+                          weapons/magnet_spike/romfs/nativeNX/mhgu_de; prints the static check
 """
 import os, struct, sys
 import numpy as np
@@ -26,7 +26,7 @@ HDUI_QUEST = os.path.expanduser('~/.config/Ryujinx/mods/contents/0100770008dd800
                                 'quest_eng.arc')
 TEX_PATH = 'eng\\GUI\\99_texture\\HD_hud00_BM_NOMIP'
 MHF_ART = os.path.join(ROOT, 'dump', 'mhf', 'ui', 'mhf_90c_04.png')
-OUT = os.path.join(WEAPON, 'romfs', 'nativeNX', 'mh4uport', 'ms_hud00.tex')
+OUT = os.path.join(WEAPON, 'romfs', 'nativeNX', 'mhgu_de', 'ms_hud00.tex')
 
 # CB's pieces in HD_hud00 (2048 x 2048): a pixel inside each; the piece = its 8-connected opaque pixels (alpha > 16)
 CB = {'vial_full': (1071, 771), 'vial_empty': (1168, 771), 'shield_fill': (961, 1023), 'shield_frame': (1088, 1000)}
@@ -101,8 +101,8 @@ def build(out=OUT):
 # red, 2 neither 0xffffffff white.
 MHF_RETICLE = (1, 323, 47, 369)
 MHF_RETICLE_RGB = ((0x0b, 0x99, 0xff), (0xc6, 0x29, 0x00), (0xff, 0xff, 0xff))
-RETICLE_DIR = os.path.join(WEAPON, 'romfs', 'nativeNX', 'mh4uport')
-RETICLE_NAME = 'ms_reticle%d.tex'                     # the module's res_get("mh4uport\\ms_reticleN")
+RETICLE_DIR = os.path.join(WEAPON, 'romfs', 'nativeNX', 'mhgu_de')
+RETICLE_NAME = 'ms_reticle%d.tex'                     # the module's res_get("mhgu_de\\ms_reticleN")
 SCOPE_GUI = 'eng\\GUI\\01_quest\\hud\\hud6_scope'
 HUD01_PATH = 'eng\\GUI\\99_texture\\HD_hud01_BM_NOMIP'
 DTI_TEXTURE, DTI_TEXTURESET = 0x1b6313a3, 0x4f7228fc  # cGUIObjTexture / cGUIObjTextureSet (CRC of the DTI names)

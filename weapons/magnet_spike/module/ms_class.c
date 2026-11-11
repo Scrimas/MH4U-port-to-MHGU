@@ -168,7 +168,7 @@ int ms_factory_cc(uint32_t *regs, uint8_t *info, uint8_t *obj, uint32_t kind)
  * steady / flashing pairs, to check in a test); the shield and second indicators off */
 /* the gauge's look (test 1: "the HUD is the Charge Blade's"; tools/mshud.py): the widget's .gui (+0x24) draws CB's
  * vials and shield from HD_hud00. While our hunter drives it, the .gui's HD_hud00 texture entry points at
- * mh4uport\ms_hud00 (that atlas with MHF's gauge cells and horseshoe painted over them), back to HD_hud00 for anyone
+ * mhgu_de\ms_hud00 (that atlas with MHF's gauge cells and horseshoe painted over them), back to HD_hud00 for anyone
  * else. The entry sits in the .gui resource's texture table: GU's lookup 0xb80fd0(rGUI, ID) gets the rGUI as a
  * sprite's +0x78 and reads its loaded file (+0x64): table +0xe8, count +0x70, 64-byte entries with the rTexture at
  * +0x28 (size +0xdc / +0xe0, GPU texture +0xd0), as the loader 0xb7f988 fills them. module/icons.c's hook on that
@@ -213,8 +213,8 @@ static void hud_look(int ours)
 {
     if (ours && !s_hud_tried) {
         s_hud_tried = 1;
-        s_hud_tex = res_get("mh4uport\\ms_hud00");
-        logf("msport: HUD atlas mh4uport\\ms_hud00 -> %x", (uint32_t)(uintptr_t)s_hud_tex);
+        s_hud_tex = res_get("mhgu_de\\ms_hud00");
+        logf("msport: HUD atlas mhgu_de\\ms_hud00 -> %x", (uint32_t)(uintptr_t)s_hud_tex);
     }
     uint8_t *g = s_hud_gui && path_has(s_hud_gui, "chargeAx") ? s_hud_gui : 0, *d = g ? FIELD(uint8_t *, g, 0x64) : 0;
     uint8_t *tab = d ? FIELD(uint8_t *, d, 0xe8) : 0;
@@ -226,7 +226,7 @@ static void hud_look(int ours)
         if (ours && t != s_hud_tex && path_has(t, "HD_hud00") && FIELD(uint32_t, t, 0xdc) == FIELD(uint32_t, s_hud_tex,
             0xdc) && FIELD(uint32_t, t, 0xe0) == FIELD(uint32_t, s_hud_tex, 0xe0)) {
             s_hud_orig = t;
-            res_get("mh4uport\\ms_hud00");
+            res_get("mhgu_de\\ms_hud00");
             FIELD(uint8_t *, e, 0x28) = s_hud_tex;
             logf("msport: HUD gauge entry %x: Magnet Spike atlas", (uint32_t)(uintptr_t)e);
         } else if (!ours && t == s_hud_tex && s_hud_orig) {
@@ -242,14 +242,14 @@ static void hud_look(int ours)
  * cUIOQuestScope (update 0x61e1f4, local hunter only) shows its element 0 for our aiming class 5 (state 1, mode 0):
  * object Anm_scope, the instance tree "scope", whose TextureSet TexS_scope draws four mirrored quadrants of
  * HD_hud01 (UV (0, 32)-(240, 272), corner texel (240, 272) at the screen centre; plain params: no animation, white
- * vertex colour). mh4uport\ms_reticleN = HD_hud01's size, empty but for MHF's reticle quarter in frame N's colour at
+ * vertex colour). mhgu_de\ms_reticleN = HD_hud01's size, empty but for MHF's reticle quarter in frame N's colour at
  * that quadrant's centre corner: GU's arrows, bars, ring and gauges (the entry's other users) vanish while it is
  * bound, as MHF shows its reticle alone. While the local class-5 hunter
  * aims, the scope .gui's HD_hud01 entry points at the frame's copy; back to HD_hud01 otherwise. The widget's cGUI
  * (+0x24) holds its rGUI at +0xf0 (0x91a7d0 / 0x544940, C), the loaded file at rGUI +0x64; the texture entries as
  * hud_look's. ms_reticle (aim_view, every aim tick) refreshes the frame; without it for 8 widget updates (the hunter
  * gone, the aim ended) GU's art comes back */
-static const char *const s_ret_path[3] = {"mh4uport\\ms_reticle0", "mh4uport\\ms_reticle1", "mh4uport\\ms_reticle2"};
+static const char *const s_ret_path[3] = {"mhgu_de\\ms_reticle0", "mhgu_de\\ms_reticle1", "mhgu_de\\ms_reticle2"};
 static uint8_t *s_ret_tex[3], *s_ret_orig;
 static uint8_t s_ret_tried, s_ret_ttl;
 static int8_t s_ret_frame = -1;

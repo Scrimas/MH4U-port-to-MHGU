@@ -1,0 +1,3 @@
+# One statement per line where it fits in 120 columns (the repo's width); CI checks it (cargo fmt --all --check).
+max_width = 120
+use_small_heuristics = "Max"

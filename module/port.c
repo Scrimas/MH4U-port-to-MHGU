@@ -23,8 +23,10 @@ typedef void (*fs_close_t)(fs_file f);
 #define fs_read FN(fs_read_t, 0x13f0448)               /* nn::fs::ReadFile(size_t *, handle, offset, buf, size) */
 #define fs_close FN(fs_close_t, 0x13f046c)             /* nn::fs::CloseFile */
 
-#define DATA_DIR "app:/nativeNX/mh4uport/"
-#define POOL_SIZE (256u * 1024u)       /* every monster's data file (Gogmazios: 37.6 KB) */
+#define DATA_DIR "app:/nativeNX/mhgu_de/"
+#define POOL_SIZE PORT_DATA_POOL       /* every monster's data file, each rounded up to 16 B (tools/alloc.py DATA_POOL; module/build.py
+                                          refuses a build that does not fit: a file that doesn't is not loaded here, and its monster
+                                          then runs on its donor's manifest) */
 #define FORMAT 1u
 static uint8_t s_pool[POOL_SIZE] __attribute__((aligned(16)));
 static uint32_t s_pool_used;
@@ -59,14 +61,14 @@ static int valid(int m, const uint8_t *d, uint32_t size)
     uint32_t n = size >= 32 ? FIELD(uint16_t, d, 6) : 0;
     if (size < 32 || FIELD(uint32_t, d, 0) != 0x5034484du || FIELD(uint16_t, d, 4) != FORMAT ||
         !header_name_eq((const char *)d + 8, p->name) || FIELD(uint32_t, d, 28) != p->em_id || 32 + 12 * n > size) {
-        logf("mh4uport: %s data: bad header (format %u, em %x), not used", p->name, size >= 32 ? d[4] : 0,
+        logf("mhgu-de: %s data: bad header (format %u, em %x), not used", p->name, size >= 32 ? d[4] : 0,
              size >= 32 ? FIELD(uint32_t, d, 28) : 0);
         return 0;
     }
     for (uint32_t k = 0; k < n; k++) {
         uint32_t off = FIELD(uint32_t, d, 36 + 12 * k), len = FIELD(uint32_t, d, 40 + 12 * k);
         if ((off & 3) || off > size || len > size - off) {
-            logf("mh4uport: %s data: section %u outside the file, not used", p->name, k);
+            logf("mhgu-de: %s data: section %u outside the file, not used", p->name, k);
             return 0;
         }
     }
@@ -94,7 +96,7 @@ static int load(int m)
     uint32_t got = 0, base = 0;
     put(put(put(path, DATA_DIR), p->name), ".bin");
     if (fs_open(&f, path, 1)) {
-        logf("mh4uport: %s: no data file %s: its gear / items / quests stay off, later monsters' tables too", p->name,
+        logf("mhgu-de: %s: no data file %s: its gear / items / quests stay off, later monsters' tables too", p->name,
              path);
         return 0;
     }
@@ -106,12 +108,13 @@ static int load(int m)
     }
     fs_close(f);
     if (!ok || !valid(m, s_pool + base, (uint32_t)size)) {
-        logf("mh4uport: %s: data file %s unreadable (size %u, read %u)", p->name, path, (uint32_t)size, got);
+        logf("mhgu-de: %s: data file %s unreadable (size %u, read %u, pool %u of %u)", p->name, path, (uint32_t)size, got,
+             s_pool_used, POOL_SIZE);
         return 0;
     }
     s_data[m] = s_pool + base;
     uint32_t v = FIELD(uint32_t, s_data[m], 24);
-    logf("mh4uport: %s data %u.%u.%u loaded (%u bytes, %u sections)", p->name, v >> 16, (v >> 8) & 0xff, v & 0xff,
+    logf("mhgu-de: %s data %u.%u.%u loaded (%u bytes, %u sections)", p->name, v >> 16, (v >> 8) & 0xff, v & 0xff,
          (uint32_t)size, FIELD(uint16_t, s_data[m], 6));
     /* the registry manifest of its index (reg_files[index] = port_manifests[m]) */
     uint32_t fsz;
@@ -148,7 +151,9 @@ const uint8_t *port_section(int m, const char *tag, int nth, uint32_t *size)
     return port_data(m) ? section_of(s_data[m], tag, nth, size) : 0;
 }
 
-/* installed = its monster arc nativeNX/arc/enemy/emNNN_VV.arc exists (id = variant << 8 | em) */
+/* installed = its monster arc nativeNX/arc/enemy/emNNN_VV.arc exists (id = variant << 8 | em) and, with a stage alias,
+ * its map's stage arc nativeNX/arc/stage/mNNd/mNNd.arc (kind 56 of the folder: the map package it requires,
+ * maps/<map>, core 2.0.0): without its arena, its quests would load a stage that is not there */
 int port_installed(int m)
 {
     if (s_installed[m]) return s_installed[m] == 1;
@@ -159,7 +164,19 @@ int port_installed(int m)
     put(p, ".arc");
     uint32_t r = fs_entry_type(&type, path);
     s_installed[m] = !r && type == 1 ? 1 : 2;        /* DirectoryEntryType_File */
-    logf("mh4uport: %s %s (%s)", port_monsters[m].name, s_installed[m] == 1 ? "installed" : "NOT installed", path);
+    uint32_t f = port_monsters[m].stage_folder;      /* 28..99 (allocations.toml pool stage_folder) */
+    if (s_installed[m] == 1 && f) {
+        char map[64], a = (char)('0' + f / 10 % 10), b = (char)('0' + f % 10);
+        p = put(map, "app:/nativeNX/arc/stage/m");
+        *p++ = a; *p++ = b; p = put(p, "d/m"); *p++ = a; *p++ = b; put(p, "d.arc");
+        type = 0;
+        if (fs_entry_type(&type, map) || type != 1) {
+            s_installed[m] = 2;
+            logf("mhgu-de: %s NOT installed (its map is missing: %s)", port_monsters[m].name, map);
+            return 0;
+        }
+    }
+    logf("mhgu-de: %s %s (%s)", port_monsters[m].name, s_installed[m] == 1 ? "installed" : "NOT installed", path);
     return s_installed[m] == 1;
 }
 
@@ -174,7 +191,7 @@ int port_quest_present(int m, int k)
     put(p, ".ext");
     uint32_t r = fs_entry_type(&type, path);
     s_present[m][k] = !r && type == 1 ? 1 : 2;
-    if (s_present[m][k] != 1) logf("mh4uport: %s quest %u NOT present (%s)", port_monsters[m].name, id, path);
+    if (s_present[m][k] != 1) logf("mhgu-de: %s quest %u NOT present (%s)", port_monsters[m].name, id, path);
     return s_present[m][k] == 1;
 }
 
@@ -183,6 +200,21 @@ int port_by_em(uint32_t em_id)
     for (int m = 0; m < PORT_N; m++)
         if (port_monsters[m].em_id == em_id) return m;
     return -1;
+}
+
+/* 0xac0ec(enemy, pos, chance %, 0), the item drop [4U 0x911f58], entry: log only (the first 40 calls), so a test log shows
+ * whether a ported monster's shiny triggers run. rec+0x5d54 = the drops it has left. */
+int enemy_drop_log_c(uint32_t *regs)
+{
+    static uint32_t s_n;
+    void *self = (void *)regs[0];
+    int m;
+    if (s_n >= 40 || (m = port_by_em(FIELD(uint16_t, self, EN_ID))) < 0) return 0;
+    s_n++;
+    logf("mhgu-de: item drop call: %s, action %u/%u, chance %u, drops left %d", port_monsters[m].name,
+         FIELD(uint8_t, self, EN_ACT_CAT), FIELD(uint8_t, self, EN_ACT_NUM), regs[2],
+         (int)FIELD(int8_t, FIELD(uint8_t *, self, EN_RECORD), 0x5d54));
+    return 0;
 }
 
 int port_by_index(uint32_t index)
@@ -255,7 +287,7 @@ int file_id_c(uint32_t *regs)
         static uint32_t s_logged[PORT_N][8], s_misses;
         if ((k < 256 && !(s_logged[m][k / 32] & (1u << (k % 32)))) || (!regs[R0] && ++s_misses <= 40)) {
             if (k < 256) s_logged[m][k / 32] |= 1u << (k % 32);
-            logf("mh4uport: %s file %x (hash %x type %x) -> %x lr=%x", port_monsters[m].name, regs[R1], hash, type,
+            logf("mhgu-de: %s file %x (hash %x type %x) -> %x lr=%x", port_monsters[m].name, regs[R1], hash, type,
                  regs[R0], regs[LR] - MAIN_BASE);
         }
         return 1;

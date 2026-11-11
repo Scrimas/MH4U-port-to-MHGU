@@ -46,9 +46,11 @@ int add_hp_c(uint32_t *regs)
     return 0;
 }
 
+#ifdef EM089_DMG_RECV_DIAG
 /* 0x9d6f8(monster, part, damage, kind): monster damage receiver (cheats project notes). part >= 8 goes to vt+0x310
  * and adds nothing to HP; parts 0..7 are scaled by rec+0x388 (float) and summed into rec+0x488 + 2 * part. setHP /
- * addHP were never called for em089 although hits show blood and crits (in-game test 2026-10-17). */
+ * addHP were never called for em089 although hits show blood and crits (in-game test 2026-10-17). Test builds only
+ * (module/build.py): the Damage Numbers plugin checks this function's first 0x40 bytes (issue #13). */
 int em089_pile_hit_window(void);   /* em089_pile.c: 1 while the pile-hit shell lives */
 
 int dmg_recv_c(uint32_t *regs)
@@ -60,3 +62,4 @@ int dmg_recv_c(uint32_t *regs)
              (int32_t)(FIELD(float, FIELD(uint32_t, regs[R0], 0x1428), 0x388) * 1000.0f));
     return 0;
 }
+#endif

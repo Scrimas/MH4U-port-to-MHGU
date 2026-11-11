@@ -66,7 +66,9 @@ typedef int (*shell_setup_t)(void *self, void *param);
 #define LOG_MAX   40
 
 static dala_shcls_t s_cls;
-static uint32_t s_serial, s_log;
+static uint32_t s_serial, s_log, s_live;   /* s_live: scales between set-up and kill / delete */
+
+uint32_t dala_shell038_alive(void) { return s_live; }
 
 /* 4U 0x917620 and the alive test: present, unit state 1 / 2, not in a death action (dala.c half_dead, + capture) */
 static int owner_ok(void *owner)
@@ -110,7 +112,9 @@ static void s038_slot_kill(void *self)
         const float *pos = VEC(self, SH_POS);
         uint32_t area = FIELD(uint8_t, self, SH_AREA);
         FIELD(uint8_t, self, G_STATE) = 3;
-        void *e = live ? dala_efx_post_at(owner, DALA_EFX_SCALE_END, pos, area) : 0;   /* the owner's PEL */
+        if (s_live) s_live--;
+        /* the owner's PEL; posted as the scale (setup): a plain world post lands on the owner's model (dala_shell003.c) */
+        void *e = live ? dala_efx_post_beam(owner, DALA_EFX_SCALE_END, pos, 0, FIELD(uint32_t, self, SH_ANGLES + 4)) : 0;
         if (live) dala_snd_pos(owner, SND_END, pos, area);
         dala_gather_free(FIELD(int32_t, self, G_POINT), why);
         FIELD(int32_t, self, G_POINT) = -1;
@@ -138,17 +142,21 @@ static int s038_setup(void *self, void *param)
     FIELD(uint32_t, self, SH_ANGLES + 4) = FIELD(uint32_t, self, G_YAW);
     FIELD(uint32_t, self, SH_ANGLES + 8) = 0;
     FIELD(uint8_t, self, G_STATE) = 1;
+    s_live++;
     FIELD(float, self, G_TIME) = G_LIFE;
-    FIELD(void *, self, G_EFX) = dala_efx_post_on(owner, DALA_EFX_SCALE, self);
+    /* 4U attaches em024_006 to this still shell (0xc08698). Attached here (dala_efx_post_on) it was posted with a valid
+     * handle but not drawn (user, tests 2026-11-01: 2 of 27 shown, then none), as the uShell016 beam was: posted as
+     * the beam (world position + rotation, dala_shell016.c) and placed again every frame (s038_move) */
+    FIELD(void *, self, G_EFX) = dala_efx_post_beam(owner, DALA_EFX_SCALE, pos, 0, FIELD(uint32_t, self, SH_ANGLES + 4));
     FIELD(uint8_t, self, G_GROUND) = (uint8_t)ground_at(self);
     if (owner_ok(owner))
         FIELD(int32_t, self, G_POINT) = dala_gather_new(owner, DALA_GL_METEOR, DALA_GP_MINING, 0, 350.0f, 200.0f, 1,
                                                         pos, area, "meteor scale");
     if (++s_log <= LOG_MAX)
-        logf("dalaport: gather scale %u spawn kind %u at %d %d %d area %u efx %x point %d, floor test %s",
+        logf("dalaport: gather scale %u spawn kind %u at %d %d %d area %u efx %x point %d, floor test %s, %u alive",
              FIELD(uint32_t, self, G_SERIAL), FIELD(uint8_t, self, G_KIND), (int)pos[0], (int)pos[1], (int)pos[2], area,
              (uint32_t)FIELD(void *, self, G_EFX), FIELD(int32_t, self, G_POINT),
-             FIELD(uint8_t, self, G_GROUND) ? "on" : "off (no ground under the point)");
+             FIELD(uint8_t, self, G_GROUND) ? "on" : "off (no ground under the point)", s_live);
     s038_step(self, owner);                                 /* the init's tail call of slot 23 */
     return 1;
 }
@@ -156,9 +164,16 @@ static int s038_setup(void *self, void *param)
 /* slot 9 */
 static void s038_move(void *self)
 {
-    if (FIELD(void *, self, G_EFX) && !dala_efx_alive(FIELD(void *, self, G_EFX))) FIELD(void *, self, G_EFX) = 0;
-    uShell_move(self);                                      /* owner gone -> slot 16 */
+    if (FIELD(void *, self, G_EFX) && !dala_efx_alive(FIELD(void *, self, G_EFX))) {
+        FIELD(void *, self, G_EFX) = 0;
+        /* test log (invisible scales): the scale effect ended while the scale still lives */
+        logf("dalaport: gather scale %u effect gone after %d frames (state %u, %u alive)", FIELD(uint32_t, self, G_SERIAL),
+             (int)(G_LIFE - FIELD(float, self, G_TIME)), FIELD(uint8_t, self, G_STATE), s_live);
+    }
+    uShell_move(self);                                     /* owner gone -> slot 16 */
     if (!dala_shell_live(self)) return;
+    if (FIELD(void *, self, G_EFX))                         /* the beam's rule (setup): placed every frame */
+        dala_efx_place(FIELD(void *, self, G_EFX), VEC(self, SH_POS), 0, FIELD(uint32_t, self, SH_ANGLES + 4));
     if (FIELD(uint8_t, self, G_STATE) == 1) s038_step(self, dala_shell_owner(self));
     if (FIELD(uint8_t, self, G_STATE) == 2) VCALL0(self, SLOT_KILL);
 }
@@ -169,6 +184,8 @@ static MtDTI *s038_dti(void *self) { (void)self; return &s_cls.dti; }
 /* slot 1: deleted without a kill (area / quest teardown): no point or effect handle outlives the shell */
 static void s038_delete(void *self)
 {
+    uint8_t st = FIELD(uint8_t, self, G_STATE);
+    if ((st == 1 || st == 2) && s_live) s_live--;
     if (FIELD(int32_t, self, G_POINT) != -1) dala_gather_free(FIELD(int32_t, self, G_POINT), "scale deleted");
     void *h = FIELD(void *, self, G_EFX);
     if (dala_efx_alive(h)) dala_efx_kill(h);

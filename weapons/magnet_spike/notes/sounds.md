@@ -170,5 +170,44 @@ band (no content above 16 kHz) but costs ~4-5 dB SNR at the same 4.57 bits per s
 - The branch takes main first (merge, no rebase) so the sound file IDs come from the current allocations.toml.
 - Not decided here: the encoder's place (plan: tools/dspadpcm.py, shared) and the swings until the model-bank
   triggers are traced (plan: the GS stand-in whooshes stay until then, listed as a deviation).
-- Found by this study, to fix with the sound build: the module shakes the camera (MS_SHAKE) where MHF's event calls
-  0x10b43370, which plays a weapon-type-bank request, not a rumble preset.
+- Corrected by section 8: event 12 is a real camera shake in MHF, so the module's MS_SHAKE there is faithful. Only
+  the Triple Strike charge site shakes where MHF plays a sound (we13 request 7); fix it with the sound build.
+
+## 8. Follow-up trace (step R, 2026-11-11; static, nothing built; C unless marked)
+Answers open questions 1, 2 and most of 4.
+
+### What plays the model-bank and most weapon-type-bank requests: a data table
+- mhfdat.dec.bin header +0x61c -> 18 x {u16 count, u16 pad, u32 pointer}, one per weapon type + 1; the Magnet Spike
+  is index 14. Each row {u16 motion, u16 entries, u32 pointer} -> entries of 22 bytes: u16 frame, u16 kind, u8
+  condition, u8 pad, 4 x (u16 request, u16 weight). A weight sum under 1 plays the first request; otherwise one of
+  the four is drawn by weight; request 0xffff = silence.
+- Path: 0x1091ee30 -> 0x1092f5a9 -> 0x1091eb00 -> 0x1091e7b0 (local hunter only; remote hunters not traced).
+- Kinds: 0 system; 1 / 2 ground (by ground material); 3 / 4 slot 2 + hunter; 5 / 7 armour; 6 the weapon-type bank
+  we13 through 0x10b43370.
+- The Magnet Spike's table: 1333 entries over 163 motions, 138 of them kind 6.
+- Slot 2 + hunter holds the weapon model's bank merged with the hunter's VOICE bank (grunts come from the same
+  slot), not commonCH as section 1 guessed.
+- The category table of question 2 is mhfdat header +0x548.
+- The table is game data: it is not in the repo. It can be dumped again from the layout above (the scratch dumper
+  was about 25 lines); put the reader in mhfsnd.py with the sound build.
+
+### Hit sounds
+- From we13, chosen by weapon mode x hit level, not by the monster part's material: requests 29-31 (one mode) /
+  32-34 (the other), +35 in the magnet state; hit kind 0xe -> request 28.
+- So GU's own hit requests for class 5 have to be replaced, not added to (they would double).
+
+### Camera shake against sound
+- Event 12 = camera shake: handler 0x103383f0 -> 0x1082d830. Presets by the event's parameter: 0 / 1 / 2 =
+  amplitude 4 / 10 / 12 over 10 / 10 / 20 frames.
+- Only event 26 reaches 0x10b43370 (a sound).
+- Port, ms_act.c: `case 12` shakes with GU preset 0xf whatever the parameter (deviation until GU's presets are
+  mapped to MHF's three; the mapping is not traced). The "Triple Strike charged" site shakes when no effect handle
+  comes back: spurious, MHF plays we13 request 7 there.
+- effect-posts.md's "rumble N" lines are we13 sounds, not shakes.
+
+### Still open
+- Remote hunters' sounds, request 36's trigger, the random-pitch unit (question 3), GU's side (question 5).
+
+### File IDs for the sound build
+- After the merge of main (2026-11-11): the pool is 0x10700-0x1ffff, packages use up to 0x109ff, so 0x10a00 and up
+  is free. Nothing is allocated yet.

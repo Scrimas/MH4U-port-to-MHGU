@@ -1,0 +1,23 @@
+name: Port request / I want to port
+description: Suggest an MH4U monster (or feature) to port, or say you are starting one
+labels: [port-request]
+body:
+  - type: input
+    id: what
+    attributes:
+      label: Monster or feature
+      placeholder: "the MH4U monster or feature"
+    validations:
+      required: true
+  - type: dropdown
+    id: who
+    attributes:
+      label: Who would do it
+      options: [I'll port it myself, Scrimas or any willing contributor (I'm only suggesting it)]
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: "What makes it worth porting, what you know of it in 4U. Porting it yourself? Read notes/porting-guide.md, then open a draft PR that only claims its IDs in allocations.toml."

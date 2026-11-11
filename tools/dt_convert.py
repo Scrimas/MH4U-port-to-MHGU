@@ -2,7 +2,9 @@
 object inside the emulated game (GU loader -> edit -> GU writer, tools/guemu.py). Run with .venv/bin/python (unicorn, requirements.txt).
 
   dt_convert.py validate                 rebuild GU Teostra and Rathian from 4U data with Kushala as donor, diff
-  dt_convert.py build EMNNN DONOR OUTDIR [--sensor]    (--sensor: also the RECORDS tables, the 4U sensor)
+  dt_convert.py build EMNNN DONOR OUTDIR [--sensor] [--keep-ranges]
+      --sensor: also the RECORDS tables, the 4U sensor; --keep-ranges: the donor's AI distance ranges stay (RANGES not
+      converted: a 4U monster that runs the donor's GU AI table, whose distance checks name the donor's rows)
 
 Only mappings that a vote over the 40 monsters present in both games supports (tools/dt_vote.py, dump/dtmap/)
 are applied; everything else stays the donor's. Rules: (object field, 4U file, header word or offset, size rule).
@@ -38,8 +40,7 @@ BLOCKS = {
     'dttune': {0x68: ('etd', 5, 80, None, 0),    # 29/40 exact, 98.6 % bytes: per-PART table, 8 x 10 B {u16 part HP,
                                                  # u8 levels, u8, u8, u8, u16 2nd-level HP / 0xffff, u16 kind}
                                                  # (missed by the vote; was Kushala's part HP / breaks)
-               0x7c: ('etd', 10, 16, None, 0),   # 37/40: rows of 4 f32 thresholds; GU size = 16 x header
-                                                 # byte +0x0a (rows), donor count kept -> only row 0 is Gogmazios'
+               # 0x7c / 0x80 (etd words 10 / 11): RANGES below, every row with its count
                0x70: ('etd', 7, 80, None, 0),    # 17/40 exact, the rest retuned
                0x74: ('etd', 8, 80, None, 0),    # 16/40
                # 0x88 <- etd word 13 (18/40) left out: the writer reads a loop count from this block and 4U's
@@ -75,6 +76,14 @@ ABSENT = {
                0xBC: ('etd', 26, {0x11D: 1}), 0xC8: ('etd', 29, {0xFF: 0}), 0xCC: ('etd', 30, {0x122: 1})},
 }
 GATE32 = {0xF4}          # gates that are pointers (4 bytes), the rest are bytes
+# AI distance ranges (C, issue #11): dttune +0x7c = rows of 4 f32 thresholds (count +0xfa), +0x80 = one 12-byte
+# offset (x, y, z) per row (count +0xfb). EMC kinds 0x0e / 0x16 / 0x15 (e.g. op 0x78 `78 00 00 r`) measure the
+# distance from the monster + offset[r] to the target against row r: GU 0x8e144 -> 0x71164 (row r < +0xfa, else no
+# row: no case matches) / 0x71190; 4U 0x92b50c -> 0x92c850 (etd word 10) / 0x9369ec (etd word 11). 4U rows end at an
+# all -1 row; word 11 has one offset per row or is absent (zeros). GU files match on every row: em024_00 = 4U em031
+# (1 row), em001_00 = 4U em001 (2 rows, word 11 two zero rows), em027_00 = 4U em032 (1 row). The old rule copied
+# row 0 over the donor's and kept its count, so Gogmazios' rows 1..3 (g0 s5 / s26, wall-hunter moves) were missing.
+RANGES = (0x7C, 10, 0xFA, 0x80, 11, 0xFB)
 # 4U bytes over the start of a donor block of the same layout: field -> (4U file, header word, bytes). Rage +0x8c:
 # u16 threshold, u16 duration, then multipliers (4U etd word 14 == GU +0x8c[0:56] for Rathian, Teostra, Kushala; GU's
 # bytes 56..123 have no 4U counterpart and stay). Read by 0x82cd4 / 0xbcf00 / 0xc05a8.
@@ -122,7 +131,7 @@ def ptr_fields(kind):
     return range(0x68, 0xB8, 4) if kind == 'dtbase' else range(0x68, 0xE0, 4)
 
 
-def convert(kind, donor_bytes, d4, log=None, records=False):
+def convert(kind, donor_bytes, d4, log=None, records=False, keep_ranges=False):
     loader, vt, reset = gu_schema.KINDS[kind]
     applied = []
 
@@ -142,6 +151,28 @@ def convert(kind, donor_bytes, d4, log=None, records=False):
             uc.mem_write(guemu.OBJ + off, struct.pack('<I', new))
             uc.mem_write(guemu.OBJ + cnt, bytes([len(recs)]))
             applied.append('records +%#x <- %s word %d (%d x %d bytes, count +%#x)' % (off, fk, w, len(recs), size, cnt))
+
+    def ranges(uc, st, u32):
+        off_t, w_t, cnt_t, off_o, w_o, cnt_o = RANGES
+        u = d4['etd']
+        p = block_at(u, 'etd', w_t)
+        if p is None or not u32(guemu.OBJ + off_t) or not u32(guemu.OBJ + off_o):
+            applied.append('ranges +%#x / +%#x kept (4U word %d %s)' % (off_t, off_o, w_t,
+                                                                        'absent' if p is None else 'ok'))
+            return
+        rows = []
+        while p + 16 <= len(u) and struct.unpack_from('<4f', u, p) != (-1.0,) * 4:
+            rows.append(u[p:p + 16]); p += 16
+        q = block_at(u, 'etd', w_o)
+        offs = [u[q + 12 * i:q + 12 * i + 12] if q is not None else bytes(12) for i in range(len(rows))]
+        assert rows and len(rows) < 256, 'etd word %d: no range row' % w_t
+        for off, cnt, data in ((off_t, cnt_t, rows), (off_o, cnt_o, offs)):
+            new = st['alloc'](len(b''.join(data)))
+            uc.mem_write(new, b''.join(data))
+            uc.mem_write(guemu.OBJ + off, struct.pack('<I', new))
+            uc.mem_write(guemu.OBJ + cnt, bytes([len(data)]))
+        applied.append('ranges +%#x <- etd word %d (%d rows, count +%#x), +%#x <- %s (count +%#x)' % (
+            off_t, w_t, len(rows), cnt_t, off_o, 'etd word %d' % w_o if q is not None else 'zeros', cnt_o))
 
     dropped, focused, nulls = set(), set(), {}
 
@@ -203,6 +234,10 @@ def convert(kind, donor_bytes, d4, log=None, records=False):
             uc.mem_write(obj + off, struct.pack('<I', new))
             applied.append('block +%#x <- %s word %d (%d bytes%s)' % (off, fk, w, n,
                                                                       ', count +%#x = %d' % (cnt, n // esz) if cnt is not None else ''))
+        if kind == 'dttune' and keep_ranges:
+            applied.append('ranges +%#x / +%#x kept (the donor\'s: --keep-ranges)' % (RANGES[0], RANGES[3]))
+        elif kind == 'dttune':
+            ranges(uc, st, u32)
         if records:
             modify_records(uc, st)
         nulls.update((off, not u32(obj + off)) for off in ptr_fields(kind))
@@ -261,6 +296,7 @@ if __name__ == '__main__':
         d4 = emdata4u.load_4u(sys.argv[2]); os.makedirs(sys.argv[4], exist_ok=True)
         for kind in ('dtbase', 'dttune'):
             log = []
-            out = convert(kind, gu_file(rom, sys.argv[3], kind), d4, log, records='--sensor' in sys.argv[5:])
+            out = convert(kind, gu_file(rom, sys.argv[3], kind), d4, log, records='--sensor' in sys.argv[5:],
+                          keep_ranges='--keep-ranges' in sys.argv[5:])
             open(os.path.join(sys.argv[4], kind + '.bin'), 'wb').write(out)
             print(kind, len(out), 'bytes'); [print('   ', l) for l in log]

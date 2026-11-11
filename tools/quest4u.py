@@ -121,6 +121,61 @@ def rem_4u(q, row, gu_item):
     return d + bytes(184 - len(d))
 
 
+# Supply box (issue #11). 4U quest header +0x08 -> list of 8-byte {u8 kind, u8 slots, u16, u32 table} closed by kind
+# 0xff; a table = {u16 item, u16 count} slots (0 = empty): 32 for the box, 8 for the delivery. Gogmazios m11014 / m11035 (C, data): kind 0 -> the box (Map,
+# First-aid Med+, Ration, Cleanser, ...: the reporter's 4U box), kinds 1..3 -> one second table (7 / 8 items, the
+# later delivery; its trigger is not traced, G). GU supp (168 B): f32 1.0, u32 1, 40 x {u16 item, u8 count, u8 group};
+# a nonzero group byte starts a delivery group, the slots before it are the box at start; questData +0x58..+0x5f
+# hold the groups' conditions (S, survey of the 1854 v1.4 quests: 869 have no group, 468 `01 01 00 00 00 00 04 04` with
+# group 1 at slot 4 (4 Maps at start = q0011413, the old template: "only Maps") and group 4 at slot 32, 219
+# `00 00 00 00 00 00 04 04` with only group 4 at slot 32). Here (C, 2026-11-01: 4U HR / G quests of Black Gravios,
+# kind 0 = Maps / Torches / Cool Drinks, kind 1 = the supplies, kind 3 = the restock, the
+# layout of GU's own HR / G boxes, e.g. q11107: Maps at start, group 1 at slot 4, group 4 at slot 32): 4U kind 0 = the
+# box at start, kind 1 right after it as group 1 (the first delivery), kind 3 from slot 32 as group 4, questData +0x58
+# = SUPP_QD_1 with a group 1, else SUPP_QD. Until 2026-11-01 kinds 0 and 1 were both in the box at start (user: "you
+# get every item at once"); Gogmazios' boxes (kind 1 empty) are unchanged.
+SUPP_QD = bytes([0, 0, 0, 0, 0, 0, 4, 4])
+SUPP_QD_1 = bytes([1, 1, 0, 0, 0, 0, 4, 4])
+SUPP_GU_NAME = {'Power Coating': 'Power Coating Lv1',      # GU splits coatings into Lv1 / Lv2; GU's own boxes use Lv1
+                'Water S': 'Water S Lv1'}                  # 4U's one Water S level (Black Gravios m10923): GU's Lv1
+
+
+def supp_4u(q, names4u, gu_ids, log=print):
+    """4U quest -> (GU supp bytes, questData +0x58..+0x5f for its delivery groups or None: none). names4u = 4U item
+    names (items4u.text_4u), gu_ids = {GU name: [ids]} (the first id wins: e.g. Normal S Lv2 0x65 as GU's boxes, not
+    0x85). A 4U item GU lacks (4U Torch) is left out."""
+    # entry byte +1 = the table's slot count (S, Black Gravios' 4U quests 2026-11-01: kinds 0 / 1 / 2 / 3 = 12 / 20 /
+    # 0 / 8 or 8 / 24 / 0 / 8 slots, kinds 0 + 1 = 32 = the box; Gogmazios' 32 / 0 / 0 / 8, kinds 1..3 on one table):
+    # the box = kind 0's slots then kind 1's, the delivery = kind 3's (kind 2 has none in every quest read)
+    lst, ents = struct.unpack_from('<I', q, 8)[0], {}
+    while q[lst] != 0xFF:
+        ents[q[lst]] = (q[lst + 1], struct.unpack_from('<I', q, lst + 4)[0])
+        lst += 8
+    assert set(ents) <= {0, 1, 2, 3} and 0 in ents and ents[0][0] + ents.get(1, (0,))[0] <= 32 and \
+        ents.get(2, (0,))[0] == 0 and ents.get(3, (0,))[0] <= 8, 'unexpected 4U supply list %s' % ents
+
+    def table(t, slots):
+        out = []
+        for i in range(slots):
+            item, n = struct.unpack_from('<HH', q, t + 4 * i)
+            if not item: continue
+            name = names4u[item]
+            ids = gu_ids.get(SUPP_GU_NAME.get(name, name))
+            if not ids:
+                log('supply: 4U item %d %s has no GU item, left out' % (item, name)); continue
+            out.append((ids[0], n))
+        return out
+    box = table(ents[0][1], ents[0][0])
+    first = table(ents[1][1], ents[1][0]) if 1 in ents else []    # the first delivery (group 1)
+    later = table(ents[3][1], ents[3][0]) if 3 in ents else []    # 8 slots: m11035's runs into the list at +0x80
+    assert len(box) + len(first) <= 32 and len(later) <= 8 and all(n < 256 for _, n in box + first + later)
+    slots = [(i, n, 0) for i, n in box] + [(i, n, 1 if k == 0 else 0) for k, (i, n) in enumerate(first)]
+    slots += [(0, 0, 0)] * (32 - len(slots))
+    slots += [(i, n, 4 if k == 0 else 0) for k, (i, n) in enumerate(later)] + [(0, 0, 0)] * (8 - len(later))
+    groups = (SUPP_QD_1 if later else SUPP_QD_1[:6] + bytes(2)) if first else SUPP_QD if later else None
+    return struct.pack('<fI', 1.0, 1) + b''.join(struct.pack('<HBB', *s) for s in slots), groups
+
+
 def gmd(name, strings, unk):
     body = b''.join(s.encode('utf-8') + b'\0' for s in strings)
     n = name.encode('ascii')

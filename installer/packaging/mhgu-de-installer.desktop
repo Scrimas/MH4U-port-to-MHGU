@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=MHGU Definitive Edition Installer
+Comment=Install the MHGU Definitive Edition mod for Monster Hunter Generations Ultimate
+Exec=mhgu-de-installer
+Icon=mhgu-de-installer
+Categories=Game;Utility;
+Terminal=false
+StartupWMClass=mhgu-de-installer

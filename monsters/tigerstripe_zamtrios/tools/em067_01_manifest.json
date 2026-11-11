@@ -537,7 +537,7 @@
   "em092 sound: 53 waves (53 used by the bank), bank 11 groups / 145 entries, request 313 entries (20 common-bank entries from GU em067_00, 0 converted, + 17 more of its common-bank requests), sound call 41135 B",
   "attackdata: 4U em092 (= em022) with GU byte 28; differs from GU in the flags of records [23, 24, 31, 32, 33]",
   "bodydata: GU em067_00 minus records [12, 13] (bones [131, 142])",
-  "dttune: GU em067_00 + 72 bytes of 4U em022 -> em092 differences (GU retuned 13 other bytes)",
+  "dttune: GU em067_00 + 72 bytes of 4U em022 -> em092 differences (GU retuned 3 other bytes)",
   "area data (fields 40-44): GU em007_00 (map 5 / 22 routes; GU em067_00 covers map 14 only)",
   "kept sound\\se\\em\\em067_00\\snd_em067_00 although replaced: named by ['shell\\\\em\\\\em067_00_shell02\\\\em067_00_02']",
   "shared from em067_00: 505 files kept, 32 dropped (replaced or its model)"

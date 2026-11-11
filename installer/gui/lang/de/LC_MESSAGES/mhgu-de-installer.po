@@ -1,0 +1,714 @@
+# Strings of the MHGU Definitive Edition Installer, extracted by installer/tools/i18n.py.
+msgid ""
+msgstr ""
+"Project-Id-Version: mhgu-de-installer\n"
+"PO-Revision-Date: 2026-11-09 00:00+0000\n"
+"Last-Translator: Automatically generated\n"
+"Language-Team: none\n"
+"Language: de\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: gui/ui/app.slint
+msgid "MHGU Definitive Edition Installer"
+msgstr "MHGU Definitive Edition Installer"
+
+#: gui/ui/app.slint
+msgid "What's new"
+msgstr "Neuigkeiten"
+
+#: gui/ui/app.slint
+msgid "Install into"
+msgstr "Installieren in"
+
+#: gui/ui/app.slint
+msgid "Add a folder…"
+msgstr "Ordner hinzufügen…"
+
+#: gui/ui/app.slint
+msgid "Update"
+msgstr "Aktualisieren"
+
+#: gui/ui/app.slint
+msgid "✓ Ready to play"
+msgstr "✓ Bereit zum Spielen"
+
+#: gui/ui/app.slint
+msgid "Cancel"
+msgstr "Abbrechen"
+
+#: gui/ui/app.slint
+msgid "OK"
+msgstr "OK"
+
+#: gui/ui/app.slint
+msgid "Monsters"
+msgstr "Monster"
+
+#: gui/ui/app.slint
+msgid "Monster"
+msgstr "Monster"
+
+#: gui/ui/app.slint
+msgid "Size"
+msgstr "Größe"
+
+#: gui/ui/app.slint
+msgid "Version"
+msgstr "Version"
+
+#: gui/ui/app.slint
+msgid "Gear of the monsters that leave:"
+msgstr "Ausrüstung der entfernten Monster:"
+
+#: gui/ui/app.slint
+msgid "Close"
+msgstr "Schließen"
+
+#: gui/ui/app.slint
+msgid "Settings"
+msgstr "Einstellungen"
+
+#: gui/src/main.rs gui/ui/app.slint
+msgid "Offer pre-releases"
+msgstr "Vorabversionen anbieten"
+
+#: gui/ui/app.slint
+msgid "Test builds of the next release: they may contain bugs."
+msgstr "Testversionen des nächsten Release: Sie können Fehler enthalten."
+
+#: gui/ui/app.slint
+msgid "Look for a new installer at start"
+msgstr "Beim Start nach einem neuen Installer suchen"
+
+#: gui/ui/app.slint
+msgid "Language"
+msgstr "Sprache"
+
+#: gui/ui/app.slint
+msgid "Folders you added"
+msgstr "Hinzugefügte Ordner"
+
+#: gui/src/main.rs gui/ui/app.slint
+msgid "Remove"
+msgstr "Entfernen"
+
+#: gui/ui/app.slint
+msgid "Remove the mod from the ticked places…"
+msgstr "Die Mod von den angehakten Zielen entfernen…"
+
+#: gui/ui/app.slint
+msgid "About"
+msgstr "Über"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/ui/app.slint
+msgid "MHGU Definitive Edition Installer {}"
+msgstr "MHGU Definitive Edition Installer {}"
+
+#: gui/ui/app.slint
+msgid "Installs the MHGU Definitive Edition mod for Monster Hunter Generations Ultimate from its GitHub releases. Free software under the GNU GPL v3 or later."
+msgstr "Installiert die Mod MHGU Definitive Edition für Monster Hunter Generations Ultimate aus ihren GitHub-Releases. Freie Software unter der GNU GPL v3 oder neuer."
+
+#: core/src/apply.rs core/src/source.rs gui/src/main.rs
+msgid "Cancelled"
+msgstr "Abgebrochen"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/apply.rs
+msgid "{} is not in this release"
+msgstr "{} ist nicht in diesem Release"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/apply.rs
+msgid "The release has no {}"
+msgstr "Das Release hat kein {}"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/apply.rs
+msgid "The download of {} does not match the release's checksum"
+msgstr "Der Download von {} stimmt nicht mit der Prüfsumme des Release überein"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/apply.rs core/src/record.rs core/src/saves.rs
+#: core/src/selfupdate.rs core/src/source.rs
+msgid "Could not write {} ({})"
+msgstr "{} konnte nicht geschrieben werden ({})"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/apply.rs core/src/source.rs
+msgid "Could not read {} ({})"
+msgstr "{} konnte nicht gelesen werden ({})"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/apply.rs
+msgid "{} holds {}, which its release does not list"
+msgstr "{} enthält {}, das sein Release nicht aufführt"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/apply.rs
+msgid "{} in {} does not match the release"
+msgstr "{} in {} stimmt nicht mit dem Release überein"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/apply.rs
+msgid "{} lacks {}"
+msgstr "In {0} fehlt {1}"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/apply.rs
+msgid "Could not copy {} ({})"
+msgstr "{} konnte nicht kopiert werden ({})"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/apply.rs
+msgid "Could not remove {} ({})"
+msgstr "{} konnte nicht entfernt werden ({})"
+
+#: core/src/apply.rs
+msgid "The mod folder has no parent folder"
+msgstr "Der Mod-Ordner hat keinen übergeordneten Ordner"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/apply.rs
+msgid "{} was not downloaded"
+msgstr "{} wurde nicht heruntergeladen"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/apply.rs core/src/selfupdate.rs
+msgid "Could not replace {} ({})"
+msgstr "{} konnte nicht ersetzt werden ({})"
+
+#: core/src/i18n.rs
+msgid "..."
+msgstr "..."
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/manifest.rs
+msgid "Unreadable manifest ({})"
+msgstr "Unlesbares Manifest ({})"
+
+#: core/src/manifest.rs
+msgid "This release needs a newer installer: update the installer first"
+msgstr "Dieses Release braucht einen neueren Installer: zuerst den Installer aktualisieren"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/manifest.rs core/src/saves.rs
+msgid "Invalid manifest: {}"
+msgstr "Ungültiges Manifest: {}"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/places.rs
+msgid "{} (Flatpak)"
+msgstr "{} (Flatpak)"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/places.rs
+msgid "SD card ({})"
+msgstr "SD-Karte ({})"
+
+#: core/src/places.rs
+msgid "Ryujinx (portable)"
+msgstr "Ryujinx (portabel)"
+
+#: core/src/places.rs
+msgid "yuzu family (folder)"
+msgstr "yuzu-Familie (Ordner)"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/record.rs
+msgid "{} was written by a newer installer"
+msgstr "{} wurde von einem neueren Installer geschrieben"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/record.rs
+msgid "{} is damaged ({})"
+msgstr "{} ist beschädigt ({})"
+
+#: core/src/saves.rs
+msgid "The hunter holds a weapon that leaves, and the box has no other weapon"
+msgstr "Der Jäger trägt eine Waffe, die entfernt wird, und die Box hat keine andere Waffe"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/saves.rs
+msgid "{} cannot be read ({})"
+msgstr "{} kann nicht gelesen werden ({})"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/saves.rs
+msgid "character {} holds another tool's data where the mod keeps its own"
+msgstr "Charakter {} enthält Daten eines anderen Tools, wo die Mod ihre eigenen ablegt"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/saves.rs
+msgid "character {} was migrated by a newer release"
+msgstr "Charakter {} wurde von einem neueren Release migriert"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/saves.rs
+msgid "step {} needs a newer installer"
+msgstr "Schritt {} braucht einen neueren Installer"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/saves.rs
+msgid "character {}: {}"
+msgstr "Charakter {}: {}"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/saves.rs
+msgid "Could not back up {} ({})"
+msgstr "{} konnte nicht gesichert werden ({})"
+
+#: core/src/saves.rs
+msgid "The backup folder has no parent folder"
+msgstr "Der Sicherungsordner hat keinen übergeordneten Ordner"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/selfupdate.rs
+msgid "{} is not in {}"
+msgstr "{} ist nicht in {}"
+
+#: core/src/selfupdate.rs
+msgid "The running file has no usable name"
+msgstr "Die laufende Datei hat keinen verwendbaren Namen"
+
+#: core/src/selfupdate.rs
+msgid "The download does not match the release's checksum"
+msgstr "Der Download stimmt nicht mit der Prüfsumme des Releases überein"
+
+#: core/src/source.rs
+msgid "GitHub refused the request (too many in the last hour), try later"
+msgstr "GitHub hat die Anfrage abgelehnt (zu viele in der letzten Stunde), später erneut versuchen"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/source.rs
+msgid "GitHub answered HTTP {}"
+msgstr "GitHub antwortete mit HTTP {}"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/source.rs
+msgid "Could not reach GitHub ({})"
+msgstr "GitHub nicht erreichbar ({})"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/source.rs
+msgid "Unexpected answer from GitHub ({})"
+msgstr "Unerwartete Antwort von GitHub ({})"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/source.rs
+msgid "Download failed ({})"
+msgstr "Download fehlgeschlagen ({})"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/zipread.rs
+msgid "Damaged zip file ({})"
+msgstr "Beschädigte ZIP-Datei ({})"
+
+#: gui/src/main.rs
+msgid "Core"
+msgstr "Basis"
+
+#: gui/src/main.rs
+msgid "The release has no manifest.json"
+msgstr "Das Release hat keine manifest.json"
+
+#: gui/src/main.rs
+msgid "Looking for the latest release…"
+msgstr "Suche nach dem neuesten Release…"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "Release {} needs installer {} or newer: update the installer first."
+msgstr "Release {} braucht Installer {} oder neuer: zuerst den Installer aktualisieren."
+
+#: gui/src/main.rs
+msgid "No release of the mod can be installed by this installer yet."
+msgstr "Dieser Installer kann noch kein Release der Mod installieren."
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "Could not read the releases: {}"
+msgstr "Die Releases konnten nicht gelesen werden: {}"
+
+#: gui/src/main.rs
+msgid "Untested"
+msgstr "Ungetestet"
+
+#: gui/src/main.rs
+msgid "Not found"
+msgstr "Nicht gefunden"
+
+#: gui/src/main.rs
+msgid "Found · nothing installed"
+msgstr "Gefunden · nichts installiert"
+
+#: gui/src/main.rs
+msgid "Extracted by hand: replaced when you install"
+msgstr "Von Hand entpackt: wird beim Installieren ersetzt"
+
+#: gui/src/main.rs
+msgid "Its install record is unreadable"
+msgstr "Sein Installationsprotokoll ist unlesbar"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "Release {} · {}"
+msgstr "Release {} · {}"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "new · {}"
+msgstr "neu · {}"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "repair · {}"
+msgstr "Reparatur · {}"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{} → none"
+msgstr "{} → keine"
+
+#: gui/src/main.rs
+msgid "System language"
+msgstr "Systemsprache"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "Installer {} is out"
+msgstr "Installer {} ist erschienen"
+
+#: gui/src/main.rs
+msgid "No release"
+msgstr "Kein Release"
+
+#: gui/src/main.rs
+msgid "Install"
+msgstr "Installieren"
+
+#: gui/src/main.rs
+msgid "pre-release"
+msgstr "Vorabversion"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "Release {}"
+msgstr "Release {}"
+
+#: gui/src/main.rs
+msgid "Needed by every monster"
+msgstr "Von allen Monstern benötigt"
+
+#: gui/src/main.rs
+msgid "Will be removed · take off its gear in game first"
+msgstr "Wird entfernt · zuerst im Spiel die Ausrüstung ablegen"
+
+#: gui/src/main.rs
+msgid "map"
+msgstr "Karte"
+
+#: gui/src/main.rs
+msgid "shared files"
+msgstr "gemeinsame Dateien"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{} · also for {}"
+msgstr "{} · auch für {}"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{} in this release · each brings the map it needs"
+msgstr "{} in diesem Release · jedes bringt die Karte mit, die es braucht"
+
+#: gui/src/main.rs
+msgid "Nothing ticked"
+msgstr "Nichts angehakt"
+
+#: gui/src/main.rs
+msgid "· tick where to install"
+msgstr "· ankreuzen, wo installiert wird"
+
+#: gui/src/main.rs
+msgid "Up to date"
+msgstr "Aktuell"
+
+#: gui/src/main.rs
+msgid "An MHGU Definitive Edition folder extracted by hand is there: it is removed, then installed fresh."
+msgstr "Ein von Hand entpackter MHGU-Definitive-Edition-Ordner ist vorhanden: Er wird entfernt und neu installiert."
+
+#: gui/src/main.rs
+msgid "The mod from before 2.0.0, when it was called MH4U Port, is there: it is removed."
+msgstr "Die Mod von vor 2.0.0, als sie MH4U Port hieß, ist vorhanden: Sie wird entfernt."
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "+ {} {} (new)"
+msgstr "+ {} {} (neu)"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "↻ {} {} (repaired: files were missing)"
+msgstr "↻ {} {} (repariert: Dateien fehlten)"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "↑ {} {} → {}"
+msgstr "↑ {} {} → {}"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "− {} {} (removed)"
+msgstr "− {} {} (entfernt)"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{} · for {}"
+msgstr "{} · für {}"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "Moves to release {} (nothing to download)"
+msgstr "Wechselt zu Release {} (nichts herunterzuladen)"
+
+#: gui/src/main.rs
+msgid "Saves"
+msgstr "Spielstände"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{}: moved to this release's IDs"
+msgstr "{}: Umstellung auf die IDs dieses Release"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{}: the gear of the monsters that leave is cleaned"
+msgstr "{}: Bereinigung der Ausrüstung der entfernten Monster"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{}: moved to this release's IDs, the gear of the monsters that leave cleaned"
+msgstr "{}: Umstellung auf die IDs dieses Release, Bereinigung der Ausrüstung der entfernten Monster"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{} cannot be migrated: {}"
+msgstr "{} kann nicht migriert werden: {}"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "Every save is backed up first, into {}"
+msgstr "Jeder Spielstand wird zuerst in {} gesichert"
+
+#: gui/src/main.rs
+msgid "Unequip only (nothing deleted)"
+msgstr "Nur ablegen (nichts wird gelöscht)"
+
+#: gui/src/main.rs
+msgid "Remove the worn pieces (data loss)"
+msgstr "Getragene Teile löschen (Datenverlust)"
+
+#: gui/src/main.rs
+msgid "Remove all their items and gear (data loss)"
+msgstr "Alle ihre Gegenstände und Ausrüstung löschen (Datenverlust)"
+
+#: gui/src/main.rs
+msgid "Leave the saves as they are"
+msgstr "Spielstände unverändert lassen"
+
+#: gui/src/main.rs
+msgid "Before you go on"
+msgstr "Bevor es weitergeht"
+
+#: gui/src/main.rs
+msgid "A monster you remove takes its armor and weapon models with it: take its gear off in game first."
+msgstr "Ein entferntes Monster nimmt seine Rüstungs- und Waffenmodelle mit: zuerst im Spiel seine Ausrüstung ablegen."
+
+#: gui/src/main.rs
+msgid "This is a pre-release: it may contain bugs. Use it at your own discretion."
+msgstr "Dies ist eine Vorabversion: Sie kann Fehler enthalten. Nutzung auf eigenes Ermessen."
+
+#: gui/src/main.rs
+msgid "Online, everyone in the group needs the same release and the same monsters."
+msgstr "Online braucht jeder in der Gruppe dasselbe Release und dieselben Monster."
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "Close {} first: the game must not run while its files change."
+msgstr "Zuerst {} beenden: Das Spiel darf nicht laufen, während sich seine Dateien ändern."
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "Download: {}"
+msgstr "Download: {}"
+
+#: gui/src/main.rs
+msgid "Remove the mod"
+msgstr "Die Mod entfernen"
+
+#: gui/src/main.rs
+msgid "Install these changes?"
+msgstr "Diese Änderungen installieren?"
+
+#: gui/src/main.rs
+msgid "Close the game first"
+msgstr "Zuerst das Spiel beenden"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{} is running: close it, then install again."
+msgstr "{} läuft: beenden, dann erneut installieren."
+
+#: gui/src/main.rs
+msgid "The install failed"
+msgstr "Die Installation ist fehlgeschlagen"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{}: {}"
+msgstr "{}: {}"
+
+#: gui/src/main.rs
+msgid "Installing anyway leaves these saves as they are, which may break their ported items and gear. Close this, check them (another tool's data, a newer release, the game running), then install again to go on without them."
+msgstr "Trotzdem installieren lässt diese Spielstände unverändert, was ihre portierten Gegenstände und Ausrüstung beschädigen kann. Dies schließen, sie prüfen (Daten eines anderen Tools, ein neueres Release, das laufende Spiel), dann erneut installieren, um ohne sie fortzufahren."
+
+#: gui/src/main.rs
+msgid "Some saves cannot be migrated"
+msgstr "Einige Spielstände können nicht migriert werden"
+
+#: gui/src/main.rs
+msgid "Starting…"
+msgstr "Start…"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "Downloading · {} / {}"
+msgstr "Download · {} / {}"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "Downloading {} · {} / {}"
+msgstr "Download von {} · {} / {}"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "Installing into {} ({} of {})"
+msgstr "Installation in {} ({} von {})"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "Updating the save {}"
+msgstr "Spielstand {} wird aktualisiert"
+
+#: gui/src/main.rs
+msgid "The mod was removed."
+msgstr "Die Mod wurde entfernt."
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "Start MHGU in {}"
+msgstr "MHGU in {} starten"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "The mod is installed; these saves were left as they were. Backups: {}"
+msgstr "Die Mod ist installiert; diese Spielstände blieben unverändert. Sicherungen: {}"
+
+#: gui/src/main.rs
+msgid "Some saves could not be updated"
+msgstr "Einige Spielstände konnten nicht aktualisiert werden"
+
+#: gui/src/main.rs
+msgid "Nothing was changed in the places not yet reached; a place being installed keeps its old files."
+msgstr "An den noch nicht erreichten Zielen wurde nichts geändert; ein Ziel, das gerade installiert wurde, behält seine alten Dateien."
+
+#: gui/src/main.rs
+msgid "Where to install"
+msgstr "Wohin installieren"
+
+#: gui/src/main.rs
+msgid "The mod has never been tested in MHGU PC Recomp: it is installed into its mods folder, use it at your own discretion."
+msgstr "Die Mod wurde nie in MHGU PC Recomp getestet: Sie wird in dessen mods-Ordner installiert, Nutzung auf eigenes Ermessen."
+
+#: gui/src/main.rs
+msgid "Update the installer"
+msgstr "Den Installer aktualisieren"
+
+#: gui/src/main.rs
+msgid "This copy cannot replace itself: download the new installer from its release page."
+msgstr "Diese Kopie kann sich nicht selbst ersetzen: den neuen Installer von seiner Release-Seite herunterladen."
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "Installed: start {}"
+msgstr "Installiert: {} starten"
+
+#: gui/src/main.rs
+msgid "Cancelling…"
+msgstr "Wird abgebrochen…"
+
+#: gui/src/main.rs
+msgid "Offer pre-releases?"
+msgstr "Vorabversionen anbieten?"
+
+#: gui/src/main.rs
+msgid "Pre-releases are test builds of the next release. They may contain bugs, and they can change your save in ways a later release does not: use them at your own discretion."
+msgstr "Vorabversionen sind Testversionen des nächsten Release. Sie können Fehler enthalten und den Spielstand auf eine Weise ändern, wie es ein späteres Release nicht tut: Nutzung auf eigenes Ermessen."
+
+#: gui/src/main.rs
+msgid "While this is on, the installer installs the newest pre-release when there is one."
+msgstr "Solange dies aktiv ist, installiert der Installer die neueste Vorabversion, wenn es eine gibt."
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{} monster"
+msgstr "{} Monster"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{} monsters"
+msgstr "{} Monster"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{} removal"
+msgstr "{} Entfernung"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{} removals"
+msgstr "{} Entfernungen"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{} change"
+msgstr "{} Änderung"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{} changes"
+msgstr "{} Änderungen"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "Install {} change"
+msgstr "{} Änderung installieren"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "Install {} changes"
+msgstr "{} Änderungen installieren"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{} save updated (backed up first)"
+msgstr "{} Spielstand aktualisiert (zuvor gesichert)"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{} saves updated (backed up first)"
+msgstr "{} Spielstände aktualisiert (zuvor gesichert)"

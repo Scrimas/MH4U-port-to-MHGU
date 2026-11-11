@@ -40,7 +40,7 @@
    "path": "enemy\\em089\\em089_00\\mod\\em089_00",
    "type": "0x7cd0e77e",
    "path_hash": "0xf5fed6bd",
-   "source": "converted: parts visibility: 4U rows in the donor's 12-state layout"
+   "source": "converted: parts visibility: 4U rows in the donor's 12-state layout, eyelid group 12 in states 1 / 6"
   },
   {
    "field": 4,
@@ -675,7 +675,7 @@
   "em089_00: 15 materials -> templates ['solid', 'unlit', 'solid_at', 'tar', 'tar', 'tar', 'tar', 'tar', 'tar', 'tar', 'tar', 'tar', 'tar', 'solid', 'add']",
   "em089_00_tail: 1 materials -> templates ['solid']",
   "em089_00_gekiryusou: 1 materials -> templates ['solid']",
-  "field 3: CONVERTED parts visibility: 4U rows in the donor's 12-state layout",
+  "field 3: CONVERTED parts visibility: 4U rows in the donor's 12-state layout, eyelid group 12 in states 1 / 6",
   "field 11: CONVERTED camera list from 4U e089_cam (LCM v4 -> v5, tools/lcm4u2gu.py; ids = 4U ids of the camera events)",
   "field 26: CONVERTED attackdata from 4U etd word 28 (61 attacks, 4U attack IDs)",
   "field 28: CONVERTED hitsize from 4U etd word 27 (4U bone IDs = model IDs; 13 -> 201)",

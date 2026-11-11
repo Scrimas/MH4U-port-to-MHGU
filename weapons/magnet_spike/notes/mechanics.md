@@ -315,7 +315,7 @@ scaled), MHF's fc6:11 + fc5:15 x 3 as the cue (msfxposts CHARGED; GS's charge fl
         Txt_target1-4 (tree scope), Txt_zoom (0, 0)-(168, 32) and TexS_pointer (168, 0)-(184, 16) (zoom),
         Txt_s_scope (0, 312)-(96, 408) (simple_scope; red vertex colour), Txt_s_scope and Txt_target1-4 (target_scope).
         TexS_align samples hud00, Txt_No custom_pnl2.
-      - Port: mshud.py build_reticle writes mh4uport\ms_reticle0 / 1 / 2 (the live HD_hud01's size, 512 x 1024 BC3
+      - Port: mshud.py build_reticle writes mhgu_de\ms_reticle0 / 1 / 2 (the live HD_hud01's size, 512 x 1024 BC3
         with the HD UI mod, 512 KB each; GU's 256 x 512 otherwise), empty but for MHF's reticle quarter in frame N's
         colour at TexS_scope's quadrant centre corner (every other user blanked: they are bound only while the local
         class-5 hunter aims, so GU's ring, arrows, bars, zoom gauge and crosshairs vanish then, as MHF), 2 texels per HUD unit (+1 texel of
