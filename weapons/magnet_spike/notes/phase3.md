@@ -411,3 +411,21 @@ res R gens G` (flags +0xf0 bit 0x2000000 = build failed, built +0x118 bit 0x1000
 = gen +0x46 (5 / 0x1e effect draw, 0x37 scene model), ed bit 2 = scene mode, rflags = record +0 (0x10 model / 8 EAN
 not found, 0x2000 / 0x1000 empty path), model = the rModel, live = particles alive. The test must still show the
 look: MHF's additive meshes add (not alpha), sizes, orientation (Euler order G), and the gun's three parts.
+
+### Test 21 static follow-up (gameplay, 2026-11-11)
+The maintainer's test-15 answers, traced in MHF (mechanics.md "Invincibility", "Conditions and inputs", "Marker,
+attraction, repulsion"). Changed (ms_act.c): the attraction's fall now keeps MHF's 0.97^N momentum from the flight's
+first tick (0x103327a0; the port had restarted it at 90 / tick: about twice the speed, landing 4-8 m past MHF's spot
+and up to 50 cm higher in an offline replay), the steering gate is the horizontal distance (0x10332ae0) and the start
+pitch is clamped to 25 deg up / 10 deg down (0x103328d0). New log line, once per attraction at its end: `msport:
+attraction end (landed | action change, action A): marker y M, target y T, start y Y0, peak y P, end y E, D cm to
+the target horizontally, N ticks, phase K` (target = marker + 100; phase 3 = falling). Not changed: the RB-move
+i-frames (MHF's own 7 ticks, 17 = with Evasion +2, C), the falling attacks' carried-over i-frames (MHF event 9,
+open: S) and RB + A while moving (MHF rolls at any gauge; the port's 106 with a bar, and GU's roll on RB + A
+standing under one bar where MHF does nothing, are kept by the maintainer's decision of 2026-11-11: deliberate
+deviations). The maintainer's answers behind this (2026-11-11): the RT + Y attraction itself went too high (not the
+Y follow-up); MHF's RB + A under one bar not remembered; the MHF set's Evasion not known, but the weapon is known
+for long invincibility on RT + Y and the RB moves (to be verified). Look at in the test: RT + Y at a standing monster's body and at its head, no follow-up: does the
+hunter now land at the monster instead of past it, and how high is the arc next to MHF's (the log line gives the
+numbers); then RT + Y, Y.
+

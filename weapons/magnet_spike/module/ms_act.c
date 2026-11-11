@@ -1080,26 +1080,57 @@ static void att_dir(uint8_t *p, float *v)             /* normalize, pitch held o
     for (int i = 0; i < 3; i++) v[i] = n > 1e-4f ? v[i] / n : 0;
 }
 
+/* one diagnostic line per attraction (2026-11-11, "too high"): the flight's numbers, printed when it ends */
+static struct { uint8_t *p; float mk_y, tg_y, y0, peak, ticks; int phase; } s_attlog;
+
+static void att_log(uint8_t *p, struct ms_state *s, const char *why)
+{
+    if (s_attlog.p != p) return;
+    float *q = pos_of(p), dh = root(sq(s->att_tg[0] - q[0]) + sq(s->att_tg[2] - q[2]));
+    logf("msport: attraction end (%s, action %u): marker y %d, target y %d, start y %d, peak y %d, end y %d, "
+         "%d cm to the target horizontally, %d ticks, phase %d", why, s->action, (int)s_attlog.mk_y,
+         (int)s_attlog.tg_y, (int)s_attlog.y0, (int)s_attlog.peak, (int)q[1], (int)dh, (int)s_attlog.ticks,
+         s_attlog.phase);
+    s_attlog.p = 0;
+}
+
 static void att_start(uint8_t *p, struct ms_state *s, const float *m)
 {
     float *q = pos_of(p);
     att_target(p, m, s->att_tg);
     for (int i = 0; i < 3; i++) s->dir[i] = s->att_tg[i] - q[i];
+    {                                                   /* MHF 0x103328d0 (C): the start pitch clamped to 25 deg up
+                                                           (0xee39) / 10 deg down (0x71c) */
+        float h = root(sq(s->dir[0]) + sq(s->dir[2]));
+        if (s->dir[1] > 0.46631f * h) s->dir[1] = 0.46631f * h;
+        else if (s->dir[1] < -0.17633f * h) s->dir[1] = -0.17633f * h;
+    }
     att_dir(p, s->dir);
     s->att_b = att_dist(p, s->att_tg) - 300;
     if (s->att_b <= 0) s->att_b = 700;
     s->att_y0 = q[1];
+    s->att_h = 90;                                      /* MHF 0x103327a0 (C): 90 x 0.97^N, N = MS+0x45 = ticks since
+                                                           the flight's first tick, decayed in every phase */
+    s_attlog.p = p; s_attlog.mk_y = m[1]; s_attlog.tg_y = s->att_tg[1]; s_attlog.y0 = q[1]; s_attlog.peak = q[1];
+    s_attlog.ticks = 0; s_attlog.phase = 1;
 }
 
 static int attraction(uint8_t *p, struct ms_state *s, float tk)
 {
     float t[3], *q = pos_of(p);
-    if (s->att < 3 && !marker(s, t)) { s->att = 3; s->att_t = 0; s->att_h = 90; }
+    if (s_attlog.p == p) {
+        s_attlog.ticks += tk;
+        if (q[1] > s_attlog.peak) s_attlog.peak = q[1];
+        if (s->att > s_attlog.phase) s_attlog.phase = s->att;
+    }
+    if (s->att < 3 && !marker(s, t)) { s->att = 3; s->att_t = 0; }
     if (s->att < 3) {
         float tg[3];
         att_target(p, t, tg);
         float d1 = att_dist(p, tg);
-        if (d1 > 200) {                                 /* steering (0x10332ae0) */
+        s->att_h *= 1 - 0.03f * tk;                     /* the fall's 0.97^N runs from the first tick (0x103327a0) */
+        if (root(sq(tg[0] - q[0]) + sq(tg[2] - q[2])) > 200) {   /* steering (0x10332ae0): the gate is the
+                                                           HORIZONTAL distance (y zeroed, C) */
             float d0 = att_dist(p, s->att_tg), v[3];
             for (int i = 0; i < 3; i++) v[i] = 0.2f * s->dir[i] + 0.8f * (tg[i] - q[i]) / d1;
             att_dir(p, v);
@@ -1116,7 +1147,7 @@ static int attraction(uint8_t *p, struct ms_state *s, float tk)
             go = 90 * tk;
             float ticks = s->att_b > 252 ? (s->att_b - 252) * (1.0f / 90) : 0;
             if ((s->att_t += tk) >= ticks) {
-                s->att = 3; s->att_t = 0; s->att_h = 90; s->vy = s->dir[1] * 90;
+                s->att = 3; s->att_t = 0; s->vy = s->dir[1] * s->att_h;   /* att_h kept (0.97^N, 0x103327a0) */
                 logf("msport: attraction: falling (%d cm to the target, budget %d)", (int)d1, (int)s->att_b);
             }
         }
@@ -1328,7 +1359,7 @@ static void action_start(uint8_t *p, struct ms_state *s, const struct ms_action 
     }
     if (no != 94 && no != 97) s->pin_pending = 0;
     if (s->pin_mon && !IN(s_pinned, no)) pin_end(p, s);
-    if (!IN(s_attract, no)) { s->att = 0; s->flags &= ~0x1000u; }
+    if (!IN(s_attract, no)) { if (s->att) att_log(p, s, "action change"); s->att = 0; s->flags &= ~0x1000u; }
     s->mode = a->mode;
     if (IN(s_cost, no)) gauge_add(s, -BAR);
     MS_ACTION_FLAGS(p, s->air || s->pin_mon ? 2 : 0, 1, 0);
@@ -1496,6 +1527,7 @@ void ms_act(uint8_t *p)
         else if (s->air) landed = fall(p, s, tk);
     }
     if (landed) {
+        if (s->att) att_log(p, s, "landed");
         s->air = 0; s->att = 0; s->vy = 0; s->flags &= ~0x1000u;
         logf("msport: landed in action %u", no);
         if (no == 59 || no == 73) {                     /* test 10: the falling attacks went back to idle on landing;
