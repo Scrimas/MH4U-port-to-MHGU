@@ -162,6 +162,10 @@ It reads the mod's releases from MHGU-Definitive-Edition-Packages and its own fr
   (`tools/ci_compile.py`; it cannot link, which needs GU's `main`). Run them locally before a PR.
 - **Save code**: a change to `module/save.c` (the mod's save store and slot leases) runs `python3 tools/test_save.py`
   too: it runs that file as ARM code under unicorn on a fake character, no game files needed.
+- **Save files**: a change to `module/modsave.c`, `installer/core/src/modsave.rs` or `tools/modsave.py` (the mod's own
+  save files, notes/mod-save-format.md) runs `python3 tools/test_modsave.py [system ...]` and `python3 tools/modsave.py
+  test [system]`: C and Rust against the Python reference, byte for byte, on a synthetic slot and on copies of your
+  own saves.
 - **Installer CI** (`.github/workflows/installer.yml`, every push and PR touching `installer/`): `cargo fmt --check`,
   the unit tests, the catalogs (`installer/tools/i18n.py --check`) and `installer/tests/cli_test.py`, on Linux and
   Windows.

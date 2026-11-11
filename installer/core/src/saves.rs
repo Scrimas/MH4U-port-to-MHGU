@@ -11,8 +11,17 @@
 //! The migration level is the store's version-2 header word at +12 (version 1 has 0 there and no level; the core reads
 //! both and migrates 1 -> 2 at character load). Steps above a character's level are applied in order, then its level is
 //! the last step's. A store that is neither empty nor version 1 or 2 is another tool's data: never written.
+//!
+//! From core 3.0.0 (manifest `save_format`) everything the mod adds to a character lives in a file of its own,
+//! `mhgu_de_<slot>.bin` beside `system` (notes/mod-save-format.md, modsave.rs). The installer then works on each
+//! character as the game sees it: GU's slot with its file merged in (the store, the level and the gear included). What
+//! a step or a cleaning changed, and a character whose GU bytes still hold the mod's things (a save from before 3.0.0,
+//! one the game could not split, a restored backup), is written split: GU's slot vanilla, the rest in the file, in
+//! every copy of the save. A character the installer has nothing to do for keeps both files as they are. A file that
+//! cannot be read blocks the save (never overwritten).
 
 use crate::i18n::{tr, trf};
+use crate::modsave::{self as ms, Quest};
 use crate::places::{Kind, Place, TITLE_ID};
 use mhgu_save::equipment::{self as eq, Entry, Kind as EqKind, Owner};
 use mhgu_save::items::{self, Store};
@@ -433,6 +442,112 @@ fn clean_character(s: &mut Save, base: usize, o: &Owned, mode: Clean, n: &mut Co
     Ok(())
 }
 
+// ------------------------------------------------------------------------------------------ the mod's save files
+
+/// The release's save format (manifest `save_format`, core 3.0.0): the quest list entries that are the mod's. None: a
+/// release from before the mod's own save files (GU's file holds everything, mod files are not read).
+pub fn format(m: &crate::manifest::Manifest) -> Option<Vec<Quest>> {
+    #[derive(Deserialize)]
+    struct Format {
+        version: u32,
+        quests: Vec<(u32, u32)>,
+    }
+    let f: Format = serde_json::from_value(m.save_format.clone()?).ok()?;
+    (f.version == 1).then(|| f.quests.into_iter().map(|(index, id)| Quest { index, id }).collect())
+}
+
+/// The mod's file of character `slot` (0-based).
+pub fn mod_file(slot: usize) -> String {
+    format!("mhgu_de_{}.bin", slot + 1)
+}
+
+/// One character of an opened save.
+#[derive(Clone, Debug, Default)]
+struct SlotView {
+    slot: usize,
+    /// GU's bytes of the character, as on disk
+    raw: Vec<u8>,
+    /// its mod file beside the opened file, as on disk, and the file's header
+    file: Option<Vec<u8>>,
+    header: Option<ms::Header>,
+    /// the file was merged into the view (the game would merge it)
+    merged: bool,
+    /// the merge's records without a place: the next split writes them back
+    aside: Vec<u8>,
+}
+
+/// A save as the game sees it: `view` has every character's mod file merged in; `disk` is GU's file as read.
+struct View {
+    view: Save,
+    disk: Save,
+    loc: store::Location,
+    slots: Vec<SlotView>,
+}
+
+fn open_view(f: &Path, q: Option<&[Quest]>) -> Result<View, String> {
+    let (disk, loc) = open(f)?;
+    let mut view = disk.clone();
+    let dir = f.parent().map(Path::to_path_buf).unwrap_or_default();
+    let mut slots = vec![];
+    for slot in (0..3).filter(|&k| disk.slot_used(k)) {
+        let base = disk.base(slot);
+        let mut v = SlotView { slot, raw: disk.get(base, ms::SLOT_SIZE).to_vec(), ..Default::default() };
+        let p = dir.join(mod_file(slot));
+        if let Some(q) = q
+            && p.is_file()
+        {
+            let b = std::fs::read(&p).map_err(|e| trf("{} cannot be read ({})", &[&p.display(), &e]))?;
+            let h = ms::parse(&b).ok_or_else(|| {
+                trf("character {}: the mod's save file is damaged or from a newer release", &[&(slot + 1)])
+            })?;
+            // the game merges a file its character links to, or one beside a restored backup that still holds
+            // added things (D11); a "full" character (its last file write failed) and another character's file not
+            let take = match ms::link(&v.raw) {
+                Some(l) => l.state == ms::SPLIT && l.id == h.link,
+                None => ms::holds_added(&v.raw, q),
+            };
+            if take {
+                let mut s = v.raw.clone();
+                let (_, aside) = ms::merge(&mut s, &b, q).expect("parsed");
+                view.put(base, &s);
+                v.merged = true;
+                v.aside = aside;
+            }
+            v.header = Some(h);
+            v.file = Some(b);
+        }
+        slots.push(v);
+    }
+    view.commit();
+    Ok(View { view, disk, loc, slots })
+}
+
+/// A character whose GU bytes still hold the mod's things, which a split can take out: a save from before 3.0.0, one
+/// whose last file write failed ("full"), a restored backup. A split one with its file is left to the game (what the
+/// budget left in GU's slot stays there).
+fn needs_split(v: &SlotView, merged_slot: &[u8], q: &[Quest]) -> bool {
+    let split = v.merged && ms::link(&v.raw).is_some_and(|l| l.state == ms::SPLIT);
+    !split
+        && ms::holds_added(&v.raw, q)
+        && ms::split(&mut merged_slot.to_vec(), q, 0, 0, &v.aside, ms::FILE_SIZE, false).is_some()
+}
+
+/// The link and generation the next file of `v` gets: the character's own link, else its file's (a restored backup),
+/// else a new one.
+fn link_for(v: &SlotView) -> (u32, u32) {
+    let own = ms::link(&v.raw);
+    let id = own.map(|l| l.id).filter(|&id| id != 0).or(v.header.filter(|_| v.merged).map(|h| h.link)).unwrap_or_else(
+        || {
+            use std::hash::{BuildHasher, Hasher};
+            let mut h = std::collections::hash_map::RandomState::new().build_hasher();
+            h.write(stamp().as_bytes());
+            h.finish() as u32 | 1
+        },
+    );
+    let generation = own.map_or(0, |l| l.generation).max(v.header.map_or(0, |h| h.generation)) + 1;
+    (id, generation)
+}
+
 // ------------------------------------------------------------------------------------------ saves on disk
 
 /// A save found in a place.
@@ -550,28 +665,52 @@ pub fn find(p: &Place) -> Vec<Found> {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Need {
     Nothing,
-    /// steps to apply (their numbers), per character slot (1-based) with work
-    Migrate(Vec<(usize, Vec<u32>)>),
+    /// the characters with work
+    Migrate(Vec<Work>),
     /// cannot be migrated: why
     Blocked(String),
+}
+
+/// One character's work.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Work {
+    /// 1-based
+    pub slot: usize,
+    /// the steps to apply (their numbers)
+    pub steps: Vec<u32>,
+    /// the mod's things move out of GU's file into the character's own file (modsave.rs)
+    pub split: bool,
+}
+
+impl Need {
+    /// whether some character's steps are to apply (not only splits)
+    pub fn steps(&self) -> bool {
+        matches!(self, Need::Migrate(v) if v.iter().any(|w| !w.steps.is_empty()))
+    }
+    /// whether some character is to be split
+    pub fn split(&self) -> bool {
+        matches!(self, Need::Migrate(v) if v.iter().any(|w| w.split))
+    }
 }
 
 fn open(f: &Path) -> Result<(Save, store::Location), String> {
     store::open(f).map(|(s, l, _)| (s, l)).map_err(|e| trf("{} cannot be read ({})", &[&f.display(), &e]))
 }
 
-/// What `f` needs for `steps` (sorted).
-pub fn need(f: &Path, steps: &[Step]) -> Need {
-    if steps.is_empty() {
+/// What `f` needs for `steps` (sorted) and the release's save format `q` (`format`).
+pub fn need(f: &Path, steps: &[Step], q: Option<&[Quest]>) -> Need {
+    if steps.is_empty() && q.is_none() {
         return Need::Nothing;
     }
-    let (s, _) = match open(f) {
+    let v = match open_view(f, q) {
         Ok(x) => x,
         Err(e) => return Need::Blocked(e),
     };
+    let s = &v.view;
     let mut out = vec![];
-    for slot in (0..3).filter(|&k| s.slot_used(k)) {
-        let Some(l) = level(&s, s.base(slot)) else {
+    for sv in &v.slots {
+        let slot = sv.slot;
+        let Some(l) = level(s, s.base(slot)) else {
             return Need::Blocked(trf(
                 "character {} holds another tool's data where the mod keeps its own",
                 &[&(slot + 1)],
@@ -584,8 +723,9 @@ pub fn need(f: &Path, steps: &[Step]) -> Need {
         if let Some(bad) = todo.iter().find(|st| !st.supported()) {
             return Need::Blocked(trf("step {} needs a newer installer", &[&bad.step]));
         }
-        if !todo.is_empty() {
-            out.push((slot + 1, todo.iter().map(|st| st.step).collect()));
+        let split = q.is_some_and(|q| needs_split(sv, s.get(s.base(slot), ms::SLOT_SIZE), q));
+        if !todo.is_empty() || split {
+            out.push(Work { slot: slot + 1, steps: todo.iter().map(|st| st.step).collect(), split });
         }
     }
     if out.is_empty() { Need::Nothing } else { Need::Migrate(out) }
@@ -612,30 +752,37 @@ pub fn stamp() -> String {
 #[derive(Clone, Debug, Default)]
 pub struct Done {
     pub counts: Counts,
+    /// characters written split (the mod's things in their own file)
+    pub split: usize,
     /// the snapshot taken before writing
     pub backup: Option<PathBuf>,
     /// a Switch backup migrated: the new backup folder written beside it
     pub new_backup: Option<PathBuf>,
 }
 
-/// Migrate (`steps`, sorted) and clean (`clean`) save `f`, writing every copy after a snapshot into
-/// `backups/<save>-<hash>/<stamp>-<release>/`. A Switch backup (JKSV / Checkpoint) is not changed: the result goes
-/// into a new backup folder beside it. Nothing is written when there is nothing to change.
+/// Migrate (`steps`, sorted) and clean (`clean`) save `f`, and split it for the release's save format `q`, writing
+/// every copy (GU's files and the mod's) after a snapshot into `backups/<save>-<hash>/<stamp>-<release>/`. A Switch
+/// backup (JKSV / Checkpoint) is not changed: the result goes into a new backup folder beside it. Nothing is written
+/// when there is nothing to change.
 pub fn apply(
     f: &Found,
     steps: &[Step],
     clean: Option<(&Owned, Clean)>,
     backups: &Path,
     release: &str,
+    q: Option<&[Quest]>,
 ) -> Result<Done, String> {
-    if let Need::Blocked(why) = need(&f.file, steps) {
+    if let Need::Blocked(why) = need(&f.file, steps, q) {
         return Err(why);
     }
-    let (mut s, mut loc) = open(&f.file)?;
+    let View { view: mut s, disk, mut loc, slots } = open_view(&f.file, q)?;
+    let mut out = disk.clone();
+    let mut files: Vec<(usize, Vec<u8>)> = vec![];
     let mut done = Done::default();
-    let slots: Vec<usize> = (0..3).filter(|&k| s.slot_used(k)).collect();
-    for slot in slots {
+    for sv in &slots {
+        let slot = sv.slot;
         let base = s.base(slot);
+        let before = s.get(base, ms::SLOT_SIZE).to_vec();
         let lv = level(&s, base).unwrap_or(0);
         let todo: Vec<&Step> = steps.iter().filter(|st| st.step > lv).collect();
         for st in &todo {
@@ -648,8 +795,34 @@ pub fn apply(
             clean_character(&mut s, base, o, mode, &mut done.counts)
                 .map_err(|e| trf("character {}: {}", &[&(slot + 1), &e]))?;
         }
+        let after = s.get(base, ms::SLOT_SIZE).to_vec();
+        let Some(q) = q else {
+            out.put(base, &after); // a release from before the mod's files: GU's file holds everything
+            continue;
+        };
+        if after == before && !needs_split(sv, &after, q) {
+            continue; // GU's slot and the file stay as they are
+        }
+        let (link, generation) = link_for(sv);
+        let mut g = after.clone();
+        match ms::split(&mut g, q, link, generation, &sv.aside, ms::FILE_SIZE, true) {
+            Some((file, _)) => {
+                out.put(base, &g);
+                let file = ms::padded(&file);
+                if sv.file.as_deref() != Some(&file[..]) {
+                    files.push((slot, file));
+                }
+                done.split += 1;
+            }
+            None => {
+                // the hunter holds an added weapon and the box has no room for another: GU's slot keeps everything
+                // (link "full": the game never merges the stale file on top)
+                ms::set_link(&mut g, ms::Link { id: link, generation, state: ms::FULL });
+                out.put(base, &g);
+            }
+        }
     }
-    if !s.is_dirty() {
+    if !out.is_dirty() && files.is_empty() {
         return Ok(done);
     }
     let key = {
@@ -662,6 +835,7 @@ pub fn apply(
     let snap_name = format!("{}-{release}", stamp());
     let snap = store::snapshot(&loc, &backups.join(&key), &snap_name)
         .map_err(|e| trf("Could not back up {} ({})", &[&f.file.display(), &e]))?;
+    snapshot_mod_files(&loc, &snap).map_err(|e| trf("Could not back up {} ({})", &[&f.file.display(), &e]))?;
     done.backup = Some(snap);
     if f.backup_tool.is_some() {
         // a new backup folder beside the newest one, holding the migrated save
@@ -669,12 +843,69 @@ pub fn apply(
         let new = old.with_file_name(format!("{} MHGU Definitive Edition {release}", name_of(old)));
         copy_dir(old, &new).map_err(|e| trf("Could not write {} ({})", &[&new.display(), &e]))?;
         let (_, mut nloc) = open(&new.join("system"))?;
-        store::write_all(&mut s, &mut nloc).map_err(|e| trf("Could not write {} ({})", &[&new.display(), &e]))?;
+        write_save(&mut out, &mut nloc, &files).map_err(|e| trf("Could not write {} ({})", &[&new.display(), &e]))?;
         done.new_backup = Some(new);
     } else {
-        store::write_all(&mut s, &mut loc).map_err(|e| trf("Could not write {} ({})", &[&f.file.display(), &e]))?;
+        write_save(&mut out, &mut loc, &files).map_err(|e| trf("Could not write {} ({})", &[&f.file.display(), &e]))?;
     }
     Ok(done)
+}
+
+/// The folders holding the copies of a save (Ryujinx `0/` and `1/`, else the file's own folder).
+fn copy_dirs(loc: &store::Location) -> Vec<PathBuf> {
+    let mut v: Vec<PathBuf> = loc.copies.iter().filter_map(|p| p.parent().map(Path::to_path_buf)).collect();
+    v.dedup();
+    v
+}
+
+/// The mod's files of every copy into the snapshot, beside GU's (`0/mhgu_de_1.bin` ...).
+fn snapshot_mod_files(loc: &store::Location, snap: &Path) -> std::io::Result<()> {
+    for d in copy_dirs(loc) {
+        let rel = loc.save_dir.as_ref().and_then(|s| d.strip_prefix(s).ok()).map(Path::to_path_buf).unwrap_or_default();
+        for k in 0..3 {
+            let p = d.join(mod_file(k));
+            if p.is_file() {
+                std::fs::create_dir_all(snap.join(&rel))?;
+                std::fs::copy(&p, snap.join(&rel).join(mod_file(k)))?;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// The mod's `files` into every copy's folder (through a temporary file each), then GU's file into every copy
+/// (store::write_all). When GU's write fails, the mod's files are put back as they were.
+fn write_save(out: &mut Save, loc: &mut store::Location, files: &[(usize, Vec<u8>)]) -> Result<(), String> {
+    let mut was: Vec<(PathBuf, Option<Vec<u8>>)> = vec![];
+    let undo = |was: &[(PathBuf, Option<Vec<u8>>)]| {
+        for (p, b) in was {
+            let _ = match b {
+                Some(b) => std::fs::write(p, b),
+                None => std::fs::remove_file(p),
+            };
+        }
+    };
+    for d in copy_dirs(loc) {
+        for (k, b) in files {
+            let p = d.join(mod_file(*k));
+            let tmp = p.with_extension("mhgu-de-tmp");
+            let old = std::fs::read(&p).ok();
+            let r = std::fs::write(&tmp, b).and_then(|_| std::fs::rename(&tmp, &p));
+            was.push((p.clone(), old));
+            if let Err(e) = r {
+                let _ = std::fs::remove_file(&tmp);
+                undo(&was);
+                return Err(format!("{}: {e}", p.display()));
+            }
+        }
+    }
+    if out.is_dirty()
+        && let Err(e) = store::write_all(out, loc)
+    {
+        undo(&was);
+        return Err(e.to_string());
+    }
+    Ok(())
 }
 
 fn copy_dir(from: &Path, to: &Path) -> std::io::Result<()> {
@@ -698,10 +929,10 @@ pub fn backup_dir() -> PathBuf {
     dirs::data_dir().unwrap_or_else(std::env::temp_dir).join("mhgu-de-installer/save-backups")
 }
 
-/// The gear (by package) a save holds of `owned`: what the removal popup shows.
-pub fn holds(f: &Path, owned: &BTreeMap<String, Owned>) -> BTreeMap<String, usize> {
+/// The gear (by package) a save holds of `owned`, its mod files included (`q`, `format`): what the removal popup shows.
+pub fn holds(f: &Path, owned: &BTreeMap<String, Owned>, q: Option<&[Quest]>) -> BTreeMap<String, usize> {
     let mut out = BTreeMap::new();
-    let Ok((s, _)) = open(f) else { return out };
+    let Ok(View { view: s, .. }) = open_view(f, q) else { return out };
     for slot in (0..3).filter(|&k| s.slot_used(k)) {
         let base = s.base(slot);
         for i in 0..eq::BOX_N {
@@ -880,8 +1111,8 @@ mod tests {
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].file, file);
         let steps = vec![Step { step: 1, items: vec![(2977, 3050)], ..Default::default() }];
-        assert_eq!(need(&file, &steps), Need::Migrate(vec![(1, vec![1])]));
-        let done = apply(&found[0], &steps, None, &d.join("backups"), "1.11.0").unwrap();
+        assert_eq!(need(&file, &steps, None), Need::Migrate(vec![Work { slot: 1, steps: vec![1], split: false }]));
+        let done = apply(&found[0], &steps, None, &d.join("backups"), "1.11.0", None).unwrap();
         let snap = done.backup.unwrap();
         assert!(snap.join("1/system_backup").is_file(), "every copy backed up");
         assert!(
@@ -895,9 +1126,9 @@ mod tests {
             assert_eq!(items::get(&s2, SLOT1_BASE, Store::Box, 0).id, 3050, "{c} written");
             assert_eq!(level(&s2, SLOT1_BASE), Some(1));
         }
-        assert_eq!(need(&file, &steps), Need::Nothing, "migrated once");
+        assert_eq!(need(&file, &steps, None), Need::Nothing, "migrated once");
         let unsupported = vec![Step { step: 2, quests: vec![(1, 2)], ..Default::default() }];
-        assert!(matches!(need(&file, &unsupported), Need::Blocked(_)));
+        assert!(matches!(need(&file, &unsupported, None), Need::Blocked(_)));
         // a Switch backup: the newest one is copied into a new folder, the original untouched
         let jk = d.join("sd/JKSV/Monster Hunter Generations Ultimate/User - 2026-11-01");
         std::fs::create_dir_all(&jk).unwrap();
@@ -905,7 +1136,7 @@ mod tests {
         let sd = Place { kind: Kind::SdCard, name: "SD".into(), root: d.join("sd"), custom: true };
         let f = find(&sd);
         assert_eq!(f.len(), 1);
-        let done = apply(&f[0], &steps, None, &d.join("backups"), "1.11.0").unwrap();
+        let done = apply(&f[0], &steps, None, &d.join("backups"), "1.11.0", None).unwrap();
         let new = done.new_backup.unwrap();
         assert_eq!(
             items::get(
@@ -928,6 +1159,89 @@ mod tests {
             2977
         );
         assert!(find(&sd)[0].file.starts_with(&jk), "the new folder is not offered again");
+        std::fs::remove_dir_all(&d).unwrap();
+    }
+
+    const Q: [Quest; 1] = [Quest { index: 1509, id: 10542 }];
+
+    /// a character with an added item and an added weapon worn, beside GU's own
+    fn with_added() -> Save {
+        let mut s = Save::from_bytes(blank()).unwrap();
+        let b = SLOT1_BASE;
+        items::set(&mut s, b, Store::Box, 0, items::Stack { id: 2991, count: 3 });
+        items::set(&mut s, b, Store::Box, 1, items::Stack { id: 100, count: 2 });
+        gear(&mut s, 0, EqKind::Weapon(2), 3); // a GU weapon
+        gear(&mut s, 1, EqKind::Weapon(2), 140); // an added one, worn
+        worn_set(&mut s, [1, NONE, NONE, NONE, NONE, NONE, NONE]);
+        s
+    }
+
+    fn read(p: &Path) -> Save {
+        Save::from_bytes(std::fs::read(p).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn a_save_is_split_once_and_the_installer_sees_it_whole() {
+        let d = tmp("split");
+        let b = SLOT1_BASE;
+        let file = write_ryujinx(&d.join("save"), &with_added());
+        let f = Found { file: file.clone(), label: "t".into(), backup_tool: None };
+        assert_eq!(need(&file, &[], None), Need::Nothing, "a release from before the mod's files");
+        let n = need(&file, &[], Some(&Q));
+        assert!(n.split() && !n.steps(), "{n:?}");
+        let done = apply(&f, &[], None, &d.join("backups"), "3.0.0", Some(&Q)).unwrap();
+        assert_eq!(done.split, 1);
+        assert!(done.backup.unwrap().join("1/system_backup").is_file());
+        for c in ["0", "1"] {
+            let g = read(&d.join("save").join(c).join("system_backup"));
+            assert!(!ms::holds_added(g.get(b, ms::SLOT_SIZE), &Q), "{c}: GU's file holds nothing of the mod's");
+            assert_eq!(items::get(&g, b, Store::Box, 1).id, 100);
+            assert_eq!(g.u16(b + eq::WORN), 0, "{c}: the hunter holds the GU weapon");
+            let m = std::fs::read(d.join("save").join(c).join("mhgu_de_1.bin")).unwrap();
+            assert_eq!(m.len(), ms::FILE_SIZE, "created at the size the game writes into");
+            assert!(ms::parse(&m).is_some());
+        }
+        assert_eq!(need(&file, &[], Some(&Q)), Need::Nothing, "split once");
+        assert!(apply(&f, &[], None, &d.join("backups"), "3.0.0", Some(&Q)).unwrap().backup.is_none(), "no write");
+        // the character whole: the removal popup counts what the mod's file holds
+        let owned = Owned { items: vec![(2991, 2991)], armor: vec![], weapons: vec![(2, 140)] };
+        let held = BTreeMap::from([("p".to_string(), owned.clone())]);
+        assert_eq!(holds(&file, &held, Some(&Q)).get("p"), Some(&1));
+        assert!(holds(&file, &held, None).is_empty(), "GU's file alone holds none of it");
+        let v = open_view(&file, Some(&Q)).unwrap();
+        assert_eq!(v.view.u16(b + eq::WORN), 1, "worn again, as in the game");
+        // a cleaning reaches the mod's file
+        apply(&f, &[], Some((&owned, Clean::RemoveAll)), &d.join("backups"), "3.0.0", Some(&Q)).unwrap();
+        assert!(holds(&file, &held, Some(&Q)).is_empty());
+        let v = open_view(&file, Some(&Q)).unwrap();
+        assert_eq!(items::get(&v.view, b, Store::Box, 0).id, 100, "their item gone, the box packed");
+        assert_eq!(v.view.u16(b + eq::WORN), 0);
+        std::fs::remove_dir_all(&d).unwrap();
+    }
+
+    #[test]
+    fn a_restored_backup_is_merged_once_and_a_damaged_file_blocks() {
+        let d = tmp("d11");
+        let b = SLOT1_BASE;
+        let legacy = with_added();
+        let file = write_ryujinx(&d.join("save"), &legacy);
+        let f = Found { file: file.clone(), label: "t".into(), backup_tool: None };
+        apply(&f, &[], None, &d.join("backups"), "3.0.0", Some(&Q)).unwrap();
+        let first = std::fs::read(d.join("save/0/mhgu_de_1.bin")).unwrap();
+        // the save from before the split put back over GU's files, the mod's files kept (D11)
+        write_ryujinx(&d.join("save"), &legacy);
+        assert!(need(&file, &[], Some(&Q)).split());
+        let v = open_view(&file, Some(&Q)).unwrap();
+        assert!(v.slots[0].merged, "merged beside the restored save");
+        assert_eq!(v.view.get(b, ms::SLOT_SIZE), legacy.get(b, ms::SLOT_SIZE), "nothing twice");
+        apply(&f, &[], None, &d.join("backups"), "3.0.0", Some(&Q)).unwrap();
+        let again = std::fs::read(d.join("save/0/mhgu_de_1.bin")).unwrap();
+        assert_eq!(ms::parse(&again).unwrap().link, ms::parse(&first).unwrap().link, "the same character's link");
+        assert_eq!(again[32..], first[32..], "the same records");
+        // a damaged file: the save is left alone
+        std::fs::write(d.join("save/0/mhgu_de_1.bin"), b"MHDE junk").unwrap();
+        assert!(matches!(need(&file, &[], Some(&Q)), Need::Blocked(_)));
+        assert!(apply(&f, &[], None, &d.join("backups"), "3.0.0", Some(&Q)).is_err());
         std::fs::remove_dir_all(&d).unwrap();
     }
 

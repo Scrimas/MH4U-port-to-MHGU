@@ -275,6 +275,11 @@ msgstr "No se puede leer {} ({})"
 
 #. placeholders: {} in order, {0} {1} by position
 #: core/src/saves.rs
+msgid "character {}: the mod's save file is damaged or from a newer release"
+msgstr "personaje {}: el archivo de guardado del mod está dañado o es de una versión más reciente"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/saves.rs
 msgid "character {} holds another tool's data where the mod keeps its own"
 msgstr "el personaje {} tiene datos de otra herramienta donde el mod guarda los suyos"
 
@@ -547,6 +552,11 @@ msgstr "{}: paso a los ID de esta versión y limpieza del equipo de los monstruo
 
 #. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs
+msgid "{}: what the mod adds moves into its own save file, MHGU's keeps the rest"
+msgstr "{}: lo que añade el mod pasa a su propio archivo de guardado; el de MHGU conserva el resto"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
 msgid "{} cannot be migrated: {}"
 msgstr "No se puede migrar {}: {}"
 
@@ -656,8 +666,8 @@ msgid "Updating the save {}"
 msgstr "Actualizando la partida {}"
 
 #: gui/src/main.rs
-msgid "The mod was removed."
-msgstr "Se quitó el mod."
+msgid "The mod was removed. Your saves keep its own files (mhgu_de_1.bin …) beside MHGU's, for a reinstall."
+msgstr "Se ha quitado el mod. Tus partidas conservan sus propios archivos (mhgu_de_1.bin …) junto a los de MHGU, para una reinstalación."
 
 #. placeholders: {} in order, {0} {1} by position
 #: gui/src/main.rs

@@ -105,12 +105,14 @@ def item_texts(body, lang):
 
 
 def quest_texts():
-    """[('quests', '<ID>.<field>', English)] of every shipped quest arc's English questData GMD"""
+    """[('quests', '<ID>.<field>', English)] of every shipped quest arc's English questData GMD (the monsters' and the
+    maps' Harvest Tours)"""
     sys.path.insert(0, paths.GU_PY)
     import gmd
     from arc import arc_entries, arc_read
     out = []
-    for p in sorted(glob.glob(os.path.join(ROOT, 'monsters', '*', 'romfs', 'nativeNX', 'loc', 'arc', 'quest', 'q*.arc'))):
+    for p in sorted(glob.glob(os.path.join(ROOT, 'monsters', '*', 'romfs', 'nativeNX', 'loc', 'arc', 'quest', 'q*.arc')) +
+                    glob.glob(os.path.join(ROOT, 'maps', '*', 'romfs', 'nativeNX', 'loc', 'arc', 'quest', 'q*.arc'))):
         d = open(p, 'rb').read()
         for e in arc_entries(d):
             if e[0].startswith('eng\\quest\\questData\\questData_'):

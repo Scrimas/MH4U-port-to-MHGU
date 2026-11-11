@@ -28,11 +28,12 @@ release text on PACKAGES_REPO): What's new (notes/release-news.md, one section p
 packaging), then how to install: the installer, or by hand (the maps each monster needs). NOTES-main.md (the text of
 REPO's release, the page players land on): what the mod is, What's new, the monsters and their quests (read from the
 quest files), how to install (the installer's files, or the zips on PACKAGES_REPO), online play and removals.
-manifest.json (schema 1) is what the MHGU Definitive Edition Installer reads (installer/core/src/manifest.rs,
+manifest.json (schema 2) is what the MHGU Definitive Edition Installer reads (installer/core/src/manifest.rs,
 notes/installer.md): the release, every package with its zip, size, sha256, requires and every file (path below 'MHGU
 Definitive Edition/', size, sha256), its name in each installer language as the game shows it (titles; class and with:
-GU's class name and the package's other monsters, the subtitle; English subtitle for older installers), the save migrations and cleaning data (empty until the installer migrates saves)
-and extra warnings. The releases before 2.0.0 (MH4U Port v1.x, on REPO) have none: the installer supports 2.0.0 and
+GU's class name and the package's other monsters, the subtitle; English subtitle for older installers), the save migrations and cleaning data (empty until the installer migrates saves),
+the save format (schema 2, core 3.0.0: the quest list entries that are the mod's, for its own save files) and extra
+warnings. The releases before 2.0.0 (MH4U Port v1.x, on REPO) have none: the installer supports 2.0.0 and
 later.
 """
 import glob, hashlib, io, json, os, re, struct, subprocess, sys, tomllib, zipfile
@@ -44,8 +45,9 @@ import alloc, paths, portdata, ui_icons
 ROOT = paths.ROOT
 TITLE_ID = '0100770008DD8000'
 MOD_NAME = 'MHGU Definitive Edition'
-MANIFEST_SCHEMA = 1        # bump on a change an older installer would misread (installer/core/src/manifest.rs)
-INSTALLER_MIN = '2.0.0'    # oldest installer that installs this release (it asks for its own update otherwise)
+MANIFEST_SCHEMA = 2        # bump on a change an older installer would misread (installer/core/src/manifest.rs);
+                           # 2: save_format, the mod's own save files (core 3.0.0)
+INSTALLER_MIN = '2.1.0'    # oldest installer that installs this release (it asks for its own update otherwise)
 LEGACY_NAME = 'MH4U Port'  # the mod's folder before 2.0.0 (installer/core/src/places.rs LEGACY_FOLDER)
 REPO = 'Scrimas/MHGU-Definitive-Edition'                    # the code and the installer's releases
 PACKAGES_REPO = 'Scrimas/MHGU-Definitive-Edition-Packages'  # the mod's releases (installer/core/src/lib.rs)
@@ -101,9 +103,13 @@ def map_titles(p):
 
 def shown_names(p):
     """(titles, class, with) of a package for the manifest: its name, class (GU's) and the other named entries
-    (Shah Dalamadur), each {installer language: text}; a map has its quest-board names (map_titles)"""
+    (Shah Dalamadur), each {installer language: text}; a map has its quest-board names (map_titles); a bundle its
+    package.toml [titles], and [subtitles] as its class (the installer shows the class in its language as the card's
+    second line)"""
     if p.get('kind') == 'map':
         return map_titles(p), {}, []
+    if p.get('kind') == 'bundle':
+        return dict(p.get('titles', {'en': p['title']})), dict(p.get('subtitles', {})), []
     names = [n for n in (entry_names(m['name']) for m in p['entries']) if n]
     return names[0], gu_classes()[p['class']], names[1:]
 
@@ -119,21 +125,25 @@ def core():
 def packages():
     """one dict per package: its package.toml + romfs = its RomFS folder + entries = its allocations.toml entries (one
     data file each) + alloc = the first entry; monster packages in registry order, then the map packages
-    (maps/<name>: no entries, alloc None)"""
+    (maps/<name>: no entries, alloc None; tours = boards = its Harvest Tour quests, allocations.toml [[map]])"""
     out = []
     for p in alloc.packages():
         ents = [m for m in alloc.monsters() if alloc.package(m) == p]
         out.append(dict(toml(os.path.join(paths.monster(p), 'package.toml')), entries=ents, alloc=ents[0],
                         romfs=paths.romfs(p)))
     for mp in paths.maps():
+        ts = [t for t in alloc.tours() if t['map'] == mp]
         out.append(dict(toml(os.path.join(paths.map_dir(mp), 'package.toml')), entries=[], alloc=None,
-                        romfs=paths.map_romfs(mp)))
+                        romfs=paths.map_romfs(mp), tours=[t['quest'] for t in ts], boards=[t['quest'] for t in ts]))
+    for b in paths.bundles():               # bundles/<name>: no files (an empty zip), `requires` only
+        out.append(dict(paths.package_toml(b), entries=[], alloc=None, romfs=None))
     return out
 
 
 def zip_name(p):
-    """<monster>-<v>.zip, map-<map>-<v>.zip"""
-    return ('map-%s-%s.zip' if p.get('kind') == 'map' else '%s-%s.zip') % (p['name'], p['version'])
+    """<monster>-<v>.zip, map-<map>-<v>.zip, bundle-<bundle>-<v>.zip (empty)"""
+    return ({'map': 'map-%s-%s.zip', 'bundle': 'bundle-%s-%s.zip'}.get(p.get('kind'), '%s-%s.zip')) % (
+        p['name'], p['version'])
 
 
 def clean_env():
@@ -183,7 +193,7 @@ def check():
                 bad.append('%s: data file version %x != package.toml %s' % (e, hdr['version'], p['version']))
             if os.path.getmtime(data) < os.path.getmtime(os.path.join(paths.monster(e), 'package.toml')):
                 bad.append('%s: data file older than package.toml (repack)' % e)
-        if p.get('kind') != 'map' and all(os.path.exists(os.path.join(paths.gen(m['name']), m['name'] + '.bin'))
+        if p.get('kind') not in ('map', 'bundle') and all(os.path.exists(os.path.join(paths.gen(m['name']), m['name'] + '.bin'))
                                           for m in p['entries']):
             if p.get('class') not in gu_classes():
                 bad.append('%s: class %r is not one of GU\'s (%s)' % (name, p.get('class'), ', '.join(gu_classes())))
@@ -193,6 +203,12 @@ def check():
                     bad.append('%s: package.toml title %r, the game shows %r' % (name, p['title'], titles['en']))
                 if p.get('zh') and titles['zh_CN'] != p['zh'][p['entries'][0]['name']][1]:
                     bad.append('%s: data file has no Chinese name (rebuild its name step)' % name)
+        if p.get('kind') == 'bundle':        # no files: its requires are checked by tools/alloc.py
+            codes = {code for code, _ in SHOWN}
+            for key in ('titles', 'subtitles'):
+                if set(p.get(key, {})) != codes:
+                    bad.append('%s: package.toml [%s] needs %s' % (name, key, ', '.join(sorted(codes))))
+            continue
         if p.get('kind') == 'map':
             zh = [z for z in ('chT', 'chS') if not os.path.isdir(os.path.join(p['romfs'], 'nativeNX', z, 'arc', 'stage'))]
             if zh:
@@ -206,13 +222,15 @@ def check():
                 bad.append('RomFS path %s shipped by %s and %s' % (rel, owner[rel], name))
             owner[rel] = name
             m = re.search(r'questData_(\d{7})\.ext$', rel)
-            if m:                    # boss record +0x69 = HP row: test builds use rows 0..9 (5 % HP)
-                qd = open(os.path.join(rf, rel), 'rb').read()
+            if m:                    # boss record +5 = HP row: test builds use rows 0..9 (5 % HP); the first boss
+                qd = open(os.path.join(rf, rel), 'rb').read()   # used (a Harvest Tour's intruder sits in slot 2)
                 qid = int(m.group(1))
-                if qid not in [q for m in p['entries'] for q in m.get('quests', [])]:
+                hp = next((qd[0x64 + 13 * k + 5] for k in range(5) if struct.unpack_from('<H', qd, 0x64 + 13 * k)[0]),
+                          qd[0x69])
+                if qid not in [q for m in p['entries'] for q in m.get('quests', [])] + p.get('tours', []):
                     bad.append('%s: quest %d is not in its allocations' % (name, qid))
-                if qd[0x69] < 10:
-                    bad.append('%s: quest %d has HP row %d (a test build?)' % (name, qid, qd[0x69]))
+                if hp < 10:
+                    bad.append('%s: quest %d has HP row %d (a test build?)' % (name, qid, hp))
     import translate
     for code, r in translate.check().items():
         if r['missing'] or r['stale']:
@@ -348,6 +366,13 @@ def moved_ids():
     return [b + ' (shipped IDs never move: a migration step in migrations.toml if it must)' for b in bad]
 
 
+def save_format():
+    """the mod's own save files (core 3.0.0, notes/mod-save-format.md): the quest list entries that are the mod's,
+    the list the core carries too (module/build.py modsave_quests_h, from tools/modsave.py quest_bits)"""
+    import modsave
+    return dict(version=1, quests=[[i, q] for i, q in modsave.quest_bits()])
+
+
 def manifest(rel, pre, c, pk, out, icons):
     """manifest.json of the release in out (the zips written): what the installer reads"""
     def pkg(name, kind, title, version, zname, **more):
@@ -363,13 +388,16 @@ def manifest(rel, pre, c, pk, out, icons):
         if cls: more.update({'class': cls, 'with': also})
         if p.get('kind') == 'map':
             more['folder'] = p['folder']
+        elif p.get('kind') == 'bundle':
+            more['subtitle'] = p.get('subtitles', {}).get('en', '')
         else:
             more['entries'] = [m['name'] for m in p['entries']]
             if p['name'] in icons: more['icon'] = p['name'] + '.png'
         ps.append(pkg(p['name'], p.get('kind', 'monster'), p['title'], p['version'], zip_name(p), **more))
     return dict(schema=MANIFEST_SCHEMA, release=rel, prerelease=bool(pre), installer_min=INSTALLER_MIN,
                 title_id=TITLE_ID, mod_folder=MOD_NAME, icons='icons-%s.zip' % rel, packages=ps,
-                migrations=migrations(rel), cleaning={p['name']: cleaning(p) for p in pk if p.get('kind') != 'map'},
+                migrations=migrations(rel), save_format=save_format(),
+                cleaning={p['name']: cleaning(p) for p in pk if p.get('kind') not in ('map', 'bundle')},
                 warnings=[w if isinstance(w, str) else w['en'] for w in c.get('warnings', [])],
                 warnings_i18n=[{'en': w} if isinstance(w, str) else w for w in c.get('warnings', [])])
 
@@ -390,9 +418,9 @@ def package(out, pre=None):
     core_zip = 'core-%s.zip' % c['version']
     write_zip(os.path.join(out, core_zip), [(MOD_NAME + '/' + a, s) for a, s in members])
     for p in pk:
-        rf = p['romfs']
+        rf = p['romfs']                     # None: a bundle, an empty zip
         mem = [(MOD_NAME + '/romfs/' + os.path.relpath(os.path.join(d, f), rf).replace(os.sep, '/'), os.path.join(d, f))
-               for d, _, fs in os.walk(rf) for f in fs]
+               for d, _, fs in (os.walk(rf) if rf else []) for f in fs]
         write_zip(os.path.join(out, zip_name(p)), mem)
     icons = write_icons(os.path.join(out, 'icons-%s.zip' % rel))
     with open(os.path.join(out, 'manifest.json'), 'w', encoding='utf-8') as f:
@@ -428,7 +456,8 @@ def quests(p):
     sys.path.insert(0, paths.GU_PY)
     import gmd
     rf, out = p['romfs'], []
-    for m in p['entries']:
+    for m in p['entries'] + ([{'title': p['title'] + ' (Harvest Tours)', 'quests': p['boards']}] if p.get('boards')
+                             else []):
         for q in m.get('quests', []):
             qd = open(os.path.join(rf, 'nativeNX/loc/quest/questData/questData_%07d.ext' % q), 'rb').read()
             star = qd[0x12]

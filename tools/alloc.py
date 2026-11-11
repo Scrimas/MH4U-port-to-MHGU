@@ -17,6 +17,9 @@ are new quest list entries after GU's, module/quest.c quest_group_append, instea
 still fails; entries from 128 have no save bit, module/notes.c), `save = "lease"` (no save_index: the monster borrows a free
 save slot for each quest and its hunts, captures and size records go to the mod's store, module/save.c; every
 save_index is taken since Black Gravios, and a monster that has one keeps it).
+[[map]] entries: a map package (maps/<name>) that owns quest IDs, never a registry index: its Harvest Tours (`quests`,
+described by the map's package.toml [[tour]] tables: tours()), appended to the quest list right after the quests of
+the monster `append_after` (module/quest.c).
 """
 import os, struct, sys, tomllib
 
@@ -57,6 +60,22 @@ def monster(name, reg=None):
     for m in monsters(reg):
         if m['name'] == name: return m
     raise KeyError('no monster %r in allocations.toml' % name)
+
+
+def maps(reg=None):
+    """[[map]] entries: map packages that own quest IDs (their Harvest Tours)"""
+    return (reg or load()).get('map', [])
+
+
+def tours(reg=None):
+    """every tour quest, in quest-list order: [dict(quest, map, after, spec)], from maps/<map>/package.toml [[tour]]"""
+    return [dict(quest=t['quest'], map=mp['name'], after=mp.get('append_after'), spec=t)
+            for mp in maps(reg) for t in paths.package_toml(mp['name']).get('tour', [])]
+
+
+def stages():
+    """the map packages with a stage alias ([stage] in their package.toml), in maps/ order"""
+    return [mp for mp in paths.maps() if 'stage' in paths.package_toml(mp)]
 
 
 def package(m):
@@ -208,6 +227,7 @@ def check(reg=None, gu_main=paths.GU_MAIN):
             if m.get('items') != [first, first + n_app - 1]:
                 errs.append('%s: items %s, expected [%d, %d] (append items = %d)' % (m['name'], m.get('items'),
                                                                                     first, first + n_app - 1, n_app))
+    errs += check_maps(reg, seen)
     errs += check_packages(reg)
     if gu_main and os.path.exists(gu_main):        # the em IDs must be free in GU's own registry
         img = open(gu_main, 'rb').read()
@@ -219,6 +239,37 @@ def check(reg=None, gu_main=paths.GU_MAIN):
             if m.get('em_id', 0) >> 8 and em not in gu_ids | ported:   # a variant: variant 0 must exist (GU or ours)
                 errs.append('%s: em_id %#x is a variant of em %d, which neither GU nor a port has' %
                             (m['name'], m['em_id'], em))
+    return errs
+
+
+def check_maps(reg, seen):
+    """[[map]] entries: a map package each, quests from the pool that no other entry takes, append_after a monster,
+    and its package.toml [[tour]] tables naming exactly those quests, one each"""
+    errs, names = [], [m['name'] for m in monsters(reg)]
+    pools = reg['pools']
+    for mp in maps(reg):
+        name = mp.get('name')
+        if name not in paths.maps():
+            errs.append('map entry %r: no maps/%s/package.toml' % (name, name)); continue
+        extra = set(mp) - {'name', 'quests', 'append_after'}
+        if extra: errs.append('map %s: unknown keys %s' % (name, sorted(extra)))
+        if mp.get('append_after') not in names:
+            errs.append('map %s: append_after %r is no monster entry' % (name, mp.get('append_after')))
+        for q in mp.get('quests', []):
+            if q not in pools['quests']: errs.append('map %s: quest %d not in the pool' % (name, q))
+            if ('quests', q) in seen: errs.append('map %s: quest %d already taken by %s' % (name, q, seen['quests', q]))
+            seen['quests', q] = name
+        ts = paths.package_toml(name).get('tour', [])
+        listed = [t.get('quest') for t in ts]
+        if sorted(listed) != sorted(mp.get('quests', [])):
+            errs.append('map %s: quests %s, its package.toml tours name %s' % (name, mp.get('quests'), listed))
+        for t in ts:
+            extra = set(t) - {'quest', 'from_4u', 'template'}
+            if extra: errs.append('map %s: tour %s: unknown keys %s' % (name, t.get('quest'), sorted(extra)))
+            for key in ('from_4u', 'template'):
+                if not isinstance(t.get(key), int): errs.append('map %s: tour %s: no %s' % (name, t.get('quest'), key))
+    if len(maps(reg)) > len({mp.get('name') for mp in maps(reg)}):
+        errs.append('a map has two [[map]] entries')
     return errs
 
 
@@ -234,15 +285,29 @@ def check_packages(reg=None):
             used.add(r)
     for m in monsters(reg):
         try:
-            stage_map(m)
+            mp = stage_map(m)
         except KeyError as e:
-            errs.append(str(e).strip('"\''))
+            errs.append(str(e).strip('"\'')); continue
+        if mp and paths.package_toml(mp).get('gu_stage') != m['stage_alias'][0]:
+            errs.append('%s: stage_alias %s, its map %s has gu_stage %s' % (m['name'], m['stage_alias'], mp,
+                                                                          paths.package_toml(mp).get('gu_stage')))
     for mp in maps:
         t = paths.package_toml(mp)
         if t.get('name') != mp or t.get('kind') != 'map' or not isinstance(t.get('folder'), int):
             errs.append('maps/%s/package.toml: name = its folder, kind = "map" and a folder number' % mp)
         if mp not in used:
             errs.append('map %s is required by no monster' % mp)
+    toured = {e['name'] for e in globals()['maps'](reg) if e.get('quests')}
+    brought = set()
+    for b in paths.bundles():
+        t = paths.package_toml(b)
+        if t.get('name') != b or t.get('kind') != 'bundle' or not t.get('requires'):
+            errs.append('bundles/%s/package.toml: name = its folder, kind = "bundle" and requires' % b)
+        for r in t.get('requires', []):
+            if r not in maps: errs.append('bundle %s: requires %r, which is no map package' % (b, r))
+        brought |= set(t.get('requires', []))
+    if toured - brought:
+        errs.append('maps with Harvest Tours in no bundle (bundles/harvest_tours requires): %s' % sorted(toured - brought))
     return errs
 
 
@@ -253,6 +318,8 @@ def header(reg=None):
            '#define PORT_MONSTER_COUNT %du' % len(reg['monster']),
            '#define PORT_NOTES_COUNT %du' % sum('notes_entry' in m for m in reg['monster']),
            '#define PORT_ITEM_COUNT %du' % item_count(reg),
+           '#define PORT_TOUR_COUNT %du' % len(tours(reg)),
+           '#define PORT_STAGE_COUNT %du' % len(stages()),
            '#define PORT_FILE_ID_MIN 0x%xu' % reg['pools']['file_ids'][0],
            '#define PORT_DATA_POOL %du' % DATA_POOL]
     for k, m in enumerate(reg['monster']):

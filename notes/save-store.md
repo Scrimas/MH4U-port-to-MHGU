@@ -57,7 +57,9 @@ GU code uses it (S): every function that loads sUserInfo (625) was searched for 
 were halves of movw / movt pairs (offsets 0x1xxxx of other objects), allocation sizes (0x3d8b10), masks and
 multipliers, and other objects (0x55f238 writes +0x36cc.. of [mgr+0x45e8], 0x6e314c +0x3900 of a UI object). The
 register flow was not followed through every function, hence S. The core already keeps the items-obtained bits of
-IDs 3008.. at +0x3700..+0x38ff (module/items.c).
+IDs 3008.. at +0x3700..+0x38ff (module/items.c), the save link record at +0x3684..+0x3693 (core 3.0.0,
+notes/mod-save-format.md), and module/notes.c reads +0x36fc, in the unused part between them, as a word that is
+always zero.
 
 ## What the core does
 

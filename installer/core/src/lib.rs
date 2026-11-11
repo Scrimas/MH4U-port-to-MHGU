@@ -7,6 +7,7 @@
 pub mod apply;
 pub mod i18n;
 pub mod manifest;
+pub mod modsave;
 pub mod places;
 pub mod plan;
 pub mod record;

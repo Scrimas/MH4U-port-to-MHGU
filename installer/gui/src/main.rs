@@ -412,7 +412,7 @@ fn refresh(app: &mut App, ui: &AppWindow) {
         monogram: "C".into(),
         progress: row_progress(app, &core.name),
     });
-    for p in m.monsters() {
+    for p in m.tickable() {
         let (v, tone, removed) = status(app, &p.name, &p.version);
         let mut sub =
             if removed { tr("Will be removed · take off its gear in game first") } else { p.shown_subtitle() };
@@ -437,7 +437,8 @@ fn refresh(app: &mut App, ui: &AppWindow) {
             monogram: monogram(&p.title).into(),
             progress: row_progress(app, &p.name),
         });
-        for r in &p.requires {
+        for r in p.requires.iter().filter(|_| p.kind != Kind::Bundle) {
+            // a bundle's card lists no maps
             let Some(d) = m.package(r) else { continue };
             if !shown.insert(r.clone()) {
                 continue;
@@ -513,8 +514,8 @@ fn message(ui: &AppWindow, title: &str, lines: Vec<Line>) {
 
 /// The saves of the planned places: what each needs (the release's migrations, the cleaning of the monsters that
 /// leave), and the ones that cannot be migrated.
-/// a save, whether it migrates, and the cleaning it gets
-type SaveJob = (Found, bool, Option<(Owned, Clean)>);
+/// a save, whether its steps apply, whether it is split, and the cleaning it gets
+type SaveJob = (Found, bool, bool, Option<(Owned, Clean)>);
 
 struct SaveWork {
     jobs: Vec<SaveJob>,
@@ -533,6 +534,7 @@ fn clean_mode(i: i32) -> Option<Clean> {
 
 fn save_work(app: &App, m: &Manifest, plans: &[(usize, State, PlacePlan)]) -> Result<SaveWork, String> {
     let steps = saves::steps(m)?;
+    let fmt = saves::format(m);
     let mut w = SaveWork { jobs: vec![], blocked: vec![], holds_gear: false };
     for (i, _, plan) in plans {
         let mut leaving = Owned::default();
@@ -541,15 +543,15 @@ fn save_work(app: &App, m: &Manifest, plans: &[(usize, State, PlacePlan)]) -> Re
         }
         let held = std::collections::BTreeMap::from([("leaving".to_string(), leaving.clone())]);
         for f in saves::find(&app.places[*i]) {
-            let gear = !leaving.is_empty() && !saves::holds(&f.file, &held).is_empty();
+            let gear = !leaving.is_empty() && !saves::holds(&f.file, &held, fmt.as_deref()).is_empty();
             w.holds_gear |= gear;
-            match saves::need(&f.file, &steps) {
+            match saves::need(&f.file, &steps, fmt.as_deref()) {
                 Need::Blocked(why) => w.blocked.push((f.label.clone(), why)),
                 need => {
                     let clean = clean_mode(app.clean_index).filter(|_| gear).map(|c| (leaving.clone(), c));
-                    let migrate = matches!(need, Need::Migrate(_));
-                    if migrate || clean.is_some() {
-                        w.jobs.push((f, migrate, clean));
+                    let (migrate, split) = (need.steps(), need.split());
+                    if migrate || split || clean.is_some() {
+                        w.jobs.push((f, migrate, split, clean));
                     }
                 }
             }
@@ -623,15 +625,26 @@ fn review(app: &mut App, ui: &AppWindow, remove_all: bool) {
             if !w.jobs.is_empty() || !w.blocked.is_empty() {
                 lines.push(line(tr("Saves"), 0, true));
             }
-            for (f, migrate, clean) in &w.jobs {
+            for (f, migrate, split, clean) in &w.jobs {
                 let what = match (migrate, clean.as_ref().map(|c| c.1)) {
-                    (true, None) => trf("{}: moved to this release's IDs", &[&f.label]),
-                    (false, Some(_)) => trf("{}: the gear of the monsters that leave is cleaned", &[&f.label]),
-                    _ => {
-                        trf("{}: moved to this release's IDs, the gear of the monsters that leave cleaned", &[&f.label])
-                    }
+                    (false, None) => None,
+                    (true, None) => Some(trf("{}: moved to this release's IDs", &[&f.label])),
+                    (false, Some(_)) => Some(trf("{}: the gear of the monsters that leave is cleaned", &[&f.label])),
+                    _ => Some(trf(
+                        "{}: moved to this release's IDs, the gear of the monsters that leave cleaned",
+                        &[&f.label],
+                    )),
                 };
-                lines.push(line(what, 0, false));
+                if let Some(what) = what {
+                    lines.push(line(what, 0, false));
+                }
+                if *split {
+                    lines.push(line(
+                        trf("{}: what the mod adds moves into its own save file, MHGU's keeps the rest", &[&f.label]),
+                        0,
+                        false,
+                    ));
+                }
             }
             for (label, why) in &w.blocked {
                 lines.push(line(trf("{} cannot be migrated: {}", &[label, why]), 2, false));
@@ -734,6 +747,7 @@ fn start_install(app: &mut App, ui: &AppWindow, remove_all: bool) {
     }
     let save_jobs = work.jobs;
     let steps = saves::steps(&m).unwrap_or_default();
+    let fmt = saves::format(&m);
     let jobs: Vec<(Place, State, PlacePlan)> =
         planned.into_iter().map(|(i, s, p)| (app.places[i].clone(), s, p)).filter(|(_, _, p)| !p.is_empty()).collect();
     if jobs.is_empty() && save_jobs.is_empty() {
@@ -808,10 +822,11 @@ fn start_install(app: &mut App, ui: &AppWindow, remove_all: bool) {
             // the saves, once the files of their release are in place; one failing does not stop the others
             let mut errors = vec![];
             let mut updated = 0;
-            for (f, _, clean) in &save_jobs {
+            for (f, _, _, clean) in &save_jobs {
                 let label = f.label.clone();
                 later(move |_, ui| ui.set_progress_text(trf("Updating the save {}", &[&label]).into()));
-                match saves::apply(f, &steps, clean.as_ref().map(|(o, c)| (o, *c)), &saves::backup_dir(), &m.release) {
+                let clean = clean.as_ref().map(|(o, c)| (o, *c));
+                match saves::apply(f, &steps, clean, &saves::backup_dir(), &m.release, fmt.as_deref()) {
                     Ok(_) => updated += 1,
                     Err(e) => errors.push(trf("{}: {}", &[&f.label, &e])),
                 }
@@ -839,7 +854,10 @@ fn finished(app: &mut App, ui: &AppWindow, res: Result<(usize, Vec<String>), Str
             app.warned_blocked.clear();
             ui.set_phase(2);
             let mut sub = if app.done_places.is_empty() {
-                tr("The mod was removed.")
+                // GU's save is vanilla already; the mod's own files stay
+                tr(
+                    "The mod was removed. Your saves keep its own files (mhgu_de_1.bin …) beside MHGU's, for a reinstall.",
+                )
             } else {
                 trf("Start MHGU in {}", &[&app.done_places.join(", ")])
             };
@@ -1067,10 +1085,13 @@ fn main() {
             let mut k = 0;
             let mut shown = BTreeSet::new();
             let mut hit = None;
-            for p in m.monsters() {
+            for p in m.tickable() {
                 k += 1;
                 if k == i as usize {
                     hit = Some(p.name.clone());
+                }
+                if p.kind == Kind::Bundle {
+                    continue;
                 }
                 k += p.requires.iter().filter(|r| m.package(r).is_some() && shown.insert(r.to_string())).count();
             }

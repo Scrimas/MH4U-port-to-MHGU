@@ -94,6 +94,12 @@ int em_create_c(uint32_t *regs)
     if (m >= 0)
         logf("mhgu-de: em_create %s id=%x serial=%x lr=%x", port_monsters[m].name, regs[R0], regs[R1],
              regs[LR] - MAIN_BASE);
+    else if (!(regs[R0] & 0x1000) && port_tour_of(port_quest_id()) >= 0) {
+        /* a Harvest Tour has no target: every large monster is an intruder (GU's roll, questData +0xCC..) */
+        static uint32_t s_n;
+        if (++s_n <= 40) logf("mhgu-de: tour %u: intruder id=%x serial=%x lr=%x", port_quest_id(), regs[R0],
+                              regs[R1], regs[LR] - MAIN_BASE);
+    }
     return 0;
 }
 

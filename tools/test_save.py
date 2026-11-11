@@ -31,7 +31,8 @@ def run(*a):
 
 def build_elf(out):
     with open(os.path.join(out, 'alloc.h'), 'w', encoding='utf-8') as f:
-        f.write('#pragma once\n#define PORT_MONSTER_COUNT 10u\n')     # test_save.c port_monsters[]
+        f.write('#pragma once\n#define PORT_MONSTER_COUNT 10u\n#define PORT_TOUR_COUNT 0u\n'
+                '#define PORT_STAGE_COUNT 0u\n')     # test_save.c port_monsters[]
     objs = []
     for src in (os.path.join(ROOT, 'module', 'save.c'), os.path.join(ROOT, 'module', 'util.c'),
                 os.path.join(HERE, 'test_save.c')):

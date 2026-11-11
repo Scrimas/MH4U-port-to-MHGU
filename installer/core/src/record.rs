@@ -36,6 +36,11 @@ impl Record {
     pub fn monsters(&self) -> impl Iterator<Item = &str> {
         self.packages.iter().filter(|(_, p)| p.kind == Kind::Monster).map(|(n, _)| n.as_str())
     }
+
+    /// What the player ticked: its monsters and bundles.
+    pub fn ticked(&self) -> impl Iterator<Item = &str> {
+        self.packages.iter().filter(|(_, p)| matches!(p.kind, Kind::Monster | Kind::Bundle)).map(|(n, _)| n.as_str())
+    }
 }
 
 /// What a place holds.

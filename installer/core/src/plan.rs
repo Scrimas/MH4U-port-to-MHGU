@@ -90,7 +90,7 @@ pub fn plan(m: &Manifest, wanted: &BTreeSet<String>, state: &State, remove_all: 
             kind: p.map_or(Kind::Utility, |p| p.kind),
             size: if matches!(action, Action::Remove { .. }) { 0 } else { p.map_or(0, |p| p.size) },
             version: p.map_or_else(String::new, |p| p.version.clone()),
-            needed_by: if p.is_some_and(|p| p.kind != Kind::Core && p.kind != Kind::Monster) {
+            needed_by: if p.is_some_and(|p| !matches!(p.kind, Kind::Core | Kind::Monster | Kind::Bundle)) {
                 needed_by(n)
             } else {
                 vec![]
@@ -134,9 +134,9 @@ pub fn plan(m: &Manifest, wanted: &BTreeSet<String>, state: &State, remove_all: 
 
 /// The monsters to show switched on: those the ticked places hold (any of them), else every monster of the release.
 pub fn initial_wanted<'a>(m: &Manifest, records: impl Iterator<Item = &'a Record>) -> BTreeSet<String> {
-    let have: BTreeSet<String> = records.flat_map(|r| r.monsters().map(String::from).collect::<Vec<_>>()).collect();
+    let have: BTreeSet<String> = records.flat_map(|r| r.ticked().map(String::from).collect::<Vec<_>>()).collect();
     if have.is_empty() {
-        m.monsters().map(|p| p.name.clone()).collect()
+        m.tickable().map(|p| p.name.clone()).collect()
     } else {
         have.into_iter().filter(|n| m.package(n).is_some()).collect()
     }

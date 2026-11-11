@@ -125,6 +125,7 @@ fn main() {
             }
             // saves: migrations of the release, cleaning of the monsters that leave
             let steps = saves::steps(&m).unwrap_or_else(|e| fail(e));
+            let fmt = saves::format(&m);
             let clean = match values("--clean").first().map(String::as_str) {
                 None | Some("unequip") => Some(Clean::Unequip),
                 Some("worn") => Some(Clean::RemoveWorn),
@@ -141,14 +142,28 @@ fn main() {
                 }
                 let held = std::collections::BTreeMap::from([("leaving".to_string(), leaving.clone())]);
                 for f in saves::find(p) {
-                    let need = saves::need(&f.file, &steps);
-                    let cleans = clean.is_some() && !leaving.is_empty() && !saves::holds(&f.file, &held).is_empty();
+                    let need = saves::need(&f.file, &steps, fmt.as_deref());
+                    let cleans = clean.is_some()
+                        && !leaving.is_empty()
+                        && !saves::holds(&f.file, &held, fmt.as_deref()).is_empty();
                     match &need {
                         Need::Blocked(why) => {
                             println!("  save {}: cannot be migrated ({why})", f.label);
                             blocked += 1;
                         }
-                        Need::Migrate(v) => println!("  save {}: migrate {v:?}", f.label),
+                        Need::Migrate(v) => {
+                            let steps: Vec<(usize, &Vec<u32>)> =
+                                v.iter().filter(|w| !w.steps.is_empty()).map(|w| (w.slot, &w.steps)).collect();
+                            let split: Vec<usize> = v.iter().filter(|w| w.split).map(|w| w.slot).collect();
+                            let mut what = String::new();
+                            if !steps.is_empty() {
+                                what += &format!(" migrate {steps:?}");
+                            }
+                            if !split.is_empty() {
+                                what += &format!(" split {split:?}");
+                            }
+                            println!("  save {}:{what}", f.label)
+                        }
                         Need::Nothing if cleans => println!("  save {}: clean", f.label),
                         Need::Nothing => {}
                     }
@@ -180,12 +195,66 @@ fn main() {
             }
             apply::prune_cache(&cache, &m.release);
             for (f, clean) in &save_jobs {
-                let done =
-                    saves::apply(f, &steps, clean.as_ref().map(|(o, c)| (o, *c)), &saves::backup_dir(), &m.release)
-                        .unwrap_or_else(|e| fail(format!("{}: {e}", f.label)));
+                let done = saves::apply(
+                    f,
+                    &steps,
+                    clean.as_ref().map(|(o, c)| (o, *c)),
+                    &saves::backup_dir(),
+                    &m.release,
+                    fmt.as_deref(),
+                )
+                .unwrap_or_else(|e| fail(format!("{}: {e}", f.label)));
                 let backup = done.backup.map(|b| b.display().to_string()).unwrap_or_default();
                 println!("save {}: {} change(s), backup {backup}", f.label, done.counts.total());
             }
+        }
+        // the mod's save files, one slot at a time, for tools/test_modsave.py (the three implementations compared):
+        //   modsave split SLOT QUESTS LINK GENERATION FILE_OUT SLOT_OUT [--compute]   exit 5: not split
+        //   modsave merge SLOT FILE QUESTS SLOT_OUT                                    prints the counts
+        // SLOT = one character's bytes (modsave::SLOT_SIZE), QUESTS = JSON [[list index, quest ID], ...]
+        Some("modsave") => modsave_cmd(&args[1..]),
+        _ => usage(),
+    }
+}
+
+fn modsave_cmd(a: &[String]) {
+    use mhgu_de_core::modsave;
+    let read = |p: &str| std::fs::read(p).unwrap_or_else(|e| fail(format!("{p}: {e}")));
+    let write = |p: &str, b: &[u8]| std::fs::write(p, b).unwrap_or_else(|e| fail(format!("{p}: {e}")));
+    let quests = |p: &str| -> Vec<modsave::Quest> {
+        let v: Vec<(u32, u32)> = serde_json::from_slice(&read(p)).unwrap_or_else(|e| fail(format!("{p}: {e}")));
+        v.into_iter().map(|(index, id)| modsave::Quest { index, id }).collect()
+    };
+    let num = |s: &str| s.parse::<u32>().unwrap_or_else(|_| usage());
+    match a.first().map(String::as_str) {
+        Some("split") if a.len() >= 7 => {
+            let mut slot = read(&a[1]);
+            let q = quests(&a[2]);
+            let clean = !a.iter().any(|x| x == "--compute");
+            match modsave::split(&mut slot, &q, num(&a[3]), num(&a[4]), &[], modsave::FILE_SIZE, clean) {
+                Some((f, left)) => {
+                    write(&a[5], &f);
+                    write(&a[6], &slot);
+                    println!("{} bytes, {left} left", f.len());
+                }
+                None => exit(5),
+            }
+        }
+        Some("merge") if a.len() >= 5 => {
+            let mut slot = read(&a[1]);
+            let f = read(&a[2]);
+            let (st, aside) =
+                modsave::merge(&mut slot, &f, &quests(&a[3])).unwrap_or_else(|| fail("not a valid file".into()));
+            write(&a[4], &slot);
+            println!(
+                "{{\"exact\": {}, \"placed\": {}, \"moved\": {}, \"kept\": {}, \"aside\": {}, \"aside_bytes\": {}}}",
+                st.exact,
+                st.placed,
+                st.moved,
+                st.kept,
+                st.aside,
+                aside.len()
+            );
         }
         _ => usage(),
     }
