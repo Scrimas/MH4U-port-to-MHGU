@@ -27,7 +27,7 @@ ROOT = os.path.dirname(os.path.dirname(WEAPON))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(ROOT, 'tools'))
 import paths, arcpack, xfs, lmt
-import aan, fskl, msact, sdt, msgrip, msmot, mshit, msfx, fmod2gu, mshud, mhffx2gu, msfxposts, msgun
+import aan, fskl, msact, sdt, msgrip, msmot, mshit, msfx, fmod2gu, mshud, mhffx2gu, msfxposts, msgun, effcheck
 sys.path.append(paths.GU_PY)
 from romfs import RomFS
 from arc import arc_entries, arc_read
@@ -776,12 +776,19 @@ def main(report_only=False):
     # the PEL loader is not traced)
     k = next(i for i, (p, t, b) in enumerate(fx) if p == 'effect\\pel\\pl\\w05_000')
     fx[k:k] = mfx_ents
-    write('player/quest/w05.arc', arcpack.build([
-        ('player\\mot\\w05\\w05', T_LMT, body),
-        ('player\\mot\\w05\\w05_sa', T_LMT, empty_list()),
-        ('player\\param\\pl_w05', T_PARAM, w00['player\\param\\pl_w00'][1]),
-        ('player\\hit\\pl_we05_hitdata', T_HDP, hdp),
-        ('player\\hit\\pl_we05_hitsize', T_HTS, hts)] + fx))
+    w05 = [('player\\mot\\w05\\w05', T_LMT, body),
+           ('player\\mot\\w05\\w05_sa', T_LMT, empty_list()),
+           ('player\\param\\pl_w05', T_PARAM, w00['player\\param\\pl_w00'][1]),
+           ('player\\hit\\pl_we05_hitdata', T_HDP, hdp),
+           ('player\\hit\\pl_we05_hitsize', T_HTS, hts)] + fx
+    # GU's effect-load / Model-unit conditions on the class arc (effcheck.py: model, MRL, materials, textures, mesh
+    # frame, kind-5 curves); a problem there drew nothing in tests 18-20, so it stops the build
+    bad, (n_efl, n_mu) = effcheck.check(w05)
+    line = 'effcheck: %d EFLs, %d Model units, %d problems' % (n_efl, n_mu, len(bad))
+    open(os.path.join(OUT_GEN, 'report.txt'), 'a').write('\n'.join(bad + [line]) + '\n')
+    print(line)
+    assert not bad, 'effcheck (gen/report.txt):\n' + '\n'.join(bad[:20])
+    write('player/quest/w05.arc', arcpack.build(w05))
     write('player/quest/w05_m.arc', arcpack.build([
         ('player\\cam\\w05\\w05', T_CAM, gs_m['player\\cam\\w00\\w00'][1]),
         ('player\\cam\\w05\\w05_sa', T_CAM, gs_m['player\\cam\\w00\\w00_sa'][1])]))

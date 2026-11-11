@@ -610,7 +610,9 @@ static void *fx_fixed(uint8_t *p, const struct ms_fxpost *f, uint32_t id)
  * marks the effect failed (+0xf0 bit 0x2000000) when one fails; a generator's runtime record = +0x28 (resource +0x70
  * + entry x 0x44: +0x14 EAN, +0x18 the Model's model, 0xa94b48), +0x46 its draw mode (0x1e / 5 Model draws,
  * 0xa956d8), +0xb0 its first live particle, +0x34 its unit. Model vtable 0x17907fc, Billboard 0x179017c, Polygon
- * 0x17908fc. Logged 2 and 12 ticks after the first 30 motion-row posts; pointers checked before every read. */
+ * 0x17908fc. Logged 2 and 12 ticks after the first 30 motion-row posts; pointers checked before every read.
+ * Also: effect +0x118 (bit 0x1000000 = built, 0x9bda64), record +0 flags (0x10 model / 0x8 EAN not found, 0x2000 /
+ * 0x1000 empty path, 0xb5bbec) and the live particle count (list +0xb0, next +4). */
 #define FXW_N 6
 static struct { void *h; uint16_t id; uint8_t t, used; } s_fxw[FXW_N];
 static int fxw_ok(uint32_t v) { return v >= 0x10000000u && v < 0x80000000u && !(v & 3); }
@@ -626,13 +628,17 @@ static void fxw_dump(int i)
     uint32_t e = (uint32_t)(uintptr_t)s_fxw[i].h;
     if (!fxw_ok(e)) return;
     uint32_t g = FIELD(uint32_t, e, 0x1f0);
-    logf("msport: fxwatch %u t%u eff %x flags %x res %x gens %x", s_fxw[i].id, s_fxw[i].t, e, FIELD(uint32_t, e, 0xf0),
-         FIELD(uint32_t, e, 0xf4), g);
+    logf("msport: fxwatch %u t%u eff %x flags %x built %x res %x gens %x", s_fxw[i].id, s_fxw[i].t, e,
+         FIELD(uint32_t, e, 0xf0), FIELD(uint32_t, e, 0x118), FIELD(uint32_t, e, 0xf4), g);
     for (int k = 0; k < 24 && fxw_ok(g); k++) {
         uint32_t vt = FIELD(uint32_t, g, 0), rec = FIELD(uint32_t, g, 0x28);
         uint32_t ean = fxw_ok(rec) ? FIELD(uint32_t, rec, 0x14) : 0, mdl = fxw_ok(rec) ? FIELD(uint32_t, rec, 0x18) : 0;
-        logf("msport: fxwatch %u  gen %d vt %x mode %x ed %x rec %x ean %x model %x part %x", s_fxw[i].id, k,
-             vt - MAIN_BASE, FIELD(uint8_t, g, 0x46), FIELD(uint8_t, g, 0xed), rec, ean, mdl, FIELD(uint32_t, g, 0xb0));
+        uint32_t rfl = fxw_ok(rec) ? FIELD(uint32_t, rec, 0) : 0, part = FIELD(uint32_t, g, 0xb0);
+        int live = 0;
+        for (uint32_t q = part; fxw_ok(q) && live < 999; q = FIELD(uint32_t, q, 4)) live++;
+        logf("msport: fxwatch %u  gen %d vt %x mode %x ed %x rec %x rflags %x ean %x model %x part %x live %d",
+             s_fxw[i].id, k, vt - MAIN_BASE, FIELD(uint8_t, g, 0x46), FIELD(uint8_t, g, 0xed), rec, rfl, ean, mdl,
+             part, live);
         g = FIELD(uint32_t, g, 0xc);
     }
 }

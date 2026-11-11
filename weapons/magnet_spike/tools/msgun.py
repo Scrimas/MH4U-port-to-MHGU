@@ -7,8 +7,9 @@ bone 18 + M18 (-4, -4, 2) and draws three meshes of the effect model pack (0x13,
 first six (position, scale) x 0.95; read as position / scale / rotation (S), local = T R(Rz Ry Rx) S as MHF's motions.
 Drawn white with the default blend (0x114067e0 mode 1).
 
-GU: one rigid effect model (mhfmodel: MOD, w00 cm010_000's effect material, the pack's PNG 1 = the meshes' only
-image; the three parts baked into the bone-18 frame) and one EFL entry = GU's one-shot Model unit
+GU: one rigid effect model (mhfmodel: MOD, its effect material, the pack's PNG 1 = the meshes' only image; the
+three parts baked into the bone-18 frame, merged into one mesh: a Model unit shows one mesh, mhffx2gu.MODEL_FRAME)
+and one EFL entry = GU's one-shot Model unit
 (mhffx2gu.MODEL_TEMPLATE, copied whole), life 32 frames, no motion, no spin, scale 1, white. The MHF hand bone 18
 frame = GU joint 12's (as every other effect on a hand: msbuild.fx_post_tables, S). Test 18 (not seen): the unit was
 em001_00_500 entry 1 cut at 0x140, its +0x134 value-block offset (0x170) left pointing past the cut; the vertex
@@ -77,6 +78,8 @@ def build_efl(gu_read):
     struct.pack_into('<HHHHHHHH', u, 0x38, 0, 0, 0, 0, 0, 0, 0, 0)   # no size / colour / UV curves
     u[0x48:0x50] = b'\xff' * 8                                  # white
     u[0x50:0x90] = MODEL.encode().ljust(0x40, b'\0')
+    mhffx2gu.model_frame(u)                                     # the model's one mesh (group 0)
+    mhffx2gu.model_effect_mode(u)                               # GU's effect draw (the blend byte)
     struct.pack_into('<6f', u, 0x90, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0)   # scale x / y / z
     struct.pack_into('<6f', u, 0xa8, *([0.0] * 6))                   # scale rates
     struct.pack_into('<6f', u, 0xd0, *([0.0] * 6))                   # rotation
@@ -98,4 +101,4 @@ def build(gu_read, rom):
     ms.model('gun', parts(src), img, path=MODEL)
     ents = ms.entries() + [(EFL, mhffx2gu.T_EFL, build_efl(gu_read))]
     mod = ms.mods['gun'][2]
-    return ents, {KEY: [(EFL, 1, (0.0, 0.0, 0.0))]}, ['hand piece: %s (%d B MOD, 3 meshes), %s' % (MODEL, len(mod), EFL)]
+    return ents, {KEY: [(EFL, 1, (0.0, 0.0, 0.0))]}, ['hand piece: %s (%d B MOD, 3 parts in one mesh), %s' % (MODEL, len(mod), EFL)]

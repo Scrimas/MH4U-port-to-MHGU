@@ -391,3 +391,23 @@ into cm123_041's blocks.
 
 ## Test 21 (built and installed 2026-11-05)
 Test 19's steps. The log now shows whether each posted effect built and whether its models resolved.
+
+### Test 21 static follow-up (2026-11-11)
+Cause (C, gu-efl-units.md "Unit block, Model (type 5)"): every Model unit kept cm123_041 entry 0's +0x100 = frame 1
+and its scene-model bit (+0x1a bit 0). In that mode GU draws the particle as a model unit showing only mesh j == frame
+for j < the mesh count (0xa99a38, 0xa94c10); our MODs have one mesh (group 0), so nothing was shown (tests 18-20).
+Ruled out statically: model / MRL / textures resolve in w05.arc before their EFLs, every material name is in its
+MRL with the effect class, MOD version 0xd4, kind-5 curves present. Change: mhffx2gu.model_frame (frame 0, no range)
+on every MHF Model unit and the gun; mhfmodel merges a model's parts into one mesh (the gun's three); effcheck.py
+replays the conditions and stops msbuild on a problem (gen/report.txt). The installed test 21 build is stale: rebuild
+and reinstall before test 21. Then (coordinator's decision) the units moved to GU's effect draw, as efl4u2gu's
+models and 10795 / 11359 GU Model units: mhffx2gu.model_effect_mode clears +0x1a bit 0 and the template's
+scene-mode values (+8 = 0, +0x10c = 0: its bits 20-23 and the +0x10e bit 4 flag are 0 in effect-mode GU units);
+blend = MHF's draw byte in unit byte 3 (S: the effect path takes it, gu-efl-units.md "Blend"); materials now pass
+the ready check's class test (effcheck: 0 problems; also 0 on GU's w00 / w04 / w13 and efl4u2gu's em089-091 arcs).
+Log (ms_act.c fxw_*, first 30 motion-row posts, 2 and 12 ticks after): `msport: fxwatch ID tT eff E flags F built B
+res R gens G` (flags +0xf0 bit 0x2000000 = build failed, built +0x118 bit 0x1000000 = built) and per generator
+`msport: fxwatch ID  gen K vt V mode M ed D rec R rflags L ean A model O part P live N`: vt 0x17907fc = Model, mode
+= gen +0x46 (5 / 0x1e effect draw, 0x37 scene model), ed bit 2 = scene mode, rflags = record +0 (0x10 model / 8 EAN
+not found, 0x2000 / 0x1000 empty path), model = the rModel, live = particles alive. The test must still show the
+look: MHF's additive meshes add (not alpha), sizes, orientation (Euler order G), and the gun's three parts.

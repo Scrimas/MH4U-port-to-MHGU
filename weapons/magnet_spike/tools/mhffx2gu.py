@@ -65,6 +65,31 @@ ADD_BLEND, ALPHA_BLEND = 0, 1
 # scroll values / speeds, 0xa99f40) and an animation block (+0x138 lo16, 0xa99a38); 0 = none.
 MODEL_TEMPLATE = ('player/quest/w04.arc', 'effect\\cm\\cm123_041', 0)
 MODEL_SIZE = 0x140
+# Model unit +0x100 bits 12-21 = the mesh 'frame' a particle shows, + rand % (bits 22-31 + 1) (or the frame curve
+# +0x44), 0xa99a38 -> particle +0x108; particle +0x100 = the index of the first mesh whose group (MOD mesh d0 & 0xfff)
+# equals it (0xb49090, 0 when none). Effect draw (0xa956d8): that mesh. Scene-model mode (unit +0x1a bit 0, as this
+# template: 0xa949f8 sets draw mode 0x37, 0xa94c10 makes one GU model unit per particle) shows mesh bit j (j < mesh
+# count) only when j == the frame (C; S that the bits are the meshes' display mask). cm123_041 entry 0 picks frame 1
+# of cm100_910 (5 meshes, groups 1 / 0 / 2 / 3 / 4); ours have one mesh in group 0 -> frame 0 (frame 1 hid every
+# Model unit, tests 18-20: test 21 static follow-up), drawn in effect mode (model_effect_mode)
+MODEL_FRAME = 0x100
+
+
+def model_frame(u, group=0):
+    """unit +0x100: show the mesh of `group`, no random frame range (MODEL_FRAME)"""
+    w = struct.unpack_from('<I', u, MODEL_FRAME)[0]
+    struct.pack_into('<I', u, MODEL_FRAME, (w & 0xfff) | (group & 0x3ff) << 12)
+
+
+def model_effect_mode(u):
+    """the template's scene-model unit -> GU's effect draw (as efl4u2gu's models and 10795 / 11359 GU Model units;
+    notes/gu-efl-units.md "Unit block, Model"): +0x1a bit 0 clear (0xa949f8: draw mode 5, materials checked by
+    0xa94b48, the unit's blend byte used); +8 = 0 and +0x10c = 0, the effect-mode majority, where the template held
+    scene-mode values (+0x10c bits 20-23 = 1 -> 0xc90094 / 0xc90380 arguments, +0x10e bit 4 -> gen +0x44 bit 3: 15 /
+    1 of 10731 GU effect-mode units, G meaning; +8 -> gen +0xa0 and 0xc90094, 0 in 3308 / 3327 weapon-arc units)"""
+    u[0x1a] &= 0xfe
+    struct.pack_into('<I', u, 8, 0)
+    struct.pack_into('<I', u, 0x10c, 0)
 FLAT = 0.05                  # a mesh is flat when its z extent <= 5 % of its x / y extent
 
 
@@ -489,6 +514,7 @@ class Builder:
         struct.pack_into('<HHHHHHHH', u, 0x38, 0, 0, 0, 0, 0, off_c, 0, 0)
         struct.pack_into('<4s4s', u, 0x48, cols[0][1], cols[0][1])
         u[0x50:0x90] = self.models.mesh(e['mesh']).encode().ljust(0x40, b'\0')
+        model_frame(u); model_effect_mode(u)
         struct.pack_into('<6f', u, 0x90, *[x for k in range(3) for x in (base[k] - rng[k], 2 * rng[k])])
         struct.pack_into('<6f', u, 0xa8, *([0.0] * 6))
         r, rr = a['rot'], a['rot_r']

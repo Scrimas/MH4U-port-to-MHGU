@@ -61,9 +61,19 @@ def image_of(src, mi):
     return src.tex_img[src.mat_tex[m['material_list'][0]]]
 
 
+def merged(parts):
+    """[(P, N, UV, COL, triangles)] -> one part (the triangles renumbered)"""
+    tris, base = [], 0
+    for P, _, _, _, t in parts:
+        tris += [(a + base, b + base, c + base) for a, b, c in t]; base += len(P)
+    return tuple(np.concatenate([p[k] for p in parts]) for k in range(4)) + (tris,)
+
+
 def mod_bytes(parts):
-    """[(P, N, UV, COL, triangles)] -> GU MOD bytes: one rigid mesh per part, material 0 (MAT)"""
+    """[(P, N, UV, COL, triangles)] -> GU MOD bytes: the parts as one rigid mesh in group 0, material 0 (MAT). One
+    mesh: a GU Model unit shows only the mesh its frame names (mhffx2gu.MODEL_FRAME, C)"""
     import mod4u2gu
+    parts = [merged(parts)] if len(parts) > 1 else parts
     vb, ib, recs, envs, allp, ntri = bytearray(), bytearray(), [], [], [], 0
     for P, N, UV, COL, tris in parts:
         n = len(P)

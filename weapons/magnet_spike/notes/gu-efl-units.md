@@ -147,8 +147,78 @@ and interpolation: not traced (G: linear, frames).
 - Size: unit +0x28..+0x34 and the scale curve (prop 0x40); read 0xa6a2cc / 0xa6a434 next.
 - Curve interpolation and time base: 0xaed74c, 0xaf7958, 0xaf938c.
 - Billboard orientation modes (gen +0x46 0x17 / 0x19 / 0x2f from unit +0x18 bits 4-7) in the draw 0xa7b580.
-- Polyline (types 1 / 0xc, vtable 0x1790c84: init 0xab76d8, loop 0xab7f2c) and Model (type 5, 0x17907fc: init
-  0xa9958c, loop 0xa9a154) not decoded beyond the shared head.
+- Polyline (types 1 / 0xc, vtable 0x1790c84: init 0xab76d8, loop 0xab7f2c) not decoded beyond the shared head.
+- Model (decoded below): the GU model unit's mesh mask (+0x110) read side, the blend on the scene-model path, the
+  one-mesh draw 0xc90380 / 0xc90494 / 0xc90b50, and the name of DTI 0x21293e8 (the effect material class).
+
+## Unit block, Model (type 5) (static, 2026-11-11; C unless marked)
+Vtable 0x17907fc: slot 6 0xa9499c bind (0xa58fa8, then 0x120-B particles, + 0x20 x (unit +0x138 bits 24-27 + 1) when
+unit +0x134 lo16 != 0), 8 0xa949f8 setup, 15 0xa94b48 ready check, 17 0xa94bd8 translate, 19 0xa94bf8, 20 0xa94c10
+scene-model update, 21 0xa956d8 draw, 23 0xa9958c particle init, 24 0xa9a154 loop (0xa9a280 per particle).
+
+**Resource resolution.** rEffectList (vtable 0x1793aa4) load 0xb5c5cc ('EFL', version 0x20120306) -> 0xb5c770: n
+0x44-B records at resource +0x70 -> 0xb5c878 per entry: 0xb5b97c clears the record, 0xb5bab0 element +0xb8 / +0xba
+/ +0xbc (offsets of path strings, flags 0x20 / 0x200 / 0x400 when unresolved), 0xb5c288 move block, 0xb5bbec unit
+block by type. Type 5: unit +0x50 (char[0x40]) -> sResource (0x2126a64) vt+0x30(rModel DTI 0x21251c8, path, 1) ->
+record +0x18; empty path -> record +0 |= 0x2000, not found -> |= 0x10; unit +0x138 lo16 = offset of an EAN path ->
+rEffectAnim -> record +0x14 (0x1000 / 8). The lookup is by path + type (no arc named in the code; S that it finds
+what the loaded arcs hold, as GS's cm010_000 in its own class arc). rModel (vtable 0x1792f34): load 0xb490cc takes
+MOD version 0xd4 only; +0x84 material count, +0x218 material names (0x80 B), +0x74 / +0x78 meshes (0x30 B) / count.
+Post-load (slot 10, 0xb49854): the rMaterial (DTI 0x21250f8) of the model's own path -> +0x210; per material name
+MRL vt+0x40(name) -> +0x214[i]; missing MRL or name -> a default material (global 0x2126afc +0x4304c).
+
+**Ready check 0xa94b48.** Skipped when unit +0x1a bit 0 is set (gen +0xec bit 10, 0xa59268). Else every material of
+record +0x18 (rModel vt+0x40 0xb48d70 = +0x214[i]) must pass sEffect (0x2126554, vtable 0x179510c) vt+0x6c =
+0xb91ef0: material DTI id (+0x1c) == DTI 0x21293e8's (unnamed in dti.pkl; S: the class 0x5fb0ebe4 that every GU
+effect-model material carries). Then the shared 0xa59ce4: move kind 5 needs move +0x70 (else 0). A failure makes
+0x9bda64 set effect +0xf0 bit 0x2000000: no generator of the effect runs. A null record +0x18 is dereferenced
+(G: a crash rather than a quiet fail).
+
+**Setup 0xa949f8.** Draw mode gen +0x46: unit +0x1a bit 0 -> 0x37 (scene model); else 5, or 0x1e when 0xa5b880 holds
+(unit +2 bit 0). Unit +0x100 bits 0-3 -> gen +0xe8 bits 16-19, bits 4-7 -> bits 24-27 (!= 6 sets gen +0xdc bit 30);
++0x10e bit 4 -> gen +0x44 bit 3; +0x11c -> gen +0x1ac; +0x40 / +0x48 / +0x4c colour mode and colours as Billboard.
+
+**Particle init 0xa9958c.** Frame (0xa99a38): unit +0x100 bits 12-21 + rand % (bits 22-31 + 1), or the frame curve at
+unit +0x44 -> particle +0x108; particle +0x100 = 0xb49090(model, frame) = index of the first mesh whose group
+(MOD mesh d0 & 0xfff) equals the frame, 0 when none. Colour: curve unit +0x42 (0xaed74c / 0xaf938c; header >= 0 ->
+particle flag 0x20000, re-evaluated every frame by 0xa9a280) else colours A / B (0xa6be40), alpha or colour scaled by
+the emit fade (gen +0x40 bits 12-15, masks 0xaa / 0x154). Scale 0xa6b59c: unit +0x90 (value, range) x 3, +0xa8
+rates, or the curve +0x132 (keys 28 B: u32 time, 3 x (value, range); particle flag 0x800000). Rotation 0xa6adac:
+unit +0xd0, +0xe8, curve +0x130. Unit +0x10c bits 20-23 -> particle +0x100 bits 12-15, bit 31 -> flag 0x8000 (scale
+rates x unit +0xc0..+0xc8 per frame); +0x114 -> particle +0xf8; +0x134 lo16 -> UV layers (0xa99f40).
+
+**Draw.** Effect mode (gen +0x46 5 / 0x1e; 0xa956d8 returns for any other value): per particle 0xa9af40 ->
+0xc90094(context, record +0x18, the owner position, unit +8, (unit +0x10c >> 20) & 0xf, owner +0x208 + unit +0x120)
+and 0xc90380(particle +0xf8, ..., particle +0x100 & 0xff, ...) (S: draws that one mesh). Scene-model mode (0x37):
+0xa94c10 gives each particle a GU model unit (0xa955b0: 0x500 B via 0xc6b66c / 0xc6b6a8, moved by 0xc08100, vt+0x58
+= record +0x18) with the particle's matrix, alpha (+0x158), material colour (vt+0x2c) and mesh mask +0x110: for j <
+the mesh count, bit j = (j == particle +0x108) (C; S that +0x110 is the meshes' display mask). The unit blend byte is
+not read on this path (G).
+
+**Blend.** All GU effect-model materials are BSBlendAlpha (mhfmodel), yet effect-mode Model units use unit byte 3 =
+1 / 0 / 6 / 5 (10111 / 294 / 261 / 65 of 10731), and 0xb007fc (the model helper efl4u2gu traced) picks the blend
+state from a draw word (bits 5-15, > 0x22 -> 1) through the shader-state table: S that the effect path takes the
+unit's blend byte over the material's (the byte -> word step in 0xa956d8 / 0xc90b50 is not traced).
+
+**Fields only the effect path reads** (template cm123_041 e0 -> GU weapon-arc effect-mode units / efl4u2gu em089-090):
+| field | use | e0 | GU effect | efl4u2gu |
+|---|---|---|---|---|
+| +2 bit 0 | 0xa5b880: draw mode 0x1e instead of 5 (C) | 0 | 0 | 0 (4 x 1) |
+| +3 | blend index (S, above) | 1 | 1 / 6 / 0 | 1 / 0 / 5 / 6 |
+| +8 | gen +0xa0 -> 0xa9af40 block; 0xc90094 argument (C; G meaning) | 1 | 0 (3308 / 3327) | 0 / 1 |
+| +0x10c bits 20-23 | 0xc90094 argument, particle +0x100 bits 12-15 -> 0xc90380 (C; G meaning) | 1 | 0 | 0 |
+| +0x10e bit 4 | gen +0x44 bit 3 (0xa949f8, C) | 1 | 0 | 0 |
+| +0x100 bits 8-11, +0x10c bit 28, +0x110 | draw sub-modes / offset x gen +0xfc (0xa956d8, C; G) | 0, 0, 0 | 0, 0, 0 mostly | same |
+| +0x3c, +0x120..+0x12c, +0x13c | 0xa9af40 block, sort key, UV transform (C) | GU's common values | same | same |
+The MHF units (mhffx2gu.model_effect_mode, 2026-11-11) clear +0x1a bit 0 and set +8 = 0, +0x10c = 0; blend = MHF's.
+
+**Nothing drawn when** (C unless marked): model path empty / unresolved; MRL or a material name missing, or an
+effect-mode material of another class (ready check, the whole effect fails); move kind 5 without +0x70; scene mode
+with frame >= mesh count (tests 18-20: frame 1 from cm123_041 entry 0 on our one-mesh models); alpha 0 from colour
+A / the curve / the fade; scale 0. Effect mode with a frame that names no group draws mesh 0 (S).
+GU corpus (11359 Model units): 564 scene mode, 10795 effect mode; cm123_041's scene-mode entries pick frames 1 / 2 /
+4 of cm100_910 (5 meshes, groups 1 / 0 / 2 / 3 / 4). Check: `python3 weapons/magnet_spike/tools/effcheck.py ARC`
+replays these conditions (0 problems on GU's w00 / w04 / w13 and on efl4u2gu's em089_00 / em090_00 / em091_00).
 
 ## Main-agent decode (2026-11-04, C unless marked)
 - **Emit block = particle life** (0xaed0d0, called per new particle by 0xa5ca24 for emit-type high nibble 1 / 2):
