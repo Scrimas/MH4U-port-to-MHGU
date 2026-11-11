@@ -429,3 +429,67 @@ for long invincibility on RT + Y and the RB moves (to be verified). Look at in t
 hunter now land at the monster instead of past it, and how high is the arc next to MHF's (the log line gives the
 numbers); then RT + Y, Y.
 
+Rebuilt and installed 2026-11-11 from commit cf80391 (MS_SLICE, the maintainer's Ryujinx mods folder): test 21 =
+test 19's steps plus the two attraction checks above; not played yet.
+
+### Test 21 results and fixes
+Log: dump/mhf/test_logs/test21.log (commit cf80391; 33 Ryujinx cheats on, among them Instant Kill, Invincible, Inf HP,
+Attack Rate x99, Charge Blade Phials Max / Red Charged). The maintainer: (1) RB + Y / B / X / A: some effects show,
+"definitely wrong"; (2) the Y + B finisher triggers now, wrong effects; (3) plain Y / B ground smoke right; (4) RT +
+B: the hand piece shows, never clear and at the wrong place, no reticle, no projectile; (5) / (6) the attraction
+flight and RT + Y, Y fixed; (7) RT + A and RT + Y show no effect (test 20 showed the old ones). Magnetise not tried
+(charged: "Cutting Magnetise ready", never switched on).
+
+| # | issue | cause (C unless marked) | change (test 22) |
+|---|---|---|---|
+| 1 | RB moves: wrong effects | the ids are MHF's: 11 / 135 fc5:40 at f62 of 1045 (the unmagnetised branch), 107 / 108 the mhfdat keys of 1493 / 1494, at MHF's frames and bones. Extra: GS's swing crescent on 1045 (msfx arcs, effect-posts.md "Port vs MHF"). The rest is the look (conversion), row 4 and row 10 | GS's crescents no longer posted with the MHF effects on (msbuild; the swing sounds stay) |
+| 2 | finisher: wrong effects | 152 / 154 without Magnetise: MHF posts nothing (1406 / 1446 / 1035: M-gated code posts, no keys); the port posts nothing MHF either, so what shows is GS's crescent on 1035. 155: 1418's keys fae:17 / faf:0, posted | crescent dropped (row 1); question: was the reference video's finisher Magnetised? |
+| 3 | hand piece | posted on joint 12 at f6 (event 17), MHF's offset; msgun assembled its three parts wrongly. A Model-only effect that shows: effect-mode Model units can build (S) | msgun fixed: fxplace 0.0 cm against MHF's 0x1004f7b0 |
+| 4 | no attraction / repulsion effect | the posts are those of test 20 (same ids and frames in both logs); the effect files changed (ebe2340): MHF Model units in GU's effect draw now run the Model ready check 0xa94b48, which scene mode skipped (generator +0xed bit 2), and one failing generator fails the whole effect (0x9bda64). Every attraction / repulsion effect but the hand flashes 3073 / 3074 holds Model units (3078, 3084, 3089, 3332, carriers 3416 / 3417 / 3482 / 3483), and so do the mixed RB-move ones (3343, 3349) and the Guard Counter's 3092. S: their material fails the class test 0xb91ef0 (effcheck: passes; the class is a runtime DTI, not proven) | fxwatch made real (row 7) to show it; carriers kept alive (row 5); one-build A/B on the draw mode (row 11) |
+| 5 | no projectile (and no marker look since test 17) | the shot (fc5:b, 3486) and the marker (fc5:e, 3480) were killed and re-posted every update / tick: the proxy creates its effect in its own start step and the effect builds on its first update, so the kill came first (S; test 16's moved version showed them) | posted once, moved every update (0x32a45c), re-posted when ended or (marker) moved over 150 cm; killed at the end (fx_follow) |
+| 5 | no reticle, no aim camera | GU's 0x29fb8c (end of the player update, after slot 139) clears the aim byte +0x2716 and +0x2714 every update for a drawn non-bowgun (0x29fe90): the quest camera ended its aim in the first frame and the scope HUD (cUIOQuestScope, made for every class; the Charge Blade redirect does not touch it) read 0. Mode 0 would also have followed the turn target +0x14a0 (no look) | slot 45 sets the byte / pitch / camera aim again after 0x29fb8c; MHF's look (0x240 yaw / 0x160 pitch per MHF tick, digital) on GU's right stick through GU's aim reader 0x27d5c4 and invert options; slot 260 writes it into the camera's yaw / pitch, the hunter does not turn. Deviations: pitch starts level, clamp ±0xd1c (G: sense), GU's crosshair for MHF's reticle frames (mechanics.md "Port (aim view)") |
+| 6 | 3 shots missed | shot 1 flew away from the monster (direction opposite to shot 2's: aimed or camera, G); shot 4 pitched 14 deg down into the ground (4 ticks); shot 6 life over (750 m); shots 3 / 5 were replaced in flight by the next one (no end logged). Shot 2's marker ended the same tick: the area test (monster +0x1054 != the hunter's), by elimination (mechanics.md). No cheat explains these (the shot deals no damage) | logs: closest pass to a hurt volume, every monster's em_ok gates and distance to the line, the camera at the shot, replaced shots, why a marker ended |
+| 7 | logs | fxwatch read the proxy as the effect (effect-posts.md "GU's post handle"); carrier lines printed 0 for unkept handles and a 32-bit mask hid the attraction's beam / rail (32 / 34 folded onto 0 / 2); GS's marker flash ran beside MHF's every other update | fxwatch follows proxy -> effect -> generators with vtable / PEL-id checks ("invalid" otherwise), for every post kind (2 per PEL id, 48 ids); carriers logged with their PEL and first handle; the GS flash only without MHF effects |
+| 8 | attraction timing | fc5:7 at the marker came at the start (MHF f10); fc5:3 / fc5:4 both on the first update (the 'act' rows count from frame 0, 1472 starts at f8: MHF f10 / f14) | fc5:7 1 tick after the start; the 'act' rows now add the first step's start frame (msbuild.fx_post_tables) |
+| 9 | Model placement | GU draws a Model particle in the emitter's frame = the PEL record's T R x the joint's full matrix (gu-efl-units.md "Model transform") | tools/fxplace.py replays both sides on the built arc: 253 Model units, median 0.00 / max 1.97 cm, 0.00 deg (posts without rotation) |
+| 10 | swing effects: "can't tell direction" (part) | MHF's per-motion keys carry a follow mode d (0x1099a720 / 0x1099ae30, C; msfxposts.key_mode). Our 124 attached keys (kind 7) all use d 0 = the bone's full rotation, so the 'att' PEL on the joint is right (the old "treated as full follow" deviation did not apply). But 20 fixed keys (kind 6: fae:c, fae:d, faf:0, faf:2 = plain Y's smoke, 107 / 108 / 1418's) use d 3 = (0, the hunter's yaw at the key, 0), which the port posted with the joint's full rotation; 2 ground keys use d 4 = yaw + 90 deg | modes 'fixyaw' / 'fixyaw90' / 'gnd90' (ms_act.c fx_fixed 3 / 4 / 5). fxplace, hunter yaw 30 deg, joint turned Rx 40 Rz 25 against it, 12 Model units: before median 257.8 / max 299.5 cm, after median 0.0 / max 23.0 cm (the rest = MHF's Euler sum against GU's matrix product, as the --yaw check) |
+| 11 | which draw mode builds | statics cannot settle why the mixed effects vanished (row 4): the Model-only plain-Y smoke (fae:b / c / d) and the gun showed in effect mode. Other ways a build fails (C, effect-posts.md "GU's post handle"): a generator allocation, the effect's work block, a slot init | test-22 split (mhffx2gu.SCENE_TEST22, gen/report.txt): the Model units of fc5:1 / 2 / 5 / 7 / 0x38 / 0x4d / 0x4e (attraction, repulsion, Guard Counter: 45 units) in SCENE mode, frame 0; every other MHF Model unit in effect mode; fxwatch prints scene / effect per effect and which build step stopped |
+| 12 | GS stand-ins in the module | with the MHF effects on (gen/ms_data.inc MS_FXQ_ON 1, MS_NFXPOSTS 251) every GS stand-in post sits in a constant-false branch: marker flash (flash_at; MHF: fc5:e on the marker, fc5:b / fc5:a for the shot), Magnetise aura (MHF task 0xd / 0xe: fc6:10, fc5:55-58), guard flash (MHF fc5:46 / 47 / 15; Impact guard fc5:16, fc4:2, fc5:15), Magnetise-on flash (fc6:10 at t18 / 17), Magnetic Shock (task 0xf / 0x10 spot posts), Triple Strike charged (fc6:11 + fc5:15 x 3) | the marker flash's branch now tests MS_FXQ_ON itself (it ran beside MHF's in test 21) |
+
+## Test 22 (built 2026-11-11: msbuild.py + `GOG_DEFINES=MS_SLICE` module; not installed yet)
+In this build: rows 1-12 above (carriers kept alive, real fxwatch, no GS crescents, follow modes, the gun fixed, the
+draw-mode split). Before playing, switch off these Ryujinx cheats: Instant Kill, Attack Rate x99, Invincible, Inf HP
+(markers, guards and Magnetise need a live monster and real hits), Charge Blade Phials Max and Charge Blade Red
+Charged (the magnet HUD is the Charge Blade's phial widget). Play, then close the game; the log answers the rest.
+Xbox letters.
+1. Plain Y combo (let it play out): the ground smoke, and its direction along the hunter's facing.
+2. RB + Y, RB + B, RB + X, RB + A, once each, standing: the swing effects and which way they face.
+3. Y combo into Y + B (the finisher): no white crescent any more; what shows.
+4. Hold RT (aim): the camera goes over the shoulder with a crosshair in the screen centre, and the right stick
+   turns the view (left / right and up / down; the hunter does not turn; the left stick still walks). Aim the
+   crosshair at a large monster's body, standing still, press B; three shots, one at a time. Then release RT: the
+   normal camera comes back looking the same way. Say: did the camera and crosshair show, did the right stick move
+   the view the right way round (up = up), was it too fast or slow, did the projectile fly to the crosshair, the
+   marker's look on the part.
+5. RT + Y from 14-40 m to the marker (attraction), no follow-up: its effects (hand flashes, beam, rail, landing).
+6. RT + A under 14 m (repulsion): its effects.
+7. RB + RT into a monster attack (Guard Counter), then Y + B: the counter's effects.
+8. Magnetise: hit the monster in one mode (stay in Cutting) until it is ready (charge MV x 0.8 per hit to 1000:
+   20-40 hits; the log says "Cutting Magnetise ready"; the HUD's first phial changes, S), then hold RB and press
+   Back (View); then RB + Y once: the flash, spots and pulses.
+Ask only about visuals: for each step, did an effect show, where, which way it faced.
+What the draw-mode split means (fxwatch "scene" count per effect; steps 5-7 = the scene-mode set, 2 / 3 / 8 the
+effect-mode mixed ones, 1 effect-mode Model only):
+- scene set built and seen, effect-mode mixed set "failed (0x2000000)" with all its generators, block and slots:
+  the effect-mode Model ready check (0xa94b48, material class) -> scene mode for every MHF Model unit, or fix the
+  material.
+- both sets built (built, live particles) but one not seen: a draw-time problem (blend, layer, alpha), not the build.
+- a set "failed" with gens below the entries or block 0: a generator / work-block allocation (budget), not the mode.
+- the scene set fails too: the mode is not the cause; compare with step 1's lines (effect mode, seen in test 21).
+New log lines: `msport: fxwatch ID tT proxy H unit U state S step K kind N efl R (flags F) effects C`; per effect
+`msport: fxwatch ID  effect I E unit U built|not built[, failed (0x2000000)][, no resource / init (0x4000000)] res R
+(N entries): gens G, block B, slots S` and `msport: fxwatch ID   N gens: Model M (scene S, live L), Billboard ...`
+(a generator with record flags gets its own line), or `... invalid: REASON`; `msport: mhf carrier K (N rows, PEL P)
+at X Y Z: H`; `msport: mhf carrier PEL P stopped (WHY) after N ticks, alive A`; `msport: aim view on (camera mode M, manager H, quest camera C, yaw Y deg)`; `msport: aim tick: byte B cam aim A mode M settled S yaw Y deg pitch P deg (+0x2714 R)` (the first 10 updates of each aim; byte 1 and cam aim 1 = the fix holds); `msport: marker shot: camera now
+...`, `... closest pass ...`, `... monster I ... ok ...`, `msport: marker shot replaced in flight`; `msport: marker
+gone (..., in manager, small, hp, area, hunter area)`; `msport: mhf effect ... mode 3` = a hunter-yaw key.

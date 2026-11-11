@@ -134,6 +134,8 @@ void ms_init(void)
     vt_fn(37, ms_on_hit);           /* +0x94: after our attack's damage on a monster (every class: bx lr) */
     vt_fn(356, ms_guarded);         /* +0x590: the guard reaction (build.py's guard patches let class 5 guard) */
     vt_fn(44, ms_invuln);           /* +0xb0: invulnerable now (GU's), + MHF's "evaded through an attack" */
+    vt_fn(45, ms_after_update);     /* +0xb4: after GU's 0x29fb8c (aim byte clear) in the player update: the aim view */
+    vt_fn(260, ms_aim_cam);         /* +0x410: the quest camera's aim mode 0 hook: MHF's look into its yaw / pitch */
     forge_tables_init();
     /* still GS's: 82 (resource setup + manager group 35, S), 443 (common actions 0x172-0x174 at GS frames) */
     logf("msport: class 5 vtable at %x (GS %x)", (uint32_t)(uintptr_t)ms_vt, MAIN(VT_GS));

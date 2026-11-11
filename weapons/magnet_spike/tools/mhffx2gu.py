@@ -73,6 +73,19 @@ MODEL_SIZE = 0x140
 # of cm100_910 (5 meshes, groups 1 / 0 / 2 / 3 / 4); ours have one mesh in group 0 -> frame 0 (frame 1 hid every
 # Model unit, tests 18-20: test 21 static follow-up), drawn in effect mode (model_effect_mode)
 MODEL_FRAME = 0x100
+# TEST-22 DIAGNOSTIC SPLIT (one-build A/B on the Model draw mode; phase3.md "Test 22"). Test 20 (scene mode, frame 1)
+# showed the attraction / repulsion / Guard Counter effects' billboards; test 21 (effect mode, frame 0) showed none of
+# them, while the Model-only plain-attack smoke (fae 0xb / 0xc / 0xd) and the gun did show. These effects keep the
+# template's SCENE mode (model_effect_mode not applied: 0xa94b48's material test skipped, gen +0xed bit 2; draw mode
+# 0x37, one GU model unit per particle, mesh j shown when j == the frame: frame 0 = our one mesh, S) with frame 0;
+# every other MHF Model unit (RB moves, per-motion keys, finisher, Magnetise, shot, marker, the gun) stays in EFFECT
+# mode. fxwatch prints "scene N" per effect. Drop the table (all effect mode, or all scene) after test 22.
+SCENE_TEST22 = {
+    (0xfc5, 0x1): 'attraction f30 / repulsion t2 (mixed)', (0xfc5, 0x5): 'attraction f10 (Model only)',
+    (0xfc5, 0x7): 'attraction marker f10 (mixed)', (0xfc5, 0x2): 'attraction beam (Model only)',
+    (0xfc5, 0x4d): 'repulsion t3 / marker (mixed)', (0xfc5, 0x4e): 'repulsion carrier (Model only)',
+    (0xfc5, 0x38): 'Guard Counter success f32 (mixed)',
+}
 
 
 def model_frame(u, group=0):
@@ -514,7 +527,11 @@ class Builder:
         struct.pack_into('<HHHHHHHH', u, 0x38, 0, 0, 0, 0, 0, off_c, 0, 0)
         struct.pack_into('<4s4s', u, 0x48, cols[0][1], cols[0][1])
         u[0x50:0x90] = self.models.mesh(e['mesh']).encode().ljust(0x40, b'\0')
-        model_frame(u); model_effect_mode(u)
+        model_frame(u)
+        if getattr(self, 'cur_eff', None) in SCENE_TEST22:
+            self.n_scene = getattr(self, 'n_scene', 0) + 1
+        else:
+            model_effect_mode(u)
         struct.pack_into('<6f', u, 0x90, *[x for k in range(3) for x in (base[k] - rng[k], 2 * rng[k])])
         struct.pack_into('<6f', u, 0xa8, *([0.0] * 6))
         r, rr = a['rot'], a['rot_r']
@@ -544,6 +561,7 @@ class Builder:
         in MHF, 0x113d37e0, C), posted as one PEL record with that offset; at most 32 entries per EFL (the record's
         element mask)"""
         st = self.cur_set = self.src.set(sid)
+        self.cur_eff = (sid, eid)
         by_pos, skipped = {}, []
         for a, e, ok, why in particles(st, eid):
             if not ok:
@@ -670,4 +688,7 @@ def build_all(gu_read, effects=MS_EFFECTS, src=SRC, rom=None):
         ents[k:k] = b.models.entries()
         rep.append('mhf effect models: %d meshes, %d textures, %d Model units' % (
             len(b.models.mods), len(b.models.tex), getattr(b, 'n_models', 0)))
+        rep.append('mhf effect models, test-22 draw-mode split: %d Model units in SCENE mode (%s), the rest in effect '
+                   'mode' % (getattr(b, 'n_scene', 0), ', '.join('%#x %#x = %s' % (s, e, w)
+                                                                 for (s, e), w in sorted(SCENE_TEST22.items()))))
     return ents, made, rep

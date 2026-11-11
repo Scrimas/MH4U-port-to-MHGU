@@ -4,7 +4,11 @@ MHF (C unless marked): at f6 of actions 82 / 84 event 17 starts MS task kind 0 (
 18 (the -x hand) for 16 ticks (the event's parameter). Every tick it takes bone 18's matrix with the origin moved to
 bone 18 + M18 (-4, -4, 2) and draws three meshes of the effect model pack (0x13, 0x74, 0x97 = our model0.fmod meshes
 19, 116, 151) through the draw list 0x1ecde5e0 (callback 0x1004f7b0), each with 9 constants from 0x1004d4b0, the
-first six (position, scale) x 0.95; read as position / scale / rotation (S), local = T R(Rz Ry Rx) S as MHF's motions.
+first six (position, scale) x 0.95 (C). The draw callback 0x1004f7b0 (C, disassembled): the position p is turned by the
+part's own rotation (0x10006830 / 0x10006880 / 0x1000d320: x, then y, then z, right-handed) and then by the bone
+(D3DXVec3TransformNormal), added to the origin; the mesh matrix = Scaling(s) x RotX x RotY x RotZ (0x10004f80, row
+vectors) x the bone matrix (task data +0x58 = 0x12 != 0), translation = that point. In column form, in the bone-18
+frame: v -> R (S v + p), R = Rz Ry Rx. (Test 21 built R S v + p: the parts 15-50 cm apart, the barrel turned 90 deg.)
 Drawn white with the default blend (0x114067e0 mode 1).
 
 GU: one rigid effect model (mhfmodel: MOD, its effect material, the pack's PNG 1 = the meshes' only image; the
@@ -46,13 +50,13 @@ def euler(r):
 
 
 def parts(src):
-    """the three meshes, each T(K pos) R(rot) S(K scale), in the bone-18 frame (mhfmodel parts)"""
+    """the three meshes, each R(rot) (S(K scale) v + K pos), in the bone-18 frame (mhfmodel parts; 0x1004f7b0, C)"""
     import mhfmodel
     out = []
     for mi, (pos, scl, rot) in zip(MESHES, PARTS):
         m = src.meshes[mi]
         R = euler(rot)
-        P = (np.array(m['pos'], float) * (K * np.array(scl))) @ R.T + K * np.array(pos)
+        P = (np.array(m['pos'], float) * (K * np.array(scl)) + K * np.array(pos)) @ R.T
         N = (np.array(m['normal'], float) / np.array(scl)) @ R.T
         out.append(mhfmodel.mesh_part(src, mi, P, N))
     return out

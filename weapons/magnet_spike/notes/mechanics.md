@@ -200,10 +200,41 @@ scaled), GS's charge flash as the cue.
     - Free look: yaw ±0x240 and pitch ±0x160 per tick, pitch clamped to −0x12e4..+0xd1c.
     - It stays on in idle / walk / runs and in 98 / 99; it is off in the pin actions.
   - **Reticle:** HUD 0x10b87b40 → 0x10339700 draws sprite 0xb6 at the screen centre. Frame 0 = repel possible, 1 = attract possible, 2 = neither. Scale = screen height / 720. No lock-on.
-  - **Port (aim view):** GU's gunner aim view for any class (C): the player byte +0x2716 (vt+0x1c8) gates the quest
-    camera's aim (0x23ebc) and the scope HUD (0x61e1f4 -> 0x61e834); 0x1baa4(camera manager, 0x2a0520(p)) starts
-    the camera's aim. ms_act.c aim_view sets them while the aim flag is on (local hunter, not pinned). Deviations:
-    GU's offsets, look speed and crosshair (MHF's reticle frames not drawn).
+  - **Look (C, 0x1033a880 re-traced 2026-11-11):** each tick the camera controls (commands 0x20 / 0x21 / 0x22 /
+    0x23 held: digital, no tilt scaling; MHF's invert options 0x1082f610 / 0x1082f660) step the camera's own yaw by
+    0x240 and its pitch by 0x160. The pitch starts from the camera's (0x1033a750) and is clamped −0x12e4..+0xd1c
+    (camera setting 0; other settings / distances move the bounds). The hunter's body does not turn; the shot's
+    start (82 / 84) turns him to the camera's yaw.
+  - **Port (aim view):** GU's gunner aim view, any class (C):
+    - The player byte +0x2716 (vt+0x1c8) gates the quest camera's aim (0x23ebc) and the scope HUD. 0x1baa4(camera
+      manager, 0x2a0520(p)) starts the camera's aim (+0xacc on, mode +0xac8, settled +0xa60).
+    - **Same-update clear (tests 18-21: no crosshair, no aim camera):** 0x29fb8c, at the end of the player update
+      0x29b8e8 (slot 139 runs earlier, inside 0x27c97c), clears the byte and +0x2714 every update for a drawn hunter
+      that is no bowgun (0x27c7ec kind 0) outside common actions 1/97-98 (0x29fe90). The camera saw 0 and ended its
+      aim in the first frame. Fix: slot 45 (+0xb4, called right after 0x29fb8c) sets the byte and the pitch again and
+      calls 0x1baa4 (a no-op while +0xacc is on; it restarts the aim after GU's 0x2a0624 ends it on an action change).
+    - **Scope widget:** cUIOQuestScope (layer 7) is made for every class by 0x6658ec; the Charge Blade redirect
+      (0x665ad8, layers 5 / 6 / 0x10) does not touch it. Update 0x61e1f4: 0x61e438 gives state 8 for class 5 (vt+0x1c4
+      / 0x6e0 / 0x6e4 / 0x558 all 0), then byte 1 -> +0x4c 1 -> 0x61e834 with +0x58 0 = element 0 (the crosshair)
+      shown, element 1 (gauge) off.
+    - **Camera mode 0** (0x23f24, every frame): yaw +0x9dc = hunter +0x14a0 + 0x8000, pitch +0x9d8 = (s16) +0x2714,
+      then vt+0x410(p, out, 0). +0x14a0 is the turn target (GU writes it with +0xfec; GU's gunner look 0x2a07a8 ->
+      0x2a1738 puts body yaw + look there, so bowgunners turn). Ours (slot 260) writes the look into +0x9dc / +0x9d8
+      instead: the hunter does not turn (MHF). Releasing the aim: 0x23ebc copies +0x9d8 / +0x9dc into the normal
+      camera's +0x9e0 / +0x9e4 / +0x9e8 / +0x9ec, so it keeps the aimed view.
+    - **Look input:** GU's aim reader 0x27d5c4(p, source 1) = the stick at +0x140c angle / +0x1410 magnitude (pad
+      +0x6bac / +0x6bb0, 0x2a7b14), the one 0x2a07a8 reads alone while the hunter can walk aimed (the move stick
+      +0x140e / +0x1412 is source 2): the right stick. dirs 4 / 8 = yaw + / −, 1 / 2 = pitch + / − (0x2a07a8, VSELEQ
+      at 0x2a154c), after GU's invert options (vt+0x1b0 0x400000 inside, global *0x188ca48 +0x66 in 0x2a07a8, both
+      applied). Steps per MHF tick (tick_len): 0x240 yaw, 0x160 pitch.
+    - Deviations: GU's over-the-shoulder offsets (camera preset 6) and crosshair (MHF's reticle frames not drawn,
+      below); the pitch starts level, not from the camera's (GU's pitch sense against the view not traced); the
+      pitch is clamped ±0xd1c, since which of MHF's bounds (−0x12e4 / +0xd1c) is up in GU's sense is not traced (G).
+    - **MHF's reticle (open):** not drawn. The texture-swap path used for the gauge (ms_class.c hud_look) would
+      need: the scope .gui that 0x61def4 picks (table by a global byte +0xa5, 1..6), the texture entry of element
+      0's sprite (static parse as tools/mshud.py does for hud14_chargeAx), an atlas with MHF's three frames, the
+      attract / repel range test per update (not re-traced in MHF), and a per-frame swap. GU's crosshair is the
+      stand-in.
   - **"Launcher":** not a model. The weapon is one mesh with no part scaling; the shot and effect 0x312 (event 17's task 0x3c, 0x1004d700) both come from bone 18, the −x hand.
 - Shot (82 / 84; 0x103333a0, 0x101e8de0 / 0x101e9070 / 0x101eb540, C):
   - **Start:** the hunter takes the camera yaw; the direction = normalize(look-at − eye), pitch included.
@@ -216,7 +247,14 @@ scaled), GS's charge flash as the cue.
     - shot_step every tick: the swept segment against each large monster's hurt volumes, placed by GU's 0x16de70 from bodydata 0x710b0 (push-only records skipped);
     - the surface point toward the shot goes into that joint's frame (joint_mat); marker() rebuilds it from the joint each tick;
     - deviations (S): GU's marker flash every 2 ticks as the shot's look, no wall test (ground − 300 instead);
-    - not done: the reticle and the aim camera.
+    - the aim camera: "Port (aim view)" above (test 22); the reticle: GU's crosshair, MHF's frames open.
+    - test 21 (C by elimination, ms_act.c): a marker placed by a hit ended on the same tick ("alive 0"): the shot's
+      em_ok had just passed (in the manager, not small, HP > 0), so the area test (monster +0x1054 != the hunter's;
+      +0x1054 is the unit's area, as 0x53b500 / 0x42eac read it) ended it: the monster was in another area than the
+      hunter. The Instant Kill cheat cannot cause it (the shot deals no damage). The log line now names the failing part.
+    - looks (fc5:e on the marker, fc5:b on the shot): posted once and moved every update (0x32a45c), re-posted only
+      when the effect ended or the marker moved over 150 cm; tests 17-21 killed and re-posted them every tick and they
+      never showed (S, effect-posts.md "GU's post handle").
 - Ranges (3-D distance to the marker): attract 1400 < d < 4000, repel 0 < d < 1400.
 - Attraction (58 / 61 / 62 / 68 / 71 / 72; 0x10331780 start, 0x10332dd0 update, 0x10332ae0 steering, C; MS block =
   ext + 0x1c0):

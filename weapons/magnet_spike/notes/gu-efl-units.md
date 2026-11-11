@@ -220,6 +220,38 @@ GU corpus (11359 Model units): 564 scene mode, 10795 effect mode; cm123_041's sc
 4 of cm100_910 (5 meshes, groups 1 / 0 / 2 / 3 / 4). Check: `python3 weapons/magnet_spike/tools/effcheck.py ARC`
 replays these conditions (0 problems on GU's w00 / w04 / w13 and on efl4u2gu's em089_00 / em090_00 / em091_00).
 
+## Model transform, effect draw (static, 2026-11-11; C unless marked)
+Row vectors throughout (MT: v' = v . M, translation in row 3; 0x1ebe8 = A . B, C). Per particle (0xa956d8 mode 5 /
+0x1e -> 0xa6d3b4 -> 0xc90380 / 0xc90b50, which copies the matrix to the draw constants as is):
+**world = v . S . R . G100**, translation row replaced by the particle position (particle +0x20).
+- S = diag(particle +0xd0 x particle +0x40): unit +0x90 scale (value + r range, or the +0x132 curve) x size (+0x28, G
+  for the +0x40 source).
+- R = 0x321694(particle +0x60 rotation, order gen +0xe8 bits 16-19 = unit +0x100 bits 0-3; default 4 from 0xa59268).
+  Radians. Order 0 = v . Rx . Ry . Rz = column Rz Ry Rx (MHF's particle order, below); order 4 = v . Rz . Rx . Ry =
+  column Ry Rx Rz; 1-3, 5 decoded in 0x321694 too (not needed). Every MHF Model unit and the gun use order 0 (+0x100
+  = 0x60). Rotation init 0xa6adac: +0xd0 (value + r range) -> particle +0x60 / +0x70, speeds +0xe8 -> +0xa0; gen
+  +0x52 bit 3 (unit +0x1b) adds a random y, gen +0xec bit 11 (unit +4 bit 21) adds 0xa6a950's, gen +0xc1 bit 6
+  mirrors y / z (all clear in ours).
+- Unit +4 bit 18 (gen +0xec bit 13) swaps to R . S; gen +0x50 bit 17 (unit +0x1b bit 1) aligns to the emitter's motion
+  instead; particle flag 0x80 with gen +0xe8 bits 24-27 != 6 (unit +0x100 bits 4-7) takes a billboard axis (switch
+  in 0xa6d3b4): ours have +0x100 bits 4-7 = 6 and +4 = +0x1b = 0, so none applies.
+- **G100** (gen +0x100, 0xa5a0c4 each frame) = the emitter's rotation rows (gen +0x18 matrix) x effect +0x1a0..+0x1a8 x
+  effect +0x1b0 x gen +0xf8 (element +0x40, value + r range) x the slot scale (+0xe0..); identity rows when gen +0xec
+  bit 12 (unit +4 bit 20 / 21). The translation row of G100 is dropped.
+- Particle position (move kind 0, 0xa64a04): the emitter matrix x the spawn offset; kind 5: E (spawn + Rp curve(age))
+  (gu-efl-move.md).
+- **The emitter matrix** (effect slot 0x130 B, effect +0x1f4; 0x9be664 init, 0x9bea1c per frame) = slot local
+  (rotation from the slot quaternion +0x90 or Euler, translation +0x80 = the PEL record offset) . J, with J = the
+  owner's joint matrix: effect vt +0xec = 0x9c0020 -> owner vt +0x54; the hunter's = 0x27c40c: joint record +0x10
+  of `owner +0x494 + 0xa0 x ids[joint]` (owner +0x498), the owner's own matrix (+0xb0) for joint 0xffff. Mode = slot
+  +0x10c bits 16-19 (from the record): 3 = no owner, 2 = owner position with the local rotation, else the product
+  (rows normalised, their lengths kept as the slot scale). Hence a PEL post on joint j with offset o draws
+  v . S . R . (rows of T(o) R_rec J) at the particle position: **the model in the joint's frame, offset o in that
+  frame**, as MHF's bone-attached draw (S: that joint record +0x10 is the world matrix, as ms_act.c fx_fixed uses it).
+- Not traced: draw-time paths for mode 5 beyond the matrix (0xaef728, 0xbae520), the colour / alpha scaling in
+  0xc90b50 (alpha byte / constant), the material's lighting.
+Check: `python3 weapons/magnet_spike/tools/fxplace.py` replays this on the built arc against MHF's math.
+
 ## Main-agent decode (2026-11-04, C unless marked)
 - **Emit block = particle life** (0xaed0d0, called per new particle by 0xa5ca24 for emit-type high nibble 1 / 2):
   three u32 = (u16 frames, u16 random range) each: +0 fade-in A, +4 hold B (or a curve at the block +

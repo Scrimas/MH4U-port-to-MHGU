@@ -140,10 +140,30 @@ EVENT_POSTS = {
 #   the bone each tick: follows; 4 / 5 (0x1099a970) the bone's position snapped to the ground (0x108cbe30), fixed
 #   (5 also tests the ground's presence, 0x108cf000, not a gate). Kinds 0 / 1 = sounds (S: 0x11413d70 / 0x114252b0),
 #   8 = the face slots (0x1099af40 -> 0x10886860: blinks), not effects.
-# Modes: 'att' = a PEL record on the joint (follows); 'fix' = posted at the joint's world point and rotation at that
-# frame (ms_act.c); 'gnd' = at the joint's point on the ground, the hunter's yaw. MHF's d (3 / 4 = position only +
-# the hunter's yaw, 5 = no update) is left out: S deviation for those rows (they follow the joint's rotation).
+# d = the rotation the key's effect task reads (0x1099a720 for the fixed kinds 2 / 4 / 5 / 6, the switch in
+# 0x1099a890 / 0x1099ae30 for the attached 3 / 7; C, 2026-11-11): 0 = the bone's Euler angles (fixed kinds: of the
+# matrix copied at the key, 0x1146b050; attached: re-read each tick, 0x1146ac30); 1 = the bone's yaw only (0x1146b0b0
+# / 0x1146aca0); 2 = the copied / bone matrix's rotation rows (0x1099a700 / 0x1099a6d0 -> 0x1099a3d0, S: = 0);
+# 3 = (0, the hunter's yaw P+0xa4, 0): fixed kinds store it at the key (task +0x54, 0x1146b370), attached ones read
+# it each tick (0x1146af70); 4 = the same + 0x4000 = 90 deg (0x1146afb0); 5 = no rotation getter. The ground kinds
+# 4 / 5 (0x1099a970) copy RotY(the bone's yaw) at the bone's point snapped to the ground, so their d 0 / 2 = the
+# bone's yaw. Magnet Spike keys (mhfdat): kind 7 d0 x124, kind 6 d0 x34 / d2 x5 / d3 x20, kind 5 d0 x18 / d2 x2 /
+# d3 x3 / d4 x2; no kind 2 / 3 / 4, no d 1 / 5.
+# Modes: 'att' = a PEL record on the joint (follows it fully: kind 7 d 0); 'fix' = posted at the joint's world point
+# (+ the offset in its frame) with the joint's rotation at that frame (ms_act.c fx_fixed; kind 6 d 0 / 2); 'fixyaw'
+# / 'fixyaw90' = the same point with the rotation (0, the hunter's yaw [+ 90 deg], 0) (kind 6 d 3 / 4); 'gnd' /
+# 'gnd90' = the joint's point on the ground, the hunter's yaw [+ 90 deg] (kinds 4 / 5; d 0 / 2 / 3 -> 'gnd': the
+# bone's yaw read as the hunter's, S for bone 0 = the root, the only bone our ground keys use).
 KEY_KINDS = {2: 'fix', 3: 'att', 4: 'gnd', 5: 'gnd', 6: 'fix', 7: 'att'}
+
+
+def key_mode(kind, d):
+    """the port's mode for an MHF effect key (kind, follow mode d)"""
+    if kind in (3, 7):
+        assert d == 0, 'attached key with follow mode %d: not ported' % d
+        return 'att'
+    if kind in (4, 5): return 'gnd90' if d == 4 else 'gnd'
+    return {3: 'fixyaw', 4: 'fixyaw90'}.get(d, 'fix')
 
 
 def motion_keys(dat, weapon_type=13):
@@ -158,7 +178,7 @@ def motion_keys(dat, weapon_type=13):
             f, kind, a, b, c, d, x, y, z = struct.unpack_from('<HHHHBBhhh', dat, ptr + 16 * j)
             if kind in KEY_KINDS:
                 off = (x, y, z) if kind in (6, 7) else (0, 0, 0)
-                out.append((('mot', mot), f, (a, b), c, off, 0, KEY_KINDS[kind]))
+                out.append((('mot', mot), f, (a, b), c, off, 0, key_mode(kind, d)))
     return out
 
 

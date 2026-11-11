@@ -206,9 +206,35 @@ static float seg_seg(const float *a0, const float *a1, const float *b0, const fl
     return d;
 }
 
-static void fx_at(uint8_t *p, uint32_t k, uint32_t n, const float *t, const float *rot, void **h);
-static void fx_stop(void **h);
+struct ms_carrier;
+static void fx_at(uint8_t *p, uint32_t k, uint32_t n, const float *t, const float *rot, struct ms_carrier *c);
+static void fx_stop(struct ms_carrier *c, const char *why);
 static void shot_dir_deg(const struct ms_state *s, float r[3]);
+
+/* test 22 diagnostic, on a miss: the closest pass to a tested hurt volume, then every monster in the manager with
+ * em_ok's gates (spawned +0xb5f9, active +0x7652 == 1, small +0xb5f7, record +0x1a0 / +0x444, HP +0x370), its area
+ * (+0x1054) and how far its origin is from the shot's line (cm off the line, cm along it) */
+static void shot_miss_log(struct ms_state *s)
+{
+    if (s->shot_near < 1e29f)
+        logf("msport: marker shot: closest pass %d cm from a hurt volume of monster %x joint %u at tick %d",
+             (int)s->shot_near, (uint32_t)(uintptr_t)s->shot_near_m, s->shot_near_j, (int)s->shot_near_t);
+    else logf("msport: marker shot: no hurt volume tested (no monster passed em_ok)");
+    void *mgr = MS_EM_MGR;
+    float n = root(dot3(s->shot_v, s->shot_v)), u[3];
+    if (n < 1e-3f) return;
+    for (int k = 0; k < 3; k++) u[k] = s->shot_v[k] / n;
+    for (int i = 0; mgr && i < 10; i++) {
+        uint8_t *m = MS_EM_GET(mgr, i), *r = m ? em_rec(m) : 0;
+        if (!m || !r) continue;
+        float w[3] = {FIELD(float, r, 0x40) - s->shot_o[0], FIELD(float, r, 0x44) - s->shot_o[1],
+                      FIELD(float, r, 0x48) - s->shot_o[2]}, along = dot3(w, u), off = root(dot3(w, w) - along * along);
+        logf("msport: marker shot: monster %u %x em %u ok %d (spawned %u active %u small %u rec %u/%u hp %d area %u)"
+             " origin %d cm off the line at %d cm", i, (uint32_t)(uintptr_t)m, FIELD(uint8_t, m, 0xb5f4), em_ok(m),
+             FIELD(uint8_t, m, 0xb5f9), FIELD(uint8_t, m, 0x7652), FIELD(uint8_t, m, 0xb5f7), FIELD(uint8_t, r, 0x1a0),
+             FIELD(uint8_t, r, 0x444), FIELD(int32_t, r, 0x370), FIELD(uint8_t, m, 0x1054), (int)off, (int)along);
+    }
+}
 
 /* one step of the shot from s->shot_p over tk ticks: 1 = it hit (marker placed), -1 = it ended, 0 = flying */
 static int shot_step(uint8_t *p, struct ms_state *s, float tk)
@@ -234,7 +260,16 @@ static int shot_step(uint8_t *p, struct ms_state *s, float tk)
             if (!ty) continue;
             const float *c1 = ty == 1 ? out : out + 4;
             float sa, sb, d = seg_seg(a0, a1, out, c1, &sa, &sb), rr = out[8] + SHOT_R;
-            if (d > rr * rr || sa >= best) continue;
+            if (d > rr * rr) {                          /* diag: the closest pass (gap between the shot's sphere
+                                                           and the volume's surface) */
+                float gap = root(d) - rr;
+                if (gap < s->shot_near) {
+                    s->shot_near = gap; s->shot_near_m = m; s->shot_near_t = s->shot_t + sa * tk;
+                    s->shot_near_j = (uint16_t)(ty != 1 && sb > 0.5f && r[1] != -1 ? r[1] : r[0]);
+                }
+                continue;
+            }
+            if (sa >= best) continue;
             best = sa; bm = m;
             bj = (uint16_t)(ty != 1 && sb > 0.5f && r[1] != -1 ? r[1] : r[0]);
             float ax[3], sp[3], n3[3], nl;                     /* the volume's surface toward the shot */
@@ -255,7 +290,7 @@ static int shot_step(uint8_t *p, struct ms_state *s, float tk)
                 float w[3] = {hit[0] - m[12], hit[1] - m[13], hit[2] - m[14]}, l2 = dot3(ax, ax);
                 s->mk_local[k] = l2 > 1e-9f ? dot3(w, ax) / l2 : 0;
             }
-        if (MS_FXQ_ON) { float t[3]; fx_stop(s->mk_fx); if (marker(s, t)) fx_at(p, MS_FXQ_MARKER, t, 0, s->mk_fx); }
+        if (MS_FXQ_ON) { float t[3]; fx_stop(&s->mk_c, "new marker"); if (marker(s, t)) fx_at(p, MS_FXQ_MARKER, t, 0, &s->mk_c); }
         float *q = pos_of(p);
         logf("msport: marker shot hit monster %x (em %u) joint %u at %d %d %d, %d cm away, after %d ticks",
              (uint32_t)(uintptr_t)bm, FIELD(uint8_t, bm, 0xb5f4), bj, (int)hit[0], (int)hit[1], (int)hit[2],
@@ -265,7 +300,9 @@ static int shot_step(uint8_t *p, struct ms_state *s, float tk)
     for (int k = 0; k < 3; k++) s->shot_p[k] = a1[k];
     s->shot_t += tk;
     if (s->shot_t >= SHOT_LIFE || s->shot_p[1] < MS_GROUND_Y(p) - 300.0f) {
-        logf("msport: marker shot missed (%d ticks, %d cm)", (int)s->shot_t, (int)(s->shot_t * SHOT_SPEED));
+        logf("msport: marker shot missed (%d ticks, %d cm, %s)", (int)s->shot_t, (int)(s->shot_t * SHOT_SPEED),
+             s->shot_t >= SHOT_LIFE ? "life over" : "300 cm under the ground");
+        shot_miss_log(s);
         return -1;
     }
     return 0;
@@ -280,12 +317,27 @@ static void marker_shot(uint8_t *p, struct ms_state *s)
         s->shot_p[k] = (h ? h[12 + k] : q[k] + (k == 1 ? 150.0f : 0)) + o[k];
         s->shot_v[k] = s->aim_dir[k] * SHOT_SPEED;
     }
-    s->shot_t = 0; s->shot_on = 1; s->trail_k = 0;
+    if (s->shot_on) {
+        logf("msport: marker shot replaced in flight (%d ticks)", (int)s->shot_t);
+        shot_miss_log(s);
+    }
+    s->shot_t = 0; s->shot_on = 1; s->trail_k = 0; s->shot_near = 1e30f; s->shot_near_m = 0;
     for (int k = 0; k < 3; k++) s->shot_o[k] = s->shot_p[k];
-    if (MS_FXQ_ON) { float r[3]; shot_dir_deg(s, r); fx_stop(s->shot_fx); fx_at(p, MS_FXQ_SHOT, s->shot_p, r, s->shot_fx); }
+    if (MS_FXQ_ON) { float r[3]; shot_dir_deg(s, r); fx_stop(&s->shot_c, "new shot"); fx_at(p, MS_FXQ_SHOT, s->shot_p, r, &s->shot_c); }
     logf("msport: marker shot from %d %d %d (hand %s), direction %d %d %d / 1000", (int)s->shot_p[0],
          (int)s->shot_p[1], (int)s->shot_p[2], h ? "joint 12" : "missing", (int)(s->aim_dir[0] * 1000),
          (int)(s->aim_dir[1] * 1000), (int)(s->aim_dir[2] * 1000));
+    uint8_t *cm = MS_CAM_MGR, *cam = cm ? FIELD(uint8_t *, cm, 0x54) : 0;
+    if (cam) {                                          /* diag: the camera now (the shot took its direction at the
+                                                           action start), the hunter's yaw, the aim view */
+        float d[3];
+        for (int k = 0; k < 3; k++) d[k] = FIELD(float, cam, 0x60 + 4 * k) - FIELD(float, cam, 0x40 + 4 * k);
+        float dn = root(dot3(d, d));
+        if (dn > 1)
+            logf("msport: marker shot: camera now %d %d %d / 1000, hunter yaw %d deg, aim view %u, scope byte %u",
+                 (int)(d[0] / dn * 1000), (int)(d[1] / dn * 1000), (int)(d[2] / dn * 1000),
+                 (int)(FIELD(uint16_t, p, 0xfec) * (360.0f / 65536.0f)), s->aim_view, MS_AIM_BYTE(p));
+    }
 }
 
 /* ------------------------------------------------------------------------------------------------ gauge, inputs */
@@ -383,6 +435,9 @@ static void shock_tick(uint8_t *p, struct ms_state *s, float tk)
 #define MARKER_BLINK 60.0f
 #define AURA_EVERY 45.0f
 
+static void fxw_add(void *h, uint32_t id);
+static void *post_n_w(uint8_t *p, uint32_t id, uint32_t n);
+
 static void *post_at(uint8_t *p, uint32_t id, const float *t, const float *rot_deg)   /* a PEL id at a world point */
 {
     uint32_t buf[0x100 / 4 + 4];
@@ -405,41 +460,83 @@ static void *post_at(uint8_t *p, uint32_t id, const float *t, const float *rot_d
     }
     void *h = ms_post(p, id, req);
     MS_REQ_DTOR(req);
+    fxw_add(h, id);
     return h;
 }
 
 static void *flash_at(uint8_t *p, const float *t) { return post_at(p, MS_EFX_MARKER, t, 0); }   /* GS's stand-in */
 
-/* MHF effects carried by a moving thing (msfxposts.EVENT_POSTS 'MARKER' / 'SHOT' / 'TRAIL' = ms_fxq rows k..k+n):
- * every record at the point (handles kept in h), moved every tick (MHF: attached to its special), stopped at its
- * end. S: one point for all records (their MHF base offsets are 0). */
-static void fx_at(uint8_t *p, uint32_t k, uint32_t n, const float *t, const float *rot, void **h)
+/* GU's post handle (C, ms_act.c "Effect build diagnostic"): a uMHProofEffect proxy (vtable MAIN 0x1731578), its PEL
+ * record = *(*(proxy+0x34 + proxy+0x40 x 0x14 + 0x74) + proxy+0x44 x 4), u16 +0x50 = the PEL id; unit state +0xc & 7
+ * (0 not yet run, 1 / 2 alive), byte +0x30 = 2 once killed. fx_mine: the handle is still the proxy we posted for
+ * `id` (the manager frees ended proxies and reuses their memory: tests 18-21 logged one handle for two posts) */
+#define FXW_PROXY_VT 0x1731578u
+#define FXW_EFF_VT 0x17317dcu
+static int fxw_ok(uint32_t v) { return v >= 0x10000000u && v < 0xf0000000u && !(v & 3); }
+static int fx_mine(void *hp, uint32_t id)
+{
+    uint32_t h = (uint32_t)(uintptr_t)hp, pel, list, idx, recs;
+    if (!fxw_ok(h) || FIELD(uint32_t, h, 0) != MAIN(FXW_PROXY_VT)) return 0;
+    if (!fxw_ok(pel = FIELD(uint32_t, h, 0x34)) || (list = FIELD(uint32_t, h, 0x40)) > 2) return 0;
+    if ((idx = FIELD(uint32_t, h, 0x44)) >= FIELD(uint32_t, pel + list * 0x14, 0x68)) return 0;
+    if (!fxw_ok(recs = FIELD(uint32_t, pel + list * 0x14, 0x74)) || !fxw_ok(FIELD(uint32_t, recs, idx * 4))) return 0;
+    uint32_t st = FIELD(uint32_t, h, 0xc) & 7;
+    return FIELD(uint16_t, FIELD(uint32_t, recs, idx * 4), 0x50) == id && st < 3 && FIELD(uint8_t, h, 0x30) < 2;
+}
+
+/* MHF effects carried by a moving thing (msfxposts.EVENT_POSTS 'MARKER' / 'SHOT' / 'TRAIL' / 'ATT_*' / 'REP_*' =
+ * ms_fxq rows k..k+n): every record posted at the point (kept in c when given). S: one point for all records (their
+ * MHF base offsets are 0). Logged: the first post of each carrier set and its first handle */
+static void fx_at(uint8_t *p, uint32_t k, uint32_t n, const float *t, const float *rot, struct ms_carrier *c)
 {
     int j = 0;
+    void *first = 0;
     for (uint32_t i = 0; i < n; i++)
         for (uint32_t r = 0; r < ms_fxq[k + i].n; r++) {
             void *x = post_at(p, ms_fxq[k + i].id + r, t, rot);
-            if (h && j < MS_FXH) h[j++] = x;
+            if (!first) first = x;
+            if (c && j < MS_FXH) { c->h[j] = x; c->id[j] = (uint16_t)(ms_fxq[k + i].id + r); j++; }
         }
-    static uint32_t s_seen;
-    if (!(s_seen & (1u << (k & 31))) && (s_seen |= 1u << (k & 31))) logf("msport: mhf carrier %u (%u rows) at %d %d %d: %x", k, n, (int)t[0], (int)t[1], (int)t[2],
-                         h ? (uint32_t)(uintptr_t)h[0] : 0);
+    if (c) { for (int i = 0; i < 3; i++) c->at[i] = t[i]; c->age = 0; }
+    static uint64_t s_seen;                             /* test 21: a 32-bit mask folded 32 / 34 onto 0 / 2, so the
+                                                           attraction's beam and rail posts were never logged */
+    if (k < 64 && !(s_seen & (1ull << k))) {
+        s_seen |= 1ull << k;
+        logf("msport: mhf carrier %u (%u rows, PEL %u) at %d %d %d: %x", k, n, n ? ms_fxq[k].id : 0, (int)t[0],
+             (int)t[1], (int)t[2], (uint32_t)(uintptr_t)first);
+    }
 }
 
-static void fx_stop(void **h)          /* kill (0x32a400 mode 1, em089_efx_kill): mode 0 only ends the emission, and
-                                           the marker / shot particles live 631-848 s (test 16: spheres left behind,
-                                           through area changes) */
+/* kill (0x32a400 mode 1 -> vt+0xa4 0x32a258: its effects' vt+0x40, state 2): mode 0 only ends the emission, and the
+ * marker / shot particles live 631-848 s (test 16: spheres left behind, through area changes). Only our own live
+ * proxies (fx_mine) */
+static void fx_stop(struct ms_carrier *c, const char *why)
 {
-    for (int j = 0; j < MS_FXH; j++) { if (ms_efx_alive(h[j])) MS_EFX_STOP(h[j], 1); h[j] = 0; }
+    static int s_n;
+    if (c->h[0] && s_n++ < 12)
+        logf("msport: mhf carrier PEL %u stopped (%s) after %d ticks, alive %d", c->id[0], why, (int)c->age,
+             fx_mine(c->h[0], c->id[0]));
+    for (int j = 0; j < MS_FXH; j++) { if (c->h[j] && fx_mine(c->h[j], c->id[j])) MS_EFX_STOP(c->h[j], 1); c->h[j] = 0; }
 }
 
-/* a carrier follows its point: its particles are emitted once, in world space, so moving the effect (0x32a45c) left
- * them at the spawn point (test 16); re-posted at the point every MHF tick instead, the previous one killed (S: their
- * UV scroll restarts each tick) */
-static void fx_follow(uint8_t *p, uint32_t k, uint32_t n, const float *t, const float *rot, void **h)
+/* a carrier follows its point: posted once, then moved there every update (0x32a45c writes the position of the
+ * proxy's effects +0x150 / +0x154, +0x40: GU's own beams move this way, em089_efx.c); re-posted only when its effect
+ * ended or the point moved more than `repost` cm from where it was posted (world-space particles stay where they were
+ * emitted: test 16). Tests 17-21 killed and re-posted it every tick: the proxy creates its effect only in its own
+ * start step (0x329908, after the post) and the effect builds on its first update (0x43ff4 -> 0x9bda64), so the next
+ * tick's kill came before any particle was drawn (S: the marker and the shot were never seen in tests 17-21, while
+ * test 16's moved version showed) */
+static void fx_follow(uint8_t *p, uint32_t k, uint32_t n, const float *t, const float *rot, struct ms_carrier *c,
+                      float repost, float tk)
 {
-    fx_stop(h);
-    fx_at(p, k, n, t, rot, h);
+    c->age += tk;
+    if (c->h[0] && fx_mine(c->h[0], c->id[0]) &&
+        sq(t[0] - c->at[0]) + sq(t[1] - c->at[1]) + sq(t[2] - c->at[2]) < repost * repost) {
+        for (int j = 0; j < MS_FXH; j++) if (c->h[j] && fx_mine(c->h[j], c->id[j])) MS_EFX_SET_POS(c->h[j], t, 0);
+        return;
+    }
+    if (c->h[0]) fx_stop(c, fx_mine(c->h[0], c->id[0]) ? "moved: re-posted" : "ended by itself: re-posted");
+    fx_at(p, k, n, t, rot, c);
 }
 
 static void dir_deg(const float *v, float r[3])  /* S: (pitch, yaw, 0) of a direction, GU's beam order */
@@ -453,7 +550,7 @@ static void shot_dir_deg(const struct ms_state *s, float r[3]) { dir_deg(s->shot
 
 static void fx_row(uint8_t *p, int k, int n, int i)  /* one row (PEL records on its joint) of an ms_fxq set */
 {
-    if (i < n) ms_post_n(p, ms_fxq[k + i].id, ms_fxq[k + i].n);
+    if (i < n) post_n_w(p, ms_fxq[k + i].id, ms_fxq[k + i].n);
 }
 
 /* Magnetise's look (MHF MS task 0xd / 0xe, 0x1004e3ab / 0x1004e59b / 0x1004e617, C; msfxposts 'MAGZ_*'): the flash at
@@ -495,6 +592,12 @@ static void att_carriers(uint8_t *p, struct ms_state *s, float tk)
     if (n < 1) return;
     for (int k = 0; k < 3; k++) d[k] /= n;
     s->att_all += tk;
+    if (!s->att_mark && s->att_all >= 1.0f) {           /* fc5 7 at the marker (f10 of 1069 / 1079 / 1414 / 1415 /
+                                                           1460 / 1472, 0x10335782; 58 starts 1472 at f8: 1 tick, S
+                                                           for the other attractions' start frames) */
+        s->att_mark = 1;
+        fx_at(p, MS_FXQ_ATT_MARK, t, 0, 0);
+    }
     if (s->att_all >= 8 && (s->rail_t -= tk) <= 0 && s->att_b > 500) {
         s->rail_t += 2;
         float r = 300 + 220 * s->rail_n;
@@ -533,27 +636,122 @@ static void rep_posts(uint8_t *p, struct ms_state *s, float tk)
 }
 
 /* the aim view: MHF's aim camera 0x1033a880 (over the shoulder, free look; on in idle / walk / runs, off in the pin
- * actions) and reticle 0x10339700 (sprite 0xb6 at the screen centre) -> GU's gunner aim view (ms.h MS_AIM_BYTE):
- * GU's own over-the-shoulder offsets and look speed, GU's crosshair (deviations: MHF's preset offset and its reticle
- * frames repel blue / attract red / neither white are not drawn). Local hunter only, as MHF (0x1033a270) */
+ * actions) and reticle 0x10339700 (sprite 0xb6 at the screen centre) -> GU's gunner aim view (ms.h MS_AIM_BYTE): the
+ * quest camera's aim mode 0 (GU's over-the-shoulder offsets) with MHF's look (aim_look), GU's crosshair (deviations:
+ * MHF's preset offset and its reticle frames repel blue / attract red / neither white are not drawn). Local hunter
+ * only, as MHF (0x1033a270). GU's 0x29fb8c clears the byte at the end of every update (ms.h): ms_after_update (slot
+ * 45, right after it) sets it again, so the camera and the scope HUD read 1 */
+static int aim_want(uint8_t *p, struct ms_state *s)
+{
+    return (s->flags & 1) && !(s->flags & 0x10) && MS_IS_LOCAL(p);
+}
+
+static uint8_t *quest_cam(void)                       /* the quest camera (0x1baa4's DTI walk), else 0 */
+{
+    uint8_t *cm = MS_CAM_MGR, *cam = cm ? FIELD(uint8_t *, cm, 0x54) : 0;
+    if (!cam) return 0;
+    uint8_t *d = ((uint8_t *(*)(void *))MS_VT(cam, 0x14))(cam);
+    uint32_t id = FIELD(uint32_t, MAIN(MS_DTI_QCAM), 4);
+    for (; d; d = FIELD(uint8_t *, d, 0x10)) if (FIELD(uint32_t, d, 4) == id) return cam;
+    return 0;
+}
+
+#define AIM_YAW_STEP 576.0f                             /* MHF 0x1033a880 (C): 0x240 per tick on the camera's yaw */
+#define AIM_PITCH_STEP 352.0f                           /* 0x160 per tick on its pitch */
+#define AIM_PITCH_MAX 3356.0f                           /* MHF clamps -0x12e4..+0xd1c (camera setting 0); the sign of
+                                                           MHF's pitch against GU's is not traced (G): +-0xd1c, the
+                                                           smaller side, holds in both senses */
+
+/* MHF's look (0x1033a880, C): each tick the camera controls (commands 0x20 / 0x21 / 0x22 / 0x23 held, digital: no
+ * tilt scaling) step the camera's yaw by 0x240 and its pitch by 0x160 (MHF's invert options 0x1082f610 / 0x1082f660),
+ * the pitch clamped; the hunter's body does not turn (the camera's own fields; the shot's start turns him, case 82 /
+ * 84 in ms_act). Port: GU's right stick through GU's own aim reader 0x27d5c4 (source 1) with GU's invert options, as
+ * GU's gunner look 0x2a07a8 does, at MHF's steps per MHF tick (tick_len) */
+static void aim_look(uint8_t *p, struct ms_state *s)
+{
+    uint32_t d = 0;
+    int16_t mag = 0;
+    if (MS_AIM_DIRS(p, 1, &d, &mag) != 1) d = 0;
+    uint8_t *o = MS_OPT_OBJ;
+    if (o) {
+        uint8_t inv = FIELD(uint8_t, o, 0x66);
+        if ((inv | 2) == 3) d = (d & ~3u) | (d & 1) << 1 | (d & 2) >> 1;
+        if ((inv & 0xfe) == 2) d = (d & ~12u) | (d & 4) << 1 | (d & 8) >> 1;
+    }
+    float tk = tick_len(p);
+    int dy = !!(d & 4) - !!(d & 8), dp = (d & 1) ? 1 : (d & 2) ? -1 : 0;
+    s->aim_yaw += dy * AIM_YAW_STEP * tk;
+    while (s->aim_yaw >= 65536.0f) s->aim_yaw -= 65536.0f;
+    while (s->aim_yaw < 0) s->aim_yaw += 65536.0f;
+    s->aim_pitch += dp * AIM_PITCH_STEP * tk;
+    if (s->aim_pitch > AIM_PITCH_MAX) s->aim_pitch = AIM_PITCH_MAX;
+    if (s->aim_pitch < -AIM_PITCH_MAX) s->aim_pitch = -AIM_PITCH_MAX;
+}
+
 static void aim_view(uint8_t *p, struct ms_state *s)
 {
-    int want = (s->flags & 1) && !(s->flags & 0x10) && MS_IS_LOCAL(p);
-    if (want) {
+    if (aim_want(p, s)) {
+        uint8_t *cm = MS_CAM_MGR, *cam = quest_cam();
         if (!s->aim_view) {
-            uint8_t *cm = MS_CAM_MGR;
             int mode = MS_AIM_MODE(p);
+            float y = FIELD(uint16_t, p, 0xfec);        /* MHF keeps the camera's yaw: the view's yaw, else the hunter's */
+            if (cam) {
+                float dx = FIELD(float, cam, 0x60) - FIELD(float, cam, 0x40), dz = FIELD(float, cam, 0x68) -
+                    FIELD(float, cam, 0x48);
+                if (dx * dx + dz * dz > 1) y = (float)yaw_to(dx, dz);
+            }
+            s->aim_yaw = y;
+            s->aim_pitch = 0;                           /* deviation: MHF starts from the camera's pitch (0x1033a750);
+                                                           GU's pitch sense against the view is not traced: level */
             MS_AIM_BYTE(p) = 1;
+            MS_AIM_PITCH(p) = 0;
             if (cm) MS_CAM_AIM(cm, mode);
+            s->aim_log = 10;
             static int s_n;
-            if (s_n++ < 10) logf("msport: aim view on (camera mode %d, manager %x)", mode, (uint32_t)(uintptr_t)cm);
+            if (s_n++ < 10) logf("msport: aim view on (camera mode %d, manager %x, quest camera %x, yaw %d deg)", mode,
+                                 (uint32_t)(uintptr_t)cm, (uint32_t)(uintptr_t)cam, (int)(y * (360.0f / 65536.0f)));
+        } else if (s->aim_log) {                        /* before 0x29fb8c: what the last update left (test 22) */
+            s->aim_log--;
+            logf("msport: aim tick: byte %u cam aim %u mode %u settled %u yaw %d deg pitch %d deg (+0x2714 %d)",
+                 MS_AIM_BYTE(p), cam ? FIELD(uint8_t, cam, 0xacc) : 0xff, cam ? FIELD(uint8_t, cam, 0xac8) : 0xff,
+                 cam ? FIELD(uint8_t, cam, 0xa60) : 0xff, (int)(s->aim_yaw * (360.0f / 65536.0f)),
+                 (int)(s->aim_pitch * (360.0f / 65536.0f)), MS_AIM_PITCH(p));
         }
-        MS_AIM_BYTE(p) = 1;                             /* 0x29fb8c clears it when the camera is not a quest camera */
+        MS_AIM_BYTE(p) = 1;
         s->aim_view = 1;
     } else if (s->aim_view) {
         MS_AIM_BYTE(p) = 0;                             /* the camera's 0x23ebc then ends its aim */
         s->aim_view = 0;
     }
+}
+
+/* slot 45 (+0xb4): GU's 0x281ef8, then the aim view again after 0x29fb8c's clear (ms.h): the byte, the pitch and the
+ * camera's aim (0x1baa4 returns at once while +0xacc is on; it restarts the aim after GU's 0x2a0624 ends it on an
+ * action change) */
+void ms_after_update(uint8_t *p)
+{
+    MS_AFTER_UPDATE_GU(p);
+    struct ms_state *s = ms_of(p);
+    if (!s->aim_view || !aim_want(p, s)) return;
+    aim_look(p, s);
+    MS_AIM_BYTE(p) = 1;
+    MS_AIM_PITCH(p) = (int16_t)s->aim_pitch;
+    uint8_t *cm = MS_CAM_MGR;
+    if (cm && quest_cam()) MS_CAM_AIM(cm, MS_AIM_MODE(p));
+}
+
+/* slot 260 (+0x410): the quest camera's aim mode 0 calls it right after setting its yaw +0x9dc / pitch +0x9d8 from
+ * the hunter (0x23f24): ours puts the look there (the camera looks along aim_yaw: +0x8000, as GU's own +0x14a0)
+ * instead of the turn target +0x14a0, so the hunter does not turn while aiming (MHF) */
+void ms_aim_cam(uint8_t *p, void *out, int k)
+{
+    MS_AIM_OFF_GU(p, out, k);
+    if (k) return;
+    struct ms_state *s = ms_of(p);
+    uint8_t *cam = s->aim_view ? quest_cam() : 0;
+    if (!cam || FIELD(uint8_t *, cam, 0x85c) != p || !FIELD(uint8_t, cam, 0xacc) || FIELD(uint8_t, cam, 0xac8)) return;
+    FIELD(uint32_t, cam, 0x9dc) = ((uint32_t)(int32_t)s->aim_yaw + 0x8000u) & 0xffffu;
+    FIELD(int32_t, cam, 0x9d8) = (int16_t)s->aim_pitch;
 }
 
 static void marker_blink(uint8_t *p, struct ms_state *s)
@@ -574,15 +772,17 @@ static void marker_blink(uint8_t *p, struct ms_state *s)
 static void *post_at(uint8_t *p, uint32_t id, const float *t, const float *rot_deg);
 static int joint_point(const uint8_t *u, uint32_t id, const int16_t *v, float t[3]);
 
-/* a fixed row (MHF per-motion keys 2 / 6 / 4 / 5, msfxposts.KEY_KINDS): the joint's world point (+ the offset in its
- * frame) and rotation at the key's frame, posted there once (MHF copies the bone matrix: the effect stays); mode 2 =
- * on the ground (MS_GROUND_Y) with the hunter's yaw (MHF 0x1099a970). Joint 0x80 | k = the drawn weapon's joint k
+/* a fixed row (MHF per-motion keys 2 / 6 / 4 / 5, msfxposts.key_mode): the joint's world point (+ the offset in its
+ * frame) at the key's frame, posted there once (MHF copies the bone matrix: the effect stays), with the rotation of
+ * the key's follow mode d (0x1099a720, C): mode 1 = the joint's (d 0 / 2), 3 / 4 = (0, the hunter's yaw [+ 90 deg],
+ * 0) (d 3 / 4: 0x1146b370 with the yaw stored at the key, + 0x4000 for d 4); mode 2 / 5 = on the ground
+ * (MS_GROUND_Y) with the hunter's yaw [+ 90] (0x1099a970). Joint 0x80 | k = the drawn weapon's joint k
  * (its model's joint records, part-0 object +0x23a0, test 6), 0xff = the hunter's own point */
 static void *fx_fixed(uint8_t *p, const struct ms_fxpost *f, uint32_t id)
 {
     const uint8_t *u = (f->joint & 0x80) && f->joint != 0xff ? FIELD(const uint8_t *, p, 0x23a0) : p;
     uint32_t j = f->joint == 0xff ? 0xffffffffu : f->joint & 0x7f;
-    float t[3], r[3] = {0, FIELD(uint16_t, p, 0xfec) * (360.0f / 65536.0f), 0};
+    float t[3], r[3] = {0, FIELD(uint16_t, p, 0xfec) * (360.0f / 65536.0f) + (f->mode == 4 || f->mode == 5 ? 90.0f : 0.0f), 0};
     const uint8_t *ids = u ? FIELD(const uint8_t *, u, 0x498) : 0, *js = u ? FIELD(const uint8_t *, u, 0x494) : 0;
     const float *m = (j != 0xffffffffu && ids && js && ids[j & 0xff] != 0xff) ? (const float *)(js + 0xa0 * ids[j & 0xff] + 0x10) : 0;
     if (m) {
@@ -601,45 +801,98 @@ static void *fx_fixed(uint8_t *p, const struct ms_fxpost *f, uint32_t id)
         const float *q = pos_of(p);
         for (int k = 0; k < 3; k++) t[k] = q[k];
     }
-    if (f->mode == 2) t[1] = MS_GROUND_Y(p);
+    if (f->mode == 2 || f->mode == 5) t[1] = MS_GROUND_Y(p);
     return post_at(p, id, t, r);
 }
 
-/* Test 21 diagnostic (the 3-D Model units never showed; C for the layout): an effect's build (0x9bda64) walks its
- * generators (effect +0x1f0, next = generator +0xc), calls each one's setup and ready check (vt +0x20 / +0x3c) and
- * marks the effect failed (+0xf0 bit 0x2000000) when one fails; a generator's runtime record = +0x28 (resource +0x70
- * + entry x 0x44: +0x14 EAN, +0x18 the Model's model, 0xa94b48), +0x46 its draw mode (0x1e / 5 Model draws,
- * 0xa956d8), +0xb0 its first live particle, +0x34 its unit. Model vtable 0x17907fc, Billboard 0x179017c, Polygon
- * 0x17908fc. Logged 2 and 12 ticks after the first 30 motion-row posts; pointers checked before every read.
- * Also: effect +0x118 (bit 0x1000000 = built, 0x9bda64), record +0 flags (0x10 model / 0x8 EAN not found, 0x2000 /
- * 0x1000 empty path, 0xb5bbec) and the live particle count (list +0xb0, next +4). */
-#define FXW_N 6
+/* Effect build diagnostic (test 22; the test-21 version read the post handle as the effect and printed garbage).
+ * C, GU 1.4 (notes/effect-posts.md "GU's post handle"): the post 0x282548 -> 0x53b500 -> 0x40978 returns a
+ * uMHProofEffect (0x350 B, ctor 0x41f10, vtable MAIN 0x1731578), the PROXY. 0x3267d0 finds the PEL record (PEL
+ * resource -> proxy +0x34, list +0x40, record index +0x44: record = *(*(PEL + list * 0x14 + 0x74) + index * 4), its
+ * u16 +0x50 = the PEL id, byte +0x5d -> proxy +0x158 = kind). The proxy's start step 0x329908 (vt +0x90, sub-step
+ * byte +0x31: 0 load -> 10 wait -> 0x14 -> 0x1e) loads the EFL (kind 0: resource +0x38, its +0x50 bit 0 = loaded,
+ * 0x10 = failed), then creates the EFFECT (vt +0x88 = 0x4260c: 0x500 B, vtable MAIN 0x17317dc) into +0x150 + 4 i,
+ * count +0x15c (kind 1: 0x42644 into +0x154 + 4 i); proxy byte +0x30 = 1 running, 2 killed (0x32a034 / 0x32a400),
+ * 3 ending (0x329dbc); unit state +0xc & 7 (1 / 2 alive). The effect's update (vt +0xd0 = 0x43ff4) builds it with
+ * 0x9bda64: no resource +0xf4 (or its u16 +0x74 count 0) -> +0xf0 |= 0x4000000; a generator's ready check (vt +0x3c)
+ * failing -> +0xf0 |= 0x2000000; built -> +0x118 |= 0x1000000; generators from +0x1f0, next +0xc. Generator fields
+ * (gu-efl-units.md, C): +0x28 runtime record (+0 flags: 0x10 model / 8 EAN not found, 0x2000 / 0x1000 empty path;
+ * +0x14 EAN, +0x18 model), +0x46 draw mode (Model: 5 / 0x1e effect draw, 0x37 scene), +0xed bit 2 scene mode (the
+ * Model ready check 0xa94b48 skips its material test then), +0xb0 live particles (next +4). Vtables Model 0x17907fc,
+ * Billboard 0x179017c, Polygon 0x17908fc.
+ * Every check failing prints "invalid" with the reason instead of reading on. Up to FXW_IDS PEL ids, the first post
+ * of each (motion rows, queued posts, carriers, Magnetise), dumped 2 and 12 updates after the post; generators summed
+ * per class (a generator with record flags gets its own line). */
+#define FXW_N 24
+#define FXW_IDS 128
 static struct { void *h; uint16_t id; uint8_t t, used; } s_fxw[FXW_N];
-static int fxw_ok(uint32_t v) { return v >= 0x10000000u && v < 0x80000000u && !(v & 3); }
+static uint16_t s_fxw_ids[FXW_IDS]; static uint8_t s_fxw_cnt[FXW_IDS];
 static void fxw_add(void *h, uint32_t id)
 {
-    static int n;
-    if (!h || n >= 30) return;
+    if (!h) return;
+    int k = 0;
+    while (k < FXW_IDS && s_fxw_cnt[k] && s_fxw_ids[k] != id) k++;
+    if (k == FXW_IDS || s_fxw_cnt[k] >= 1) return;
     for (int i = 0; i < FXW_N; i++)
-        if (!s_fxw[i].used) { s_fxw[i].h = h; s_fxw[i].id = (uint16_t)id; s_fxw[i].t = 0; s_fxw[i].used = 1; n++; return; }
+        if (!s_fxw[i].used) {
+            s_fxw[i].h = h; s_fxw[i].id = (uint16_t)id; s_fxw[i].t = 0; s_fxw[i].used = 1;
+            s_fxw_ids[k] = (uint16_t)id; s_fxw_cnt[k]++;
+            return;
+        }
 }
 static void fxw_dump(int i)
 {
-    uint32_t e = (uint32_t)(uintptr_t)s_fxw[i].h;
-    if (!fxw_ok(e)) return;
-    uint32_t g = FIELD(uint32_t, e, 0x1f0);
-    logf("msport: fxwatch %u t%u eff %x flags %x built %x res %x gens %x", s_fxw[i].id, s_fxw[i].t, e,
-         FIELD(uint32_t, e, 0xf0), FIELD(uint32_t, e, 0x118), FIELD(uint32_t, e, 0xf4), g);
-    for (int k = 0; k < 24 && fxw_ok(g); k++) {
-        uint32_t vt = FIELD(uint32_t, g, 0), rec = FIELD(uint32_t, g, 0x28);
-        uint32_t ean = fxw_ok(rec) ? FIELD(uint32_t, rec, 0x14) : 0, mdl = fxw_ok(rec) ? FIELD(uint32_t, rec, 0x18) : 0;
-        uint32_t rfl = fxw_ok(rec) ? FIELD(uint32_t, rec, 0) : 0, part = FIELD(uint32_t, g, 0xb0);
-        int live = 0;
-        for (uint32_t q = part; fxw_ok(q) && live < 999; q = FIELD(uint32_t, q, 4)) live++;
-        logf("msport: fxwatch %u  gen %d vt %x mode %x ed %x rec %x rflags %x ean %x model %x part %x live %d",
-             s_fxw[i].id, k, vt - MAIN_BASE, FIELD(uint8_t, g, 0x46), FIELD(uint8_t, g, 0xed), rec, rfl, ean, mdl,
-             part, live);
-        g = FIELD(uint32_t, g, 0xc);
+    uint32_t h = (uint32_t)(uintptr_t)s_fxw[i].h, id = s_fxw[i].id, t = s_fxw[i].t;
+    const char *bad = 0;
+    uint32_t pel = 0, list = 0, idx = 0, rec = 0, n = 0;
+    if (!fxw_ok(h)) bad = "handle";
+    else if (FIELD(uint32_t, h, 0) != MAIN(FXW_PROXY_VT)) bad = "proxy vtable (freed or reused)";
+    else if (!fxw_ok(pel = FIELD(uint32_t, h, 0x34)) || (list = FIELD(uint32_t, h, 0x40)) > 2) bad = "PEL";
+    else if ((idx = FIELD(uint32_t, h, 0x44)) >= (n = FIELD(uint32_t, pel + list * 0x14, 0x68)) ||
+             !fxw_ok(FIELD(uint32_t, pel + list * 0x14, 0x74)) ||
+             !fxw_ok(rec = FIELD(uint32_t, FIELD(uint32_t, pel + list * 0x14, 0x74), idx * 4))) bad = "PEL record";
+    else if (FIELD(uint16_t, rec, 0x50) != id) bad = "PEL id (proxy reused)";
+    if (bad) { logf("msport: fxwatch %u t%u proxy %x invalid: %s", id, t, h, bad); return; }
+    uint32_t res = FIELD(uint32_t, h, 0x38), kids = FIELD(uint32_t, h, 0x15c), kind = FIELD(uint8_t, h, 0x158);
+    logf("msport: fxwatch %u t%u proxy %x unit %u state %u step %u kind %u efl %x (flags %x) effects %u",
+         id, t, h, FIELD(uint32_t, h, 0xc) & 7, FIELD(uint8_t, h, 0x30), FIELD(uint8_t, h, 0x31), kind, res,
+         fxw_ok(res) ? FIELD(uint32_t, res, 0x50) : 0, kids);
+    if (kind != 0 || kids > 2) return;
+    for (uint32_t c = 0; c < kids; c++) {
+        uint32_t e = FIELD(uint32_t, h, 0x150 + 4 * c);
+        if (!fxw_ok(e) || FIELD(uint32_t, e, 0) != MAIN(FXW_EFF_VT)) {
+            logf("msport: fxwatch %u  effect %u %x invalid: vtable", id, c, e);
+            continue;
+        }
+        uint32_t f = FIELD(uint32_t, e, 0xf0), r = FIELD(uint32_t, e, 0xf4), g = FIELD(uint32_t, e, 0x1f0);
+        /* which build step stopped (0x9bda64, C): 0x9bdc68 creates the generators (per-class 0x1d0-B allocations,
+           count +0x1e0 lo16; a null one sets 0x2000000, a failed init 0x4000000), 0x9be320 allocates one work block
+           (+0x1f4: distinct slots x 0x130 + the generators' +0x20 sizes; null -> 0x2000000), 0x9be664 inits each
+           slot (count +0x1e4; one failing -> 0x2000000), then the ready checks (one failing -> 0x2000000) */
+        logf("msport: fxwatch %u  effect %u %x unit %u %s%s%s res %x (%u entries): gens %u, block %x, slots %u", id,
+             c, e, FIELD(uint32_t, e, 0xc) & 7, FIELD(uint32_t, e, 0x118) & 0x1000000 ? "built" : "not built",
+             f & 0x2000000 ? ", failed (0x2000000)" : "", f & 0x4000000 ? ", no resource / init (0x4000000)" : "",
+             r, fxw_ok(r) ? FIELD(uint16_t, r, 0x74) : 0, FIELD(uint16_t, e, 0x1e0), FIELD(uint32_t, e, 0x1f4),
+             FIELD(uint16_t, e, 0x1e4));
+        /* generators summed per class (count / scene mode / live particles), any with record flags printed */
+        static const uint32_t s_vt[3] = {0x17907fc, 0x179017c, 0x17908fc};
+        static const char *const s_cn[4] = {"Model", "Billboard", "Polygon", "other"};
+        int cnt[4] = {0}, scene[4] = {0}, live[4] = {0}, k = 0;
+        for (; k < 32 && g; k++) {
+            if (!fxw_ok(g)) { logf("msport: fxwatch %u   gen %d %x invalid: pointer", id, k, g); break; }
+            uint32_t v = FIELD(uint32_t, g, 0) - MAIN_BASE, gr = FIELD(uint32_t, g, 0x28), part = FIELD(uint32_t, g, 0xb0);
+            int c = v == s_vt[0] ? 0 : v == s_vt[1] ? 1 : v == s_vt[2] ? 2 : 3, n = 0;
+            for (uint32_t q = part; fxw_ok(q) && n < 999; q = FIELD(uint32_t, q, 4)) n++;
+            cnt[c]++; live[c] += n; scene[c] += (FIELD(uint8_t, g, 0xed) >> 2) & 1;
+            uint32_t rf = fxw_ok(gr) ? FIELD(uint32_t, gr, 0) : 0xffffffffu;
+            if (rf & 0x3018)
+                logf("msport: fxwatch %u   gen %d %s mode %x rec flags %x (0x10 model / 8 EAN not found, 0x2000 / "
+                     "0x1000 empty path) ean %x model %x", id, k, s_cn[c], FIELD(uint8_t, g, 0x46), rf,
+                     fxw_ok(gr) ? FIELD(uint32_t, gr, 0x14) : 0, fxw_ok(gr) ? FIELD(uint32_t, gr, 0x18) : 0);
+            g = FIELD(uint32_t, g, 0xc);
+        }
+        logf("msport: fxwatch %u   %d gens: Model %d (scene %d, live %d), Billboard %d (live %d), Polygon %d (live %d),"
+             " other %d (live %d)", id, k, cnt[0], scene[0], live[0], cnt[1], live[1], cnt[2], live[2], cnt[3], live[3]);
     }
 }
 static void fxw_tick(void)
@@ -650,6 +903,13 @@ static void fxw_tick(void)
         if (s_fxw[i].t == 2 || s_fxw[i].t == 12) fxw_dump(i);
         if (s_fxw[i].t >= 12) s_fxw[i].used = 0;
     }
+}
+/* ms_post_n with every record watched (one PEL record per MHF base-offset group: each its own proxy) */
+static void *post_n_w(uint8_t *p, uint32_t id, uint32_t n)
+{
+    void *h = 0;
+    for (uint32_t k = 0; k < n; k++) { void *x = ms_post(p, id + k, p + 0x2550); fxw_add(x, id + k); if (!h) h = x; }
+    return h;
 }
 
 static void fx_posts(uint8_t *p, struct ms_state *s)
@@ -676,9 +936,8 @@ static void fx_posts(uint8_t *p, struct ms_state *s)
         if (!MS_REACHED(p, (float)f->frame)) continue;
         s->fx_done[k >> 3] |= 1 << (k & 7);
         void *h = 0;
-        if (f->mode) for (uint32_t r = 0; r < f->n; r++) h = fx_fixed(p, f, f->id + r);
-        else h = ms_post_n(p, f->id, f->n);
-        fxw_add(h, f->id);
+        if (f->mode) for (uint32_t r = 0; r < f->n; r++) { void *x = fx_fixed(p, f, f->id + r); if (!h) h = x; }
+        else h = post_n_w(p, f->id, f->n);
         static int s_log;
         if (s_log++ < 400)
             logf("msport: mhf effect %u x%u at motion %u f%u (action %u, gate %u, mode %u joint %x): %x", f->id, f->n,
@@ -690,7 +949,7 @@ static void fx_queue(uint8_t *p, struct ms_state *s, int k, int n)
 {
     for (int i = k; i < k + n; i++) {
         const struct ms_fxq *q = &ms_fxq[i];
-        if (!q->delay) { ms_post_n(p, q->id, q->n); continue; }
+        if (!q->delay) { post_n_w(p, q->id, q->n); continue; }
         for (int j = 0; j < MS_FXQ_MAX; j++)
             if (s->fxq_t[j] <= 0) { s->fxq_t[j] = q->delay; s->fxq_id[j] = q->id; s->fxq_n[j] = q->n; break; }
     }
@@ -700,7 +959,7 @@ static void fx_queue(uint8_t *p, struct ms_state *s, int k, int n)
 static void fx_queue_tick(uint8_t *p, struct ms_state *s, float tk)
 {
     for (int j = 0; j < MS_FXQ_MAX; j++)
-        if (s->fxq_t[j] > 0 && (s->fxq_t[j] -= 2 * tk) <= 0) { s->fxq_t[j] = 0; ms_post_n(p, s->fxq_id[j], s->fxq_n[j]); }
+        if (s->fxq_t[j] > 0 && (s->fxq_t[j] -= 2 * tk) <= 0) { s->fxq_t[j] = 0; post_n_w(p, s->fxq_id[j], s->fxq_n[j]); }
 }
 
 static void tick(uint8_t *p, struct ms_state *s, float tk)
@@ -722,18 +981,19 @@ static void tick(uint8_t *p, struct ms_state *s, float tk)
                 for (int k = 0; k < 3; k++) q[k] = s->shot_o[k] + s->shot_v[k] * d;
                 fx_at(p, MS_FXQ_TRAIL, q, rot, 0);
             }
-            if (r) fx_stop(s->shot_fx); else fx_follow(p, MS_FXQ_SHOT, s->shot_p, rot, s->shot_fx);
+            if (r) fx_stop(&s->shot_c, r == 1 ? "shot hit" : "shot ended"); else fx_follow(p, MS_FXQ_SHOT, s->shot_p, rot, &s->shot_c, 1e9f, tk);
         }
         if (r) s->shot_on = 0;
         else if (!MS_FXQ_ON && (int)(s->shot_t * 0.5f) != (int)((s->shot_t - tk) * 0.5f)) flash_at(p, s->shot_p);   /* every
                                                            2 ticks (MHF: special #9 trail posts at 100..1500 cm) */
     }
-    if (s->mk_mon && MS_FXQ_ON && (s->mk_fx_t += tk) >= 1.0f) {   /* MHF: fc5:e follows it, once per tick */
+    if (s->mk_mon && MS_FXQ_ON) {                      /* MHF: fc5:e attached to the marker (special #2) */
         float t[3];
-        s->mk_fx_t = 0;
-        if (marker(s, t)) fx_follow(p, MS_FXQ_MARKER, t, 0, s->mk_fx);
+        if (marker(s, t)) fx_follow(p, MS_FXQ_MARKER, t, 0, &s->mk_c, 150.0f, tk);
     }
-    else if (s->mk_mon && (s->mk_blink -= tk) <= 0) { s->mk_blink = MARKER_BLINK; marker_blink(p, s); }
+    else if (!MS_FXQ_ON && s->mk_mon && (s->mk_blink -= tk) <= 0) { s->mk_blink = MARKER_BLINK; marker_blink(p, s); }   /* GS's
+                                                           stand-in only without the MHF effects (test 21: it also
+                                                           ran every other update beside them) */
     if (MS_FXQ_ON) { magz_look(p, s, tk); att_carriers(p, s, tk); rep_posts(p, s, tk); }
     else if (s->mag[s->mode] == 1 && ms_drawn(p) && (s->aura_t -= tk) <= 0) {
         s->aura_t = AURA_EVERY;
@@ -749,9 +1009,17 @@ static void tick(uint8_t *p, struct ms_state *s, float tk)
     if (s->mk_mon) {
         if (!s->att) s->mk_t -= tk;                     /* frozen during the attraction */
         if (s->mk_t <= 0 || !em_alive(s->mk_mon, p)) {
-            logf("msport: marker gone (%d ticks left, alive %d)", (int)s->mk_t, em_alive(s->mk_mon, p));
+            uint8_t *mr = em_rec(s->mk_mon);            /* em_alive's parts (the pointer is still in the manager
+                                                           or the record read is skipped) */
+            int inmgr = 0;
+            void *mgr = MS_EM_MGR;
+            for (int i = 0; mgr && i < 10; i++) if (MS_EM_GET(mgr, i) == s->mk_mon) inmgr = 1;
+            logf("msport: marker gone (%d ticks left, alive %d: in manager %d, small %u, hp %d, area %u, hunter area %u)",
+                 (int)s->mk_t, em_alive(s->mk_mon, p), inmgr, inmgr ? FIELD(uint8_t, s->mk_mon, 0xb5f7) : 0,
+                 inmgr && mr ? FIELD(int32_t, mr, 0x370) : 0, inmgr ? FIELD(uint8_t, s->mk_mon, 0x1054) : 0,
+                 FIELD(uint8_t, p, 0x1054));
             s->mk_mon = 0;
-            fx_stop(s->mk_fx);
+            fx_stop(&s->mk_c, "marker gone");
         }
     }
     if (!ms_drawn(p)) { s->mode = 0; s->flags &= ~(1u | 0x8000u); }
@@ -1374,7 +1642,7 @@ static void action_start(uint8_t *p, struct ms_state *s, const struct ms_action 
         s->att = 1; s->att_t = 0; s->flags |= 0x1000;
         att_start(p, s, t);
         s->att_all = 0; s->rail_t = 0; s->beam_t = 0; s->rail_n = 0;
-        if (MS_FXQ_ON) fx_at(p, MS_FXQ_ATT_MARK, t, 0, 0);   /* fc5 7 at the marker (f10, 0x10335782) */
+        s->att_mark = 0;                                /* att_carriers: fc5 7 at the marker at f10 */
         set_air(p, s);
         break;
     case 66: case 67:                                   /* repulsion: face the marker, the motion pushes away */

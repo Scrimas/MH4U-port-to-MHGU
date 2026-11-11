@@ -88,7 +88,9 @@ FX_POSTS, FX_QUEUE = [], []   # MHF effect posts for ms_act.c (fx_post_tables)
 POST_BASE = 3000              # PEL ids of the MHF effect posts (msfxposts.py)
 
 
-MODES_FX = {'att': 0, 'fix': 1, 'gnd': 2}     # ms_act.c fx_posts: 0 PEL on its joint, 1 / 2 at a joint's world point
+MODES_FX = {'att': 0, 'fix': 1, 'gnd': 2, 'fixyaw': 3, 'fixyaw90': 4, 'gnd90': 5}   # ms_act.c fx_posts / fx_fixed: 0 PEL
+# on its joint; at a joint's world point with 1 its rotation, 3 / 4 (0, the hunter's yaw [+ 90], 0); 2 / 5 on the
+# ground, the hunter's yaw [+ 90] (msfxposts.key_mode)
 
 
 def fx_post_tables(acts, own, made, report, keys=(), wpose=None):
@@ -120,8 +122,13 @@ def fx_post_tables(acts, own, made, report, keys=(), wpose=None):
         key, frame, eff, bone, off, gate = row[:6]
         mode = row[6] if len(row) > 6 else 'att'
         if key[0] == 'act':
-            a = key[1]; mots = [m for kind, m, *_ in (acts[a]['steps'] if a < len(acts) else []) if kind in (3, 4, 5)]
-            mot = mots[0] if mots else None
+            # action-time rows (MHF task ticks from the action start): the first motion step starts at frame `start`
+            # and GU's motion frame (MS_REACHED) counts from there (attraction 1472 starts at f8: fc5 3 / 4 at t1 / t3
+            # = f10 / f14, they fired on the first update)
+            a = key[1]; mots = [(m, st) for kind, m, st, *_ in (acts[a]['steps'] if a < len(acts) else [])
+                                if kind in (3, 4, 5)]
+            mot, start = mots[0] if mots else (None, 0)
+            frame += start
         else:
             mot, a = key[1], key[2] if len(key) > 2 else 0xffff
         if mot not in own:
@@ -708,6 +715,11 @@ def main(report_only=False):
     # MHF's own effects (mhffx2gu.py): every posted MHF effect's convertible particles, in the class arc; the flashes
     # with an MHF counterpart (msfx.MHF_FX) post it instead of GS's stand-in
     mfx_on = os.environ.get('MS_MHF_FX', '1') != '0'
+    if mfx_on and posts:     # GS's swing crescents were stand-ins from before MHF's effects: with these on, no arc is
+        # posted (2026-11-11: test 21, they were part of what the maintainer called "the wrong ones"); the swing sounds stay
+        freport.append('arcs: GS stand-in crescents not posted (MHF effects on): %d posts on %d slots dropped' % (
+            sum(len(v[1]) for v in posts.values()), len(posts)))
+        posts, arcs = {}, []
     mfx_list = sorted(set(mhffx2gu.MS_EFFECTS) | set(msfxposts.effects(dat)))
     keys = msfxposts.motion_keys(dat)
     w13w_, wbones_, weapon_ = wdata[0], wdata[1], wdata[2]

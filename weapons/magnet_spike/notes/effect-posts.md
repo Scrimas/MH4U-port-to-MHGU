@@ -172,7 +172,15 @@ hunter update keys them per motion.
   1045, Finishing Slash 1035 and lead-ins 1406 / 1446 have no keys.
 - **Port:** msbuild.fx_post_tables (modes 'att' PEL on the joint, 'fix' / 'gnd' placed by ms_act.c fx_fixed at the
   joint's world point; weapon bones: 'att' on the holding hand at the bone's pose (msgrip), 'fix' on the drawn weapon's
-  joint). Deviation (S): MHF's follow modes 3 / 4 / 5 are treated as full follow.
+  joint). Follow mode d (C, 2026-11-11; msfxposts.key_mode): fixed kinds 2 / 4 / 5 / 6 set the task's rotation
+  getter (+0x64) in 0x1099a720: d 0 0x1146b050 (Euler of the copied matrix), 1 0x1146b0b0 (its yaw), 2 0x1099a700 ->
+  0x1099a3d0 (the copied rotation rows, S: = d 0), 3 0x1146b370 = (0, the hunter's +0xa4 yaw stored at the key, 0),
+  4 the same + 0x4000, 5 none; attached kinds 3 / 7 (0x1099a890 / 0x1099ae30): d 0 0x1146ac30 (the bone's Euler
+  each tick), 1 0x1146aca0, 2 0x1099a6d0, 3 0x1146af70 (the hunter's yaw each tick), 4 0x1146afb0 (+ 90 deg), 5
+  none. Ground kinds (0x1099a970) copy RotY(the bone's yaw) at the ground point. Our keys: kind 7 d0 x124, kind 6
+  d0 x34 / d2 x5 / d3 x20, kind 5 d0 x18 / d2 x2 / d3 x3 / d4 x2. Port: kind 7 = 'att' (full follow, right); kind 6
+  d3 = 'fixyaw' (ms_act.c fx_fixed mode 3: the joint's point, rotation (0, hunter yaw, 0)); kind 5 d4 = 'gnd90'
+  (mode 5). Kind 5 d 0 / 2 use the hunter's yaw for the bone's (bone 0 only, S).
 
 ## More code posts found (2026-11-05)
 | site | set:id | form | when | mark |
@@ -221,9 +229,52 @@ children.
 - **Not MS**: 0x101eb9d0 (0x1d via 0x113d6250) and 0x101ebe00 (0x13) sit in other objects' state tables (0x11933fe8,
   0x119340e4). 0x103362e0 is a rumble / flag helper for fc5 3 / 4 / 0x46 / 0x47.
 
+## GU's post handle and the effect build (C, GU 1.4, 2026-11-11)
+What the module's post (ms.h ms_post: 0x282548 -> 0x53b500 -> 0x40978) returns, and where the effect is:
+- **Proxy** = the handle: uMHProofEffect, 0x350 B (0x41cf4(0x350, 0x10), ctor 0x41f10 over the base 0x328900),
+  vtable MAIN 0x1731578. 0x3267d0 finds the record (index where the list's record u16 +0x50 == id) and 0x329308
+  stores PEL resource +0x34, list +0x40, record index +0x44, kind byte +0x158 = record +0x5d. Unit state +0xc & 7.
+- **Start step** 0x329908 (vt +0x90), sub-step byte +0x31: 0 loads the EFL (0x324300 -> +0x38; kind 1: 0x324588
+  -> +0x3c), 10 waits for its +0x50 bit 0 (loaded; 0x10 = failed), 0x14 vt +0x7c, 0x1e creates the effect (vt +0x88
+  = 0x4260c) into +0x150 + 4 i, count +0x15c (kind 1: vt +0x8c 0x42644 into +0x154 + 4 i), registers it
+  (0xc067ec), byte +0x30 = 1. Kill 0x32a400(h, 1) -> vt +0xa4 0x32a258 (each effect's vt +0x40), +0x30 = 2; ending
+  0x329dbc sets 3. 0x32a45c(h, pos, 0) writes the effects' +0x40 position.
+- **Effect** (the object 0x9bda64 builds): 0x500 B, base 0x3273f0, vtable MAIN 0x17317dc, +0x374 = its proxy; its
+  update vt +0xd0 = 0x43ff4 calls 0x9bda64: resource +0xf4 (u16 +0x74 entries) missing -> +0xf0 |= 0x4000000; a
+  generator's ready check (vt +0x3c) failing -> +0xf0 |= 0x2000000 (the whole effect: nothing of it draws);
+  built -> +0x118 |= 0x1000000; generators from +0x1f0 (next +0xc). The Model ready check 0xa94b48: skipped when
+  generator +0xed bit 2 (scene mode); else every material of the model (+0x84 count, vt +0x40) must pass 0xb91ef0
+  (its DTI +0x1c == one fixed material class's), then 0xa59ce4 (move kind 5 curve).
+- **Other build failures** (C, all set +0xf0 0x2000000 unless noted): 0x9bdc68 creates one generator per entry the
+  element mask keeps (vt +0xdc), each from its class's allocator (0x1d0 B: Billboard 0xa7b084, Polygon 0xa9c490,
+  Model 0xa9490c, ...; null -> 0x2000000; its init vt +0x18 failing -> 0x4000000), count +0x1e0 lo16; 0x9be320
+  allocates ONE work block +0x1f4 of (distinct emitter slots, keyed by generator +0x1c hi16) x 0x130 + the sum of
+  the generators' +0x20 sizes (+ 0x60 + 0xa5b584(resource +0x7c bits 4-7) when effect +0x1d0) from a heap (0x7aa47c
+  vt +0x1c; null -> 0x2000000); 0x9be664 inits each slot (0xaeb230 must return 1), count +0x1e4. None depends on
+  the Billboard / Model mix as such; the work block grows with the generator count and particle budgets (our mixed
+  effects are the largest: fc5:7 21 entries, fc5:38 19, fc5:1 17, fc5:4d 16). Heap and pool sizes not traced.
+- Consequence: tests 18-21's fxwatch read the proxy as the effect (garbage); ms_act.c fxw_* now follows proxy ->
+  effect -> generators with vtable and PEL-id checks ("invalid" otherwise).
+
+## Port vs MHF, found from test 21 (2026-11-11)
+- **GS's swing crescents still posted** (C): msfx.build gives every ported attack with a fitted arc a GS crescent
+  (PEL 1000+, class PSL kind 2: report "arcs: 36 records on 30 slots"), MHF effects or not. On the moves of test
+  21: 1045 (11 / 135, RB + Y), 1035 (the finisher's second motion, 152 / 154 / 155), 1034 (Guard Counter), the plain
+  1049 / 1050 / 1047 / 1051 / 1041 / 1043, not 1493 / 1494 (107 / 108).
+- **Finishing Slash without Magnetise** (C): MHF posts nothing on 1406 / 1446 / 1035 (code posts M only, no keys);
+  only 155's lead-in 1418 has keys (f2 fae:17 on bone 2, f12 faf:0 on weapon bone 0). The weapon effect and ground
+  impact of the reference video are then Magnetised posts (fc6:11, fc5:3 x 2, special #10's fc6:22) or another
+  source (S: the attack's hit data, not traced).
+- **'act' rows from frame 0** (C): msfxposts' ('act', a) rows give task ticks as frames from 0, but 58 / 61 / 62
+  start their motion 1472 at frame 8 (msact step start): fc5:3 (t1) and fc5:4 (t3) both post on the first update.
+  MHF: f10 / f14. Fix belongs in msbuild.fx_post_tables (frame += the first step's start for 'act' keys).
+- **Attraction fc5:7** (C): posted at the action start; MHF at f10 (0x10335782). Module now 1 tick after the start.
+
 ## Open
 - The meaning of the zero vector v in EFX, and the set flags word (0 at every MS site).
 - Where 0x1032bb60 (the weapon matrix used by the Magnetise carriers) points, and bone 10's place on the body.
 - The pin effects (0x101bc000..0x101be000, special #3): triggers and positions only partly read.
 - Special #10's carrier offset (0x101eb2b0) and the fc5:28 ground point's horizontal offset.
 - Whether TASK posts on non-local hunters show on this client (0x1146aa50 path).
+- The material class 0xb91ef0 compares with (GOT 0xb91f24 + 0xb91f14 -> a runtime DTI at MAIN 0x21293e8, not in
+  dump/gu_main/dti.pkl): needed to prove the MHF models' efx_blend material passes the effect-mode ready check.

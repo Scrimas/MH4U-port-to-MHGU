@@ -204,7 +204,16 @@ MHF's), the attach offset on GU's weapon bone, all 40 models.
     the pin's, event 17's hand piece (effect-posts.md "Not posted yet" in msfxposts.py);
   - spawn spread: the MHF base offset = the record's position, the range = GU's box spawn shape (element +0x78
     byte 0 = 1, extents +0x60 / +0x68 / +0x70: 0xa5e450 case 1, C);
-  - world-oriented MHF meshes -> GU Polygons (type 2, template w04.arc cm121_041 entry 2; layout C 0xa9ff8c:
+  - (2026-11-11) world-oriented 3-D meshes (not flat in x / y) -> GU Model units in effect draw on the mesh as a
+    model (mhffx2gu.model_unit, mhfmodel.py); MHF's particle matrix = S, then RotationX / Y / Z (0x113ce4d0 ->
+    0x10006ab0 / 0x10006a50 / 0x100069f0, D3DXMatrixMultiply on the right: column Rz Ry Rx, C) of the SUM of the
+    post's Euler angles and the A spawn rotation (0x113d3bd0, C), the A position turned by the post's yaw
+    (0x113d37e0, C); GU's = S . R(order 0 = the same Rz Ry Rx) . the emitter (gu-efl-units.md "Model transform").
+    Equal for a post without rotation (fxplace.py: <= 2 cm, the key times rounded to whole GU frames); with a
+    post yaw, MHF's Euler sum differs from GU's product wherever the spawn roll (z) is non-zero (S deviation);
+  - the shot's hand piece (msgun.py, 0x1004f7b0, C): v -> bone 18 (origin + R (S v + p)), R = Rz Ry Rx: the part
+    offset p is turned by the part's rotation (test 21 drew R S v + p: parts 15-50 cm apart, the barrel 90 deg off);
+  - (older, flat meshes) world-oriented MHF meshes -> GU Polygons (type 2, template w04.arc cm121_041 entry 2; layout C 0xa9ff8c:
     rotation x / y / z pairs +0x170, width / height +0x1c0 / +0x1c8 with curves +0x1b0 / +0x1b4); rotation order G;
   - MHF UV animation (modes 2-6) -> baked frames on one looping EAN entry (flags 3, speed = 1 / frames per cell):
     flipbooks exact, scrolls as SCROLL_FRAMES (8) steps per cycle (deviation: choppier than MHF's smooth scroll);

@@ -22,6 +22,8 @@ struct ms_fxpost { uint16_t mot, frame, action; uint8_t gate; uint16_t id; uint8
 struct ms_fxq { uint16_t delay, id; uint8_t n; };
 #define MS_FXQ_MAX 12
 #define MS_FXH 8                    /* effect handles kept per carrier */
+struct ms_carrier { void *h[MS_FXH]; uint16_t id[MS_FXH]; float at[3], age; };   /* ms_act.c fx_follow: the posted
+                                       proxies, their PEL ids, the point they were posted at, updates since */
                                     /* when 0 step start, 1 frame, 2 never, 3 charge level >= lvl; id = MHF event */
 struct ms_action { uint16_t no; uint8_t mode, nsteps; uint16_t step0; uint8_t nevents; uint16_t ev0; };
 
@@ -83,13 +85,20 @@ struct ms_state {
     uint8_t fx_done[32];            /* rows of ms_fxposts posted in this motion run (from fx_first) */
     uint16_t fx_first;              /* the motion's first row (ms_fxposts is sorted by motion) */
     uint8_t aim_view;               /* GU's aim view (camera + scope HUD) started by aim_view() */
+    uint8_t aim_log;                /* "aim tick" log lines left after "aim view on" */
+    float aim_yaw, aim_pitch;       /* the aim look (ms_act.c aim_look): yaw in u16 units (hunter-yaw sense, the
+                                       camera looks along it), pitch in u16 units (GU's +0x2714 sense) */
     float fxq_t[MS_FXQ_MAX];        /* queued event posts: frames left (0 = free slot) */
     uint16_t fxq_id[MS_FXQ_MAX];
     uint8_t fxq_n[MS_FXQ_MAX];
-    void *mk_fx[MS_FXH], *shot_fx[MS_FXH];   /* MHF's marker (fc5:e) / shot (fc5:b) effects, moved every tick */
+    struct ms_carrier mk_c, shot_c; /* MHF's marker (fc5:e) / shot (fc5:b) effects, moved every update */
     float shot_o[3];                /* the shot's start (its trail fc5:a at 100 / 300 / 600 / 1000 / 1500 from it) */
     uint8_t trail_k;                /* trail points posted */
-    float mk_fx_t;                  /* ticks since the marker effect was re-posted */
+    float mk_fx_t;                  /* (unused since test 22: the marker effect moves every update) */
+    float shot_near, shot_near_t;   /* the shot's closest pass to a hurt volume surface (cm, -1 none) and its tick */
+    uint8_t *shot_near_m;           /* that volume's monster */
+    uint16_t shot_near_j;           /* its joint */
+    uint8_t att_mark;               /* the attraction's fc5 7 at the marker posted (MHF f10) */
 };
 struct ms_state *ms_of(uint8_t *p);
 void ms_reset(struct ms_state *s);
@@ -153,15 +162,34 @@ typedef uint8_t *(*ms_em_t)(void *mgr, int i);
 #define MS_EM_GET FN(ms_em_t, 0x5ceb4)                /* monster slot 0..9 of the manager *(MAIN 0x1851fe0) */
 #define MS_EM_MGR (*(void **)MAIN(0x1851fe0))
 #define MS_CAM_MGR (*(uint8_t **)MAIN(0x2126504))     /* +0x54 = the camera: eye +0x40, look-at +0x60 */
-/* GU's aim view (ms_act.c aim_view, C): the player byte +0x2716 (vt+0x1c8 = 0x2a1c48) gates the quest camera's aim
- * (0x23ebc ends it once the byte reads 0) and the scope HUD (cUIOQuestScope 0x61e1f4 -> 0x61e438 state 8 ->
- * 0x61e834), any class; 0x1baa4(camera manager, mode) starts the camera's aim (+0xacc) as the bowguns' 0x2a039c does,
- * mode from 0x2a0520(p); local hunter = +0x13cc bit 0 (0x27bcd0) */
+/* GU's aim view (ms_act.c aim_view / ms_after_update / ms_aim_cam, C; mechanics.md "Port (aim view)"): the player
+ * byte +0x2716 (vt+0x1c8 = 0x2a1c48) gates the quest camera's aim (0x23ebc ends it once the byte reads 0) and the
+ * scope HUD (cUIOQuestScope, made for every class by 0x6658ec; update 0x61e1f4 -> 0x61e438 state 8 -> 0x61e834);
+ * 0x1baa4(camera manager, mode) starts the camera's aim (+0xacc; mode +0xac8, settled +0xa60) as the bowguns'
+ * 0x2a039c does, mode from 0x2a0520(p); local hunter = +0x13cc bit 0 (0x27bcd0). GU's 0x29fb8c (end of the player
+ * update 0x29b8e8, after slot 139) clears the byte and +0x2714 every update for a drawn non-bowgun outside common
+ * actions 1/97-98 (0x29fe90): slot 45 (+0xb4, called right after it) sets them again. Aim mode 0 (0x23f24): camera
+ * yaw +0x9dc = hunter +0x14a0 (the turn target: face() writes it with +0xfec) + 0x8000, pitch +0x9d8 = (s16) +0x2714,
+ * then vt+0x410(p, out, 0) (slot 260): ours writes the look there instead of turning the hunter */
 #define MS_AIM_BYTE(p) FIELD(uint8_t, (p), 0x2716)
 #define MS_IS_LOCAL(p) (FIELD(uint32_t, (p), 0x13cc) & 1)
 typedef void (*ms_camaim_t)(void *mgr, int mode);
 #define MS_CAM_AIM FN(ms_camaim_t, 0x1baa4)
 #define MS_AIM_MODE FN(ms_p_t, 0x2a0520)
+#define MS_AIM_PITCH(p) FIELD(int16_t, (p), 0x2714)
+typedef void (*ms_p1_t)(void *p);
+#define MS_AFTER_UPDATE_GU FN(ms_p1_t, 0x281ef8)      /* slot 45 of every class */
+typedef void (*ms_aimoff_t)(void *p, void *out, int k);
+#define MS_AIM_OFF_GU FN(ms_aimoff_t, 0x2a714c)       /* slot 260 of GS (and so ours): only k 0xc does anything */
+/* GU's aim-direction reader 0x27d5c4(p, sources, &dirs, &magnitude) -> 1 when a source is past 0x31; source 1 = the
+ * stick at +0x140c angle / +0x1410 magnitude (0x2a7b14: pad +0x6bac / +0x6bb0), the one GU's gunner look 0x2a07a8
+ * reads alone while the hunter can walk aimed (the move stick +0x140e / +0x1412 is source 2): the right stick.
+ * dirs: 4 / 8 = yaw + / -, 1 / 2 = pitch + / - (0x2a07a8 -> 0x2a1738), after the camera-invert options GU applies
+ * inside (vt+0x1b0 0x400000) and in 0x2a07a8 (global *0x188ca48 +0x66: 1 / 3 swap 1-2, 2 / 3 swap 4-8) */
+typedef int (*ms_dirs_t)(void *p, uint32_t sources, uint32_t *dirs, int16_t *magnitude);
+#define MS_AIM_DIRS FN(ms_dirs_t, 0x27d5c4)
+#define MS_OPT_OBJ (*(uint8_t **)MAIN(0x188ca48))   /* +0x66 = the aim-invert option read by 0x2a07a8 */
+#define MS_DTI_QCAM 0x184d8b8                         /* uQuestCamera (0x1baa4 / 0x1bb14 test the camera's DTI chain) */
 #define MS_U16_RAD 9.58738e-5f                        /* u16 angle -> radians */
 /* effects: GU's code post vt+0x39c (p, id, p + 0x2550, 1) = 0x282624 -> the +0x2634 job's slot 0x150, as GU's
  * classes call it (GS: ids 6 / 7 / 36, list 1), returned 0 for every id under class 5 (tests 3-5, GS's own flash 7
@@ -206,5 +234,7 @@ int ms_weapon_element(uint32_t id, uint32_t *type, uint32_t *value);   /* ms_cla
 void ms_on_hit(uint8_t *p, uint8_t *atk, uint8_t *mon, uint32_t kind);      /* ms_act.c: slot 37 */
 void ms_guarded(uint8_t *p, uint32_t level, uint8_t *info, int32_t *dmg);   /* ms_act.c: slot 356 */
 int ms_invuln(uint8_t *p);          /* ms_act.c: slot 44 */
+void ms_after_update(uint8_t *p);   /* ms_act.c: slot 45 (+0xb4) */
+void ms_aim_cam(uint8_t *p, void *out, int k);    /* ms_act.c: slot 260 (+0x410) */
 void ms_init(void);                 /* ms_class.c, from module_init */
 void ms_text_loaded(uint8_t *m, const char *name, uint32_t lang);           /* ms_class.c, from items.c */
