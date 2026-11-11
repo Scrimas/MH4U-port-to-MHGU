@@ -817,6 +817,7 @@ def main(report_only=False):
     write('weapon/w05/g00.arc', arcpack.build([('weapon\\w05\\mot\\wg05_00', T_LMT, wlist),
                                                ('weapon\\w05\\mot\\wg05_sa_00', T_LMT, empty_list())]))
     print('HUD: ' + mshud.build())                      # the gauge's look (ms_class.c hud_look)
+    print('reticle: ' + mshud.build_reticle())          # MHF's reticle on the scope HUD (ms_class.c scope_look)
     print('motions: %d body slots (%d KB), weapon list %d KB; %d hits; %d tables, %d command files' % (
         len(plan), len(body) // 1024, len(wlist) // 1024, len(hit_index), len(tbl_index) + 47, len(cmds)))
     print('report: %s' % os.path.join(OUT_GEN, 'report.txt'))

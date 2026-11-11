@@ -269,6 +269,7 @@ if MS_SLICE:
         ('ms_forge_create', 0x6F9658),    # smithy create getter (this, type, row): type 12 = ours
         ('ms_forge_process', 0x70153C),   # smithy process getter (this, type, row): type 12 = ours
         ('ms_hud', 0x646560),         # CB phial widget update after its hunter reads (r4 widget, r5 hunter)
+        ('ms_scope', 0x61E1F4),       # scope widget update entry (r0 widget): MHF's reticle (ms_reticle)
         ('ms_snd_file', 0x4EA0DC),    # weapon sound-request file ID (?, class, equipment, k): class 5 asks as GS
         ('ms_wsync', 0x308DDC), ('ms_wsync2', 0x308E68),  # weapon sync's class reads: class 5 picks by mode as SA
         ('ms_icon_rect', 0x560920),   # icon rectangle (_, kind, icon, out) after its kind check: MS_ICON_ID's spot

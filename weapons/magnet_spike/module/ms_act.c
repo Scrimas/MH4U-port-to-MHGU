@@ -637,8 +637,8 @@ static void rep_posts(uint8_t *p, struct ms_state *s, float tk)
 
 /* the aim view: MHF's aim camera 0x1033a880 (over the shoulder, free look; on in idle / walk / runs, off in the pin
  * actions) and reticle 0x10339700 (sprite 0xb6 at the screen centre) -> GU's gunner aim view (ms.h MS_AIM_BYTE): the
- * quest camera's aim mode 0 (GU's over-the-shoulder offsets) with MHF's look (aim_look), GU's crosshair (deviations:
- * MHF's preset offset and its reticle frames repel blue / attract red / neither white are not drawn). Local hunter
+ * quest camera's aim mode 0 (GU's over-the-shoulder offsets) with MHF's look (aim_look), MHF's reticle frames repel
+ * blue / attract red / neither white on GU's scope HUD (ms_reticle; deviation: MHF's preset offset). Local hunter
  * only, as MHF (0x1033a270). GU's 0x29fb8c clears the byte at the end of every update (ms.h): ms_after_update (slot
  * 45, right after it) sets it again, so the camera and the scope HUD read 1 */
 static int aim_want(uint8_t *p, struct ms_state *s)
@@ -717,11 +717,26 @@ static void aim_view(uint8_t *p, struct ms_state *s)
                  cam ? FIELD(uint8_t, cam, 0xa60) : 0xff, (int)(s->aim_yaw * (360.0f / 65536.0f)),
                  (int)(s->aim_pitch * (360.0f / 65536.0f)), MS_AIM_PITCH(p));
         }
+        {                                               /* MHF's reticle frame (0x10339700, C): 0 repel possible =
+                                                           marker 0 < d < 1400, 1 attract possible = 1400 < d < 4000,
+                                                           else 2 (3-D d to the marker; MHF also asks 0x10331c10's
+                                                           target test, not ported), shown on GU's scope HUD
+                                                           (ms_class.c ms_reticle) */
+            float dm = marker_dist(p, s);
+            int fr = dm > 0 && dm < 1400.0f ? 0 : dm > 1400.0f && dm < 4000.0f ? 1 : 2;
+            ms_reticle(fr);
+            static int s_fr = -1, s_frn;
+            if ((fr != s_fr || !s->aim_view) && s_frn++ < 40)
+                logf("msport: aim reticle frame %d (%s), marker %d cm", fr, fr == 0 ? "repel possible, blue" :
+                     fr == 1 ? "attract possible, red" : "neither, white", (int)dm);
+            s_fr = fr;
+        }
         MS_AIM_BYTE(p) = 1;
         s->aim_view = 1;
     } else if (s->aim_view) {
         MS_AIM_BYTE(p) = 0;                             /* the camera's 0x23ebc then ends its aim */
         s->aim_view = 0;
+        ms_reticle(-1);                                 /* the scope HUD's HD_hud01 back */
     }
 }
 

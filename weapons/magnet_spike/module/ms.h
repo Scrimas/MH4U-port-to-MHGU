@@ -236,5 +236,6 @@ void ms_guarded(uint8_t *p, uint32_t level, uint8_t *info, int32_t *dmg);   /* m
 int ms_invuln(uint8_t *p);          /* ms_act.c: slot 44 */
 void ms_after_update(uint8_t *p);   /* ms_act.c: slot 45 (+0xb4) */
 void ms_aim_cam(uint8_t *p, void *out, int k);    /* ms_act.c: slot 260 (+0x410) */
+void ms_reticle(int frame);         /* ms_class.c: the scope HUD shows MHF's reticle frame (-1 = GU's) */
 void ms_init(void);                 /* ms_class.c, from module_init */
 void ms_text_loaded(uint8_t *m, const char *name, uint32_t lang);           /* ms_class.c, from items.c */

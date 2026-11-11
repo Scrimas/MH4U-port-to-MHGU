@@ -236,6 +236,92 @@ static void hud_look(int ours)
     }
 }
 
+/* MHF's aim reticle on GU's scope HUD (notes/mechanics.md "MHF's reticle", tools/mshud.py build_reticle). MHF
+ * (0x10339700, C) draws sprite 0xb6 at the screen centre while its local hunter aims: one 46 x 46 cell of mhf_90c
+ * entry 4 tinted per frame (0 repel possible blue, 1 attract possible red, 2 neither white). GU's scope widget
+ * cUIOQuestScope (update 0x61e1f4, local hunter only) shows its element 0 for our aiming class 5 (state 1, mode 0):
+ * object Anm_scope, the instance tree "scope", whose TextureSet TexS_scope draws four mirrored quadrants of
+ * HD_hud01 (UV (0, 32)-(240, 272), corner texel (240, 272) at the screen centre; plain params: no animation, white
+ * vertex colour). mh4uport\ms_reticleN = HD_hud01's size, empty but for MHF's reticle quarter in frame N's colour at
+ * that quadrant's centre corner: GU's arrows, bars, ring and gauges (the entry's other users) vanish while it is
+ * bound, as MHF shows its reticle alone. While the local class-5 hunter
+ * aims, the scope .gui's HD_hud01 entry points at the frame's copy; back to HD_hud01 otherwise. The widget's cGUI
+ * (+0x24) holds its rGUI at +0xf0 (0x91a7d0 / 0x544940, C), the loaded file at rGUI +0x64; the texture entries as
+ * hud_look's. ms_reticle (aim_view, every aim tick) refreshes the frame; without it for 8 widget updates (the hunter
+ * gone, the aim ended) GU's art comes back */
+static const char *const s_ret_path[3] = {"mh4uport\\ms_reticle0", "mh4uport\\ms_reticle1", "mh4uport\\ms_reticle2"};
+static uint8_t *s_ret_tex[3], *s_ret_orig;
+static uint8_t s_ret_tried, s_ret_ttl;
+static int8_t s_ret_frame = -1;
+
+void ms_reticle(int frame)
+{
+    s_ret_frame = (int8_t)(frame >= 0 && frame < 3 ? frame : -1);
+    s_ret_ttl = 8;
+}
+
+static void scope_look(uint8_t *w, int fr)
+{
+    if (fr >= 0 && !s_ret_tried) {
+        s_ret_tried = 1;
+        for (int k = 0; k < 3; k++) s_ret_tex[k] = res_get(s_ret_path[k]);
+        logf("msport: reticle textures %x %x %x", (uint32_t)(uintptr_t)s_ret_tex[0], (uint32_t)(uintptr_t)s_ret_tex[1],
+             (uint32_t)(uintptr_t)s_ret_tex[2]);
+    }
+    uint8_t *gui = FIELD(uint8_t *, w, 0x24), *rg = gui ? FIELD(uint8_t *, gui, 0xf0) : 0;
+    if (!rg || !path_has(rg, "hud6_scope")) return;
+    uint8_t *d = FIELD(uint8_t *, rg, 0x64), *tab = d ? FIELD(uint8_t *, d, 0xe8) : 0;
+    uint32_t n = d ? FIELD(uint32_t, d, 0x70) : 0;
+    if (!tab || n > 64) return;
+    uint8_t *want = fr >= 0 ? s_ret_tex[fr] : 0;
+    if (want && !FIELD(void *, want, 0xd0)) want = 0;
+    static int s_n;
+    for (uint32_t i = 0; i < n; i++) {
+        uint8_t *e = tab + 64 * i, *t = FIELD(uint8_t *, e, 0x28);
+        if (!t) continue;
+        int mine = t == s_ret_tex[0] || t == s_ret_tex[1] || t == s_ret_tex[2];
+        if (want) {
+            if (t == want) continue;
+            if (!mine) {
+                if (!path_has(t, "HD_hud01")) continue;
+                if (FIELD(uint32_t, t, 0xdc) != FIELD(uint32_t, want, 0xdc) ||
+                    FIELD(uint32_t, t, 0xe0) != FIELD(uint32_t, want, 0xe0)) {
+                    static uint8_t s_dims;
+                    if (!s_dims++) logf("msport: scope reticle: HD_hud01 %ux%u, ours %ux%u: GU's crosshair kept",
+                                        FIELD(uint32_t, t, 0xdc), FIELD(uint32_t, t, 0xe0),
+                                        FIELD(uint32_t, want, 0xdc), FIELD(uint32_t, want, 0xe0));
+                    continue;
+                }
+                s_ret_orig = t;
+            }
+            res_get(s_ret_path[fr]);                /* one reference per swap-in (hud_look's proven pattern): the
+                                                       .gui releases one reference of whatever its entry holds when
+                                                       it goes, so the copy in the entry must own an extra one. The
+                                                       copies a colour change leaves keep theirs: one count per
+                                                       change, never released (the copies stay resident for the
+                                                       session through s_ret_tex's own reference anyway). No release
+                                                       here: GU's release call is not traced (a per-.gui "already
+                                                       referenced" flag would under-reference a copy if a new .gui
+                                                       reused the old address) */
+            FIELD(uint8_t *, e, 0x28) = want;
+            if (s_n++ < 40) logf("msport: scope reticle entry %x: MHF frame %d", (uint32_t)(uintptr_t)e, fr);
+        } else if (mine && s_ret_orig) {
+            FIELD(uint8_t *, e, 0x28) = s_ret_orig;
+            if (s_n++ < 40) logf("msport: scope reticle entry %x: back to HD_hud01", (uint32_t)(uintptr_t)e);
+        }
+    }
+}
+
+/* hook 0x61e1f4 (r0 = the scope widget), its update's entry: the entry swap before GU's update and draw */
+int ms_scope_c(uint32_t *regs)
+{
+    uint8_t *w = (uint8_t *)regs[R0];
+    int fr = s_ret_ttl ? s_ret_frame : -1;
+    if (s_ret_ttl) s_ret_ttl--;
+    if (w) scope_look(w, fr);
+    return 0;
+}
+
 int ms_hud_c(uint32_t *regs)
 {
     uint8_t *w = (uint8_t *)regs[R4], *p = (uint8_t *)regs[R5];

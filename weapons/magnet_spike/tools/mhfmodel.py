@@ -15,7 +15,10 @@ GU side (C unless marked):
 - MRL: em024 cm101_000 material 0 = efl4u2gu's efx_blend (BSBlendAlpha, tAlbedoMap), the one its converted effect
   models drew with in the monster ports; test 19 / 20 used w00 cm010_000's (the material of 328 / 429 GU
   effect-model materials) and no model showed (S). Every GU effect material is BSBlendAlpha; the unit's blend byte
-  picks add / blend (S)."""
+  picks add / blend (C: 0xa9958c -> particle +0x18 -> 0xb007fc in the draw 0xc90b50, after the material's state).
+  Its features (notes/gu-efl-units.md "Model look"): FUVTransformOffset (the unit's UV layer 0 lands in fUVTransform,
+  C), FDiffuseVertexColorMD (the vertex colour; x2 of the 0x7f neutral S / G), FEmissionConstantEflEmu (the unit
+  colour -> fDiffuseColor, C), DSZTestWrite, RSMeshCN (S: depth write, no cull)."""
 import os, struct, sys
 import numpy as np
 

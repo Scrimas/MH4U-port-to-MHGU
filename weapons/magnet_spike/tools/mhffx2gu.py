@@ -31,7 +31,8 @@ What a converted particle is (one GU entry per MHF particle; the MHF count of a 
   f_path: velocity, gravity, drag curve, growth) -> GU move kind 5 (keyed offsets over the particle age, linear, the
   end values outside; notes/gu-efl-move.md, C on both sides); F's velocity spread = a random path turn (S); the
   ground (bounces, child effects) left out (S).
-Not converted yet (each reported by particles()): UV modes 1 / 7, mesh flipbooks, rotation curves, sets' own packs,
+Model units: MHF's UV scroll (modes 1-3) = GU's UV layer 0 (uv_block, C both sides).
+Not converted yet (each reported by particles()): UV modes 1 / 7 on sprites, mesh flipbooks, rotation curves, sets' own packs,
 colour flags 0x40."""
 import io, math, os, struct, random
 import numpy as np
@@ -103,6 +104,41 @@ def model_effect_mode(u):
     u[0x1a] &= 0xfe
     struct.pack_into('<I', u, 8, 0)
     struct.pack_into('<I', u, 0x10c, 0)
+# Model UV scroll (GU side C, notes/gu-efl-units.md "Model UV layers"): unit +0x134 lo16 = offset (from the unit) of
+# a 0x40-B value block = UV layer 0: f32 (value, range) pairs u +0x00, v +0x08, du +0x10, dv +0x18 (per GU frame),
+# damping +0x20 (du *= it each frame; 1 = constant speed), +0x30 / +0x34 curve offsets for u / v (0 = none), +0x38 /
+# +0x3c the curves' "add to the previous value" flags. Init 0xa99f40 -> 0xa6b824 (value + r x range), update 0xa9ada0
+# -> 0xa6bc0c (u += du, wrapped by 2 when beyond +-2), draw 0xa956d8 -> 0xcaf17c (slot 0 = EAN offset + layer 0,
+# wrapped to (-1, 1)) -> 0xc90b50, which writes slot 0 into the material's CBMaterial fUVTransform translation (+0x2c /
+# +0x3c; efx_blend's FUVTransformPrimary = FUVTransformOffset, FUVAlbedoMap = FUVPrimary). GU's own effect-mode Model
+# units: 2206 / 4708 in the player arcs carry such a block (du / dv 0.005-0.1, damping 0.6-1.0).
+# MHF side (C, 0x113d0690, per MHF tick, ages count 2 per tick): E +0x16 mode 1 = u and v, 2 = u, 3 = v; the offset
+# += 1 / (E +0x18 (u) or +0x1c (v)) / ls, ls = the particle's life scale (A +0x5c, 1 below 0.01), wrapped to [0, 1];
+# the draw adds it to the mesh UVs (S: 0x113ce040 puts it in the texture matrix's translation row). GU per frame =
+# half of it; v negated (GU v = 1 - MHF v, mhfmodel.mesh_part); the start offset = -D x speed, so the scroll's phase at
+# MHF's spawn frame D (the particle exists in GU from frame 0, invisible until D) is MHF's 0.
+UV_BLOCK = 0x134
+
+
+def uv_scroll(e, ls):
+    """MHF UV scroll (modes 1-3) -> (du, dv) per GU frame in GU's UV orientation, or None"""
+    m = e['uv_mode']
+    if m not in (1, 2, 3): return None
+    sp = lambda n: (1.0 / n / ls / 2.0) if n else 0.0
+    du = sp(e['uv_u']) if m in (1, 2) else 0.0
+    dv = -sp(e['uv_v']) if m in (1, 3) else 0.0
+    return (du, dv) if (du or dv) else None
+
+
+def uv_block(e, ls, D):
+    """the unit's UV value block (layer 0) for an MHF UV scroll, or None (UV_BLOCK)"""
+    s = uv_scroll(e, ls)
+    if not s: return None
+    du, dv = s
+    u0, v0 = math.fmod(-D * du, 1.0), math.fmod(-D * dv, 1.0)
+    return struct.pack('<9f', u0, 0.0, v0, 0.0, du, 0.0, dv, 0.0, 1.0) + bytes(0x40 - 36)
+
+
 FLAT = 0.05                  # a mesh is flat when its z extent <= 5 % of its x / y extent
 
 
@@ -497,9 +533,9 @@ class Builder:
     def model_unit(self, st, a, e, ls):
         """a world-oriented 3-D MHF mesh -> a GU Model unit on the mesh as a model (mhfmodel): MHF's local transform
         scale x rotation (0x113ce4d0, C) = the unit's scale x / y / z (base - range, 2 range) x the scale curve
-        and rotation x / y / z (value - range, 2 range, rad; GU's Euler order G); colour curve, life, motion and
-        blend as the Billboard's; no UV animation (MHF modes 2-6 on these: GU's model UV layers not decoded far
-        enough, S deviation)"""
+        and rotation x / y / z (value - range, 2 range, rad; GU order 0 = MHF's Rz Ry Rx, C); colour curve, life,
+        motion and blend (unit byte 3 -> particle +0x18 bits 5-12 -> 0xb007fc in the draw 0xc90b50, C) as the
+        Billboard's; MHF's UV scroll (modes 1-3, 132 / 266 units) as GU's UV layer 0 (uv_block, C both sides)"""
         D = a['frame']
         life = int(round(e['life'] * ls))
         tm = lambda f: D + int(round(f * ls))
@@ -538,7 +574,12 @@ class Builder:
         struct.pack_into('<6f', u, 0xd0, *[x for k in range(3) for x in (r[k] - rr[k], 2 * rr[k])])
         w, wr = (F['ang'][2] / 2, F['ang_r'][2] / 2) if F else (0.0, 0.0)
         struct.pack_into('<6f', u, 0xe8, 0.0, 0.0, 0.0, 0.0, w - wr, 2 * wr)
-        struct.pack_into('<HHHHI', u, 0x130, 0, off_s, 0, 0, 0)
+        blk = uv_block(e, ls, D)
+        off_uv = 0
+        if blk:
+            off_uv = MODEL_SIZE + len(tail); tail += blk
+            self.n_uv = getattr(self, 'n_uv', 0) + 1
+        struct.pack_into('<HHHHI', u, 0x130, 0, off_s, off_uv, 0, 0)
         emit = bytearray(self.tpl[2][1])
         struct.pack_into('<III', emit, 0, 0, D + life, 0)
         self.n_models = getattr(self, 'n_models', 0) + 1
@@ -686,8 +727,9 @@ def build_all(gu_read, effects=MS_EFFECTS, src=SRC, rom=None):
     if b.models.mods:                          # the 3-D meshes' textures / MRLs / MODs before the EFLs naming them
         k = next(i for i, (p, t, d) in enumerate(ents) if t == T_EFL)
         ents[k:k] = b.models.entries()
-        rep.append('mhf effect models: %d meshes, %d textures, %d Model units' % (
-            len(b.models.mods), len(b.models.tex), getattr(b, 'n_models', 0)))
+        rep.append('mhf effect models: %d meshes, %d textures, %d Model units (%d with MHF\'s UV scroll as GU UV layer '
+                   '0, unit +0x134)' % (len(b.models.mods), len(b.models.tex), getattr(b, 'n_models', 0),
+                                        getattr(b, 'n_uv', 0)))
         rep.append('mhf effect models, test-22 draw-mode split: %d Model units in SCENE mode (%s), the rest in effect '
                    'mode' % (getattr(b, 'n_scene', 0), ', '.join('%#x %#x = %s' % (s, e, w)
                                                                  for (s, e), w in sorted(SCENE_TEST22.items()))))

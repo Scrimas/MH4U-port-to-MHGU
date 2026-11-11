@@ -227,14 +227,80 @@ scaled), GS's charge flash as the cue.
       +0x140e / +0x1412 is source 2): the right stick. dirs 4 / 8 = yaw + / −, 1 / 2 = pitch + / − (0x2a07a8, VSELEQ
       at 0x2a154c), after GU's invert options (vt+0x1b0 0x400000 inside, global *0x188ca48 +0x66 in 0x2a07a8, both
       applied). Steps per MHF tick (tick_len): 0x240 yaw, 0x160 pitch.
-    - Deviations: GU's over-the-shoulder offsets (camera preset 6) and crosshair (MHF's reticle frames not drawn,
-      below); the pitch starts level, not from the camera's (GU's pitch sense against the view not traced); the
+    - Deviations: GU's over-the-shoulder offsets (camera preset 6); GU's other crosshair parts beside MHF's reticle
+      (below); the pitch starts level, not from the camera's (GU's pitch sense against the view not traced); the
       pitch is clamped ±0xd1c, since which of MHF's bounds (−0x12e4 / +0xd1c) is up in GU's sense is not traced (G).
-    - **MHF's reticle (open):** not drawn. The texture-swap path used for the gauge (ms_class.c hud_look) would
-      need: the scope .gui that 0x61def4 picks (table by a global byte +0xa5, 1..6), the texture entry of element
-      0's sprite (static parse as tools/mshud.py does for hud14_chargeAx), an atlas with MHF's three frames, the
-      attract / repel range test per update (not re-traced in MHF), and a per-frame swap. GU's crosshair is the
-      stand-in.
+    - **MHF's reticle (2026-11-11, ported on GU's scope HUD; test 22):**
+      - MHF, C: 0x10b87b40 draws it for weapon class 13 when 0x10b86b20 says so: the local hunter's MS flag bit 0
+        (aim, 0x1033a160) on and its action not in the table at 0x11994f30 (0x1033a130). 0x10339700:
+        0x1096bca0(sprite 0xb6, frame, screen centre, scale = min(screen height x 0.0013885 (1/720), 1); width
+        0x1ebee5a0, height 0x1ebee59c); with the camera mode byte 0x11c4a409 = 2 it is drawn at a projected point
+        instead, and skipped off screen.
+      - Frame (C): 0 if 0x10331e20 (repel possible), else 1 if 0x10331d80 (attract possible), else 2. Both need the
+        marker (0x1033b470, state +6 = 2) and 3-D d = |marker point (+0x38) - hunter position (+0xac)|: repel
+        0 < d < 1400, attract 1400 < d < 4000 (strict); then 0x10331c10 (the marked monster: a species / variant table
+        refuses, air / special states refuse unless the marker is above its ground and the hunter's ground is within
+        25). Gauge and stamina are not asked. The port computes it each aim tick (ms_act.c aim_view, without
+        0x10331c10) and logs it (`msport: aim reticle frame`).
+      - MHF's art, C: 0x10339700 calls 0x1096bca0 with HUD context EAX = 4. Context i = 12-byte record at
+        0x11882178 + 12 i (file `dat\mhf_90c.bin`, bank entry id, texture-ID list); 0x1096bba0 loads each bank
+        (0x113ecae0: the entry copied, 0x113f12f0 relocates its chunk tree) into 0x1e7fe468[i]. Context 4 = entry 20,
+        textures (0x0b14, 0x0b47, 0x0b09, 6). The lookup (0x113ed9c0 asm): table T = bank +0x10 (entry 20 +0x1c: count
+        0xb9 at +0xc, u16 offsets at T + [T+8]); sprite S = T + offset[id]; u16 frame count, then 28-byte cells from
+        +4. Sprite 0xb6: 3 frames, one cell (+2 texture index 0, +4 ARGB, +8 u 1, v 323, +0xc 46 x 46, +0x10 origin
+        −23 −23, +0x14 drawn 46 x 46); the three differ only by colour: 0xff0b99ff blue, 0xffc62900 red, 0xffffffff
+        white (0x113ecc60 multiplies the cell colour into the vertex colour; it binds texture ID list[index] through
+        0x1ecda320). Texture ID 0x0b14 = mhf_90c entry 4 (the loader at 0x1096ce81 walks 23 (entry, ID) pairs at
+        0x11881658; entry 4 -> 0x0b14), the PNG kept as dump/mhf/ui/mhf_90c_04.png (pixel-identical in the .bin and
+        .xbox banks): a white reticle, four corner brackets around a small diamond, mirror-symmetric about its column
+        22 and between rows 22 / 23 (3 pixels differ by <= 21 / 255). On screen: 46 x 46 px at heights >= 720.
+      - GU, C: the scope .gui is chosen by 0x61e13c from the text language (options object *0x188ca48 +0xa5: 1 eng,
+        2 fre, 3 spa, 4 ger, 5 ita, 6 file 0xd81d; > 6 = 1): file IDs 0xe246 / 0xe266 / 0xe286 / 0xe2a6 / 0xe2c6 =
+        <lang>\GUI\01_quest\hud\hud6_scope (quest_<lang>.arc; the HD UI v4 mod ships the same eng file byte for byte,
+        only its textures differ: HD_hud01 512 x 1024 = 2x). File (GUI v0x22715, 1280 x 720, header 72 x u32 H):
+        7 texture entries of 64 B at H[58] (+0xe8; count H[28]; +0 id, +0xc size u16 pair, +0x20 1 / size, +0x2c path;
+        ids 3 hud01, 6 hud00, 7 / 9 cmn_icon, 8 / 10 hud_icon, 11 custom_pnl2; the loader fills +0x28 = rTexture);
+        26 instances of 36 B at H[43] (+8 next, +0xc child, +0x10 name, +0x14 DTI hash, +0x18 first param, +0x20
+        TextureSet block), 8 objects of 36 B at H[47] (same links, +0x18 hash, +0x1c first param), 5 animations of
+        24 B at H[41] (id, instance count, first instance...), 563 params of 20 B at H[45] (+4 type, +0xc name, +0x10
+        value: type 2 f32 / 7 Texture / 0xb AnimationId / 0x10 SequenceId = 4 bytes at H[68] + value, type 4 = 4 floats
+        at H[69] + value, type 3 = a byte at H[67] + value; type | 0x100 = animated), strings H[65]. The vertex buffer:
+        file +0x120 (0x4950), H[36] = 0x930 bytes of 24-byte vertices (x y z colour u v, u v in the .gui's texel
+        units); 0xb7f988 copies it into a GPU buffer at rGUI +0x80.
+      - GU's elements, C: the cGUI's object array +0xf8 is built by 0x91a7d0 from the file's objects in file order
+        (count file +0x44 -> +0x298, 0x5448a8), so element k = object k: 0 Anm_scope, 1 Anm_zoom, 2 Anm_simple_scope,
+        3 Nul_scope (their root), 4 Anm_target_scope, 5 Nul_i_club2, 6 Anm_align, 7 Null_target. An Anm object plays
+        animation AnimationId at its PosX / PosY: Anm_scope = animation 12 = instances 0-9 (tree "scope") at
+        (640, 360). For our class 5 the widget runs state 1 mode 0 (0x61e1f4 / 0x61e438 / 0x61e834): elements 0 and 3
+        on, 1 (zoom gauge) only with the weapon's bit 8; 2 / 6 (projected crosshairs, 0x61e5d4) run in states 0 / 2
+        only, 4 / 7 (target scope) by 0x61e95c. Tree "scope": TexS_scope (cGUIObjTextureSet, hud01, white, no
+        animated params) = 4 quads (−240..0 x −240..0 and its mirrors, all UV (0, 32)-(240, 272): the faint 480-unit
+        ring; texel (240, 272) at the screen centre) + 4 side bars UV (0, 272)-(160, 312) / (46, 272)-(130, 312); its
+        children TextureSet / TextureSet0 (bars, UV (0.5, 272.5)-(119.5, 311.5), rotated 90); Nul_target (animated
+        scale / rotation) -> ColAj_target -> Txt_target1-4: 16 x 16 red arrows at ±66, mTextureRect (168, 16)-(184,
+        32). A TextureSet block (H[70] + instance +0x20) = (count, first vertex, count rects); 0xa52024 keeps them at
+        +0x12c / +0x134 / +0x130, the draw 0xa515f8 strips count x 6 − 2 vertices of rGUI +0x80 from the first; the
+        draw binds the 64-byte entry (+0x104) through 0x542aa0, which reads entry +0x28 each time.
+      - Every hud01 user in hud6_scope (tools/mshud.py scope_users): TexS_scope, TextureSet, TextureSet0,
+        Txt_target1-4 (tree scope), Txt_zoom (0, 0)-(168, 32) and TexS_pointer (168, 0)-(184, 16) (zoom),
+        Txt_s_scope (0, 312)-(96, 408) (simple_scope; red vertex colour), Txt_s_scope and Txt_target1-4 (target_scope).
+        TexS_align samples hud00, Txt_No custom_pnl2.
+      - Port: mshud.py build_reticle writes mh4uport\ms_reticle0 / 1 / 2 (the live HD_hud01's size, 512 x 1024 BC3
+        with the HD UI mod, 512 KB each; GU's 256 x 512 otherwise), empty but for MHF's reticle quarter in frame N's
+        colour at TexS_scope's quadrant centre corner (every other user blanked: they are bound only while the local
+        class-5 hunter aims, so GU's ring, arrows, bars, zoom gauge and crosshairs vanish then, as MHF), 2 texels per HUD unit (+1 texel of
+        edge padding); the four mirrored quads rebuild the 46 x 46 reticle = 46 HUD units, MHF's size at 720 lines
+        (at 1080 lines MHF's is 46 of 1080 = 31 units: the port takes MHF's 720 reference). Checks (the build stops on
+        a failure): the hud01 users are exactly the decoded ones, the painted texels lie inside the atlas and the
+        quadrant (+ padding) and 1 texel away from every other user's rect, nothing else is non-empty, and the four
+        quads rendered from the copy match MHF's reticle. ms_class.c scope_look (hook 0x61e1f4, the widget's update entry): while
+        the local class-5 hunter aims (ms_reticle from aim_view, refreshed every aim tick, 8 widget updates of grace),
+        the scope .gui's HD_hud01 entry +0x28 points at the frame's copy (same size required, one reference added per
+        swap, as hud_look: each colour change leaves one count on the copy it replaces, never released, harmless as the
+        copies stay resident; GU's release call not traced); otherwise, and for every other class, back to HD_hud01.
+        Kept GU: Txt_No (custom_pnl2, target scope only) and TexS_align (hud00, states 0 / 2), other entries.
+        Deviations: the reticle sits half a unit
+        right of MHF's (its centre column on the centre); MHF's 0x10331c10 target test is not asked.
   - **"Launcher":** not a model. The weapon is one mesh with no part scaling; the shot and effect 0x312 (event 17's task 0x3c, 0x1004d700) both come from bone 18, the −x hand.
 - Shot (82 / 84; 0x103333a0, 0x101e8de0 / 0x101e9070 / 0x101eb540, C):
   - **Start:** the hunter takes the camera yaw; the direction = normalize(look-at − eye), pitch included.
@@ -247,7 +313,7 @@ scaled), GS's charge flash as the cue.
     - shot_step every tick: the swept segment against each large monster's hurt volumes, placed by GU's 0x16de70 from bodydata 0x710b0 (push-only records skipped);
     - the surface point toward the shot goes into that joint's frame (joint_mat); marker() rebuilds it from the joint each tick;
     - deviations (S): GU's marker flash every 2 ticks as the shot's look, no wall test (ground − 300 instead);
-    - the aim camera: "Port (aim view)" above (test 22); the reticle: GU's crosshair, MHF's frames open.
+    - the aim camera and MHF's reticle on GU's scope HUD: "Port (aim view)" above (test 22).
     - test 21 (C by elimination, ms_act.c): a marker placed by a hit ended on the same tick ("alive 0"): the shot's
       em_ok had just passed (in the manager, not small, HP > 0), so the area test (monster +0x1054 != the hunter's;
       +0x1054 is the unit's area, as 0x53b500 / 0x42eac read it) ended it: the monster was in another area than the

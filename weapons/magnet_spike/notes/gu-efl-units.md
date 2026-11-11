@@ -149,7 +149,8 @@ and interpolation: not traced (G: linear, frames).
 - Billboard orientation modes (gen +0x46 0x17 / 0x19 / 0x2f from unit +0x18 bits 4-7) in the draw 0xa7b580.
 - Polyline (types 1 / 0xc, vtable 0x1790c84: init 0xab76d8, loop 0xab7f2c) not decoded beyond the shared head.
 - Model (decoded below): the GU model unit's mesh mask (+0x110) read side, the blend on the scene-model path, the
-  one-mesh draw 0xc90380 / 0xc90494 / 0xc90b50, and the name of DTI 0x21293e8 (the effect material class).
+  shader math behind the material features (vertex colour x2?, lighting, depth write: "Model look" below), the
+  extra UV layers (+0x136 / +0x138) beyond their init, and the name of DTI 0x21293e8 (the effect material class).
 
 ## Unit block, Model (type 5) (static, 2026-11-11; C unless marked)
 Vtable 0x17907fc: slot 6 0xa9499c bind (0xa58fa8, then 0x120-B particles, + 0x20 x (unit +0x138 bits 24-27 + 1) when
@@ -185,7 +186,7 @@ particle flag 0x20000, re-evaluated every frame by 0xa9a280) else colours A / B 
 the emit fade (gen +0x40 bits 12-15, masks 0xaa / 0x154). Scale 0xa6b59c: unit +0x90 (value, range) x 3, +0xa8
 rates, or the curve +0x132 (keys 28 B: u32 time, 3 x (value, range); particle flag 0x800000). Rotation 0xa6adac:
 unit +0xd0, +0xe8, curve +0x130. Unit +0x10c bits 20-23 -> particle +0x100 bits 12-15, bit 31 -> flag 0x8000 (scale
-rates x unit +0xc0..+0xc8 per frame); +0x114 -> particle +0xf8; +0x134 lo16 -> UV layers (0xa99f40).
+rates x unit +0xc0..+0xc8 per frame); +0x114 -> particle +0xf8; +0x134 lo16 -> UV layers (0xa99f40, "Model look").
 
 **Draw.** Effect mode (gen +0x46 5 / 0x1e; 0xa956d8 returns for any other value): per particle 0xa9af40 ->
 0xc90094(context, record +0x18, the owner position, unit +8, (unit +0x10c >> 20) & 0xf, owner +0x208 + unit +0x120)
@@ -195,10 +196,14 @@ and 0xc90380(particle +0xf8, ..., particle +0x100 & 0xff, ...) (S: draws that on
 the mesh count, bit j = (j == particle +0x108) (C; S that +0x110 is the meshes' display mask). The unit blend byte is
 not read on this path (G).
 
-**Blend.** All GU effect-model materials are BSBlendAlpha (mhfmodel), yet effect-mode Model units use unit byte 3 =
-1 / 0 / 6 / 5 (10111 / 294 / 261 / 65 of 10731), and 0xb007fc (the model helper efl4u2gu traced) picks the blend
-state from a draw word (bits 5-15, > 0x22 -> 1) through the shader-state table: S that the effect path takes the
-unit's blend byte over the material's (the byte -> word step in 0xa956d8 / 0xc90b50 is not traced).
+**Blend (C, 2026-11-11).** Particle init 0xa9958c: particle +0x18 = (unit +0 u32 >> 19) & 0x1fe0 = unit byte 3 << 5.
+The effect draw 0xa956d8 (mode 5) -> 0xc90380 -> 0xc90b50(rModel instance, draw context, ..., stack: colour, particle
++0x50, particle +0x18, particle +0xc bits 16-23, UV block): after the material set 0x87a048 (0xc91114) it calls the
+model helper 0xb007fc(context, particle +0x18) at 0xc928ec: index = (word & 0xffff) >> 5 (> 0x22 -> 1) into the
+blend-state table (0 BSBlendAddAlpha, 1 BSBlendBlendAlpha, 5 / 6 reverse-subtract: efl4u2gu, C) -> context +0x118, dirty
+bit context +0x10c bit 13. So the unit's byte 3 sets the blend over the material's own (BSBlendAlpha in every GU
+effect material: 4708 / 4708 effect-mode units of the player arcs, byte 3 = 0 on 24 of them). Ghidra stops 0xc90b50
+at 0xc9127c (the noreturn memcpy thunk 0x13efe30); the rest is read in dump/gu_main/main.asm (0xc90b50-0xc929xx).
 
 **Fields only the effect path reads** (template cm123_041 e0 -> GU weapon-arc effect-mode units / efl4u2gu em089-090):
 | field | use | e0 | GU effect | efl4u2gu |
@@ -210,7 +215,8 @@ unit's blend byte over the material's (the byte -> word step in 0xa956d8 / 0xc90
 | +0x10e bit 4 | gen +0x44 bit 3 (0xa949f8, C) | 1 | 0 | 0 |
 | +0x100 bits 8-11, +0x10c bit 28, +0x110 | draw sub-modes / offset x gen +0xfc (0xa956d8, C; G) | 0, 0, 0 | 0, 0, 0 mostly | same |
 | +0x3c, +0x120..+0x12c, +0x13c | 0xa9af40 block, sort key, UV transform (C) | GU's common values | same | same |
-The MHF units (mhffx2gu.model_effect_mode, 2026-11-11) clear +0x1a bit 0 and set +8 = 0, +0x10c = 0; blend = MHF's.
+The MHF units (mhffx2gu.model_effect_mode, 2026-11-11) clear +0x1a bit 0 and set +8 = 0, +0x10c = 0; blend = MHF's;
+MHF's UV scroll = UV layer 0 (+0x134, mhffx2gu.uv_block).
 
 **Nothing drawn when** (C unless marked): model path empty / unresolved; MRL or a material name missing, or an
 effect-mode material of another class (ready check, the whole effect fails); move kind 5 without +0x70; scene mode
@@ -248,9 +254,46 @@ Row vectors throughout (MT: v' = v . M, translation in row 3; 0x1ebe8 = A . B, C
   (rows normalised, their lengths kept as the slot scale). Hence a PEL post on joint j with offset o draws
   v . S . R . (rows of T(o) R_rec J) at the particle position: **the model in the joint's frame, offset o in that
   frame**, as MHF's bone-attached draw (S: that joint record +0x10 is the world matrix, as ms_act.c fx_fixed uses it).
-- Not traced: draw-time paths for mode 5 beyond the matrix (0xaef728, 0xbae520), the colour / alpha scaling in
-  0xc90b50 (alpha byte / constant), the material's lighting.
+- Not traced: draw-time paths for mode 5 beyond the matrix (0xaef728, 0xbae520); colour, UV and blend: "Model look".
 Check: `python3 weapons/magnet_spike/tools/fxplace.py` replays this on the built arc against MHF's math.
+
+## Model look: UV layers, colour, material (static, 2026-11-11; C unless marked)
+**UV layers.** Unit +0x134 lo16 = offset (from the unit) of a 0x40-B value block, UV layer 0: f32 (value, range)
+pairs u +0x00, v +0x08, du +0x10, dv +0x18; +0x20 damping; +0x24..+0x2f 0 (all GU units); +0x30 / +0x34 offsets of u / v
+curves (0 = none; header bits 27-29 == 3 set particle flag 0x10 = no sub-frame blend, 0xa6b824); +0x38 / +0x3c
+"curve adds to the previous value" flags. +0x136 = offset of extra layers (0x30 B each, count unit +0x13b & 0xf when
++0x138 bits 24-27 != 0; +0x138 bits 24-25 / 26-27 -> particle +0x100 bits 8-9 / 10-11).
+- Bind 0xa9499c: particle + 0x20 x (n extra + 1) bytes when +0x134 lo16 != 0; gen +0xd4 = their offset.
+- Init 0xa99f40 -> 0xa6b824: layer {u, v (two buffers each, particle +0xf bit 0), du, dv, flags, damping} = value
+  + r x range; du != 0 -> particle +0x10 flag 0x800, dv -> 0x1000 (curves: 0x20000000 / 0x40000000).
+- Update 0xa9a280 -> 0xa9ada0 -> 0xa6bc0c, every frame: u(new) = u(old) + du, du *= damping (curve: u = curve(age)
+  [+ u(old)]); both buffers beyond +-2 -> -+2. Extra layers alike (flags in their +0x18).
+- Draw 0xa956d8 mode 5: particle +0xcc == 0 and particle +0xfc lo16 == 0 -> no UV block (slot count 0); else
+  0xcaf17c(sub-frame, particle, block, EAN record +0x14) fills up to 4 slots (u, v) + count at +0x20: slot 0 = the EAN
+  frame offset (none: 0) + layer 0 blended by the sub-frame, wrapped to (-1, 1); slots 1.. the extra layers.
+- 0xc90b50 (0xc914dc): slot 0 -> CBMaterial +0x2c / +0x3c, slot 1 -> +0x4c / +0x5c, slot 2 -> +0x6c / +0x7c = the
+  translations of fUVTransform / 2 / 3 (2 x 4 rows at floats 8 / 16 / 24; mfx layout, mrl.cb_layout). efx_blend selects
+  FUVTransformPrimary = FUVTransformOffset and FUVAlbedoMap = FUVPrimary (S: by name, the albedo UV + that offset).
+- GU's own (player arcs): 2206 / 4708 effect-mode Model units carry a value block (du / dv 0.005..0.1 per frame,
+  damping 0.6..1.0; curves in 44); none uses +0x136 / +0x138 layers. Converted: mhffx2gu.uv_block (MHF modes 1-3).
+**Colour.** Particle colour +0xf0 / +0xf4 (RGBA u32, byte 0 = R; double-buffered, blended by gen +0x9c / 256), alpha x
+the draw's alpha argument >> 8; alpha 0 = not drawn. 0xc90b50: alpha / 255 -> 0x886bb4 (context +0x17c, a per-draw
+constant; S: multiplies the output alpha). The material's FEmission feature (0xb0ffd4 = its feature word) ==
+FEmissionConstantEflEmu: CBMaterial fDiffuseColor (floats 0..2) = RGB / 255 x particle +0x50 / 256 when particle +0x1c &
+0x3200001 == 0, else RGB / 255 and a second constant (context +0x1704) = particle +0x50 / 256 (0xc913a8..0xc914d8);
+fTransparency (float 3) stays the material's 1.0. Particle +0x50 = int(unit +0x20 x 256) (0xa6a2a4): unit +0x20 is an
+intensity (GU effect-mode units: 2.0 in 2691, 1.0 in 1588, 4.0 in 429 of 4708; ours 1.0).
+**Material** (efx_blend = em024 cm101_000, class 0x5fb0ebe4; feature words = (jamcrc(variant) & 0xfffff) << 12 |
+record, mrl_build.state_word, names from AppShaderPackage.mfx): FDiffuse = FDiffuseVertexColorMD, FEmission =
+FEmissionConstantEflEmu, FTransparency = FTransparencyAlpha, FAlbedo = FAlbedoMap (tAlbedoMap), FUVTransformPrimary =
+FUVTransformOffset, FLighting / FBRDF / FBump / FReflect / FShininess / FOcclusion / FDistortion / FVertexDisplacement
+= the feature's own (default) name, FSpecular = FSpecularMap (no map), FFresnel = FFresnelSchlick; states BSBlendAlpha
+(replaced per unit, above), DSZTestWrite, RSMeshCN. S (names only, the shader code is not read): unlit EFL emulation
+(texture x vertex colour x fDiffuseColor as emission), depth test and write on, no back-face cull. Every GU
+effect-mode model material has DSZTestWrite (4708 / 4708) and RSMeshCN in 4453. G: whether "MD" doubles the vertex
+colour (Capcom's 0x7f neutral, mhfmodel.NEUTRAL): GU's 7f-vertex models come with unit +0x20 = 1.0 (948) as often as
+2.0 (1264), so the corpus does not settle it.
+Check: `python3 weapons/magnet_spike/tools/fxlook.py` renders MHF's and GU's draw of the built units side by side.
 
 ## Main-agent decode (2026-11-04, C unless marked)
 - **Emit block = particle life** (0xaed0d0, called per new particle by 0xa5ca24 for emit-type high nibble 1 / 2):

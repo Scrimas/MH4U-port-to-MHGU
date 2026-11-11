@@ -17,7 +17,11 @@ problem lines. Conditions (notes/gu-efl-units.md "Unit block, Model (type 5)"; C
   group (0xb49090, C) and, for scene-model units (unit +0x1a bit 0), frame < mesh count (0xa94c10 shows mesh bit j
   for j < count only when j == frame, C). Tests 18-20: frame 1 on one-mesh models = nothing drawn.
 - Move kind 5 needs its position curve (move +0x70 != 0): 0xa59ce4 returns 0, the build fails (C).
-- Effect-mode units (unit +0x1a bit 0 clear): blend index (unit byte 3) one of EFFECT_BLENDS (S: what GU uses)."""
+- Effect-mode units (unit +0x1a bit 0 clear): blend index (unit byte 3) one of EFFECT_BLENDS (S: what GU uses).
+- UV layer 0 (unit +0x134 lo16, a 0x40-B value block read by 0xa99f40 / 0xa6b824 / 0xa6bc0c, C): inside the EFL; its
+  u / v curve offsets (+0x30 / +0x34, from the unit) zero or a curve header inside the EFL; no extra layers (+0x136,
+  +0x138 bits 24-27: 0 in all 4708 GU effect-mode units of the player arcs, not decoded beyond 0xa99f40); damping
+  (+0x20) finite. A bad offset reads garbage speeds or curves (no bounds check in the code)."""
 import os, struct, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -87,6 +91,20 @@ def check(entries, only=None):
                 for tt, tp in r['textures']:
                     if tt == T_TEX and pos.get((tp, T_TEX), kr + 1) > kr:
                         bad.append('%s: texture %s %s' % (tag, tp, 'missing' if (tp, T_TEX) not in pos else 'after the MRL'))
+            vb, x136 = struct.unpack_from('<HH', d, u + 0x134)
+            if vb:
+                if u + vb + 0x40 > len(d):
+                    bad.append('%s: UV value block +0x134 = %#x past the EFL end' % (tag, vb))
+                else:
+                    c_u, c_v = struct.unpack_from('<II', d, u + vb + 0x30)
+                    for nm, co in (('u', c_u), ('v', c_v)):
+                        if co and (u + co + 4 > len(d) or not struct.unpack_from('<I', d, u + co)[0] & 0xff):
+                            bad.append('%s: UV %s curve offset %#x invalid' % (tag, nm, co))
+                    damp = struct.unpack_from('<f', d, u + vb + 0x20)[0]
+                    if not (damp == damp and abs(damp) < 1e3):
+                        bad.append('%s: UV damping %r' % (tag, damp))
+            if x136 or (struct.unpack_from('<I', d, u + 0x138)[0] >> 24) & 0xf:
+                bad.append('%s: extra UV layers (+0x136 %#x / +0x138 bits 24-27) not decoded' % (tag, x136))
             if struct.unpack_from('<H', d, u + 0x44)[0]: continue
             f = struct.unpack_from('<I', d, u + 0x100)[0]
             groups = {x['group'] for x in m['mesh_list']}

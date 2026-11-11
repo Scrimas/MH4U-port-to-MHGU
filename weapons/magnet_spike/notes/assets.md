@@ -210,13 +210,36 @@ MHF's), the attach offset on GU's weapon bone, all 40 models.
     post's Euler angles and the A spawn rotation (0x113d3bd0, C), the A position turned by the post's yaw
     (0x113d37e0, C); GU's = S . R(order 0 = the same Rz Ry Rx) . the emitter (gu-efl-units.md "Model transform").
     Equal for a post without rotation (fxplace.py: <= 2 cm, the key times rounded to whole GU frames); with a
-    post yaw, MHF's Euler sum differs from GU's product wherever the spawn roll (z) is non-zero (S deviation);
+    post yaw, MHF's Euler sum differs from GU's product wherever the spawn roll (z) is non-zero (deviation, below);
+  - (2026-11-11, look) the Model units' blend = MHF's draw byte in unit byte 3 (C both sides: GU 0xa9958c -> particle
+    +0x18 -> 0xb007fc in the draw 0xc90b50, over the material's BSBlendAlpha; gu-efl-units.md "Blend"); MHF's UV
+    scroll (E +0x16 modes 1-3, 0x113d0690: 1 / (E +0x18 | +0x1c) / ls per tick, wrapped, C) = GU's UV layer 0 (unit
+    +0x134 value block, du / dv = half the per-tick step, v negated, start -D x speed: mhffx2gu.uv_block; 132 / 266
+    units; GU side C to the material's fUVTransform translation, gu-efl-units.md "Model look"). No Model unit uses a
+    flipbook (modes 4-6) or mode 1. Colour: the unit colour curve = MHF's C keys -> CBMaterial fDiffuseColor (RGB / 255
+    x unit +0x20 = 1.0, C), vertex colour RGB / 2 (Capcom's 0x7f neutral, S); MHF: texture x vertex colour x key (C).
+    Offline check: tools/fxlook.py (contact sheets in gen/fxplace/look/; mean |MHF - GU| of the pictures 0.0-2.4 / 255
+    on the 44 effects with Model units, up to 22 without the UV layer);
+  - look deviations (2026-11-11): (1) the Euler sum: at a post yaw of 90 deg 93 / 253 Model units move by more than 1
+    cm (fxplace --yaw 90), all but 4 with a spawn roll (fae:16's 4 at 1.2-1.4 cm: key rounding): fae:8 / a / b / c / d (48-83 cm), faf:1 / 3 (up
+    to 859 cm), fc5:2 / 5 / 22 / 38 / 39 / 3d / 3e / 40 / 4f (the RB-move arcs, attraction beam, Magnetise: up to 27 m
+    at the long beam's tip), fc6:2e / 2f / 30 / 33 / 34 (8-75 cm). MHF turns the particle by Rz(z) Ry(y + yaw) Rx(x)
+    (the post's yaw summed into the Euler angles, 0x113d3bd0), GU by Ry(yaw) Rz(z) Ry(y) Rx(x) (the emitter matrix
+    outside the unit's rotation, 0xa6d3b4): equal only for z = 0, and the yaw is the hunter's at run time, so no unit
+    value reproduces it (no static fix; C both sides). (2) the vertex colour x2 of efx_blend's FDiffuseVertexColorMD
+    (S / G: if the shader is 1x, every converted model draws at half brightness; unit +0x20 = 2.0 would be the fix).
+    (3) depth: efx_blend's DSZTestWrite writes depth (S by name), MHF's render states around its mesh draw (0x113ce040 /
+    0x113ce180 -> 0x1000c7d0) are not decoded (G): overlapping translucent arcs may hide each other in GU. (4) BC3:
+    the model textures lose 4-12 / 255 per channel and the median hue of saturated texels moves by 3-9 deg (mtex03
+    25.6 -> 34.4, mtex06 33.8 -> 26.1; measured, tools/tex.py's BC1 fit; an alpha-weighted fit gains 1-3.5 / 255, not
+    the hue); a contributor to the "wrong hue", not its cause (tests 17 / 18 had RGBA8 textures);
   - the shot's hand piece (msgun.py, 0x1004f7b0, C): v -> bone 18 (origin + R (S v + p)), R = Rz Ry Rx: the part
     offset p is turned by the part's rotation (test 21 drew R S v + p: parts 15-50 cm apart, the barrel 90 deg off);
   - (older, flat meshes) world-oriented MHF meshes -> GU Polygons (type 2, template w04.arc cm121_041 entry 2; layout C 0xa9ff8c:
     rotation x / y / z pairs +0x170, width / height +0x1c0 / +0x1c8 with curves +0x1b0 / +0x1b4); rotation order G;
-  - MHF UV animation (modes 2-6) -> baked frames on one looping EAN entry (flags 3, speed = 1 / frames per cell):
-    flipbooks exact, scrolls as SCROLL_FRAMES (8) steps per cycle (deviation: choppier than MHF's smooth scroll);
+  - MHF UV animation (modes 2-6) on sprites -> baked frames on one looping EAN entry (flags 3, speed = 1 / frames per
+    cell): flipbooks exact, scrolls as SCROLL_FRAMES (8) steps per cycle (deviation: choppier than MHF's smooth scroll;
+    the Model units scroll smoothly, above);
   - 453 GU entries over the 35 effects (one 1024 x 1024 atlas, 28 cells / 106 frames). Not converted yet
     (gen/report.txt lists each): position curves (67 particles), F emitters (15), UV modes 7 / 1 (3 / 1);
   - deviations (until a test says otherwise): GU's billboard size unit is G (half extent in cm assumed); mesh
