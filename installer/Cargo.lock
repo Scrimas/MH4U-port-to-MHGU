@@ -2566,11 +2566,13 @@ dependencies = [
  "rfd",
  "serde",
  "serde_json",
+ "skrifa",
  "slint",
  "slint-build",
  "sys-locale",
  "windows 0.61.3",
  "winresource",
+ "yeslogic-fontconfig-sys",
 ]
 
 [[package]]

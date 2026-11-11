@@ -32,10 +32,16 @@ dirs = "6"
 # the Start Menu shortcut (src/desktop.rs): the version sysinfo already brings
 windows = { version = "0.61", features = ["Win32_UI_Shell", "Win32_System_Com", "Win32_Storage_FileSystem"] }
 
-[target.'cfg(all(target_os = "linux", target_arch = "aarch64"))'.dependencies]
-# the arm64 AppImage is cross built (packaging/build.py): no aarch64 libfontconfig to link against, so Slint's font
-# lookup loads fontconfig at start (as winit loads Wayland and xkbcommon); Slint does not pass this feature on
+[target.'cfg(target_os = "linux")'.dependencies]
+# Slint's font lookup loads fontconfig at start, as winit loads Wayland and xkbcommon: the AppImages open without it
+# (the bundled fonts, src/fonts.rs), and the arm64 one is cross built with no aarch64 libfontconfig to link against.
+# Slint does not pass this feature on; src/fonts.rs asks the same fontconfig whether the system has fonts.
 fontique = { version = "0.11", default-features = false, features = ["fontconfig-dlopen"] }
+yeslogic-fontconfig-sys = { version = "6", features = ["dlopen"] }
+
+[dev-dependencies]
+# src/fonts.rs's test reads the bundled fonts' characters (the version Slint already brings)
+skrifa = "0.44"
 
 [build-dependencies]
 slint-build = "=1.18.1"

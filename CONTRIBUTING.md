@@ -112,8 +112,8 @@ full release into `dump/release/` ([Releases](#releases-maintainer) below).
 ## The installer
 
 `installer/` is the MHGU Definitive Edition Installer (Rust + Slint), the app players use. It needs no game files and
-none of the setup above: only [Rust](https://rustup.rs) (stable), and on Linux the fontconfig and xkbcommon
-development packages (Debian / Ubuntu: `libfontconfig1-dev libxkbcommon-dev`). `installer/README.md` maps its code;
+none of the setup above: only [Rust](https://rustup.rs) (stable), and on Linux the xkbcommon development package
+(Debian / Ubuntu: `libxkbcommon-dev`; fontconfig is loaded at start, not linked). `installer/README.md` maps its code;
 `notes/installer.md` is its design.
 
 ```sh

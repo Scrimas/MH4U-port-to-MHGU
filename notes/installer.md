@@ -124,6 +124,14 @@ enabled unless mods/load_order.txt marks it `# off:`): strong, not confirmed; th
   entry, an older copy takes it only when the file it names is gone. A self-update points the entry at the new file
   before the restart. `TryExec` hides a Linux entry whose AppImage is deleted; a Windows shortcut to a deleted .exe
   stays until another copy starts. CI's Windows job checks the shortcut after the snapshot run.
+- Fonts (`installer/gui/src/fonts.rs`): on Linux, Slint finds fonts through fontconfig, loaded at start (fontique's
+  `fontconfig-dlopen`, as winit loads Wayland and xkbcommon): the AppImages need no libfontconfig. A system without
+  fontconfig would show no text, and a fontconfig without fonts would stop the window from opening (fontique 0.11
+  unwraps fontconfig's empty match). There the window takes the AppImage's own fonts (`usr/share/mhgu-de-installer/
+  fonts`: Inter, Noto Sans Symbols for the gear, Noto Sans SC and TC, the window's Chinese first) through
+  `SLINT_FONT_PATH`, plus `FONTCONFIG_FILE` (their `fonts.conf`) when fontconfig has none. The fonts are cut to the
+  characters the installer shows (`installer/packaging/fonts.py`, about 500 KB); `fonts::tests::every_character` fails
+  when a translation or the window gains one they lack. Windows always has its own fonts (DirectWrite).
 - Settings and the download cache: `<config>/mhgu-de-installer/settings.json`, `<cache>/mhgu-de-installer/<release>/`;
   after each install only the installed release's zips stay (they serve another place later), older releases'
   folders are deleted.
@@ -132,7 +140,9 @@ enabled unless mods/load_order.txt marks it `# off:`): strong, not confirmed; th
 - Tests: core unit tests (synthetic saves: zeros with valid slot pointers, no game data), `installer/tests/cli_test.py`
   (a fake release of dummy files into every kind of place), CI on Linux and Windows; each Windows .exe (x86_64 and
   arm64) is started on its runner and draws its window (MHGU_DE_SNAPSHOT), each AppImage gives its `--version` on
-  Linux x86_64 and aarch64. Windows and ARM are tested by CI only.
+  Linux x86_64 and aarch64 and draws its window under Xvfb three times: with the system's fonts, with an empty
+  fontconfig (in Chinese), and with libfontconfig hidden (its own fonts both times). Windows and ARM are tested by CI
+  only.
 
 ## Not yet verified
 

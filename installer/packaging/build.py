@@ -16,9 +16,10 @@ Needs:
   x86_64 AppImage   cargo-zigbuild + zig (else the binary needs this machine's glibc or newer), mksquashfs
                     (squashfs-tools), APPIMAGE_RUNTIME=<the type 2 runtime-x86_64 file>
   arm64 AppImage    rustup target aarch64-unknown-linux-gnu + cargo-zigbuild + zig (zig needed unless this machine is
-                    aarch64), mksquashfs, APPIMAGE_RUNTIME_ARM64=<the type 2 runtime-aarch64 file>; fontconfig is
-                    loaded at start (gui/Cargo.toml: fontique fontconfig-dlopen on aarch64 Linux, there is no
-                    aarch64 libfontconfig to link against when cross building), as Wayland and xkbcommon already are
+                    aarch64), mksquashfs, APPIMAGE_RUNTIME_ARM64=<the type 2 runtime-aarch64 file>
+Both AppImages load fontconfig at start, as Wayland and xkbcommon (gui/Cargo.toml: fontique fontconfig-dlopen), and
+carry fallback fonts (gui/assets/fonts, packaging/fonts.py) in usr/share/mhgu-de-installer/fonts: on a system without
+fontconfig, or whose fontconfig has no font, the window takes them (gui/src/fonts.rs).
 CI: .github/workflows/installer.yml, in an Arch Linux container like the editor's.
 """
 import hashlib, os, platform, shutil, subprocess, sys, tempfile, tomllib
@@ -89,6 +90,8 @@ def appimage(ver, arch):
         for d in ('usr/bin', 'usr/share/applications', 'usr/share/icons/hicolor/256x256/apps'):
             os.makedirs(os.path.join(app, d))
         shutil.copy(binary, os.path.join(app, 'usr/bin/mhgu-de-installer'))
+        # the fallback fonts, their licences and fonts.conf (gui/src/fonts.rs finds them from usr/bin)
+        shutil.copytree(os.path.join(INST, 'gui/assets/fonts'), os.path.join(app, 'usr/share/mhgu-de-installer/fonts'))
         desktop = os.path.join(HERE, 'mhgu-de-installer.desktop')
         icon = os.path.join(INST, 'gui/assets/icon-256.png')
         shutil.copy(desktop, os.path.join(app, 'usr/share/applications'))

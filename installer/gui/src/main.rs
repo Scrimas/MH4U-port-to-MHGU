@@ -5,6 +5,7 @@
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
 mod desktop;
+mod fonts;
 mod i18n;
 
 use mhgu_de_core::apply;
@@ -999,6 +1000,9 @@ fn main() {
         println!("{}", mhgu_de_core::VERSION);
         return;
     }
+    // the bundled fonts when the system has none (src/fonts.rs): before the window and any thread
+    #[cfg(target_os = "linux")]
+    fonts::fallback(i18n::LANGS[i18n::index_of(&s.language)].0);
     // the system's menu: the AppImage's desktop entry, the .exe's Start Menu shortcut (CI's Windows job checks it)
     desktop::install();
     // Wayland app id / X11 class, the entry's StartupWMClass: the desktop matches the window to its icon. Before

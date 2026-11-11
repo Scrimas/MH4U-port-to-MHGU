@@ -10,7 +10,8 @@ name: Installer
 #                runtime) and SHA256SUMS-<v> of the four
 #   windows      each shipped .exe started on Windows (x86_64, and Windows 11 on ARM): it opens its window and draws
 #                it into a PNG, then quits
-#   linux        each shipped AppImage started on Linux (x86_64, aarch64): --version
+#   linux        each shipped AppImage started on Linux (x86_64, aarch64): --version, then its window drawn into PNGs
+#                with the system's fonts, with a fontconfig without fonts, and without fontconfig (its own fonts)
 #   release      a tag: a DRAFT release "MHGU Definitive Edition <v>" with the files, Latest once published
 #                (GitHub's default: the newest version); its text comes from tools/release.py (NOTES-main.md).
 #                This repository's releases are the installer's since 2.0.0; the mod's are on
@@ -47,7 +48,7 @@ jobs:
           python-version: '3.12'
       - name: Linux libraries
         if: runner.os == 'Linux'
-        run: sudo apt-get install -y -q libfontconfig1-dev libxkbcommon-dev gettext
+        run: sudo apt-get install -y -q libxkbcommon-dev gettext
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: installer
@@ -84,7 +85,7 @@ jobs:
       - name: Toolchain
         run: |
           pacman -Syu --noconfirm --needed git github-cli rustup mingw-w64-gcc zig cargo-zigbuild squashfs-tools \
-            fontconfig python
+            python
           rustup default stable
           rustup target add x86_64-pc-windows-gnu aarch64-pc-windows-gnullvm aarch64-unknown-linux-gnu
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
@@ -177,6 +178,43 @@ jobs:
         run: |
           chmod +x "$APP"
           test "$(APPIMAGE_EXTRACT_AND_RUN=1 "$APP" --version)" = "$VER"
+      - name: Open the window (system fonts, a fontconfig without fonts, no fontconfig)
+        # under Xvfb, each start draws its window into a PNG, then quits. Without system fonts the window takes the
+        # AppImage's own (installer/gui/src/fonts.rs): an empty fontconfig (in Chinese, the CJK fonts), then
+        # libfontconfig itself hidden behind /dev/null
+        run: |
+          set -o pipefail
+          sudo apt-get update -q
+          sudo apt-get install -y -q xvfb libfontconfig1 fonts-dejavu-core libegl1 libegl-mesa0 libgl1 libglx-mesa0 \
+            libgl1-mesa-dri libxkbcommon-x11-0 libxcursor1 libxi6
+          Xvfb :99 -screen 0 1280x800x24 &
+          export DISPLAY=:99
+          sleep 3
+          shot() {  # <name> [VAR=value ...]: the window drawn into <name>.png, its output in <name>.log
+            n=$1
+            shift
+            env "$@" APPIMAGE_EXTRACT_AND_RUN=1 MHGU_DE_SNAPSHOT="$PWD/$n.png" timeout 180 "$APP" 2>&1 | tee "$n.log"
+            test -s "$n.png"
+          }
+          shot system-fonts
+          if grep -q 'the bundled fonts' system-fonts.log; then
+            echo "::error::the bundled fonts with the system's"
+            exit 1
+          fi
+          printf '<fontconfig></fontconfig>\n' > "$RUNNER_TEMP/empty.conf"
+          shot fontconfig-without-fonts FONTCONFIG_FILE="$RUNNER_TEMP/empty.conf" LANGUAGE=zh_TW
+          grep -q 'fontconfig has no font, the bundled fonts' fontconfig-without-fonts.log
+          lib=$(ldconfig -p | awk '/libfontconfig\.so\.1 /{print $NF; exit}')
+          sudo mount --bind /dev/null "$lib"
+          shot no-fontconfig
+          grep -q 'no fontconfig, the bundled fonts' no-fontconfig.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-${{ matrix.arch }}-window-${{ needs.build.outputs.ver }}
+          path: "*.png"
+          if-no-files-found: ignore
+          retention-days: 3
 
   release:
     needs: [build, windows, linux]
