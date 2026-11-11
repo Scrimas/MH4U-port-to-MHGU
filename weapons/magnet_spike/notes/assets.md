@@ -17,7 +17,7 @@ records each file's source and SHA-1.
 | `weapon/wkNNN/{0.fmod, 1.fskl, 2.tex}` | `dat/extend/wk000.abn` / `wk500.abn` entries: ECD, then a simple archive of JPK parts. The build uses wk400, 404, 407, 414, 415, 595, 606 |
 | `player/m_editpl.{0.bin, fskl}` | the character-edit male body (parts 0 FMOD, 1 FSKL) |
 | `zz/mhfdat.dec.bin`, `zz/mhfsdt.dec.bin` | `dat/mhfdat.bin` / `mhfsdt.bin` of the ZZ client "Monster Hunter Frontier Z PC [EN-CT4.1]", ECD-decrypted (CRC checked) |
-| `ui/mhf_90c_04.png` | `dat/mhf_90c.bin.xbox`, PNG 4 (the HUD's gauge cell and horseshoe) |
+| `ui/mhf_90c_04.png` | `dat/mhf_90c.bin.xbox`, PNG 4 (the HUD's gauge cell and horseshoe; the aim reticle's cell at v 323, mechanics.md "MHF's reticle") |
 
 Bringing these scripts into the repo would allow a `setup.py mhf` step from a client folder; not done yet.
 
@@ -38,8 +38,9 @@ Bringing these scripts into the repo would allow a `setup.py mhf` step from a cl
     steps, i.e. slow motion.
   - The set-motion routine 0x10a92cd0 halves the step's blend (`blend / 2`) before storing it in a counter.
 
-  The preview plays at 60 fps (Paxlord's plugin used 30). For GU's 30 fps lists, MHF frames, event frames and cancel
-  windows divide by 2. To confirm with the first in-game walk.
+  The preview plays at 60 fps (Paxlord's plugin used 30). (Superseded 2026-10-29: GU's motion frames are 1/60 s too,
+  so MHF motion, event and cancel-window frames carry over 1:1, phase2.md "Frames", msmot.py; only MHF's tick
+  counts double into frames: mechanics.md "Time and units".)
 
 ## Skeletons (C)
 MHF player (FSKL, 21 bones) and MHGU player (bone ids 0-19 + root track 255 in GU's LMTs) are the same skeleton,
@@ -74,7 +75,7 @@ other fist is within 6 cm of the keyed weapon and 4 cm closer): 17 motions spend
 0-102, 1043 frames 11-139, ...; the wind-ups 1406 / 1418 / 1446 that precede 1035 in actions 152 / 155 / 154 end in
 it), and every clean switch (new fist 0.1-1.2 cm) comes while the other fist is on the weapon too, i.e. a hand-over.
 No flag for it in the motion files (bones 0-2 carry no channels, no data after the tracks) nor in the action events:
-MHF's switch mechanism is still to find (Phase 2 can run on msgrip's table meanwhile).
+MHF's switch mechanism is still to find; the port bakes msgrip's table into the weapon root track (msmot.py).
 The Euler order holds on these grips: with R = Rz Ry Rx the free palm meets the bar within 5 cm on 34 % of 2232
 sampled frames (median 6.5 cm), against 2-10 % (median 18-35 cm) for the five other orders.
 Shapes in the hand frame (wk400):
@@ -83,7 +84,7 @@ Shapes in the hand frame (wk400):
 - Impact: the rods folded parallel into a 1.4 m double shaft along +z (the grip), the blades parallel (the
   horseshoe) from 0.55 to 2.65 m, bone 4 keyed 250 cm out (the head block at 2.2-2.5 m).
 Guard Counter (1034) lets the right hand go for the counter swing (29-34 cm off the weapon at frames 30-45, back by
-frame 60): MHF's animation, the keys keep the weapon in the left fist. Not read yet (Phase 2): the sheathed placement.
+frame 60): MHF's animation, the keys keep the weapon in the left fist. Not read yet: the sheathed placement (the port carries it as a Great Sword, phase3.md test 4 row 11).
 
 ## Weapon motions in MHGU (C, corrected 2026-10-29)
 The player LMTs animate the player bones only, and the model arcs (weapon\wNN\%03d) hold no motions. The weapon
@@ -106,8 +107,10 @@ the 11 FSKL bones with local matrices and inverse binds (cube quantisation folde
 vertices in 0x14D40022, one strip per triangle, envelopes from mod4u2gu. The PNG texture (MHF `2.tex` = small header
 + PNG) -> GU BC3 albedo + BC4 alpha (`tools/tex.py`). `fmod2gu.py arc WKDIR TEMPLATE.arc OUT.arc` puts the MOD
 and textures into a GU weapon arc in place of its own (template MRL kept): wk400 in Great Sword 001's arc parses
-back clean (`armor4u2gu.check`). Still to do for real weapons: edge and proxy meshes, the MRL (materials from
-MHF's), the attach offset on GU's weapon bone, all 40 models.
+back clean (`armor4u2gu.check`). Still to do for real weapons (Phase 1 list): edge and proxy meshes, the MRL (materials from
+MHF's), the attach offset on GU's weapon bone, all 40 models. Since: msbuild converts the 7 models the weapons use
+(Inputs); the attach needs no offset (joint 8, gu-weapon-class.md "Weapon attach"); edge / proxy meshes and the MRL
+not re-checked in these notes.
 
 ## Effects (MHF side, C unless marked; 2026-11-04)
 - **Container**: `dat/effect.bin` = u32 count 20 + (offset, size) pairs; the client keeps it at 0x1ed528bc.
@@ -132,10 +135,10 @@ MHF's), the attach offset on GU's weapon bone, all 40 models.
   - Attraction / marker / pin (0x10332..0x10336): 0xfc5 0x16, 0x22, 0x30, 0x3a, 0x39, 0x3e, 0x40, 0x45, 0x4f, 0x5e, 0x5d, 0x1a, 0x3, 0x14, 0x15, 0x37, 0x38.
 - **Plan** (port, maintainer's request after test 14):
   1. decode the set sections' meaning from the spawn / update / draw code (0x113d35a0 on);
-  2. convert the textures (PNG -> GU RGBA8 .tex, as tools/efl4u2gu.py convert_tex);
+  2. convert the textures (PNG -> GU RGBA8 .tex, as tools/efl4u2gu.py convert_tex; BC3 since test 20);
   3. build GU EFL per MHF effect from GU template units (billboard particle / ribbon / mesh: tools/efl4u2gu.py knows the containers and block layouts), with MHF's colours, sizes, lifetimes, counts and velocities;
-  4. post them where MHF does (msfx PEL ids, ms_act posts); they replace the GS stand-ins.
-- **Effect runtime** (decoded 2026-11-04 except the F emitters):
+  4. post them where MHF does (msfx PEL ids, ms_act posts); they replace the GS stand-ins. (All four done: Conversion.)
+- **Effect runtime** (decoded 2026-11-04 except the F emitters; those: effect-posts.md "F emitters", C):
   - **Effect** = every A record with A +0x50 == the effect id: the posted "index" is that id, not an A row. 0x113d3fc0 runs the timeline per frame:
     - each matching A spawns at its frame +0x4e: +0x58 particles, flags +0x54 (bit 0 = no particle);
     - particle definition = the E record whose +4 == A +0x4c; params A +0x48 / +0x5c / +0x52;
@@ -191,8 +194,15 @@ MHF's), the attach offset on GU's weapon bone, all 40 models.
     paths. Any effect whose motion GU can only approximate (from the 3-key paths on, or anything the converter
     fits with an error above its tolerance) goes on the deviation list with its error; the converter prints that
     list.
-- **Conversion** (tools/mhffx2gu.py, run by msbuild; GU format: notes/gu-efl-units.md), 2026-11-04:
-  - each MHF particle = one GU Billboard entry cloned from em001_00_500 entry 0 (one particle, once, no motion);
+- **Conversion** (tools/mhffx2gu.py, run by msbuild; GU format: notes/gu-efl-units.md), 2026-11-04 to 2026-11-11.
+  Current state (2026-11-11): camera-facing particles -> Billboards on one BC3 atlas (mesh, spawn rotation and scale
+  baked); world-oriented flat meshes -> Polygons; world-oriented 3-D meshes -> Model units (effect draw; the test-22
+  scene-mode set aside) with MHF's blend and UV scroll; position curves and F emitters (mean path) -> move kind 5;
+  every code post, per-motion key, carrier and the hand piece posted (effect-posts.md, msfxposts.py, msgun.py);
+  effcheck.py / fxplace.py / fxlook.py / fxbudget.py check the built arc. Not converted: sprite UV modes 1 / 7, mesh
+  flipbooks, rotation curves, sets' own packs, colour flag 0x40, F bounces / children (mhffx2gu.py docstring,
+  gen/report.txt). Deviations: the list below and phase3.md "Deviations". The items below are in order of work:
+  - each (camera-facing, since test 19) MHF particle = one GU Billboard entry cloned from em001_00_500 entry 0 (one particle, once, no motion);
     its MHF mesh baked into a sprite of one atlas (effect\base\ms_mhf_000 TEX + EAN), scale / colour curves from
     MHF's keys, the burst frame as an invisible lead-in (alpha 0, keys shifted), life in the emit block;
   - msbuild packs every converted effect into w05.arc (effect\pl\w05\ms_SSS_EEE[_k], <= 32 entries per file);
@@ -200,8 +210,9 @@ MHF's), the attach offset on GU's weapon bone, all 40 models.
     offset) = a record per MHF base-offset group with its entry mask and joint (msmot.BODY_MAP; bone 0 = none);
     ms_act.c fx_posts posts the motion rows (117) at their frames with MHF's Magnetise gate, fx_queue the event
     rows (guard, Impact guard, Triple Strike level 1 / overcharge / early release); GS's Magnetic Shock stand-ins
-    are off when the table is on. Not posted yet: the carriers (marker, shot and trail, beams, Magnetise loops),
-    the pin's, event 17's hand piece (effect-posts.md "Not posted yet" in msfxposts.py);
+    are off when the table is on. Not posted yet (2026-11-04): the carriers (marker, shot and trail, beams, Magnetise
+    loops), the pin's, event 17's hand piece (since posted, but for the pin's: tests 16-18, msfxposts EVENT_POSTS,
+    msgun.py);
   - spawn spread: the MHF base offset = the record's position, the range = GU's box spawn shape (element +0x78
     byte 0 = 1, extents +0x60 / +0x68 / +0x70: 0xa5e450 case 1, C);
   - (2026-11-11) world-oriented 3-D meshes (not flat in x / y) -> GU Model units in effect draw on the mesh as a
@@ -240,8 +251,9 @@ MHF's), the attach offset on GU's weapon bone, all 40 models.
   - MHF UV animation (modes 2-6) on sprites -> baked frames on one looping EAN entry (flags 3, speed = 1 / frames per
     cell): flipbooks exact, scrolls as SCROLL_FRAMES (8) steps per cycle (deviation: choppier than MHF's smooth scroll;
     the Model units scroll smoothly, above);
-  - 453 GU entries over the 35 effects (one 1024 x 1024 atlas, 28 cells / 106 frames). Not converted yet
-    (gen/report.txt lists each): position curves (67 particles), F emitters (15), UV modes 7 / 1 (3 / 1);
+  - 453 GU entries over the 35 effects (one 1024 x 1024 atlas, 28 cells / 106 frames; 2026-11-04 numbers). Not converted
+    then (gen/report.txt lists each): position curves (67 particles), F emitters (15) (both since test 18: move kind 5,
+    gu-efl-move.md), UV modes 7 / 1 (3 / 1; still);
   - deviations (until a test says otherwise): GU's billboard size unit is G (half extent in cm assumed); mesh
     overlaps baked with "max"; the GU volume setting may shorten fades.
 - **GU side**: GU's generator classes (DTI names at 0x157816d..):

@@ -7,8 +7,14 @@ The module side is weapons/magnet_spike/module/ms_act.c (Phase 3).
 ## Time and units
 - MHF counters tick at 30 / s (S: executor tick); motion frames are 1/60 s. GU: `dt` = float p+0x1c in 1/60-s frames
   (C: 0.5 per update at the FPS patch's 120 updates / s, test 13's per-update log; 2.0 at 30-Hz logic), timers do
-  `t -= dt` (0x53aa84), the i-frame timer +0x2b40 too. Module: MHF ticks = dt / 2 (tests 1-14 used dt: every MHF
-  timer ran twice as fast).
+  `t -= dt` (0x53aa84), the i-frame timer +0x2b40 too. Module: MHF ticks = dt / 2 (ms_act.c tick_len; tests 1-14 used
+  dt: every MHF timer ran twice as fast).
+- Which number is which (C on the code, 2026-11-11): MHF motion frames = GU motion frames (both 1/60 s), so motion,
+  step, event and cancel-window frames carry over 1:1 (msmot.py, msbuild.py, phase2.md "Frames"); counts in MHF's
+  30-Hz ticks become 2 frames a tick where they turn into frame data (an attack's live time: HDP [3] = 2 x mhfsdt
+  raw[1], msbuild; task ticks t after a motion frame f0: frame f0 + 2 t, msfxposts; effect ages and timelines, which
+  MHF counts 2 a tick, carry over 1:1, mhffx2gu), and stay ticks in the module's timers (tick_len). assets.md's old
+  "divide by 2" (Phase 1, for 30-fps lists) does not apply: GU's motion lists run at 60 frames / s.
 - Distances: MHF units = GU units (S: both ~cm). Stamina: MHF 75 = a roll, GU 150 = a roll (GU = 6 x displayed,
   S) -> GU = 2 x MHF.
 
@@ -28,13 +34,13 @@ the marker: 29 87 88 118 168. +0x34 max turn: 95/96/159-162 60 deg, 110/111/114/
 | 1 | `P+0x410 = (p&2)?2:0` (ends on landing), p&1 airborne | `air` (GU move state 2), `end_on_land` |
 | 2 | P+0x12 = p (drawn) | the action start's vt+0x46c(p, 1) |
 | 3 / 4 | attack (mhfsdt 0x78) / special (0x79) | arm the event's hit-data entry (+ MS_MAG_BASE magnetised) |
-| 6 | ext+0x280 = 1: 0x1032f880 keeps P+0x4f0 >= 4 every executor tick (event 5 would clear it; unused). At the start of nearly every action, so P+0x4f0 never reaches 0 while in MS actions: not an i-frame counter (the hit gate 0x108c5910 does not read it; C) | not run |
+| 6 | ext+0x280 = 1: 0x1032f880 keeps P+0x4f0 >= 4 every executor tick (event 5 would clear it; unused). At the start of nearly every action, so P+0x4f0 never reaches 0 while in MS actions: not an i-frame counter (the hit gate 0x108c5910 does not read it; C). Every action change clears ext+0x280 (0x10a80050, see "Invincibility"; C) | not run |
 | 7 / 8 | i-frames P+0x4ee = max(., p) (0x10338240) / max(., 0x10337e30(p)) (0x103382b0): p + prm10 (10) with skill 0xb2 (0x101c06a0(P, 0xb2)) or 0x10a8c3e0(0xfc), else p + prm9 (5) with 0xb1 / 0xfb, else p. Both also clear ext+0x284 (event 9) | 0x2a6760(p, 2p, 0); Evasion level 0x2a69dc(p, 0x1f); `keep_if = 0` |
-| 9 | ext+0x284 = 1 (0x10338320): 0x1032f880 keeps P+0x4ee >= 2 every executor tick until a later event 7 / 8 clears it (no other writer in the dll for the MS: C; see "Invincibility") | 0x2a6760(p, 4, 0) each update; the module also clears it at every action start (deviation) |
+| 9 | ext+0x284 = 1 (0x10338320): 0x1032f880 keeps P+0x4ee >= 2 every executor tick of that action; events 7 / 8 and every action change (0x10a80050) clear it, so it never outlives the action (C, 2026-11-11; see "Invincibility") | 0x2a6760(p, 4, 0) each update of that action; `keep_if` cleared by 7 / 8, at every action start and when GU takes over (same as MHF); log lines `event-9 i-frame keep on / off` |
 | 11 / 45 | stamina 75 (evade) / prm80 30 | 0x2a5ebc(p, -150 / -60, 0) |
 | 12 | camera shake preset p (local) | 0x2a063c(p, 0xf, 0) (S: GS's landing preset for all) |
 | 13 | motion rate p % (P+0xc24) | p+0x50c = p / 100 |
-| 17 | task 0x3c (marker effect) | not run (effects) |
+| 17 | task 0x3c: the shot's hand piece on bone 18 ("0x312" = bone 18, 3 parts: not an effect id; effect-posts.md "Notes") | msgun.py's model posted as a motion key on joint 12 at f6 of 82 / 84 (msbuild) |
 | 21 | guard window P+0x418 0x8000: 0 set, 1 clear, 2 / 3 clear unless Guard skills 0x28 / 0x29 | +0x2510 bit 0x10 (0x283238 / 0x28321c); 2 kept with GU's has-skill (0x2864c4) 14 or 15, 3 kept with 15 (S: GU's guard code checks 14 / 15 = Guard +1 / +2) |
 | 24 | MS+0x6a guard level (5) | class 5 guards with GS's rules (build.py patches) |
 | 25 | per tick y -= p * 0.1 * t; t++ | `grav`, `grav_t` |
@@ -65,30 +71,56 @@ Unused by the data: 5, 10, 14-16, 18-20, 22, 23, 32, 34, 35.
 - **Capcom's chart "17if" = Evasion +2 (C, arithmetic):** the chart's moves carry event 8 param 7 and the repulsion event
   8 param 14; 7 + prm10 = 17 and 14 + prm10 = 24 = the chart's repulsion "24if". In 60-Hz frames the base values would
   read 14 / 28, so the chart is in 30-Hz ticks with Evasion +2 (the chart's Just Guard "19if" vs 113's 7 + 10 = 17: G).
-- **Event 9 persistence: OPEN (S overall; not ported).** What is C: ext+0x284 is set by event 9 (0x10338320) and
-  cleared by events 7 / 8 (0x10338240 / 0x103382b0); its only reader is the keeper 0x1032f880, called from the MS
-  executor 0x1032fa80 (descriptor slot 9, run only by the group-1 dispatcher 0x109ff060 for actions other than
-  0xf0-0xf4), so the keep runs in MS actions (walk 40 / 41 / 44 / 45 included) and not in drawn idle (0x1032d2d0 is
-  slot 4, run by the group-0 idle handler 0x109af850) or shared actions. Searched (2026-11-11): every `[reg+0x284]`
-  store in the dll (only the weapons' own event-7 / 8 / 9 handlers, each for its weapon type), every memset after
-  an ext-index computation (18 sites; none covers ext+0x284: MS 0x1c0 + 0x90, +0x580 + 0xbc, +0x92c + 0x9c), the
-  action-change setter 0x10a81af0 (no ext access). Not excludable statically: block writes through passed pointers,
-  and hit paths other than 0x108c5910 that skip the +0x4ee gate. If MHF works as the code reads, after 59 / 73 /
-  63 / 69 / 94 / 97 the hunter stays invulnerable in every later MS action without event 7 / 8 (the landings
-  60 / 64 / 70 / 74, walk 41, attacks 141 / 142, Guard Counter 14) until one with event 7 / 8 (58, 66, 106-108, 135,
-  136 from 60) starts; in idle the counter runs out in 2 ticks. Windows (base, no Evasion; 30-Hz ticks):
-  attraction alone 0-6 of ~30-42 to the landing; attraction -> Y (59, earliest at 58's f50 = tick 21): 0-6, gap
-  7-20 (17-20 with Evasion +2), then 59 + landing 60 covered, idle: 2 more ticks, then none; approach cancel 63: as
-  59; pin leap 94 / 97: from its start through 98 / 99 (4 / tick) until 101-104 (20) or 105 / 157 (110) clear
-  it. Port: the keep lasts to the end of that action (`keep_if` reset at every action start).
+- **Event 9 does not carry over (C, 2026-11-11, step H).** ext+0x284 is set by event 9 (0x10338320), cleared by
+  events 7 / 8 (0x10338240 / 0x103382b0) AND by 0x10a80050, which every action change runs: it writes ext+0x280,
+  +0x284 and +0x288 = 0 unconditionally (after resetting the weapon-type part of the ext block), for any hunter with
+  P+0x10 == 0 (the same test event 9's handler makes). Its callers (571) include the general action setter 0x10a80a00
+  (straight-line after its early returns, which return without changing the action) and the neutral setter
+  0x10a81af0 (when P+0x411 == 0). MS action changes: the cancel engine 0x10a68110 and the step runner 0x10a67790 both
+  change the action through the executor's callback 0x10337c50 -> 0x10337c00 -> 0x10a80a00; the landing handler
+  0x10331350 through 0x1032fc10 (-> 0x10a80050, 0x10a81af0); the extras 0x103339d0 call 0x10a80a00 directly; the
+  end of the action / neutral through 0x10a81af0. The executor 0x1032fa80 also skips the keeper on a tick whose steps
+  or extras changed the action. So the keep lasts from event 9 (start of 59 / 73 / 63 / 69 / 94 / 97) to the end of
+  that action; at the change +0x4ee holds >= 2, which runs out in 2 ticks (0x10a72ed0). The earlier "no other
+  writer" missed 0x10a80050 because its ext pointer comes from the player, not from an `add reg, 0x1e2a32f0` site
+  followed by a store, and 0x10a81af0 reaches it through a call.
+  - (a) ext block (C): a static array of 8 x 0x9d0 bytes at 0x1e2a32f0 (index P+0xc < 8; uninitialised section,
+    zero at load); getter 0x10a7e850 (346 callers). Writers covering +0x284: the three MS handlers, 0x10a80050, and
+    other weapon types' own event handlers (10275960 ... 11327750, via 0x10a7e850, run only for their weapon type).
+    Scanned: every ext-base computation (962) followed through register copies, lea, pushes and the callees taking
+    the pointer; every memset / rep movs / rep stos those reach (none covers +0x284: MS +0x1c0 / 0x90, +0x6c / 0xa0,
+    +0x11c / 0xa0, +0x580 / 0xbc, +0x92c / 0x9c); no whole-entry (0x9d0 / 0x274 dwords) or whole-array copy of the ext
+    array. Not followed: ext pointers saved in stack locals and reloaded (about 80 sites); 0x10a80050 already settles
+    the question.
+  - (b) hits (C for the attack objects, S beyond): 0x108c5910 and 0x108c69c0 test +0x4ee first (above). Damage that
+    is not an attack object (status ticks, environment) not traced. The answer to "carried over" does not depend on
+    (b): the flag is gone at the next action change.
+  - (c) what ends it: any action change (the landings 60 / 64 / 70 / 74 included, whatever events they carry), events
+    7 / 8, sheathing, items, rolls, being hit (all action changes). Drawn idle never sees it set.
+  - (d) invulnerable ticks (30 Hz, base, no Evasion; +5 / +10 on event 8 with Evasion +1 / +2):
+    - attraction 58, no follow-up: 0-6 (event 8: 7), then none through the flight, the fall and the landing.
+    - 58 -> Y 59 (from 58's f50, tick 21) -> landing 60 -> stand 3 s -> walk 3 s -> Y: 0-6, none 7-20, all of 59 to the
+      landing, 2 ticks into 60, then none (60, idle, walk and the plain Y carry no event 7 / 8 / 9).
+    - approach cancel 63 / 69: all of 63 from its start, 2 ticks into the next action.
+    - pin leap 94 / 97: all of the leap, 2 ticks into 98, none in the rest of 98, 4 every tick of 99 (pinned QTE,
+      0x103339d0), then 4 ticks into 100 / 156, or event 8 20 in 101-104, event 7 110 in 105 / 157.
+  - The maintainer's memory ("RT + Y is invincible from input to the moment the player reaches the ground") does not
+    match MHF's code for the attraction alone: 58 grants 7 ticks (0.23 s; 17 = 0.57 s with Evasion +2) and nothing
+    during the flight. It matches RT + Y followed by Y (59): from 59's start to the ground, plus 58's first 7 ticks;
+    the gap between them is 14 ticks (0.47 s) at the earliest Y. Not settled by statics: per-kind hit tests after the
+    +0x4ee gate for an airborne hunter (S).
+  - Port (C, same as MHF): `keep_if` from event 9 to the action's end (action_start, events 7 / 8, GU's own action),
+    4 GU frames (2 ticks) each update while set, so 2 ticks remain after the change. Log: `msport: event-9 i-frame
+    keep on in action A (frame F)` / `msport: event-9 i-frame keep off (action change | event 7 / 8 | GU action, next
+    N) after T ticks of action A, GU timer G/60 s`.
 
 | moves (actions) | MHF (30-Hz ticks from the action start) | port | source |
 |---|---|---|---|
 | RB moves: Double Slash 11 / 135, Double Swipe 39 / 146, Assault 12 / 51 / 136, 38 / 53 / 138, Retreat Slash 106, 158, Magnetic Evasion 107 / 108 / 116 / 117 | event 8: 7 (0.233 s); 12 / 17 with Evasion +1 / +2 (0.4 / 0.567 s) | same (2n GU frames + GU's Evasion; log "GU timer 14/60 s") | C |
 | Just Guard 113, Guard Assault 114 / 115 | event 8: 7 / 12 / 17 | same | C |
 | attraction 58 / 61 / 62 / 68 / 71 / 72 | event 8 at the start only: 7 / 12 / 17; nothing until landing (the flight lasts ~20-25 ticks + the fall) | same | C |
-| falling attacks 59 / 73, approach cancels 63 / 69 | event 9: >= 2 every tick of the action (C); kept in later MS actions until an event 7 / 8 (open, S) | >= 2 ticks each update of that action only | C / S |
-| pin leaps 94 / 97 -> 98 | event 9 as above | as above | C / S |
+| falling attacks 59 / 73, approach cancels 63 / 69 | event 9: >= 2 every tick of the action, cleared at the next action change (0x10a80050): 2 ticks remain | same | C |
+| pin leaps 94 / 97 -> 98 | event 9 as above | as above | C |
 | pinned QTE 99 | 4 every tick while pinned | 8 GU frames each update, forced | C |
 | repulsion 66 / 67 | event 8: 14 / 19 / 24 (0.467-0.8 s) | same | C |
 | Guard Counter success 57 / 76 / 77 | event 7: 14 (no Evasion) | same | C |
@@ -159,8 +191,8 @@ test common ids 4 / 24 / 38 (1/6) and 49 / 50 (1/13, 1/14); with R held 49 / 50 
   start of 1082 in 161 / 162; it restarts task kind 0x0f (0x1004d810, one step per tick): special #12 (MV 5, KO 5)
   spawned (0x101e8120(owner, 0, 12, pos, 0)) at ticks 3 / 5 / 7 / 10 on spots (x, z) = (-120, 170), (-90, 250),
   (-30, 400), (40, 550) cm in the hunter's frame (0x1004d650), with MHF effects 0x2d / 0x54 (ticks 0 / 1) and
-  0x2e / 0x2f / 0x30. Module: msbuild SHOCK (one hit entry per spot), ms_act.c shock_tick, GS's ground impact (PEL
-  105) moved to each spot (S); the hits follow the hunter (S: MHF's stay where spawned).
+  0x2e / 0x2f / 0x30. Module: msbuild SHOCK (one hit entry per spot), ms_act.c shock_tick, MHF's spot effects as motion rows
+  (msfxposts SHOCK_HIT / SHOCK_WHIFF; GS's ground impact PEL 105 only with the MHF effects off); the hits follow the hunter (S: MHF's stay where spawned).
 - Specials' hit shapes (C): mhfsdt kind 0x79 has one shape set per special id (14 sets; the attack-record field
   msbuild read, r[8], is 0 for every special): #5-#7 / #10 / #12 = a 100 cm-radius, 400 cm-tall pillar at the spawn
   point, #8 = 700 cm on weapon bone 7, #11 = 250 cm, #3 = 800 cm, #1 = 30 cm (the projectile). The MV-0 specials (#1,
@@ -187,7 +219,7 @@ test common ids 4 / 24 / 38 (1/6) and 49 / 50 (1/13, 1/14); with R held 49 / 50 
 0x130. Motion 1080's code compares kind level + 3 (level 1 at 20 ticks, effect 0xfc6/0x11) and kind 5 (34 ticks,
 effect 0xfc6/0xe, release), one counter. Release = input 15 (circle not held) -> 208: level > 0 -> 35 Charged
 Strike, else 36 Triple Strike 3; the hold expiring (step kind 2) -> 36. Module: 20 / 34 ticks (skills not
-scaled), GS's charge flash as the cue.
+scaled), MHF's fc6:11 + fc5:15 x 3 as the cue (msfxposts CHARGED; GS's charge flash only with the MHF effects off).
 
 ## Marker, attraction, repulsion
 - Aim (C, static study 2026-11-04):
@@ -227,8 +259,7 @@ scaled), GS's charge flash as the cue.
       +0x140e / +0x1412 is source 2): the right stick. dirs 4 / 8 = yaw + / −, 1 / 2 = pitch + / − (0x2a07a8, VSELEQ
       at 0x2a154c), after GU's invert options (vt+0x1b0 0x400000 inside, global *0x188ca48 +0x66 in 0x2a07a8, both
       applied). Steps per MHF tick (tick_len): 0x240 yaw, 0x160 pitch.
-    - Deviations: GU's over-the-shoulder offsets (camera preset 6); GU's other crosshair parts beside MHF's reticle
-      (below); the pitch starts level, not from the camera's (GU's pitch sense against the view not traced); the
+    - Deviations: GU's over-the-shoulder offsets (camera preset 6); the pitch starts level, not from the camera's (GU's pitch sense against the view not traced); the
       pitch is clamped ±0xd1c, since which of MHF's bounds (−0x12e4 / +0xd1c) is up in GU's sense is not traced (G).
     - **MHF's reticle (2026-11-11, ported on GU's scope HUD; test 22):**
       - MHF, C: 0x10b87b40 draws it for weapon class 13 when 0x10b86b20 says so: the local hunter's MS flag bit 0
@@ -238,10 +269,9 @@ scaled), GS's charge flash as the cue.
         instead, and skipped off screen.
       - Frame (C): 0 if 0x10331e20 (repel possible), else 1 if 0x10331d80 (attract possible), else 2. Both need the
         marker (0x1033b470, state +6 = 2) and 3-D d = |marker point (+0x38) - hunter position (+0xac)|: repel
-        0 < d < 1400, attract 1400 < d < 4000 (strict); then 0x10331c10 (the marked monster: a species / variant table
-        refuses, air / special states refuse unless the marker is above its ground and the hunter's ground is within
-        25). Gauge and stamina are not asked. The port computes it each aim tick (ms_act.c aim_view, without
-        0x10331c10) and logs it (`msport: aim reticle frame`).
+        0 < d < 1400, attract 1400 < d < 4000 (strict); then 0x10331c10 ("MHF's target test" below; refused = the
+        next frame down, so white in either range). Gauge and stamina are not asked. The port computes it each aim
+        tick (ms_act.c aim_view, without 0x10331c10: deviation) and logs it (`msport: aim reticle frame`).
       - MHF's art, C: 0x10339700 calls 0x1096bca0 with HUD context EAX = 4. Context i = 12-byte record at
         0x11882178 + 12 i (file `dat\mhf_90c.bin`, bank entry id, texture-ID list); 0x1096bba0 loads each bank
         (0x113ecae0: the entry copied, 0x113f12f0 relocates its chunk tree) into 0x1e7fe468[i]. Context 4 = entry 20,
@@ -300,8 +330,8 @@ scaled), GS's charge flash as the cue.
         copies stay resident; GU's release call not traced); otherwise, and for every other class, back to HD_hud01.
         Kept GU: Txt_No (custom_pnl2, target scope only) and TexS_align (hud00, states 0 / 2), other entries.
         Deviations: the reticle sits half a unit
-        right of MHF's (its centre column on the centre); MHF's 0x10331c10 target test is not asked.
-  - **"Launcher":** not a model. The weapon is one mesh with no part scaling; the shot and effect 0x312 (event 17's task 0x3c, 0x1004d700) both come from bone 18, the −x hand.
+        right of MHF's (its centre column on the centre); MHF's 0x10331c10 target test is not asked (below).
+  - **"Launcher":** not a model. The weapon is one mesh with no part scaling; the shot and event 17's hand piece (task 0x3c, 0x1004d700: three meshes, "0x312" is bone 18 + 3 parts, not an effect id) both come from bone 18, the −x hand.
 - Shot (82 / 84; 0x103333a0, 0x101e8de0 / 0x101e9070 / 0x101eb540, C):
   - **Start:** the hunter takes the camera yaw; the direction = normalize(look-at − eye), pitch included.
   - **Spawn:** bone 18 + R(yaw) (22, 0, 0) + 20 up, at event 4 (f14 in 82, f12 in 84).
@@ -312,7 +342,8 @@ scaled), GS's charge flash as the cue.
   - **Module:**
     - shot_step every tick: the swept segment against each large monster's hurt volumes, placed by GU's 0x16de70 from bodydata 0x710b0 (push-only records skipped);
     - the surface point toward the shot goes into that joint's frame (joint_mat); marker() rebuilds it from the joint each tick;
-    - deviations (S): GU's marker flash every 2 ticks as the shot's look, no wall test (ground − 300 instead);
+    - deviation (S): no wall test (ground − 300 instead); the looks: MHF's fc5:b / fc5:a / fc5:e (below; GU's marker flash
+      only with the MHF effects off, test 21 row 12);
     - the aim camera and MHF's reticle on GU's scope HUD: "Port (aim view)" above (test 22).
     - test 21 (C by elimination, ms_act.c): a marker placed by a hit ended on the same tick ("alive 0"): the shot's
       em_ok had just passed (in the manager, not small, HP > 0), so the area test (monster +0x1054 != the hunter's;
@@ -335,14 +366,13 @@ scaled), GS's charge flash as the cue.
     ties T to the hunter's height. MS+0x24 = T, +0x30 = the marker point. Units MHF = GU (S: assets.md, the skeleton
     offsets match cm for cm).
   - **Direction** D (MS+0xc) toward T at the start, rebuilt from yaw and pitch (0x108e4ad0: pitch = -atan2(y, h))
-    with the pitch clamped by 0x103328d0 to 10 deg down (0x71c) / 25 deg up (0xee39) (C, 2026-11-11; the port does
-    not clamp: little effect, the steering re-aims from the same tick); then held off the ground: with D x 90,
+    with the pitch clamped by 0x103328d0 to 10 deg down (0x71c) / 25 deg up (0xee39) (C, 2026-11-11; the port clamps the
+    same since 2026-11-11, ms_act.c att_start); then held off the ground: with D x 90,
     D.y >= -(height above the ground) when within 90 of it (0x10331780). Budget B (MS+0x40) = |T - pos| - 300 (3-D;
     700 if not positive). MS+0x3c = the hunter's y, written in the update's first tick (0x10332dd0 case 0).
   - **Steering** (0x10332ae0, called at the end of every update, C): each tick of phases 1-2, when the HORIZONTAL
-    |T - pos| > 200 (y zeroed, C; the port tests the 3-D distance) and 0x10331c10 allows it (refuses a listed monster
-    species / variant, or a monster in the air / special states unless the marker is above its ground and the hunter's
-    ground is within 25 of it): D = normalize(0.2 D + 0.8 toward the new T) (same ground rule, no pitch clamp),
+    |T - pos| > 200 (y zeroed, C) and 0x10331c10 allows it ("MHF's target test" below; refused = no re-aim that
+    tick, the flight keeps D and B): D = normalize(0.2 D + 0.8 toward the new T) (same ground rule, no pitch clamp),
     B = |T new - pos| - |T old - pos| + max(0, B - 252) + 252. So MHF re-targets every tick (C; old notes: "direction
     set at the start").
   - **Phases:** 1 ease-in v = 90 (0.2 n)(2 - 0.2 n) along D, n = 0..4 (252 in all); 2 fly 90 / tick along D for
@@ -353,7 +383,7 @@ scaled), GS's charge flash as the cue.
     the height is kept in [y0 - 550, y0 + 1000] of the START height, B x 0.9 while at the top; the hunter is snapped
     to the ground when within 90 under it. tri -> 59 / 73 falling attacks (condition 9), cross -> 63 / 69 approach
     cancel.
-  - Port (test 18): as above, without 0x10331c10's monster-state test (S). Tests 15-17's "too high / off": the port
+  - Port (test 18): as above, without 0x10331c10 (deviation, "MHF's target test"). Tests 15-17's "too high / off": the port
     had clamped the height around the marker's and re-aimed fully every tick at the marker itself.
   - Fixed 2026-11-11 (ms_act.c att_start / attraction): the fall had restarted at 90 / tick instead of 90 x 0.97^N
     from the flight's first tick (about twice MHF's momentum); the steering gate was 3-D; no start pitch clamp. Offline
@@ -365,6 +395,33 @@ scaled), GS's charge flash as the cue.
   - GU: move state 2 (vt+0x300), landing 0x2a84d8(p, 0, 0); walls and ground run after the action (0x2e7aa0,
     vt+0x368).
 - Repulsion (66 / 67): face the marker; the motion pushes away (no drive events).
+- **MHF's target test 0x10331c10 (C, asm, 2026-11-11 step H)**, P = the asking hunter, M = the marker special
+  (0x1033b470, its point +0x38 only while state +6 == 2), E = the marked monster (marker +0xac):
+  1. no marker or no E: allow.
+  2. E's (+0x15, +0x14) (S: action group / action, the hunter's own layout) in the list of the mhfemd.bin block at
+     header +0x4c (u16 count +0x1a, 4-byte entries at +0x1c, bytes 1 / 2 compared): refuse. The ZZ data
+     (dat/mhfemd.bin, decoded: ECD CRC ok, JPK size ok) has count 0: never refuses.
+  3. E type +3 = 0x3b (59, Chameleos, G: community id list) in group 3 action 0x1d: refuse.
+  4. "special" = E+0x410 == 4, or E+0xca6 != 0, or type 0x30 (48, Daimyo Hermitaur, G) in motion +0x32c 0x40a /
+     0x40b / 0x40c / 0x418 / 0x421 / 0x443 (0x436 / 0x442 / 0x444 by a frame test 0x108ff810), or type 0x43 (67,
+     Shogun Ceanataur, G) in 0x40a / 0x40b / 0x418 / 0x41a / 0x421 (0x436 by frame), or E+0x410 == 1 with type 0x4d
+     (77, Akantor, G) (0x10f972c0 / 0x10f97370). What E+0x410 / +0xca6 mean is not traced (G: airborne / dug in).
+  5. ground rule: g = the ground probe 0x108cbe30 from M + (0, 500, 0); M.y >= g and P+0x708 (S: the hunter's
+     ground y, 0x10a80a00 compares it with P+0xb0) <= g + 25: allow.
+  6. otherwise allow unless "special".
+  The ids match the marker-refusal list's 29 / 87 / 88 / 118 (rocks, gorge objects, dummy) in the same community
+  list, hence G for the names. Callers: cond 10 / 11 (0x10336710 / 0x10336760: stamina P+0x7fc > 0, the gauge >= prm19
+  (0x1033be30), then 0x10331d80 / 0x10331e20 = range + this test): refused = the cancel entry does not qualify, the
+  attraction / repulsion does not start, and while aiming the other inputs are masked (0x10337330), so nothing starts
+  (S for "nothing"); drawn idle 0x1032d2d0 skips the entries for 58 / 68 (attract) and 66 / 67 (repel) the same way;
+  the reticle 0x10339700 drops to the next frame (white); the steering 0x10332ae0 skips the re-aim; also asked by
+  0x103399c0 (HUD) and 0x1003cb90 / 0x1003cfc0 / 0x1003d3d0 (marker look, not ported).
+  Port: none of steps 2-5 maps onto a traced GU field: GU has the four species, but MHF's actions / motions and
+  E+0x410 / +0xca6 have no traced GU counterpart (the module reads only em_ok's spawned / active / small / hurt / HP
+  fields), and the ground rule only matters for a "special" monster. So the attraction start, the repulsion start, the
+  steering and the reticle all skip it, and agree (deviation: MHF refuses Chameleos in 3/0x1d always, and the four
+  "special" cases when the marker is below the monster's ground or the hunter stands more than 25 above that ground).
+  To port: GU fields for a flying / burrowed / submerged monster (one logged test), then E+0x410 / +0xca6 in MHF.
 
 ## Magnetic Pin
 - 94 (Impact) / 97 (Cutting) leap (event 1 airborne, 25 gravity, 28 drives) with the pin attack (MV 1); on a hit
@@ -390,9 +447,16 @@ scaled), GS's charge flash as the cue.
 | our attack hit a monster: owner vt+0x94 (slot 37, `bx lr` in every class)(owner, attack, monster, 1); attack = p + 0x3020 + 0xb8 * slot | 0x16c93c |
 | monsters: manager *(MAIN 0x1851fe0), 0x5ceb4(mgr, i) i < 10; rec = *(m + 0x1428): pos +0x40.., yaw u16 +0x54, HP s32 +0x370; small m+0xb5f7; hit-pass filter m+0xb5f9, u8 m+0x7652 == 1, rec+0x1a0, !rec+0x444 | 0x16b15c |
 | camera *(*(MAIN 0x2126504) + 0x54): eye +0x40, look-at +0x60 | 0x27f678 |
-| effects: vt+0x39c(p, id, p + 0x2550, 1) (id space of class 5 unknown) | 0x282624 |
-| HUD per-class gauge switch 0x665ad8 (class 5 word 0x665b34 = GS's case; CB's phial gauge = 0x264, S) | 0x665ad8 |
+| effects: the class PEL (+0x3304, effect\pel\pl\w05_000) list 1 through 0x282548 (ms.h ms_post, phase3.md test 5 row 2; vt+0x39c returned 0 for class 5) | 0x282548 |
+| HUD per-class gauge switch 0x665ad8 (class 5 word 0x665b34 = GS's case; CB's phial gauge = 0x264, S); the port sends class 5 to CB's case (hook 0x646560, phase3.md "Status" HUD) | 0x665ad8 |
 
-## Not yet ported (Phase 3 open)
-MHF's QTE prompt, effects and sounds (MHF dat/effect.bin unstudied: GU stand-ins, phase3.md), the monster hold
-during the pin, multiplayer (events 43 / 44, authority).
+## Not yet ported (2026-11-11)
+Ported (phase3.md "Status"): the moveset, inputs, hits, gauge and Magnetise, guard, Triple Strike, i-frames, the pin
+(hunter side), the shot and marker, attraction and repulsion, the aim view and MHF's reticle; MHF's effects are
+converted and posted (effect-posts.md, assets.md "Conversion"; their look is still being tested). Open:
+- MHF's weapon sounds (Great Sword stand-ins; MHF plays them from code and from per-motion keys of kind 0 / 1).
+- The pin: MHF's QTE prompt, the monster hold (GU's status pipeline above: one logged test), MHF's hold / cap values.
+- MHF's target test 0x10331c10 and the marker's part-break end (above).
+- Triple Strike's skill scaling (0x10a6a510).
+- Multiplayer: event 44 (the other side's pin finisher), the run toggle / authority (event 41), the "not O" effect
+  branches (effect-posts.md "Gates for the port").

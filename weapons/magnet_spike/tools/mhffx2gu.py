@@ -54,7 +54,7 @@ TEX_SUFFIX = '_HQ_NOMIP'
 # BC3, not RGBA8 (test 19: the 1024 x 2048 RGBA8 atlas = 8 MB, w05.arc 27 MB unpacked against GU's largest weapon
 # arc w13 at 18.7 MB / largest file 1.2 MB: no effect drew at all, old ones included; S, the class heap not traced)
 TEX_FMT = 'bc3'
-CELL_MIN, CELL_MAX, ATLAS_W = 32, 128, 1024   # one 1024 x 1024 RGBA8 atlas (4 MB) for every effect
+CELL_MIN, CELL_MAX, ATLAS_W = 32, 128, 1024   # one atlas, 1024 texels wide, for every effect (TEX_FMT above)
 CELL_MAX_ANIM, SCROLL_FRAMES = 64, 8     # animated sprites: smaller cells; a UV scroll cycle in this many frames
 ADD_BLEND, ALPHA_BLEND = 0, 1
 # GU's simplest one-shot Model unit (type 5, emit 17, move 0, no curves / UV layers / animation block, 0x140 B; w04
@@ -87,6 +87,21 @@ SCENE_TEST22 = {
     (0xfc5, 0x4d): 'repulsion t3 / marker (mixed)', (0xfc5, 0x4e): 'repulsion carrier (Model only)',
     (0xfc5, 0x38): 'Guard Counter success f32 (mixed)',
 }
+
+
+# Record mask (C, notes/gu-efl-units.md "Record mask"): an effect builds entry i only when element +0 & the PEL
+# record's +0x48 != 0 (and element +4 & +0x4c; 0x9be8c4, the mask copied by 0x31c3a8 field 0x12 -> proxy +0xd8 ->
+# 0x32aa44 -> 0x9bd5a0 -> effect +0x1c8). GU's pattern (1251 / 1391 weapon-arc records): one bit per position group,
+# shared by the group's entries, one record per group. The template's element +0 = 1 on every entry made the first
+# record build the whole EFL at its offset and the others nothing (319 / 488 records, test 21 builds)
+GROUP_BITS = 32
+
+
+def group_element(el, bit):
+    """(type, element bytes) with element +0 = the group's bit"""
+    b = bytearray(el[1])
+    struct.pack_into('<I', b, 0, bit)
+    return (el[0], bytes(b))
 
 
 def model_frame(u, group=0):
@@ -599,8 +614,8 @@ class Builder:
     def efl(self, sid, eid):
         """one MHF effect -> ([(EFL path, EFL bytes)], groups [(EFL path, element mask, base position)], entries,
         [(E id, reasons)] not converted). A group = the entries of one MHF base position (turned by the effect yaw
-        in MHF, 0x113d37e0, C), posted as one PEL record with that offset; at most 32 entries per EFL (the record's
-        element mask)"""
+        in MHF, 0x113d37e0, C), posted as one PEL record with that offset whose mask (+0x48) = the group's bit in
+        its entries' element +0 (GROUP_BITS); at most 32 entries per EFL"""
         st = self.cur_set = self.src.set(sid)
         self.cur_eff = (sid, eid)
         by_pos, skipped = {}, []
@@ -615,10 +630,14 @@ class Builder:
         def flush():
             if cur:
                 path = efl_name(sid, eid) + ('_%d' % len(files) if files else '')
-                files.append((path, write_efl(self.tpl_head, [x for _, x in cur], self.tpl_tail)))
-                masks = {}
-                for i, (pos, _) in enumerate(cur): masks[pos] = masks.get(pos, 0) | 1 << i
-                groups.extend((path, m, pos) for pos, m in masks.items())
+                bit = {}
+                for pos, _ in cur: bit.setdefault(pos, len(bit))
+                if len(bit) > GROUP_BITS:
+                    raise SystemExit('mhffx2gu: %s needs %d position groups, the record mask holds %d (0x9be8c4)'
+                                     % (path, len(bit), GROUP_BITS))
+                ents = [[group_element(x[0], 1 << bit[pos])] + x[1:] for pos, x in cur]
+                files.append((path, write_efl(self.tpl_head, ents, self.tpl_tail)))
+                groups.extend((path, 1 << g, pos) for pos, g in bit.items())
         for pos, es in by_pos.items():
             for x in es:
                 if len(cur) == 32: flush(); cur.clear()

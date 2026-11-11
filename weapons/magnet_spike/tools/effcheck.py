@@ -21,13 +21,20 @@ problem lines. Conditions (notes/gu-efl-units.md "Unit block, Model (type 5)"; C
 - UV layer 0 (unit +0x134 lo16, a 0x40-B value block read by 0xa99f40 / 0xa6b824 / 0xa6bc0c, C): inside the EFL; its
   u / v curve offsets (+0x30 / +0x34, from the unit) zero or a curve header inside the EFL; no extra layers (+0x136,
   +0x138 bits 24-27: 0 in all 4708 GU effect-mode units of the player arcs, not decoded beyond 0xa99f40); damping
-  (+0x20) finite. A bad offset reads garbage speeds or curves (no bounds check in the code)."""
+  (+0x20) finite. A bad offset reads garbage speeds or curves (no bounds check in the code).
+- Budget (fxbudget.py, notes/gu-efl-units.md "Limits and budgets"): no EFL above GU's own corpus maximum in entries,
+  particle slots (the sum of element +0xc) or the estimated work block (0x9be320 / 0xa5b658, C formula); the heap
+  behind them is the shared 120 MiB Unit heap (C), so these are GU-tested sizes, not hard limits.
+- Record masks (check_masks; 0x9be8c4, C): each of our PEL records keeps >= 1 entry of its EFL and exactly one
+  position group, and every entry is kept by some record (else it never draws)."""
 import os, struct, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
 sys.path.insert(0, os.path.join(ROOT, 'tools'))
 import paths, mod as modlib, mrl as mrllib
+sys.path.insert(0, HERE)
+import fxbudget
 sys.path.append(paths.GU_PY)
 from arc import arc_entries, arc_read
 
@@ -56,6 +63,7 @@ def check(entries, only=None):
     for k, (p, t, d) in enumerate(entries):
         if t != T_EFL or (only and only not in p): continue
         n_efl += 1
+        bad += fxbudget.budget_problems({p: fxbudget.efl_stats(d)})
         n = struct.unpack_from('<H', d, 0x10)[0]
         for i in range(n):
             w = struct.unpack_from('<4I', d, 0x30 + 16 * i)
@@ -113,7 +121,47 @@ def check(entries, only=None):
                     bad.append('%s: frame %d names no mesh group (has %s)' % (tag, fr, sorted(groups)))
                 elif scene and fr >= len(m['mesh_list']):
                     bad.append('%s: scene-model frame %d >= %d meshes: nothing shown' % (tag, fr, len(m['mesh_list'])))
+    bad += check_masks(entries, OWN if only is None else only)
     return bad, (n_efl, n_units)
+
+
+OWN = '\\ms_'                  # our converted EFLs (mhffx2gu / msgun): the record-mask rule applies to them
+
+
+def check_masks(entries, own=OWN):
+    """record masks (notes/gu-efl-units.md "Record mask", C: entry i built when element +0 & record +0x48 and
+    element +4 & +0x4c): for the PEL records naming an EFL whose path contains `own` (every one msbuild writes is
+    posted by a module table): the record keeps >= 1 entry, keeps exactly one group (one mask bit = one element +0
+    value), and every entry of the EFL is kept by some record. GU tolerates orphan entries (91 of 433 weapon-arc
+    EFLs: posted by code with other masks), overlapping masks (22) and a record keeping nothing (1): `own` = '' runs
+    the rule on GU's own data to count them."""
+    efls = {p: d for p, t, d in entries if t == T_EFL}
+    out, used = [], {}
+    for p, t, d in entries:
+        if not p.startswith('effect\\pel\\') or d[:4] != b'PEL\0': continue
+        try:
+            recs = fxbudget.pel_records(d, lists=(0, 1, 2))
+        except (IndexError, struct.error):
+            continue
+        for rid, (ep, joint, m0, m1) in recs.items():
+            if own not in ep or ep not in efls: continue
+            b = efls[ep]
+            n = struct.unpack_from('<H', b, 0x10)[0]
+            els = [struct.unpack_from('<II', b, (struct.unpack_from('<I', b, 0x30 + 16 * i)[0] >> 8) + 0x30)
+                   for i in range(n)]
+            kept = [i for i, (x, y) in enumerate(els) if x & m0 and y & m1]
+            used.setdefault(ep, set()).update(kept)
+            tag = '%s record %d -> %s (mask %#x)' % (p, rid, ep, m0)
+            if not kept:
+                out.append('%s: keeps no entry (the effect builds nothing, +0xf0 0x1000000)' % tag)
+            elif len({els[i][0] for i in kept}) > 1 or bin(m0).count('1') != 1:
+                out.append('%s: keeps entries of several groups %s' % (tag, sorted({els[i][0] for i in kept})))
+    for ep, k in sorted(used.items()):
+        n = struct.unpack_from('<H', efls[ep], 0x10)[0]
+        orphan = sorted(set(range(n)) - k)
+        if orphan:
+            out.append('%s: entries %s kept by no record (never drawn)' % (ep, orphan))
+    return out
 
 
 def main():

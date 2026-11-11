@@ -78,9 +78,11 @@ rotation -pi + r * 2pi covers the full circle in 1848 / 2096 Billboard units). I
 ## Emit block (w2, 16 B) — S / G only
 Four u32, observed as small integers or u16 pairs: +0 (0 / 5 / 10), +4 (often a u16 pair, e.g. lo 0 hi 15),
 +8 (10 / 20 / 30), +0xc 0 or 1 (152 / 1586). G: wait / interval, count (+ random), emitter life, loop. The reader
-was not traced (next step: callers reading gen +0x38).
+was not traced (next step: callers reading gen +0x38). (Superseded: the emit block = particle life, C, "Main-agent
+decode" below.)
 
 ## Move block, kind 2 (w3, 0x50 B) — the most common (8980 of 15086 entries)
+Corrected and extended (C) by gu-efl-move.md ("Corrections to gu-efl-units.md"; +0x48, +0x50..+0x6c below are wrong).
 | off | type | meaning | ev |
 |---|---|---|---|
 | +0x00 | u32 | flags; byte 0 bit 4 -> gen +0xdc bit 25 (0xa59268); 0x01000000 in 2390 / 3123 | C / S |
@@ -133,7 +135,8 @@ Curve tables (C for the colour use, S for the layout, efl4u2gu.unit_curve_props)
 (prop 0 colour, 1 alpha, 0x40 scale), then `count` keys of 12 B `{u32 frame, u32 a, u32 b}`. The evaluator
 0xaed74c (time) + 0xaf938c (colour) / 0xaf7958 (float) takes the particle; key word 0 < 0 (bit 31) marks a
 looping / non-life track (`-1 < *curve` sets particle flag 0x20000 / 0x80000). Time base (frames vs life fraction)
-and interpolation: not traced (G: linear, frames).
+and interpolation: not traced (G: linear, frames). (Superseded: byte 3 is a flags byte with the time source, C,
+"Main-agent decode" "Curve header"; the interpolation table 0xaf7a80 is still unread.)
 
 ## Particle (0xb0 B, list at gen +0xb0, next +4) — runtime, for reading the code
 +0x20 / +0x30 position (current / previous), +0x50 / +0x54 / +0x58 from unit +0x20, +0x60 motion state (0xa6a004),
@@ -141,16 +144,19 @@ and interpolation: not traced (G: linear, frames).
 +0xa4 angular speed, +0xa8 second rate (adds to +0x78, death when < 0), +0xa0 motion record.
 
 ## Open
-- Emit block reader (count / interval / burst / loop) and emitter life: find the readers of gen +0x38.
-- Particle life, spawn position / shape (move +0x04 mode), velocity, gravity and drag: 0xa6a004 (per-frame motion,
-  returns 0 = dead) and the emission path; the move-block meanings above are S / G.
-- Size: unit +0x28..+0x34 and the scale curve (prop 0x40); read 0xa6a2cc / 0xa6a434 next.
-- Curve interpolation and time base: 0xaed74c, 0xaf7958, 0xaf938c.
+Updated 2026-11-11 (the 2026-11-04 list, with what the later sections settled):
+- Emit block: decoded ("Main-agent decode": particle life, emission types 1 / 2); open: the burst interval / end
+  readers 0xa5c464 / 0xa5c7dc.
+- Particle life, age and motion: decoded ("Main-agent decode"; motion kinds 0-11 in gu-efl-move.md, C); open: the
+  spawn shapes of move +0x04 beyond the box shape (0xa5e450 case 1).
+- Size: decoded ("Main-agent decode" "Size", 0xa6a2d0 / 0xa6a434).
+- Curves: time source and keys decoded ("Curve header"); open: the interpolation jump table 0xaf7a80.
 - Billboard orientation modes (gen +0x46 0x17 / 0x19 / 0x2f from unit +0x18 bits 4-7) in the draw 0xa7b580.
 - Polyline (types 1 / 0xc, vtable 0x1790c84: init 0xab76d8, loop 0xab7f2c) not decoded beyond the shared head.
-- Model (decoded below): the GU model unit's mesh mask (+0x110) read side, the blend on the scene-model path, the
-  shader math behind the material features (vertex colour x2?, lighting, depth write: "Model look" below), the
-  extra UV layers (+0x136 / +0x138) beyond their init, and the name of DTI 0x21293e8 (the effect material class).
+- Model: type 5, its transform, look (UV layers incl. the extra ones, colour, material), blend, limits and record
+  masks decoded below; open: the mesh mask +0x110 read side (S), the blend on the scene-model path (G), the shader
+  math behind the material features (vertex colour x2?, lighting, depth write: G), the name of DTI 0x21293e8 (the
+  effect material class the ready check wants, effect-posts.md "Open").
 
 ## Unit block, Model (type 5) (static, 2026-11-11; C unless marked)
 Vtable 0x17907fc: slot 6 0xa9499c bind (0xa58fa8, then 0x120-B particles, + 0x20 x (unit +0x138 bits 24-27 + 1) when
@@ -294,6 +300,75 @@ effect-mode model material has DSZTestWrite (4708 / 4708) and RSMeshCN in 4453. 
 colour (Capcom's 0x7f neutral, mhfmodel.NEUTRAL): GU's 7f-vertex models come with unit +0x20 = 1.0 (948) as often as
 2.0 (1264), so the corpus does not settle it.
 Check: `python3 weapons/magnet_spike/tools/fxlook.py` renders MHF's and GU's draw of the built units side by side.
+
+## Limits and budgets (static, 2026-11-11; C unless marked)
+What an effect consumes from the post to the draw, and what happens at a limit. Tool: `python3
+weapons/magnet_spike/tools/fxbudget.py [--log TEST.log]` (corpus distributions, ours placed in them, peak per action);
+effcheck.py fails a build whose EFL is above GU's own maximum in entries, particle slots or work block.
+| piece | size / count | from | at the limit |
+|---|---|---|---|
+| proxy uMHProofEffect (the post handle) | 0x350 B; live count in the global MAIN 0x1850a50 (ctor 0x41f10 +1, dtor 0x4201c -1) | 0x41cf4 -> its DTI's allocator | **144** (0x41558, called by the post 0x40978 before the proxy exists): post category (extra +8) 2 / 3 end one live proxy from the manager's buckets (+0x74.. bit masks, slots +0x770; vt +0x40) and go on; any other category is refused, handle 0. The module posts with extra 0 = category 0 |
+| effect object | 0x500 B (0x4260c -> 0x43b70) | its DTI's allocator | null: no effect (G: not followed further) |
+| generator | 0x1d0 B per kept entry (0x250 node); one per entry the record keeps (below) | the class's operator new (0xa7b084, 0xa9490c, ...: `0x7aa47c(DTI)` vt +0x20) | null -> effect +0xf0 0x2000000, whole effect (0x9bdc68); init vt +0x18 failing -> 0x4000000 |
+| work block | slots x 0x130 + the generators' gen +0x20 (+ 0x60 + table 0x1671700[res +0x7c bits 4-7] with effect +0x1d0) | uEffect's DTI allocator (0x9be320) | null -> 0x2000000, whole effect |
+| slot map | n2 x 4 B (EFL header n2) | 0xb91f44 | null -> 0x4000000 |
+| slot extra | 0x20 / 0x30 / 0x50 B per slot by element fields (0xaeb230) | a DTI allocator | null -> 0x2000000 (0x9be664) |
+| scene-mode model unit | 0x500 B per live particle (0xa955b0 -> 0xc6b66c), registered in sUnit (0xc08100) | its DTI allocator | null: that particle not shown (0xa955b0 returns 0) |
+| draw | 0xaef728 copies the unit's 0x30-B draw block (unit +0x3e) and skips the draw when its byte 0 bit 1 is set and a global +0x158 is 0; 0xbae520 picks the draw context (+0x2c + 4 x layer) and sets its layer / priority | - | no count, no per-frame list cap found on these paths |
+**Allocators.** An MT class allocates from `table[(DTI +0x18 >> 23) & 0x3f]` (0x7aa47c, table MAIN 0x18a62e8). The index
+comes from a name map built at boot (0x15004c: 303 calls of 0x7aa394(name, index); 0x7aa588 walks each DTI's
+parents to the first mapped name): cParticleManager (parent of every cParticleGenerator*) and uBaseEffect (parent
+of uEffect, uProofEffect, uMHProofEffect) -> 21, cUnit -> 15. 0x151ccc creates the heaps: 15 'Unit' 120 MiB, 16
+Area 1 MiB, 3 Array/String 16 MiB, 4 Collision 4 MiB, 18 Physics 14 MiB, 13 Resource 500 MiB, 17 Sound 20 MiB, NVN
+texture / buffer / shader 848 / 200 / 100 MiB, and aliases 8 / 0x14 / **0x15** / 0x16 to the Unit heap. So every
+effect piece above comes from the one 120 MiB Unit heap that every unit of the game shares: **no per-class
+generator pool exists**, and a failure needs that heap full (G: its fill in a quest is not known statically).
+**Work block per generator** (0xa5b658, from the class bind = vtable slot 6): gen +0x20 = N x (round16(particle) +
+round16(extra) + move size) + round16(N x emit size), N = element +0xc lo16 (gen +0xd0, 0xa58fa8; x 5 / 16 or x 9 / 16
+when element +8 bit 2 is clear and gen +0x50 >> 28 is 1 / 0 with element +0x48 counts >= 2 / 4: G which applies).
+Particle bytes (bind arguments): Billboard / LiteBillboard / SizeBillboard 176, Model 288 (+ 0x20 x UV layers),
+Polygon 256, Polyline 208, BillboardStrip 192, Line 128, Texline 160, PrimModel 336, Trail 208 (fxbudget.PSIZE).
+Move size by kind (u16 table 0x1671700) 64 / 112 / 96 / 144 / 112 / 144 / 128 / 64 / 160 for kinds 0-8; emit size (u32
+table 0x1671730, index emit high nibble ^ 8) 16 for the GU types 1 / 2 / 5.
+**Record mask (C, 2026-11-11).** Entry i of an EFL is built by a post only when element +0 & mask0 != 0 and element
++4 & mask1 != 0 (0x9be8c4 = effect vt +0xdc, asked per entry by 0x9bdc68; also its runtime record +4 must share no
+bit with effect +0x116 | a global +0x228, G meaning). The chain: the PEL list record in memory = the file record's
+160-B body at +0x20 (id body +0x30 = record +0x50, the field 0x3267d0 matches); the proxy start step 0x329908 copies
+it field by field with 0x31cc6c -> 0x31c3a8 into proxy +0x80 (field 2: body +0x30 -> +0x40; **field 0x12: body +0x48
+-> +0x58, field 0x13: body +0x4c -> +0x5c**), i.e. proxy +0xd8 / +0xdc; 0x32aa44 (proxy vt +0x80) loads them (its
+record pointer = proxy +0x50) and calls 0x9bd5a0, which stores them at effect +0x1c8 / +0x1cc = mask0 / mask1. An
+effect keeping no entry builds no generator: 0x9bdc68 returns 0, +0xf0 |= 0x1000000 (not 0x2000000), nothing runs.
+GU's pattern (weapon-arc PELs, all lists, 1391 records naming an EFL of their arc): masks of one bit 1251, several
+bits 54, all ones 86; element +0 one bit in 4745 / 5695 entries (two bits 948), several entries share a bit in 378 /
+433 EFLs: **a bit = a group of entries, one record per group**. Tolerated by GU: entries no record of the arc keeps
+(91 EFLs: posted by code with other masks), overlapping masks (22), one record keeping nothing. efl4u2gu (monster
+ports) copies 4U's element blocks (its group bits) and writes mask = 1 << k from 4U's post data (efl4u2gu.py,
+`mask = 1 << r['k']`): the same pattern, not our defect; em089-091 hold 5 records that keep nothing
+(m19a03_002 mask 4; qe013_003 mask -1 on element +0 = 0 entries; em024_020 mask 2: not followed, G whether they
+matter). **Ours until 2026-11-11:** every MHF entry had the template's element +0 = 1 and the records entry-index
+bits (1 << i): 169 records built their whole EFL at the first group's offset, 319 built nothing. Now
+(mhffx2gu.Builder.efl, GROUP_BITS): element +0 = 1 << group index in its EFL, the group's record mask = that bit
+(msgun: bit 0, mask 1); more than 32 groups in one EFL stops the build. effcheck.check_masks fails a build whose
+record keeps no entry, keeps more than one group, or leaves an entry no posted record keeps (0 on GU's w00 / w04 /
+w13 and em089 for their own records: the rule runs on `\ms_` EFLs only).
+
+**Corpus (fxbudget.py, 1650 unique GU EFLs; max = GU's maximum):** entries per EFL p50 6 / p99 49 / max 122 (weapon
+arcs max 72); Model units p50 5 / max 112 (weapon arcs 51); particle slots per entry (element +0xc) p90 80 / max 1000;
+sum per EFL max 3010; UV layers per Model unit max 2; work block per EFL p50 5.8 KB / p99 88 KB / max 341 KB (weapon
+arcs 194 KB). efl4u2gu's in-game em089-091 reach 84 entries, 56 Model units, 341 KB. GU's busiest weapon motion
+(PSL slot): w08 slot 190, 4 records, 86 generators, 223 KB; w01 slot 130, 32 records, 200 generators, 92 KB.
+**Ours (w05.arc, 86 ms_* EFLs):** entries max 32, Model units max 20 (ms_fc5_038), particle slots 1 per entry (sum
+max 32), UV layers <= 1, work block max 11.7 KB (ms_fc5_03b, above 76 % of GU's EFLs): **under GU's maximum on every
+axis**. The draw mode does not enter the bind, the work block or the slot init (0xa9499c / 0xa58fa8 / 0x9be320 /
+0xaeb230 read no +0x1a bit): tests 20 (scene) and 21 (effect) built the same sizes (the 2026-11-05 build, test-20
+state: 345 KB over all EFLs; now 350 KB, the difference = the UV layers added after test 21). Scene mode adds one
+0x500-B model unit per live particle (<= 20 per effect here). Peak alive in test 21 (fxbudget --log): 10 proxies,
+55 generators, 22 KB (action 107); 20 Model generators (Guard Counter, 57); against 144 proxies and the 120 MiB heap.
+So no capacity explains the test-21 loss (C for the mechanism, S for the heap state). Records after the mask fix
+(above): 82 keep their whole (one-group) EFL, 406 one group of several, 0 none (before: 169 all, 319 none); the
+peak table keeps its numbers (the first record had built every entry) without the 4-6 empty proxies per action.
+fxplace (records placed by the mask): before 80 / 253 Model units over 1 cm, max 565.7 cm (fc5:3a; fc5:4f / 38 / 39
+about 450 cm); after 19 / 253, max 1.97 cm (the pre-existing MHF-sum residuals).
 
 ## Main-agent decode (2026-11-04, C unless marked)
 - **Emit block = particle life** (0xaed0d0, called per new particle by 0xa5ca24 for emit-type high nibble 1 / 2):

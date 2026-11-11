@@ -153,7 +153,8 @@ the same thing directly (no integration, no off-by-one): pos(age) = E . (spawn_l
    colour curves). No key is needed before D: the curve clamps to the first value (C).
 4. Key values: the MHF offsets in the same units as the PEL-record spawn base. The curve carries the whole offset
    (p0 included), so do not also add p0 to the spawn base. Note: particles() today only flags varying position
-   curves; a constant non-zero position curve is dropped (no offset applied) (S, from reading mhffx2gu.py).
+   curves; a constant non-zero position curve is dropped (no offset applied) (S, from reading mhffx2gu.py). (Since
+   test 18: mhffx2gu.Builder.motion makes a kind-5 path of any curve with a non-zero key, constant ones included.)
 5. Spawn rotation: if the MHF rotation range is 0, rotate the keys by R_spawn in the converter and leave
    +0x10..+0x24 = 0 (order irrelevant; exact). With a random range, put (rot - range, 2 range) per axis in
    +0x10..+0x24 with the order nibble that matches MHF (GU: 4 = Z, X, Y; 0 = X, Y, Z) (C for GU; MHF order G).

@@ -14,6 +14,9 @@ transform", notes/assets.md "Effects"):
   position), S = unit +0x90 (value + range / 2, or the +0x132 curve at the age) x size +0x28, R_o = 0x321694 order
   unit +0x100 bits 0-3 (0: Rz Ry Rx), G100 = the emitter rows x element +0x40 (0xa5a0c4), E = PEL record T R x the
   joint (0x9bea1c / 0x9c0020 / 0x27c40c), pos = the move kind 5 curve (kind 0: the emitter point).
+  The record of each entry = every record of the post's block whose mask keeps it (element +0 & record +0x48,
+  0x9be8c4, C; record_errors): its offset against the post offset + the entry's own MHF base; a post none of whose
+  records keeps an entry counts it as never drawn.
 The post frame is the same on both sides except the rotation: MHF adds the post's Euler angles to the particle's,
 GU multiplies the emitter's matrix; --yaw shows that difference for a post with that hunter yaw (0 = none).
 
@@ -93,6 +96,76 @@ class Built:
                                                      struct.unpack_from('<3f', d, st + 0x20), struct.unpack_from('<H', d, st + 0x32)[0]))
                 i = st + 160
         return out
+
+
+    def records(self):
+        """PEL list-1 records -> {id: (EFL path, pos, element masks +0x48 / +0x4c)}"""
+        d = next((b for (p, t), b in self.e.items() if p == PEL_PATH and b[:4] == b'PEL\0'), None)
+        out, i = {}, 8
+        if d is None: return out
+        for li in range(3):
+            n = struct.unpack_from('<I', d, i)[0]; i += 4
+            for _ in range(n):
+                L = d[i]; path = d[i + 1:i + 1 + L].decode('ascii', 'replace'); st = i + 1 + L + 2
+                if li == 1:
+                    out[struct.unpack_from('<H', d, st + 0x30)[0]] = (path, np.array(struct.unpack_from('<3f', d, st)),
+                                                                     struct.unpack_from('<II', d, st + 0x48))
+                i = st + 160
+        return out
+
+
+def keeps(efl, i, masks):
+    """0x9be8c4 (C): entry i built by a record when element +0 & mask +0x48 and element +4 & mask +0x4c"""
+    x, y = struct.unpack_from('<II', efl, entry(efl, i)[0][1])
+    return bool(x & masks[0] and y & masks[1])
+
+
+def effect_groups(src, sid, eid):
+    """mhffx2gu.Builder.efl's position groups of one effect, in record order -> [(EFL path, MHF base position)]"""
+    st = src.set(sid)
+    by_pos = {}
+    for a, e, ok, why in mhffx2gu.particles(st, eid):
+        if not ok: continue
+        for _ in range(max(1, a['count'])):
+            by_pos.setdefault(tuple(round(x, 2) for x in a['pos']), []).append(a)
+    seq = [k for k, v in by_pos.items() for _ in v]
+    name, out = mhffx2gu.efl_name(sid, eid), []
+    for k in range(0, len(seq), 32):
+        p = name + ('_%d' % (k // 32) if k else '')
+        for pos in dict.fromkeys(seq[k:k + 32]): out.append((p, pos))
+    return out
+
+
+def record_errors(src, built, cache={}):
+    """{(EFL path, entry): [placement error (cm, vec3) per posted record block]}: a block = the consecutive records
+    msbuild.fx_post_tables / FLASH_IDS write for one post (group g at id base + g, position = the post offset + the
+    group's MHF base); the error = (the position of each block record that keeps the entry) - (the post offset + the
+    entry's own MHF base). [] = posted, but no record keeps the entry (never drawn)"""
+    key = id(built)
+    if key in cache: return cache[key]
+    recs = built.records()
+    out = {}
+    for sid, eid in sorted({(r[2], r[3]) for r in model_units(src, built)}):
+        groups = effect_groups(src, sid, eid)
+        if not groups: continue
+        nxt = -1
+        for s0, r in sorted(recs.items()):          # blocks do not overlap: the next one starts after this one
+            if s0 < nxt or r[0] != groups[0][0] or not all(recs.get(s0 + g, ('',))[0] == f
+                                                           for g, (f, _) in enumerate(groups)):
+                continue
+            nxt = s0 + len(groups)
+            off = r[1] - np.array(groups[0][1])
+            blk = [recs[s0 + g] for g in range(len(groups))]
+            for f in {f for f, _ in groups}:
+                efl = built.e[(f, T_EFL)]
+                for i in range(struct.unpack_from('<H', efl, 0x10)[0]):
+                    out.setdefault((f, i, s0), [])
+                    out[(f, i, s0)] += [(rp, off) for (rf, rp, m) in blk if rf == f and keeps(efl, i, m)]
+    res = {}
+    for (f, i, s0), v in out.items():
+        res.setdefault((f, i), []).append(v)
+    cache[key] = res
+    return res
 
 
 def entry(efl, i):
@@ -208,7 +281,14 @@ def units_table(src, built, yaw=0.0):
         V = verts[path]
         mi, Rm, pm = mhf_model(src, st, a, e, f, ls, yaw)
         Vm = np.array(src.meshes[mi]['pos'], float)
-        rec = np.array(a['pos'])                 # the PEL record's offset = the group's MHF base (msbuild)
+        rec = np.array(a['pos'])                 # intended: the record of the entry's group (post offset removed)
+        blocks = record_errors(src, built).get((p, i))
+        if blocks is not None:
+            if any(not b for b in blocks):        # a post whose records all skip this entry: never drawn
+                out.append((p, i, sid, eid, e['id'], -1, (float('inf'),) * 2 + (float('nan'),) * 2, (None, None)))
+                continue
+            errs = [rp - off - rec for b in blocks for rp, off in b]
+            rec = rec + max(errs, key=lambda v: float(np.linalg.norm(v)))
         G = (_ry(yaw) @ (rec + pg + (Rg @ V.T).T).T).T if yaw else rec + pg + (Rg @ V.T).T
         M = pm + (Rm @ Vm.T).T
         out.append((p, i, sid, eid, e['id'], mi, metrics(G, M), (G, M)))
@@ -234,7 +314,7 @@ def follow_check(src, built, psi=math.radians(30.0), tilt=(math.radians(40.0), m
         y = psi + (math.pi / 2 if mode == 'fixyaw90' else 0.0)
         Rj = _ry(y) @ _rx(tilt[0]) @ _rz(tilt[1])        # the joint's full rotation (the 'fix' post)
         for r in units_table(src, built, y):
-            if mode not in modes.get((r[2], r[3]), ()): continue
+            if mode not in modes.get((r[2], r[3]), ()) or r[5] < 0: continue
             G_after, M = r[7]
             G0 = base[(r[0], r[1])][7][0]
             G_before = (Rj @ G0.T).T
@@ -348,8 +428,13 @@ def main(argv):
     print('  MHF centroid %s, GU centroid %s, MHF bone 18 at %s (hunter frame, cm)' % (
         M.mean(0).round(1), G.mean(0).round(1), W[18][:3, 3].round(1)))
     rows = units_table(src, built, yaw)
+    lost = [r for r in rows if r[5] < 0]
+    rows = [r for r in rows if r[5] >= 0]
     rows.sort(key=lambda r: -r[6][1])
-    print('Model units: %d (yaw %.0f deg); worst by max vertex distance:' % (len(rows), math.degrees(yaw)))
+    print('Model units: %d (yaw %.0f deg), placed by the PEL record that keeps each (record mask, 0x9be8c4); %d never '
+          'drawn (a post whose records keep none of them)%s; worst by max vertex distance:' % (
+              len(rows), math.degrees(yaw), len(lost), ': ' + ', '.join(sorted({r[0].split('\\')[-1] for r in lost}))
+              if lost else ''))
     print('  %-26s %3s %5s %4s %4s %9s %9s %7s %8s' % ('EFL', 'e', 'set', 'eff', 'mesh', 'centroid', 'max', 'scale',
                                                    'orient'))
     for p, i, sid, eid, eidn, mi, (c, mx, s, o), _ in rows[:10]:

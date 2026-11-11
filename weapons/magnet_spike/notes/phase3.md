@@ -4,106 +4,150 @@ Goal: every MHF Magnet Spike action, mechanic and effect on GU's class 5 (Guild 
 the weapons and the smithy (phases 4-5 folded in: a handful of endgame weapons, forgeable). Branch magnet-spike,
 switch MS_SLICE (test builds only).
 
-## Status (2026-10-30)
+## Status (2026-11-11: test 22 built, not installed)
+Current state per area; the test sections below are history (what was believed and changed at each test).
 | part | state |
 |---|---|
-| actions | every MHF action that plays Magnet Spike motions (160; msbuild ACTIONS), steps / cancels / events from mhfdat |
-| inputs | one class id per (MHF input, condition) pair (21 pairs, x2 modes); conditions run in the translator |
-| hits | 140 attack / special entries + magnetised copies (MV x 1.1); code specials #5-#7, #10, Magnetic Shock 5 x 3 (#12 x 4 spots, MHF's task 0x0f); specials' shapes by special id (were all empty); MV-0 specials not armed |
-| gauge, Magnetise | regen, on-hit gain, bar costs, Magnetise charge / on / lockout (log only: no HUD yet) |
-| guard | Guard Counter 14 -> 207 -> 57 / 76 / 77, Impact guard 112 -> 113 -> 114 / 115 (GU guard patched for class 5) |
-| charge | Triple Strike 34 -> 208 -> 35 / 36, overcharge release |
-| marker / attraction / repulsion | marker stand-in (nearest monster in front), flight phases, falling attacks, approach cancel |
-| pin | leap -> pin on hit -> QTE (X / A mash) -> finisher / pin over; the hunter rides the monster |
-| HUD | the Charge Blade's phial widget (class 5's HUD case -> CB's, hook 0x646560): 5 phials = gauge bars, colour = mode, first element = Magnetise (ready 2 / on 1 / lockout 5, S) |
-| swing arcs | GU has no blade ribbon: a swing = GS's ring mesh (cm010_000, crescent texture) posted once by the class PSL. msfx.py fits each attack's blade-tip path (MHF FK, live frames) and writes its own PEL list-1 record (ids 1000+: plane, head on the blade, scale = tip radius; GU's effect Euler order = MHF's, 0x8a7dc4 case 0): 34 arcs on 29 motions (attacks with no weapon capsule or < 35 deg of sweep: none). MHF's swings: radius 1.4-4.5 m, sweeps 70-480 deg |
-| effects | GU stand-ins posted by code (vt+0x39c = PEL list 1; GS's 0-5 / 20 / 21 = its slash arcs, 6-11 / 30 / 31 its charge flashes): Triple Strike charged = flash 7, guarded hit = flash 9, Magnetise on = flash 11; Magnetic Shock 5 x 3 = GS's ground impact (105) at each spot; the marker = flash 9's copy (1200, no sound) at the marker point every 2 s (world-position request 0x40b10, as em089_efx.c); Magnetise running = flash 11's copy (1201) on the weapon hand every 1.5 s (S). MHF's own effects (dat/effect.bin, Frontier's format) not converted; MHF's 0x10b43370 calls are rumble presets |
-| sounds | the motion sound sequence pl_wp05 (msfx.py): GS's records on GS's motion slots, ours = GS's whoosh_b + layered whoosh (fast in Cutting, slow in Impact) 2 frames before each attack. Class 5's weapon sound requests were "no file" (resolver 0x4ea0dc's class-5 case): hook ms_snd_file asks as class 0, so our record's mSrqrNo 1 / material give GS's two001 / two_bcom, packed into w05.arc. GS's flash sound plays with the flashes (its PTS). MHF's weapon banks (wkNNN.snd) = MOMO + JPK-packed Sony HD + PS-ADPCM: decodable, but MHF plays them from code (0x103339d0 per-action extras), triggers not traced; GU waves are DSP-ADPCM (needs an encoder) |
-| weapons, smithy | 6 forgeable weapons in a 15th forge category (below) |
-Mechanics and deviations: mechanics.md. Hit / motion pipeline: phase2.md.
+| moveset | every MHF action that plays Magnet Spike motions (160; msbuild ACTIONS), steps / cancels / events from mhfdat (msact.py); GU's common actions (idle, walk, rolls, draw, sheathe) with GS's draw / sheathe motions (phase2.md "Great Sword code still used"); Guild set in every style, the shared Hunter Arts only |
+| inputs | one class id per (MHF input, condition) pair (21 pairs, x 2 modes); MHF -> pad by position: tri Y, circle B, special(A) A, MS evade X, R1 RB, R2 = RB + RT (Guard Counter), L2 = RT alone (aim), SELECT = Back (0x4000) (mechanics.md "Conditions and inputs", ms_act.c PAD_* / BTN_*) |
+| hits | 140 attack / special entries + magnetised copies (MV x 1.1); HDP [2] = 0 (live at MHF's ATTACK event), [3] = 2 x MHF's live ticks (test 7); weapon capsules in the holding hand's frame plus one ghost each (test 4); element through MS_ELEMENT_MASKS (test 14, C); code specials #5-#7, #10, Magnetic Shock #12 x 4; MV-0 specials not armed; KO the template's |
+| gauge, Magnetise | regen, on-hit gain, bar costs, Magnetise charge / on / lockout (C, mechanics.md); its look = MHF's (magz_look: fc6:10, fc5:55-58), never seen in a test yet (test 22 step 8) |
+| guard, charge | Guard Counter 14 -> 207 -> 57 / 76 / 77, Impact guard 112 -> 113 -> 114 / 115 (GU guard patched for class 5); Triple Strike 34 -> 208 -> 35 / 36, overcharge release; MHF's guard / charge effects (msfxposts EVENT_POSTS) |
+| i-frames | MHF's events 7 / 8 / 9 and the QTE's, as MHF (mechanics.md "Invincibility", step H: the event-9 keep ends with its action, C) |
+| pin | leap -> pin on hit -> QTE (X / A mash) -> finisher / pin over; the hunter rides the monster; the monster is not held |
+| shot, marker | MHF's shot (500 / tick along the camera view) against GU's hurt volumes, the marker on the hit joint, ended by death or area change; looks fc5:b / fc5:a / fc5:e posted once and moved (test 21 row 5; never seen yet) |
+| attraction, repulsion | MHF's target, steering, budget, height band, start pitch clamp and fall momentum (mechanics.md "Marker, attraction, repulsion"; test 21: fixed); falling attacks, approach cancels; MHF's carriers and motion-row effects (test 21: none showed; test 22 = the scene-mode half of the draw-mode split) |
+| aim view, reticle | GU's gunner aim view kept on by slot 45, MHF's look on the right stick, MHF's reticle on GU's scope HUD (three HD_hud01 copies, GU's crosshair art hidden while aiming); first tried in test 22 (mechanics.md "Port (aim view)", "MHF's reticle") |
+| HUD | the Charge Blade's phial widget (class 5's HUD case -> CB's, hook 0x646560) with MHF's MS HUD art painted into a copy of HD_hud00 (mshud.py, ms_class.c hud_look): 5 cells = gauge bars, colour = mode, first element = Magnetise (S); layout CB's |
+| effects | MHF's own (dat/effect.bin) converted by mhffx2gu.py (assets.md "Conversion"): sprites in one BC3 atlas, 3-D meshes as GU Model units with MHF's blend and UV scroll, position curves / F emitters as kind-5 paths; posted at MHF's code-post moments (msfxposts.py, effect-posts.md), MHF's 208 per-motion keys with their follow modes, the carriers, the shot's hand piece (msgun.py). GS's crescents and flashes only when the MHF effects are off (MS_MHF_FX=0). Seen in test 21: some RB-move effects, plain Y / B smoke, the hand piece (the finisher's was GS's crescent, now dropped); open: the attraction / repulsion / Guard Counter effects (lost in effect draw mode, test 21 row 4), hue, brightness |
+| sounds | Great Sword stand-ins: GS's records on GS's motion slots, our attacks GS's whoosh_b + layered whoosh 2 frames before each attack (msfx.py); class 5's weapon sound requests asked as class 0 (hook ms_snd_file); MHF's own sounds not ported (MHF plays them from code and the per-motion keys of kind 0 / 1, effect-posts.md) |
+| weapons, smithy | 9 forgeable weapons (ids 2-10) in a 15th forge category ("Weapons and smithy" below), MHF's sharpness bars, the element on the smithy panel and in quests (test 15) |
+| multiplayer | not ported: event 44 (the other side's pin finisher) skipped, MHF's "not O" effect branches left out, other hunters' TASK posts unknown (effect-posts.md "Open"); every player needs the mod (gu-weapon-class.md "Risks") |
+| test 22 | built 2026-11-11, not installed: effects and their facing, the aim view and reticle, the attraction / repulsion / Guard Counter effects (draw-mode split), Magnetise, event-9 i-frames (checklist "### Open decisions and answers (2026-11-11)
+Rarity: the maintainer wants MHF's raw rarity (12 / 11 / 6 / 2) instead of the scaled 8 / 7 / 4 / 2, if GU can hold and
+display it: to be traced in GU before changing ms_class.c s_weapons. Sounds: notes/sounds.md "Decisions".
+
+## Test 22") |
+Mechanics: mechanics.md. Hit / motion pipeline: phase2.md. Effects: effect-posts.md, assets.md "Effects", gu-efl-units.md.
 
 ## Weapons and smithy
-| ID | weapon (MHF id, model) | GU raw | element | recipe (GU item IDs) |
-|---|---|---|---|---|
-| 2 | Demon Flamespike "Flash" (17516, wk595 -> mbg002) | 352 | fire 24 | Teostra Hardhorn 2, Cortex 4, Gem 1, Firecell Stone 5 |
-| 3 | Volnoborin IV (17563, wk606 -> mbg003) | 310 | water 45 | Lagiacrus Mantle 2, Plate 3, Plesioth Hardfang 4, Novacrystal 5 |
-| 4 | Torid Pillar "Uzi" (16964, wk414 -> mbg004) | 309 | thunder 47 | Zinogre Hardhorn 2, Hardclaw 4, Jasper 1, Eltalite Ore 5 |
-| 5 | Anoru Pillar "Wandemu" (16968, wk415 -> mbg005) | 303 | ice 50 | Barioth Cortex 6, Novacrystal 6, Meldspar Ore 5, Eltalite Ore 5 |
-| 6 | Apophis Pillar "Flash" (16933, wk404 -> mbg006) | 352 | dragon 24 | Valstrax Hardclaw 3, Cortex 4, Gore Magala Mantle 1, Novacrystal 5 |
-| 7 | Apophis Pillar "Clear" (16936, wk407 -> mbg007) | 374 | - | Rajang Hardhorn 2, Hardfang 3, Deviljho Gem 1, Eltalite Ore 5 |
-All: rarity 8, 3 slots, affinity 0, GU kireaji 106 (level 10), 60000 z, one level, no upgrades, always listed (no
-key material). Stats scaled from MHF (raw x 0.55, element x 0.3; S, user's call). Models: GU's file table names
-weapon\w05\mbg001-007 (ids 21815-21821, C), so models 2-7 need no file-ID work.
+| ID | weapon (MHF id, model) | GU raw | element | rarity | recipe (GU item IDs) |
+|---|---|---|---|---|---|
+| 2 | Demon Flamespike "Flash" (17516, wk595 -> mbg002) | 352 | fire 24 | 8 | Teostra Hardhorn 2, Cortex 4, Gem 1, Firecell Stone 5 |
+| 3 | Volnoborin IV (17563, wk606 -> mbg003) | 310 | water 45 | 8 | Lagiacrus Mantle 2, Plate 3, Plesioth Hardfang 4, Novacrystal 5 |
+| 4 | Torid Pillar "Uzi" (16964, wk414 -> mbg004) | 309 | thunder 47 | 8 | Zinogre Hardhorn 2, Hardclaw 4, Jasper 1, Eltalite Ore 5 |
+| 5 | Anoru Pillar "Wandemu" (16968, wk415 -> mbg005) | 303 | ice 50 | 8 | Barioth Cortex 6, Novacrystal 6, Meldspar Ore 5, Eltalite Ore 5 |
+| 6 | Apophis Pillar "Flash" (16933, wk404 -> mbg006) | 352 | dragon 24 | 8 | Valstrax Hardclaw 3, Cortex 4, Gore Magala Mantle 1, Novacrystal 5 |
+| 7 | Apophis Pillar "Clear" (16936, wk407 -> mbg007) | 374 | - | 8 | Rajang Hardhorn 2, Hardfang 3, Deviljho Gem 1, Eltalite Ore 5 |
+| 8 | Shesha Pillar "Clear" (16932, model 7) | 165 | - | 7 | 329 x 5, 1494 x 2, 334 x 3, 409 x 3 |
+| 9 | Ophion Pillar "Flash" (16926, model 6) | 116 | dragon 7 | 4 | 325 x 4, 1439 x 2, 1441 x 2, 324 x 3 |
+| 10 | Demon Flamespike (17511, model 2) | 83 | fire 6 | 2 | 318 x 5, 320 x 3, 460 x 1, 1172 x 2 |
+Ids 2-7 (test 1): MHF's rarity-12 records, 3 slots, 0 % affinity (MHF's, kept: test 1 row 2); 8-10 (test 3 row 2):
+16932 3 slots / 50 %, 16926 and 17511 0 slots. Rarity = MHF's 12 / 11 / 6 / 2 scaled into GU's range (ms_class.c
+s_weapons rare; G whether test 1's "keep MHF's" meant the rarity too). 60000 z, one level, no upgrades, always listed
+(no key material). Stats scaled from MHF (raw x 0.55, element x 0.3; S, the maintainer's call). Sharpness = MHF's
+bars as appended kireajiData rows (test 1 row 2). Models: GU's file table names weapon\w05\mbg001-007 (ids
+21815-21821, C), so models 2-7 need no file-ID work.
 Smithy (static research gu_smithy, C unless marked): the forge's category cursor {kind 8, 7 per page, count 14} at
 0x165007e (count -> 15, page 3 = the Magnet Spike); category -> type u8[14] 0x1650022, labels (LbShop_EqMakeMsg IDs)
 0x1650058, top-panel icons 0x176f3e4 kind 8: module copies (build.py MS_LIT_PATCHES); the create / process getters
 0x6f9658 / 0x70153c hooked for type 12; label 206 "Magnet Spike" appended to LbShop_EqMakeMsg (count 206 checked);
 CommonMsg 90 (class 5's name, "Med. Bowgun (Removed)") replaced; names / descriptions from the base vtable's
-+0x3c / +0x40 / +0xbc / +0xc0; list icon of type 12 = the Great Sword's (0x1650018). Not done: forge counter
-0x162e0c counts type 12 as LBG; the scrap list (0x73bcec) skips class 5; a real Magnet Spike icon.
++0x3c / +0x40 / +0xbc / +0xc0. Icon: MHF-Z's Magnet Spike icon through hook 0x560920 at spots empty in GU's and the HD
+UI atlas, painted into the maintainer's HD UI atlas by ms_icon_hdui.py (tests 1-3; a release needs a module-side
+atlas). Not done: forge counter 0x162e0c counts type 12 as LBG; the scrap list (0x73bcec) skips class 5.
 
-## Deviations (S, to settle in tests)
-Marker = nearest large monster within 0.6 rad / 5000 units of the camera's aim, at the monster's origin + 300; the
-QTE (hold 60 / cap 90, 70 points); every
-MHF camera-shake preset = GU 0xf; the monster is not held during the pin; Guard skills = GU's has-skill 14 / 15;
-the Magnetic Shock spots follow the hunter; R1 + evade = R + Y.
+## Deviations from MHF (current, 2026-11-11)
+Each with its reason and where it is discussed. Scope decisions (Guild style only, shared Hunter Arts): gu-weapon-class.md "Decisions".
+- Aim view = GU's gunner view: GU's over-the-shoulder offsets (camera preset 6); the pitch starts level, clamped
+  ±0xd1c (GU's pitch sense not traced, G); the reticle half a unit right of MHF's, sized at MHF's 720-line
+  reference (mechanics.md "Port (aim view)", "MHF's reticle").
+- MHF's target test 0x10331c10 not ported: attraction / repulsion start, steering and reticle never refuse (no
+  traced GU field for its cases; mechanics.md "MHF's target test", "Step H" below).
+- RB + A / X / B (and Cutting RB + Y) while walking start the RB moves with a bar, where MHF's walk tables offer only
+  the roll; standing under one bar GU's roll comes out where MHF does nothing. Kept by the maintainer's decision of
+  2026-11-11 (mechanics.md "Conditions and inputs").
+- Sounds = Great Sword stand-ins (Status "sounds").
+- Effect look (assets.md "Conversion", "look deviations"): MHF's Euler sum against GU's matrix product on posts with a
+  yaw and a spawn roll (no static fix); vertex colour x2 / brightness (G); depth write of efx_blend (G); BC3 colour
+  loss (a hue contributor; the hue itself open, test 20 row 3); billboard size unit (G), mesh overlaps baked with
+  "max", sprite UV scrolls as 8-step flipbooks; GU's volume setting may shorten fades.
+- Effects not converted / not posted: sprite UV modes 1 / 7, mesh flipbooks, rotation curves, sets' own packs, colour
+  flag 0x40, F emitters' bounces and children (their mean path only), the beam's length scale d / 4000 and the
+  repulsion carrier's scale bands (ms_act.c), the charge aura fc6:12, special #10's fc6:22, the pin's effects, the
+  status posts fc6:28-2a (msfxposts.py docstring, effect-posts.md); Magnetise's carriers ride the holding hand
+  (joint 8) instead of MHF's weapon matrix (S).
+- Test-22 draw-mode split: 45 Model units of fc5:1 / 2 / 5 / 7 / 0x38 / 0x4d / 0x4e in scene mode (test 21 row 11;
+  temporary, settled by test 22).
+- Hits: KO / exhaust and the other HDP fields from GU templates (mshit.py); ghosts sized for 120 updates / s (the 120
+  FPS patch, dt 0.5; "(test 5) ghost size" below); the Magnetic Shock spots follow the hunter (MHF's specials stay
+  where spawned, S; mechanics.md "Gauge and Magnetise").
+- Triple Strike thresholds not scaled by the skills 0x12e-0x130 (mechanics.md "Triple Strike charge").
+- Every MHF camera-shake preset = GU 0xf; Guard skills = GU's has-skill 14 / 15 (S; mechanics.md "Frame events").
+- Pin: QTE hold 60 / cap 90, success at 70 points (S: MHF's cap comes from the monster's pin value, GU has none); the
+  monster is not held (mechanics.md "Magnetic Pin").
+- Marker / shot: the marker point is MHF's rule on GU's hurt volumes (S); part breaks do not end it; the shot has no
+  wall test (it ends 300 below the ground); the attraction's ease-in is one tick shorter than MHF's (252 against 342
+  cm; mechanics.md "Shot", "Attraction").
+- Draw / sheathe motions and the sheathed carry = GS's (MHF's not found; phase2.md, test 4 row 11).
+- Weapon stats scaled into GU's G rank (S, "Weapons and smithy").
 
-## Test 1 results (user, 2026-10-30) and fixes
+## Test 1 results (the maintainer, 2026-10-30) and fixes
 | # | report | cause (log / data) | fix |
 |---|---|---|---|
 | 5, 12, 13 | no attack while walking, none after a roll, R moves not from idle | the common tables (0 idle / walk, 11 walk start, 12 / 13 rolls) lost GS's weapon commands and ours sat after GU's move / Hunter Arts commands (GU takes the first ready one; our idle block even had the stick's move before X / A) | ours in place of GS's, with GS's windows; no move command inside our block; GU's move last among equal priorities |
 | 11 | no jumping attacks | tables 18 / 19 (jumps 1/4, 1/5, 1/137, 1/140) lost GS's jump attack | tri = MHF's falling attacks 59 / 73 (the attraction flight's tri) |
 | 14 | sheathing while walking rolls | slot 9 (common 1/3, sheathe while moving) played MHF 1021, an Impact-form evade | slots 9 / 11 = GS's motions |
 | 15 | jumps / rolls always in the Cutting form | GU's rolls play 5012 / 5013 in both modes; bank-0 motions (jumps) give the weapon motion 1 | Impact: 5012 / 5013 -> 5032 / 5033 (MHF 1010 / 1011), idle variants 5005-5007 -> 5020; the weapon sync picks by mode as SA's (hooks 0x308ddc / 0x308e68) |
-| 8 | no Triple Strike cue | every MHF timer ran at half speed (tick = dt x 0.5; gauge regen measured ~100 / s), so the cue needed ~2.2 s of holding | tick = dt (cue ~1.5 s after the third hit starts); release logged (frame, A, charge) |
-| 10 | L / ZL = camera reset / lock-on | - | user's choice: ZR held = aim, R + ZR = Guard Counter |
+| 8 | no Triple Strike cue | every MHF timer ran at half speed (tick = dt x 0.5; gauge regen measured ~100 / s), so the cue needed ~2.2 s of holding | tick = dt (cue ~1.5 s after the third hit starts); release logged (frame, A, charge) (superseded: tick = dt / 2, tests 13 / 14, test 14 row 3) |
+| 10 | L / ZL = camera reset / lock-on | - | the maintainer's choice: ZR held = aim, R + ZR = Guard Counter |
 | R + B | sheathed at idle | GU's sheathe command 1/2 (common id 0xd) precedes ours | common ids 0xd / 0xe cleared when an R input of ours fires |
 | 16 | crescent too big | scale = tip radius / 109 cm (2.4x GS's for a 2.6 m reach) | scale = tip radius / 260 cm (GS's blade reach at scale 1) |
 | 4 | models lie flat in the viewer | the viewer stands a weapon on model z (GS: z -80..224); ours lay along x | model + weapon motions' root turned Ry(-90) (msgrip.TURN), the hand grip undoes it |
 | 1 | descriptions out of the box | one long line | GU's 3 lines of <= 32 characters |
-| 2 | same sharpness / rarity / affinity / slots | MHF's own records of the six: rarity 12, 3 slots, 0 % affinity (user: keep MHF's); sharpness ids differ (2 / 13 / 17 / 21): mhfdat header +0xac -> per-type pointers, MS = 0x18ff500, 8 cumulative thresholds of 400 (C) | MHF's bars as 4 appended kireajiData rows (gear.c, MS_SLICE; GU = 7 cumulative of 450: purple = MHF purple + 8th colour + Handicraft's 50) |
+| 2 | same sharpness / rarity / affinity / slots | MHF's own records of the six: rarity 12, 3 slots, 0 % affinity (the maintainer: keep MHF's); sharpness ids differ (2 / 13 / 17 / 21): mhfdat header +0xac -> per-type pointers, MS = 0x18ff500, 8 cumulative thresholds of 400 (C) | MHF's bars as 4 appended kireajiData rows (gear.c, MS_SLICE; GU = 7 cumulative of 450: purple = MHF purple + 8th colour + Handicraft's 50) |
 | 9 | X + A after the Guard Counter | MHF: only after a guarded hit (57 / 76 / 77, from f68); 57's table had GU's move before it | move last (above) |
 | 17 | hits miss | capsules checked against MHF's mesh in the hand frame (they match bone by bone); the oversized crescent suggested a reach the blade does not have | crescent fix; to re-check in test 2 |
 | 6 | no sound | not diagnosed (no log of the resolver) | resolver calls logged |
-| 3 | GS / bowgun icons | three type -> icon id tables (0x162e7dc / 0x164ff08 / 0x165000c), only the forge's was patched; HD_cmn_icon = 64-px cells, 10 per row, id n = cell (n % 10, n // 10) | MHF-Z's Magnet Spike icon (UI bank dat/mhf_90c.bin.xbox PNG 6) in the empty cell 121 of the user's HD UI atlas (tools/ms_icon_hdui.py, backup .pre-magnet-spike; GU's own atlas: cell empty, a release needs a module-side atlas); type 12 -> 121 in the three tables and the forge's category icons |
+| 3 | GS / bowgun icons | three type -> icon id tables (0x162e7dc / 0x164ff08 / 0x165000c), only the forge's was patched; HD_cmn_icon = 64-px cells, 10 per row, id n = cell (n % 10, n // 10) | MHF-Z's Magnet Spike icon (UI bank dat/mhf_90c.bin.xbox PNG 6) in the empty cell 121 of the maintainer's HD UI atlas (tools/ms_icon_hdui.py, backup .pre-magnet-spike; GU's own atlas: cell empty, a release needs a module-side atlas); type 12 -> 121 in the three tables and the forge's category icons (superseded: 121 reads past the grid, test 2 row 3) |
 | 7 | CB's HUD | class 5 drives CB's gauge widget; its .gui (hud14_chargeAx, quest_eng.arc) draws vials / shield from HD_hud00 | MHF's MS HUD art (UI bank PNG 4: horseshoe head, 5-cell bar, red / blue / grey horseshoes) painted over CB's vials / shield in a copy of HD_hud00 (tools/mshud.py -> mh4uport\ms_hud00), swapped into that .gui's texture entry while a Magnet Spike hunter drives it (ms_class.c hud_look). Layout = CB's (5 cells where the vials sit), not MHF's bar |
 
-## Test 2 results (user, 2026-10-30; smithy / village only: every quest crashed) and fixes
+## Test 2 results (the maintainer, 2026-10-30; smithy / village only: every quest crashed) and fixes
 | # | report | cause (log / data) | fix |
 |---|---|---|---|
 | crash | entering a quest crashes | hud_look walked the gauge .gui's objects as sprites; a non-sprite's +0x78 went to GU's lookup 0xb80fd0 as a table (read 0xff000000) | no object walk: 0xb80fd0's first argument is the rGUI (loader 0xb7f988: file +0x64, table +0xe8, count +0x70); module/icons.c's hook on it hands each rGUI to ms_gui_seen, the gauge's = path hud14_chargeAx |
 | 3 | icon = a piece of other icons, same everywhere | 0x560918 kinds 0 / 1 (16 / 24 units of a 256 x 512 space; GU's atlas 2x, HD UI's 4x): ids < 95 on a 10-column grid, 95..106 from lists 0x162e208 / 0x162e1a0; 121 read past them = (52, 348) (matched in the screenshot). Every grid cell is taken in both atlases | hook 0x560920 (after the kind check): MS_ICON_ID -> spots empty in both atlases, (184, 48) x 16 and (208, 32) x 24; ms_icon_hdui.py paints them, test 1's cell restored |
 | 4 | viewer still flat; the back turned 90 deg | GU weapon roots are identity; the viewer replaces joint 0's transform, so the turn on our root cancelled (in the root's bind frame the vertices still ran along x); GS's carry records do not undo the turn | the turn moves to the root's child (no vertex is skinned to the root; animated frames unchanged); the carry records GU applies off-hand get the turn undone (ms_class.c back_record, quaternion record (x) grip) |
-| 2 | bars do not follow red .. purple; 3 slots, 10 % affinity | the bars are MHF's (type 13 rows skip colours: id 2 = red 170, white 30, purple 50, sky 150); level row +15 mAffinity = 0 (10 % = the user's cheats) | none (reported) |
+| 2 | bars do not follow red .. purple; 3 slots, 10 % affinity | the bars are MHF's (type 13 rows skip colours: id 2 = red 170, white 30, purple 50, sky 150); level row +15 mAffinity = 0 (10 % = the maintainer's cheats) | none (reported) |
 
-## Test 3 results (user, 2026-10-30) and fixes
-The user names buttons by the Xbox pad's letters (HD UI shows Xbox glyphs; Ryujinx maps by position: Switch A = Xbox B,
-B = A, X = Y, Y = X). Test notes must use them. GU's player bits (+0x13f4) under the user's control type: d-pad 0x1-0x8,
+## Test 3 results (the maintainer, 2026-10-30) and fixes
+The maintainer names buttons by the Xbox pad's letters (HD UI shows Xbox glyphs; Ryujinx maps by position: Switch A = Xbox B,
+B = A, X = Y, Y = X). Test notes must use them. GU's player bits (+0x13f4) under the maintainer's control type: d-pad 0x1-0x8,
 B 0x10, X 0x20, R 0x40, Y 0x80, A 0x100, ZL 0x200, L 0x400, ZR 0x800 (roles 0x65f93c / 0x65f8ec / 0x65f9b4 swap
 0x40 / 0x800 and 0x200 / 0x400 with the other type; 0x400 = GU's camera-reset handler 0x27e970). Minus is not 0x200.
 | # | report | cause | fix |
 |---|---|---|---|
-| 10 | ZL switches modes | MHF's SELECT read 0x200 = ZL | SELECT = bits 0xf000 (S, Minus not identified: the "other buttons" log) |
+| 10 | ZL switches modes | MHF's SELECT read 0x200 = ZL | SELECT = bits 0xf000 (S, Minus not identified: the "other buttons" log) (superseded: Minus = 0x4000, test 4 row 1) |
 | 13 | R + left does the back step, R + bottom the left step | R1 + special / R1 + evade on Y / B | swapped: R + left (Y) = 106 / 158, R + bottom (B) = 107 / 116 |
-| 5, 12 | walking / after a roll: the idle attacks | GU's walk shared table 0; MHF's walk (40 / 44) has its own attacks (48 / 49 / 51 / 61, 52 / 54 / 53 / 146 / 71: a quicker lead-in into chain swing 2) | table 1 (pick392 for 2/0), 11, 12, 13: the walk's attacks first (user: after a roll = "the second Y -> Y, B -> B, faster") |
+| 5, 12 | walking / after a roll: the idle attacks | GU's walk shared table 0; MHF's walk (40 / 44) has its own attacks (48 / 49 / 51 / 61, 52 / 54 / 53 / 146 / 71: a quicker lead-in into chain swing 2) | table 1 (pick392 for 2/0), 11, 12, 13: the walk's attacks first (the maintainer: after a roll = "the second Y -> Y, B -> B, faster") |
 | 17 | visible hits miss ("A misses, A misses, A hits") | MHF counts attack life in 30 Hz ticks, motions run 2 frames a tick (Triple Strike cue: 20 ticks = f40); Impact 1 / 2 (14) and 3 (22) share one shape | live frames = 2 x MHF's; hit view: the marker flashes at both ends of each armed hit's capsule (ms_act.c MS_HIT_VIEW) |
 | 8, 9, 11, 18 | no charged strike, no X+A after GC, no jump attack, no pin | wrong buttons (Switch letters in the checklist; the log: B mashed during the charge, the GC caught hits) | instructions in Xbox letters |
 | 20 | a second GC before the first ends | MHF's GC 14 cancels to 14 from f60 (of 133) | none (MHF) |
-| 3 | the icon is wrong | MHF's type icon was not the one | the user's icon (dump/mhf/ui/ms_icon_user.png), pure white cleared |
+| 3 | the icon is wrong | MHF's type icon was not the one | the maintainer's icon (dump/mhf/ui/ms_icon_user.png), pure white cleared |
 | 4 | viewer too close | the viewer frames as GS's (sphere centre (8, 0, 72)); ours sat at (-22, 0, 0) | bind pose moved by (30, 0, 72) (fmod2gu VIEW_SHIFT; every motion keys the bones, so only the viewer sees it) |
 | 16 | crescent slightly too small | scale = r / 260 | r / 200 |
 | 2 | same slots / affinity | MHF's six share them (record +19 slots, +14 affinity) | MHF's 16932 (3 slots, 50 %), 16926 / 17511 (0 slots, sharpness id 0: a full red-to-purple bar) added |
 | 6 | sound only on draw / sheathe | not traced yet | - |
 
-## Test 4 results (user, 2026-10-30) and fixes
+## Test 4 results (the maintainer, 2026-10-30) and fixes
 
 | # | report | cause | fix |
 |---|---|---|---|
 | 9 | hits miss across the weapon | every Cutting attack has the same two r50 capsules (the U's prongs, checked in MHF's FK: they stay on the blade, 0 cm drift) and arms 2-6 frames before the swing's fastest frames, yet in the quest short fast swings landed 0-1 of 5-8 (actions 4 / 12 / 0, tip 160-180 cm a motion frame) and long sweeps 6 of 8 (action 11, tip 70 cm a frame): GU tests the shapes at each update's pose, the blade steps over monster parts. GU's fast weapons (LS, SnS, DB, SA, IG, Hammer's spin set) pair every blade shape with a type-5 shape (b.x = the blade's far end on the joint's z), GS / Lance / GL none: a trail, fields not decoded; our capsules lie up to 171 cm off the hand's z | msbuild `ghosts`: each weapon capsule gets a copy half a motion frame behind at the live window's fastest frame (hand frame; 2 -> 4 shapes, GU's max per set), offsets 12-164 cm |
 | - | element never dealt | MS_ARM flags 0: 0x2b76cc sets the element only for non-zero flags; GU's classes pass 3 or 0 | flags 3 |
-| user | no Frontier effect but the crescents | code posts (vt+0x39c) read PEL list 2 (GS's 500-517: its code-posted charge glows; list 1 = the PSL's, as em089's mode 2); ours were list-1 ids (the marker's post returned 0) | msfx CODE records in lists 1 and 2; flashes 1300-1302 on joint 8. MHF's own effects (dat/effect.bin): a later phase (user: wanted) |
+| the maintainer | no Frontier effect but the crescents | code posts (vt+0x39c) read PEL list 2 (GS's 500-517: its code-posted charge glows; list 1 = the PSL's, as em089's mode 2); ours were list-1 ids (the marker's post returned 0) | msfx CODE records in lists 1 and 2; flashes 1300-1302 on joint 8. MHF's own effects (dat/effect.bin): a later phase (user: wanted) (superseded: the list-2 reading was wrong; vt+0x39c returned 0 under class 5, test 5 row 2) |
 | 1 | Back and Plus both switch modes | BTN_MINUS 0xf000 | log: Back held 0x4000 (pressed 0x5000): 0x4000 |
-| 2 | RB + Back does nothing at a full gauge | Magnetise has its own charge per form (MV x 0.8 per hit, 1000; the user's Cutting reached 772); the 5 bars are the gauge | none (MHF's rule) |
+| 2 | RB + Back does nothing at a full gauge | Magnetise has its own charge per form (MV x 0.8 per hit, 1000; the maintainer's Cutting reached 772); the 5 bars are the gauge | none (MHF's rule) |
 | 8 | R + Y / B while walking = the walk's Y / B | plain tri / circle matched with R held | inputs 2 / 3 / 4 need R up (R1 is a modifier) |
 | 6 | pin never starts | the leap's grab (MHF attack 17, MV 1, the same capsules) must land: missed like the swings | ghosts |
 | 5 | no jump attack | log: only GU's 12-frame step-down hop (1/137, table 2018); the button log had run out | jump-press log (cap 40) |
@@ -111,7 +155,7 @@ B 0x10, X 0x20, R 0x40, Y 0x80, A 0x100, ZL 0x200, L 0x400, ZR 0x800 (roles 0x65
 | 11 | sheathed weapon carried like a GS | GS's carry record; MHF's: a ∩ on the back (curve behind the shoulders, prongs down past the hips), MHF keys it in code or its draw / sheathe motions (1471-1473 candidates) | later |
 | - | test 4's armed-hit log (cap 60) ran out in the village | - | quest-only, with the nearest monster's distance (cap 400) |
 
-## Test 5 results (user, 2026-10-30) and fixes
+## Test 5 results (the maintainer, 2026-10-30) and fixes
 
 | # | report | finding | change |
 |---|---|---|---|
@@ -122,7 +166,7 @@ B 0x10, X 0x20, R 0x40, Y 0x80, A 0x100, ZL 0x200, L 0x400, ZR 0x800 (roles 0x65
 | 6 | jump attack | three hops (1/137, 0.7 s): no press logged in any | the jump log adds held buttons |
 | 8 | no element (smithy, hits) | the attack's element comes from the hunter's stats vt+0x15c (0x11 type, 2 value), filled at equip time; the smithy reads the weapon data through per-class code (13 class readers of mElement, 0x1014d8..0x125350) | log of the hunter's stats at the first quest frame |
 | 9 | viewer unchanged | the bounding sphere does not set its framing | reverted |
-| user | ghost size (test 5 note, kept below) | see below | see below |
+| the maintainer | ghost size (test 5 note, kept below) | see below | see below |
 
 ## Test 6 results (maintainer, 2026-10-30) and fixes
 Log: dump/mhf/test_logs/ms_test6_Ryujinx_..._2026-10-30_16-13-37.log (956 msport lines; hit check, element stats,
@@ -136,7 +180,7 @@ jump held-button and effect-handle logs inside). The maintainer's answers (Demon
 | # | issue | log / cause | change (test 7) |
 |---|---|---|---|
 | 1 | hits late (test 5) | NOT placement (C): the capsule end = the drawn blade, 0 cm at 31 of 37 checks, 16-18 cm at a few arming frames. Every hit lands at motion frame >= ~33 whatever its arming frame: f11 -> +0.37 s (9 of 9, also on a small monster 22 m from the large one), f27 -> +0.10 s, f31 -> +0.04 s, f33+ -> at once. No re-hit lockout (+0.37 s even 5 s after the previous hit). GS's HDP [0] / [1] are not start / live frames (GS: 96..280 / 75), 0x2b72d4 uses [0] only with flag 0x4000 clear | hit check off; slot trace: the armed slot (p+0x3020 + slot x 0xb8) per update for 40 updates, 6 early arms |
-| 2 | no element | hunter stats key 0x11 = 0, key 2 = 0, raw 389 (C): lost at equip time. The 13 "per-class mElement readers" are save serialisers (0x1014d8: stream writes), not the fill; the fill is not 0xdee34 (skills) nor 0xe1bbc. The type -> class table 0x159fdcc: gunner types 11 / 13 / 17, so `type - 11 < 3` tests (0x5402dc, 0x6ceda4, 0x6d2fa0, 0x11ffe4c) count type 12 as a gunner (S: the smithy's missing element; not patched, what they gate is unread) | stand-in elem_fix: the record's element into stats +0x342 / +0x324 (hunter data +0x320 + 2 key) while GU left them 0; weapon entry copy at hunter data +0x18 (+4 type, +6 id). Element skills are lost while it stands in |
+| 2 | no element | hunter stats key 0x11 = 0, key 2 = 0, raw 389 (C): lost at equip time. The 13 "per-class mElement readers" are save serialisers (0x1014d8: stream writes), not the fill; the fill is not 0xdee34 (skills) nor 0xe1bbc. The type -> class table 0x159fdcc: gunner types 11 / 13 / 17, so `type - 11 < 3` tests (0x5402dc, 0x6ceda4, 0x6d2fa0, 0x11ffe4c) count type 12 as a gunner (S: the smithy's missing element; not patched, what they gate is unread) (superseded: the element getters' type masks, test 14 row 2) | stand-in elem_fix: the record's element into stats +0x342 / +0x324 (hunter data +0x320 + 2 key) while GU left them 0; weapon entry copy at hunter data +0x18 (+4 type, +6 id). Element skills are lost while it stands in |
 | 3 | no charge flash | posted (handle 47efcf80) through the guard flash's path: GS flash 7 itself is unseen | CHARGED = flash 9 (the guard's) |
 | 4 | no marker blink | 5 posts with handles at the monster: the request had no owner (req+4) nor area (req+0xc), which em089_efx.c's world posts set | req+4 = hunter, req+0xc = the area of the hunter's request +0x2550 |
 | 5 | no jump attack | one jump (1/140, table 2019): no input until RB at frame 41 (the log fires on any change: nothing was pressed, or the class input is not polled before frame 41) | log the first input frame of each jump |
@@ -175,13 +219,14 @@ aim + Y does nothing, aim + A rolls on its first frame; aim + Y unmarked does no
 |---|---|---|---|
 | 1 | no jump attack | every airborne Y came in 4/14 (the SHEATHED jump, table 2024) as sheathed command 5 = GS's jumping draw attack; s_ind_stand[5] = {1, 0, 0} (nothing). The jump code watched drawn jumps (category 1) only | command 5 in category 4 -> {0x10, 59}: MHF's falling attack 59, with the draw flag |
 | 2 | aim + A rolls | GU's common roll ids (+0x1418 bits 17-18) come before ours; only R held stripped them | stripped while aiming too |
-| 3 | no element | the equipped box entry is id 7 = Apophis Pillar "Clear", the one Magnet Spike with no element (stats raw 389 = its 374 + 15; "Flash" would be 352 + 15): likely no element bug at all | none; retest with Demon Flamespike "Flash" (id 2) |
-| 4 | no projectile, no blink (-> MHF effects port, the maintainer's call after test 10) | the projectile is not built (stand-in: the nearest large monster within 0.6 rad of the facing, 50 m); test 9's 3 shots found none in that cone, so no mark, no blink. The blink effect failed tests 6-8 with a mark | open: GS-template stand-ins at a world point never showed; MHF's projectile + mark effects belong to the effects port |
+| 3 | no element | the equipped box entry is id 7 = Apophis Pillar "Clear", the one Magnet Spike with no element (stats raw 389 = its 374 + 15; "Flash" would be 352 + 15): likely no element bug at all (disproved: tests 10-14, the cause = test 14 row 2) | none; retest with Demon Flamespike "Flash" (id 2) |
+| 4 | no projectile, no blink (-> MHF effects port, the maintainer's call after test 10) | the projectile is not built (stand-in: the nearest large monster within 0.6 rad of the facing, 50 m); test 9's 3 shots found none in that cone, so no mark, no blink. The blink effect failed tests 6-8 with a mark | open: GS-template stand-ins at a world point never showed; MHF's projectile + mark effects belong to the effects port (superseded: MHF's shot, test 14 row 6, test 15) |
 
-| (test 5) | ghost size | tuned to ~60 updates / s (the 120 FPS cheat, dt 0.5): native 30 fps moves 2 frames per check | before release: a hunt without the cheat, resize (a dt-based second set would pass GU's 255-set limit) |
+| (test 5) | ghost size | tuned to 120 updates / s (the 120 FPS patch, dt 0.5 = half a motion frame per update, test 13; corrected 2026-11-11 from "~60"): native 30-Hz logic moves 2 frames per check | before release: a hunt without the cheat, resize (a dt-based second set would pass GU's 255-set limit) |
 
 ## Test 1 (Phase 3; save backup dump/save_backups/2026-10-29_before_magnet_spike)
-Test 2 changes the buttons: ZR held = aim, R + ZR = Guard Counter.
+Test 2 changes the buttons: ZR held = aim, R + ZR = Guard Counter. (Buttons below superseded by test 1 row 10 and tests
+3 / 4 / 14: the current map is in "Status" inputs; test notes use Xbox letters.)
 Buttons (MHF -> Switch by position): tri X, circle A, tri + circle X + A, special B, R1 R, R2 ZR, SELECT Minus,
 aim L (or ZL). The gauge starts empty and fills 1 bar / 10 s and by hits; R moves cost 1 bar.
 1. Chains in both modes (Minus switches), Transform Attacks (Minus after a horizontal).
@@ -209,7 +254,7 @@ landing; aim + A still rolls. Effects: port MHF-ZZ's own (next phase).
 
 | # | issue | log / cause | change (test 11) |
 |---|---|---|---|
-| 1 | no element in the smithy | the quest's weapon was still box id 7 (Apophis "Clear", no element). The smithy / equipment rows test `type - 11 < 3` (HBG 11, LBG 13) at 0x5402dc, 0x6ceda4, 0x6d2fa0: type 12 = a bowgun row, no element line | build.py MS_GUNTYPE_SITES: type in {11, 13} (cmp / cmpne / bne) |
+| 1 | no element in the smithy | the quest's weapon was still box id 7 (Apophis "Clear", no element). The smithy / equipment rows test `type - 11 < 3` (HBG 11, LBG 13) at 0x5402dc, 0x6ceda4, 0x6d2fa0: type 12 = a bowgun row, no element line | build.py MS_GUNTYPE_SITES: type in {11, 13} (cmp / cmpne / bne) (not the cause: test 14 row 2) |
 | 2 | falling attack cut on landing | 59 ended on landing (kind-5 step) | landing 59 -> 60, 73 -> 74 (MHF's landing actions: motions 1015 / 1014, shake) |
 | 3 | aim + A rolls | no "aim A refused" line: aim + A never matched (aim + Y did) | every press while aiming logged with GU's common ids |
 
@@ -263,7 +308,7 @@ is right; (7) no MHF effect at all.
 |---|---|---|---|
 | 1 | marker gone too soon | "marker gone" 1.8-4.3 s after each hit, at the attraction's landing: the marker life test used em_ok, the hit pass's filter, whose hurt gates (rec+0x1a0 / +0x444, m+0x7652) drop for moments. MHF ends the marker on death, area change or a broken part (life prm14 = 9000 ticks) | em_alive: still in the monster manager, not small, HP > 0 (S: area / part ends not ported) |
 | 1 | no shot / marker look | stand-ins only (GS's flash, never seen in tests 6-15) | MHF's fc5:e on the marker, fc5:b on the shot, fc5:a at 100 / 300 / 600 / 1000 / 1500 of its flight (msfxposts 'MARKER' / 'SHOT' / 'TRAIL'): posted at the point (post_at), moved every tick (0x32a45c), stopped at the end (0x32a400). Trail rotation (pitch, yaw, 0) in GU's beam order: S. Reticle, aim camera, hand piece still open |
-| 2 | attraction janky, follow-up too high / slow | the log: Y in the flight -> 59, which climbs 111-124 cm before its slam. That is MHF's 59 (f0: drive up 15 / tick x 0.97^n, gravity 4 x 0.1 t; f54: the slam, gravity 60, drive -81). MHF's attraction update 0x10332dd0 runs only in 58 / 61 / 62 / 68 / 71 / 72 (its caller 0x103339d0), so 59 drops the flight's motion, as here. The flight re-targets the marker each tick (S; MHF's direction is set at the start) | none (no confirmed cause); question to the maintainer |
+| 2 | attraction janky, follow-up too high / slow | the log: Y in the flight -> 59, which climbs 111-124 cm before its slam. That is MHF's 59 (f0: drive up 15 / tick x 0.97^n, gravity 4 x 0.1 t; f54: the slam, gravity 60, drive -81). MHF's attraction update 0x10332dd0 runs only in 58 / 61 / 62 / 68 / 71 / 72 (its caller 0x103339d0), so 59 drops the flight's motion, as here. The flight re-targets the marker each tick (S; MHF's direction is set at the start) (superseded: MHF re-targets every tick too, C, mechanics.md "Steering") | none (no confirmed cause); question to the maintainer |
 | 3 | RB + A rolls while moving | every roll came with the gauge under one bar (1200, 0): R1 + special(A) costs a bar (condition 1, MHF), so GU's roll took the press; with 2000 it gave 106 | with our command set under R, GU's moving roll ids (4 / 24 / 38) are cleared too (they could take it, S). Under one bar GU still rolls: question (MHF's) |
 | 4 | no Y + B after a Guard Counter | both counters: Y + B at f32-f50 (combo 0x40, kept for 154 at f68), then B and Y 8 ms apart at f43 / f62: GU combo 0x42 = tri and the chord, tri's priority 20 (-> 16, f46-f76) beat the chord's 0 -> 16. MHF reads tri + circle as its own key action (0xe1 / 0xdc, 0x10336c70) and gives tri the higher priority inside the chord's go window, so a chord press is not tri there (S: the key layer 0x108f7010 not traced) | inputs 2 / 3 / 7 / 8 (tri, circle, R1 + tri / circle) not when the press is the chord (combo 0x40) |
 | 5 | RB moves: no i-frames | the log: 7 ticks granted in each RB move (11, 106, 107, 108, 135); the hits came at motion frames 14 and 18 (the window is 0-14). MHF decrements +0x4ee once per tick (0x10a72ed0, 0x10ad23f0): 7 ticks = 14/60 s, as here; Evasion +1 / +2 = 12 / 17 | none: MHF's value (question: was the maintainer's MHF set on Evasion?) |
@@ -290,8 +335,8 @@ area change; none on RB moves, plain Y / B attacks or the Guard Counter follow-u
 | # | issue | cause (C unless marked) | change (test 17) |
 |---|---|---|---|
 | 7 | every effect = one huge sphere | GU's billboard quad comes from the EAN frame's texels (0xa7e768: corners from frame w / h; GU's hunter billboards in w00.arc: size 0.2-1.25 on 256-px frames). Ours were cm (R x scale: 50-2000 on 32-128-px cells), 16-64x too big, so the camera sat inside each sprite and they all looked alike (S) | size = cm / (cell px / 2) (G: 1 cm per texel at size 1, not traced to the shader); Polygon width / height = the cell's half size, no width curves (G) |
-| 7 | spheres stay, through area changes | only the marker / shot effects (fc5:e / fc5:b, particles 631-848 s) live long: the stop call 0x32a400(eff, 0) only ends the emission (em089_efx.c kills with 1), and their once-emitted world-space particles do not follow 0x32a45c | kill (mode 1); the marker / shot effect re-posted at its point every MHF tick, the previous one killed (S: its UV scroll restarts); the marker also ends when its monster's area (+0x1054) is not the hunter's (MHF) |
-| 7 | none on RB moves, Y / B, GC follow-ups | MHF posts no code effect there (notes/effect-posts.md); no action uses event 15. Their look comes from another MHF source (S: the weapon trail / per-motion data, not mapped) | none yet: next study |
+| 7 | spheres stay, through area changes | only the marker / shot effects (fc5:e / fc5:b, particles 631-848 s) live long: the stop call 0x32a400(eff, 0) only ends the emission (em089_efx.c kills with 1), and their once-emitted world-space particles do not follow 0x32a45c | kill (mode 1); the marker / shot effect re-posted at its point every MHF tick, the previous one killed (S: its UV scroll restarts; superseded: posted once and moved, test 21 row 5); the marker also ends when its monster's area (+0x1054) is not the hunter's (MHF) |
+| 7 | none on RB moves, Y / B, GC follow-ups | MHF posts no code effect there (notes/effect-posts.md); no action uses event 15. Their look comes from another MHF source (S: the weapon trail / per-motion data, not mapped) | none yet: next study (found: MHF's per-motion keys, test 17 row 2) |
 
 ## Test 17 (built and installed 2026-11-04)
 1. Effects at all the moments of test 15 step 7: their size next to MHF's (still one global factor if wrong),
@@ -317,7 +362,7 @@ attraction and repulsion have effects too (reference video, scratchpad frame she
 
 ## Test 18 (built and installed 2026-11-05)
 Deviations in this build (S): the aim view is GU's (its over-the-shoulder offsets and look speed, GU's crosshair:
-MHF's red / blue / white reticle frames are not drawn); the hand piece's part transforms are read as T R S (S); F
+MHF's red / blue / white reticle frames are not drawn; superseded: ported for test 22); the hand piece's part transforms are read as T R S (S; superseded: R S v + p, test 21 row 3); F
 particles' bounces and child effects, UV modes 1 / 7 (7 particles) and the fc5:2 beam length scale are not ported.
 1. Plain Y and B: ground smoke only. Y + B finisher: the weapon effect and the ground impact.
 2. RB + Y / B / X / A: the trails and the start glow; colours next to MHF's (no white wash).
@@ -346,8 +391,8 @@ with no rotation, 26 turned 90 degrees about y) and thin-line textures (379, 31)
 
 ## Test 19 (built and installed 2026-11-05)
 Deviations in this build (S): the 3-D meshes' UV scroll (MHF modes 2-6 on the swing arcs) is not animated (GU's
-model UV layers, unit +0x136 / +0x138, not decoded far enough); GU's Euler order for the Model rotation is assumed
-X, Y, Z as MHF's; camera-facing sprites bake the base rotation x / y (their random range not); the effect-model
+model UV layers, unit +0x136 / +0x138, not decoded far enough; superseded: UV layer 0 since test 22); GU's Euler order for the Model rotation is assumed
+X, Y, Z as MHF's (since C: order 0, gu-efl-units.md "Model transform"); camera-facing sprites bake the base rotation x / y (their random range not); the effect-model
 vertex neutral 0x7f is Capcom's convention (S); plus test 18's (aim view, reticle frames, F bounces, UV modes 1 / 7,
 the beam length scale).
 1. RB + Y / B / X / A: the swing trails (weapon and, on the side moves, the hunter) and the start glow.
@@ -420,8 +465,8 @@ and up to 50 cm higher in an offline replay), the steering gate is the horizonta
 pitch is clamped to 25 deg up / 10 deg down (0x103328d0). New log line, once per attraction at its end: `msport:
 attraction end (landed | action change, action A): marker y M, target y T, start y Y0, peak y P, end y E, D cm to
 the target horizontally, N ticks, phase K` (target = marker + 100; phase 3 = falling). Not changed: the RB-move
-i-frames (MHF's own 7 ticks, 17 = with Evasion +2, C), the falling attacks' carried-over i-frames (MHF event 9,
-open: S) and RB + A while moving (MHF rolls at any gauge; the port's 106 with a bar, and GU's roll on RB + A
+i-frames (MHF's own 7 ticks, 17 = with Evasion +2, C), the falling attacks' carried-over i-frames (MHF event 9:
+no carry-over, C since step H, "Step H" below) and RB + A while moving (MHF rolls at any gauge; the port's 106 with a bar, and GU's roll on RB + A
 standing under one bar where MHF does nothing, are kept by the maintainer's decision of 2026-11-11: deliberate
 deviations). The maintainer's answers behind this (2026-11-11): the RT + Y attraction itself went too high (not the
 Y follow-up); MHF's RB + A under one bar not remembered; the MHF set's Evasion not known, but the weapon is known
@@ -456,6 +501,17 @@ flight and RT + Y, Y fixed; (7) RT + A and RT + Y show no effect (test 20 showed
 | 11 | which draw mode builds | statics cannot settle why the mixed effects vanished (row 4): the Model-only plain-Y smoke (fae:b / c / d) and the gun showed in effect mode. Other ways a build fails (C, effect-posts.md "GU's post handle"): a generator allocation, the effect's work block, a slot init | test-22 split (mhffx2gu.SCENE_TEST22, gen/report.txt): the Model units of fc5:1 / 2 / 5 / 7 / 0x38 / 0x4d / 0x4e (attraction, repulsion, Guard Counter: 45 units) in SCENE mode, frame 0; every other MHF Model unit in effect mode; fxwatch prints scene / effect per effect and which build step stopped |
 | 12 | GS stand-ins in the module | with the MHF effects on (gen/ms_data.inc MS_FXQ_ON 1, MS_NFXPOSTS 251) every GS stand-in post sits in a constant-false branch: marker flash (flash_at; MHF: fc5:e on the marker, fc5:b / fc5:a for the shot), Magnetise aura (MHF task 0xd / 0xe: fc6:10, fc5:55-58), guard flash (MHF fc5:46 / 47 / 15; Impact guard fc5:16, fc4:2, fc5:15), Magnetise-on flash (fc6:10 at t18 / 17), Magnetic Shock (task 0xf / 0x10 spot posts), Triple Strike charged (fc6:11 + fc5:15 x 3) | the marker flash's branch now tests MS_FXQ_ON itself (it ran beside MHF's in test 21) |
 
+### Step H (static, 2026-11-11): event 9 and MHF's target test
+- Event 9's i-frame keep (mechanics.md "Invincibility", C): MHF clears ext+0x284 at every action change (0x10a80050,
+  run by the action setter 0x10a80a00 and the neutral setter 0x10a81af0; the earlier search missed it), so the keep
+  ends with the action that set it, as the port already did. No behaviour change; two log lines added. RT + Y alone:
+  7 ticks (0.23 s) at the start, nothing in the flight; RT + Y then Y: covered from the Y to the ground. This differs
+  from the maintainer's memory of RT + Y alone (invincible to the ground); MHF's code gives that only with the Y
+  follow-up.
+- 0x10331c10 (mechanics.md "MHF's target test", C): refuses Chameleos in one action, and four "special" monster
+  states unless a ground rule holds; its (group, action) list is empty in the ZZ data. None maps onto a traced GU
+  field, so the port still skips it everywhere (deviation, unchanged).
+
 ## Test 22 (built 2026-11-11: msbuild.py + `GOG_DEFINES=MS_SLICE` module; not installed yet)
 In this build: rows 1-12 above (carriers kept alive, real fxwatch, no GS crescents, follow modes, the gun fixed, the
 draw-mode split); MHF's reticle on the scope HUD (step 4). Model units scroll their UVs as MHF (132 / 266, unit +0x134);
@@ -483,6 +539,11 @@ Xbox letters.
 8. Magnetise: hit the monster in one mode (stay in Cutting) until it is ready (charge MV x 0.8 per hit to 1000:
    20-40 hits; the log says "Cutting Magnetise ready"; the HUD's first phial changes, S), then hold RB and press
    Back (View); then RB + Y once: the flash, spots and pulses.
+9. Invincibility (step H; needs Invincible / Inf HP off): with a marker 14-40 m away, hold RT, press Y, then Y again
+   during the flight (the falling attack); let a monster attack land on you during the fall, then again after the
+   landing while standing. Then RT + Y with no follow-up into an attack. The log shows each `event-9 i-frame keep
+   on / off` and every hit (`hit into 64/...`): hits during the falling attack should miss, hits after the landing
+   (about 0.07 s on) and during the plain flight (after 0.23 s) should land, as MHF's code reads.
 Ask only about visuals: for each step, did an effect show, where, which way it faced.
 What the draw-mode split means (fxwatch "scene" count per effect; steps 5-7 = the scene-mode set, 2 / 3 / 8 the
 effect-mode mixed ones, 1 effect-mode Model only):
@@ -490,7 +551,13 @@ effect-mode mixed ones, 1 effect-mode Model only):
   the effect-mode Model ready check (0xa94b48, material class) -> scene mode for every MHF Model unit, or fix the
   material.
 - both sets built (built, live particles) but one not seen: a draw-time problem (blend, layer, alpha), not the build.
-- a set "failed" with gens below the entries or block 0: a generator / work-block allocation (budget), not the mode.
+- a set "failed (0x2000000)" with gens below the entries or block 0: a generator / work-block allocation; not
+  expected (2026-11-11 limits audit, gu-efl-units.md "Limits and budgets": no capacity is near its limit; the
+  proxy line now prints GU's live proxy count against its cap of 144).
+- "not built ... gens 0, block 0" with "no entry kept (0x1000000)": a record whose mask keeps no entry; none
+  expected any more. Record masks fixed (2026-11-11): every PEL record now builds exactly its own position group
+  (element +0 bit = record +0x48). Before, the first record of a multi-group effect drew all groups at group 0's
+  offset and the others built nothing (319 / 488 records; fxplace: up to 566 cm off, now 1.97 cm).
 - the scene set fails too: the mode is not the cause; compare with step 1's lines (effect mode, seen in test 21).
 New log lines: `msport: fxwatch ID tT proxy H unit U state S step K kind N efl R (flags F) effects C`; per effect
 `msport: fxwatch ID  effect I E unit U built|not built[, failed (0x2000000)][, no resource / init (0x4000000)] res R
@@ -498,4 +565,7 @@ New log lines: `msport: fxwatch ID tT proxy H unit U state S step K kind N efl R
 (a generator with record flags gets its own line), or `... invalid: REASON`; `msport: mhf carrier K (N rows, PEL P)
 at X Y Z: H`; `msport: mhf carrier PEL P stopped (WHY) after N ticks, alive A`; `msport: aim view on (camera mode M, manager H, quest camera C, yaw Y deg)`; `msport: aim tick: byte B cam aim A mode M settled S yaw Y deg pitch P deg (+0x2714 R)` (the first 10 updates of each aim; byte 1 and cam aim 1 = the fix holds); `msport: aim reticle frame F (WHAT), marker D cm` (on every change while aiming); `msport: reticle textures A B C` (three non-zero = loaded); `msport: scope reticle entry E: MHF frame F` / `... back to HD_hud01` (the first 40 swaps); `msport: scope reticle: HD_hud01 WxH, ours WxH: GU's crosshair kept` (no swap: the HD UI pack's HD_hud01 is not the size the build used); `msport: marker shot: camera now
 ...`, `... closest pass ...`, `... monster I ... ok ...`, `msport: marker shot replaced in flight`; `msport: marker
-gone (..., in manager, small, hp, area, hunter area)`; `msport: mhf effect ... mode 3` = a hunter-yaw key.
+gone (..., in manager, small, hp, area, hunter area)`; `msport: mhf effect ... mode 3` = a hunter-yaw key;
+`msport: event-9 i-frame keep on in action A (frame F)` and `msport: event-9 i-frame keep off (action change |
+event 7 / 8 | GU action, next N) after T ticks of action A, GU timer G/60 s` (step H; G = what is left, 4 = 2 MHF
+ticks).

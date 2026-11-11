@@ -163,7 +163,8 @@ hunter update keys them per motion.
 - **Kinds:** 0 / 1 = sounds (S: 0x11413d70 / 0x114252b0; MS motions use kind 1 446 times: a = id, b = 100);
   2 / 3 / 6 / 7 = an effect (a = set, b = id) on bone c (0-20 the hunter's; 21+ = weapon bone c - 21, 0x10999ce0 ->
   0x1032bb60), 6 / 7 with the offset (x, y, z) in the bone's frame; 2 / 6 copy the bone matrix once (fixed), 3 / 7
-  re-read it (follow); d = follow mode (0x1099a720: 3 / 4 position + the hunter's yaw (+ 90 deg), 5 no update);
+  re-read it (follow); d = follow mode (the rotation the effect takes: 3 / 4 the hunter's yaw (+ 90 deg), 5 none; all modes under
+  "Port" below);
   4 / 5 (0x1099a970) = at the bone's position snapped to the ground (0x108cbe30), fixed; 8 = the face slots
   (0x1099af40 -> 0x10886860: blinks), not effects.
 - **Magnet Spike use:** 208 effect keys on 53 motions (msfxposts.motion_keys): sets 0xfae / 0xfaf (the move flashes,
@@ -211,13 +212,14 @@ children.
   - part 2: (-13, 0, -35), (2.5, 2.5, 2.0), (0, 1.571, 0).
   This is the shot's hand piece. Port: tools/msgun.py, one GU effect model of the three meshes (the effect model
   pack's model0.fmod meshes 19 / 116 / 151, parts baked), a one-shot Model entry posted on joint 12 at f6 of 82 / 84
-  for 32 frames.
+  for 32 frames. Parts assembled as 0x1004f7b0 does since test 21 (origin + R (S v + p), assets.md "Conversion").
 - **The marker's look** = fc5:e attached to special #2 (C). The shot's look = fc5:b; its trail = fc5:a at 100, 300,
   600, 1000 and 1500 cm along the flight.
 - **Triple Strike** (corrects the earlier reading): fc6:11 is posted once, at level 1 (20 ticks). fc6:e is posted
   once, at the second threshold (34 ticks), together with the auto-release. Both are on bone 10. The rising fc5:15
   spots on bone 14 come at t4 / 8 / 12 after level 1. The aura is fc6:12 on bone 10 from f50 until level 1. A release
-  before level 1 posts fc6:13. GU's current stand-in (msfx PEL 1300 = 0xfc6 0xe) matches the release moment.
+  before level 1 posts fc6:13. GU's stand-in of 2026-11-04 (msfx PEL 1300 = 0xfc6 0xe) matched the release moment; since then MHF's own fc6:11 /
+  fc6:e / fc6:13 are posted (msfxposts CHARGED / RELEASE / EARLY) and 1300 only with the MHF effects off.
 - **Gates for the port**: EFX posts carry L and often O; TASK posts have none in the call. With one local hunter,
   O = L = true, and every row applies except the "not O" branches (1004dfcf fc5:14, 10334e6a / 10336082 fc5:5e,
   10335424 fc5:40). In multiplayer those branches pick what the other hunters' clients show (S).
@@ -252,13 +254,24 @@ What the module's post (ms.h ms_post: 0x282548 -> 0x53b500 -> 0x40978) returns, 
   the generators' +0x20 sizes (+ 0x60 + 0xa5b584(resource +0x7c bits 4-7) when effect +0x1d0) from a heap (0x7aa47c
   vt +0x1c; null -> 0x2000000); 0x9be664 inits each slot (0xaeb230 must return 1), count +0x1e4. None depends on
   the Billboard / Model mix as such; the work block grows with the generator count and particle budgets (our mixed
-  effects are the largest: fc5:7 21 entries, fc5:38 19, fc5:1 17, fc5:4d 16). Heap and pool sizes not traced.
+  effects are the largest: fc5:7 21 entries, fc5:38 19, fc5:1 17, fc5:4d 16). Sized 2026-11-11 (gu-efl-units.md
+  "Limits and budgets"): all of it comes from the shared 120 MiB Unit heap, no per-class pool; ours are under GU's
+  own maxima on every axis and the same size in scene and effect mode, so no capacity explains test 21. Two more
+  outcomes: the post itself is refused (handle 0) when 144 proxies live (0x41558); an effect whose record mask keeps
+  no entry (0x9be8c4: element +0 & the record's mask) builds no generator (+0xf0 0x1000000, not 0x2000000), as
+  319 of our 488 records did until the mask fix of 2026-11-11 (every MHF element +0 = 1, masks = entry bits).
+- **PEL record** (v15 file: u8 L, the EFL path, 2 bytes, a 160-B body; msfx.pel_add) as GU reads it (C, gu-efl-units.md
+  "Record mask"): body +0x00 / +0x10 / +0x20 position / rotation / scale, +0x30 u16 id (memory record +0x50), +0x32
+  joint, **+0x48 / +0x4c element masks** (proxy +0xd8 / +0xdc by 0x31c3a8 fields 0x12 / 0x13 -> effect +0x1c8 /
+  +0x1cc by 0x32aa44 -> 0x9bd5a0): the post builds the EFL entries whose element +0 / +4 share a bit with them. Ours:
+  one record per MHF position group, mask = the group's bit = its entries' element +0 (mhffx2gu.GROUP_BITS).
 - Consequence: tests 18-21's fxwatch read the proxy as the effect (garbage); ms_act.c fxw_* now follows proxy ->
   effect -> generators with vtable and PEL-id checks ("invalid" otherwise).
 
 ## Port vs MHF, found from test 21 (2026-11-11)
 - **GS's swing crescents still posted** (C): msfx.build gives every ported attack with a fitted arc a GS crescent
-  (PEL 1000+, class PSL kind 2: report "arcs: 36 records on 30 slots"), MHF effects or not. On the moves of test
+  (PEL 1000+, class PSL kind 2: report "arcs: 36 records on 30 slots"), MHF effects or not (since dropped while the MHF
+  effects are on: msbuild, phase3.md test 21 row 1). On the moves of test
   21: 1045 (11 / 135, RB + Y), 1035 (the finisher's second motion, 152 / 154 / 155), 1034 (Guard Counter), the plain
   1049 / 1050 / 1047 / 1051 / 1041 / 1043, not 1493 / 1494 (107 / 108).
 - **Finishing Slash without Magnetise** (C): MHF posts nothing on 1406 / 1446 / 1035 (code posts M only, no keys);
@@ -267,7 +280,7 @@ What the module's post (ms.h ms_post: 0x282548 -> 0x53b500 -> 0x40978) returns, 
   source (S: the attack's hit data, not traced).
 - **'act' rows from frame 0** (C): msfxposts' ('act', a) rows give task ticks as frames from 0, but 58 / 61 / 62
   start their motion 1472 at frame 8 (msact step start): fc5:3 (t1) and fc5:4 (t3) both post on the first update.
-  MHF: f10 / f14. Fix belongs in msbuild.fx_post_tables (frame += the first step's start for 'act' keys).
+  MHF: f10 / f14. Fixed 2026-11-11: msbuild.fx_post_tables adds the first step's start frame (phase3.md test 21 row 8).
 - **Attraction fc5:7** (C): posted at the action start; MHF at f10 (0x10335782). Module now 1 tick after the start.
 
 ## Open

@@ -31,9 +31,9 @@ ARC_BASE = 1000               # PEL ids of the Magnet Spike's arcs (GS's list-1 
 ARC_TEMPLATE = 2              # GS's record copied (unit mask 4: its overhead slash's arc)
 SHOCK_EFX = 1100              # PEL ids of the Magnetic Shock 5 x 3 spots (msbuild SHOCK; MHF effects 0x2e-0x30: S)
 SHOCK_TEMPLATE = 105          # GS's charged slash ground impact (cm001_004, posted with its arc 0 at slot 106 f44)
-# looks with no MHF counterpart converted (S): GS's charge flashes copied under ids its PTS does not tie a sound to.
-# Code posts (vt+0x39c) read PEL list 2 (GS's: 500-517, its code-posted charge glows; list 1 = the PSL's): test 4,
-# every code post asked list-1 ids and showed nothing (the marker's returned 0); CODE_EFX go to lists 1 and 2
+# GS stand-in looks (used only with the MHF effects off): GS's charge flashes copied under ids its PTS does not tie a
+# sound to. Test 4 read code posts as PEL list 2 (GS's 500-517); test 5: GU's vt+0x39c returned 0 for every id under class
+# 5, and the module now posts list 1 of the class PEL itself (ms.h ms_post); CODE_EFX go to lists 1 and 2 either way
 MARKER_EFX = (1200, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), 0.5, 6)          # the marker, posted at its point (ms_act.c);
 # GS's charge glow 6 (tests 6 / 7: template 9 is a GS slash trail, unseen at a still point)
 AURA_EFX = (1201, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), 0.6, 11, 8)        # Magnetise on: on the weapon hand (joint 8)

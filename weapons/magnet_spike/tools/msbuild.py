@@ -280,7 +280,8 @@ HIT_CAPS = []        # per hit entry: its first hand capsule (joint, end A, end 
                      # bone (bone, A, B in its frame) for ms_act.c's hit check
 
 
-GHOST = 0.5                           # the ghost's lag behind the blade, motion frames (GU: one motion frame an update)
+GHOST = 0.5                           # the ghost's lag behind the blade, motion frames (= one update's advance at the
+                                      # 120 FPS patch, dt 0.5, test 13; native 30-Hz logic advances 2 a check)
 MAX_SHAPES = 4                        # GU's own sets hold up to 4 shapes
 
 

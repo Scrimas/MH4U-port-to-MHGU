@@ -38,7 +38,8 @@ cmd_type / cmd_param = the input and its condition (meaning still to read from t
 - Steps: byte player +5 (bits 8..15 of word +4). Step 0 of an action: step++, `FUN_00282fd8(p, flags, a, b)`
   (action flags at +0x2510 / +0x2514, vtable +0x300), vtable +0x84c, then start a motion with `FUN_002a8d10(p, desc)`.
   Later steps poll `FUN_00950bcc(p + 0x4b0)` (motion ended = state byte bit 2) and frames: `FUN_00280e4c(frame, p)`
-  (frame reached), `FUN_00280c1c(frame, p)` (frame window); current frame float at +0x4f4.
+  (frame reached), `FUN_00280c1c(frame, p)` (frame window); current frame float at +0x4fc (+0x4f4 = the blend
+  countdown: "Motion frame fields" below, phase2.md run 5).
 - **Motion descriptor** (24 B, PC-relative tables in the class code): u32 motion (0xffff = none, e.g. 0x13f1), u32
   blend (+ flag bits 30 / 31 = other start modes), u32 start frame, u32 counter step (+0xfec), u32 -> {u16 command
   table id, i16 frame offset} for `FUN_002e9b7c`, u32 -> {u16 hit-data index, u32 type} for `FUN_002b7240` = arm
@@ -82,9 +83,10 @@ GU's cancels are data, as in MHF. Per style, each class ships a command table li
   0x27ca28 / 0x27db78; **slot 139 (+0x22c) is the class's own translator** (GS 0x1160058, CB 0x11d42b0) that sets
   the class ids (+0x1424, setter 0x285e54) from the virtual buttons and the press combos at +0x1444 (built by
   0x27ca28 with a short simultaneity window: bit 2 = X alone, 4 = A alone, 0x40 = X + A).
-  - Virtual pad bits (S, strong; from GS / common use): 0x20 = X (GS overhead / charge on hold), 0x100 = A, 0x10 = B
-    (common evade: ids 0xd / 0xe -> common actions 2 / 3), 0x80 = Y (sheathe / item), 0x1000 = R (guard; an option
-    aliases 0x2000 or 0x4000 to it). **ZR and Minus not identified yet** (first test logs the raw word).
+  - Virtual pad bits (C since the Phase 3 logs, phase3.md tests 3 / 4 / 14, ms_act.c PAD_* / BTN_*; Switch letters,
+    by position): 0x20 = X (top), 0x100 = A (right), 0x80 = B (bottom: GU's rolls 1/6, 1/13, 1/14), 0x10 = Y (left:
+    the sheathe 1/3), d-pad 0x1-0x8, R 0x40, ZL 0x200, L 0x400, ZR 0x800 (the control type swaps 0x40 / 0x800 and
+    0x200 / 0x400), Minus 0x4000. (Phase 1 read 0x10 = B / 0x80 = Y, R = 0x1000 and left ZR / Minus open: wrong.)
   - GS ids: X alone -> 0x12 / 0xc / 0x1d, A alone -> 2 / 9 / 0x1a / 0x1d, X + A -> 1 / 8, held X -> 5 / 0x11 (+ 3 /
     0x10 after a fresh press), held A -> 0x16 (+ 0x1e), R -> 0x17.
 - Inputs: the per-style `plcmd` files bind an action (act_st 0x1 common / 0x10 weapon, act_no) to an input id, and
@@ -94,18 +96,22 @@ GU's cancels are data, as in MHF. Per style, each class ships a command table li
   - i16[4] = motion value (GS 48 / 65 / 80 / 100 for draw and charge levels; CB 15..42), repeated at i16[26].
   - i16[6] = flags (1 = cut, 3, 0x2001 ...).
   - Floats 1.0 at +44 / +48.
-  - i16[2] / [3] are still unknown: GS 34 / 10, Hammer 22..52 / 6..10 (S: KO and exhaust).
+  - i16[2] = the motion frame the hit goes live on, i16[3] = its live frames (C, phase3.md test 7: 0x2b72d4 counts
+    slot +0x5c = [2] - current frame down, +0x60 = [3]); GS 34 / 10. Not KO / exhaust (the Phase 1 guess).
   - i16[19..21] are packed bytes.
 
   Arming (0x2b7240 -> 0x2b72d4): attack slot = player + 0x3020 + slot * 0xb8, entry by index (0x2a8a50), plus the
   HTS resource (0x2a8a70). i16[0] is the frame the attack goes live, counted from the motion (the motion's current
   frame +0x4f4 subtracted). So GS charge levels go live at 96 / 200 / 240, and arming late shortens the window.
+  (Superseded: [0] / [1] are not timing, phase3.md tests 6 / 7; the live frame is [2] against the frame +0x4fc.)
   The byte at +0x20 is passed as the hit-shape set (0 in the entries read).
 - **Hit shapes** `pl_weNN_hitsize`: 'HTS', u32 version, u32 count (CB 12, GS 7), then count x {u32 shape count,
   u32 offset}; shapes are 0x30 B (layout to read: joint, radius, ends).
 - For Magnet Spike, the interpreter can arm at MHF's ATTACK event frame with start 0, or arm at the step start with
   start = frame / 2. The HDP and HTS come from mhfsdt (MV, type, KO, shape sets on weapon bones 5 / 7). Still to
-  find: the active duration, and whether GU shapes can name weapon-model joints.
+  find: the active duration, and whether GU shapes can name weapon-model joints. (Settled: armed at the event with
+  [2] = 0 and [3] = 2 x MHF's live ticks, frames 1:1, no "/ 2"; GU shapes name player joints only (8 / 12 / 255),
+  so mshit.py poses MHF's blade shapes into the holding hand: mshit.py, phase2.md.)
 
 ## Class 5 in GU (Phase 2 research, 2026-10-29; C unless marked)
 - Box equipment type = class + 7, so class 5 = type 12. The type -> class switch at 0x3c1830 (`sub r0,r0,#7`,
@@ -271,7 +277,7 @@ the two patch words, the pl_w05 hash and the 0x13c208 jump table.
   - Multiplayer peers copy the class byte raw (S: everyone needs the mod).
   - Equipping in the house may request player\lobby\w05 (S).
 
-## Decisions (user, 2026-10-29, end of Phase 1)
+## Decisions (the maintainer, 2026-10-29, end of Phase 1)
 - Styles: **Guild only for now** (MHF's Magnet Spike has one moveset); other styles are not excluded for later.
 - Hunter Arts: **the 10 shared arts only** (`plcmd_com_sa0000..0009` in com_m.arc); no Magnet Spike arts.
 

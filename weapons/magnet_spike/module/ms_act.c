@@ -429,8 +429,9 @@ static void shock_tick(uint8_t *p, struct ms_state *s, float tk)
     if (s->shock_k >= MS_NSHOCK) s->shock_on = 0;
 }
 
-/* the marker's and Magnetise's looks (S: MHF's effects, dat/effect.bin, not converted): GS charge flashes (msfx
- * MARKER_EFX / AURA_EFX, no sound tied) every MARKER_BLINK / AURA_EVERY ticks, the marker's at its point through a
+/* the marker's and Magnetise's GS stand-in looks, used only with the MHF effects off (MS_FXQ_ON 0; with them: fc5:e
+ * on the marker, magz_look): GS charge flashes (msfx MARKER_EFX / AURA_EFX, no sound tied) every MARKER_BLINK /
+ * AURA_EVERY ticks, the marker's at its point through a
  * world-position request (em089_efx.c), Magnetise's on the weapon hand */
 #define MARKER_BLINK 60.0f
 #define AURA_EVERY 45.0f
@@ -719,9 +720,11 @@ static void aim_view(uint8_t *p, struct ms_state *s)
         }
         {                                               /* MHF's reticle frame (0x10339700, C): 0 repel possible =
                                                            marker 0 < d < 1400, 1 attract possible = 1400 < d < 4000,
-                                                           else 2 (3-D d to the marker; MHF also asks 0x10331c10's
-                                                           target test, not ported), shown on GU's scope HUD
-                                                           (ms_class.c ms_reticle) */
+                                                           else 2 (3-D d to the marker), shown on GU's scope HUD
+                                                           (ms_class.c ms_reticle). MHF also asks 0x10331c10 (C,
+                                                           mechanics.md "MHF's target test"): every refusal there
+                                                           needs a monster state with no traced GU field, so the
+                                                           port, as cond 10 / 11, never refuses (deviation) */
             float dm = marker_dist(p, s);
             int fr = dm > 0 && dm < 1400.0f ? 0 : dm > 1400.0f && dm < 4000.0f ? 1 : 2;
             ms_reticle(fr);
@@ -869,9 +872,10 @@ static void fxw_dump(int i)
     else if (FIELD(uint16_t, rec, 0x50) != id) bad = "PEL id (proxy reused)";
     if (bad) { logf("msport: fxwatch %u t%u proxy %x invalid: %s", id, t, h, bad); return; }
     uint32_t res = FIELD(uint32_t, h, 0x38), kids = FIELD(uint32_t, h, 0x15c), kind = FIELD(uint8_t, h, 0x158);
-    logf("msport: fxwatch %u t%u proxy %x unit %u state %u step %u kind %u efl %x (flags %x) effects %u",
-         id, t, h, FIELD(uint32_t, h, 0xc) & 7, FIELD(uint8_t, h, 0x30), FIELD(uint8_t, h, 0x31), kind, res,
-         fxw_ok(res) ? FIELD(uint32_t, res, 0x50) : 0, kids);
+    logf("msport: fxwatch %u t%u proxy %x unit %u state %u step %u kind %u efl %x (flags %x) effects %u, %d / 144 "
+         "proxies alive", id, t, h, FIELD(uint32_t, h, 0xc) & 7, FIELD(uint8_t, h, 0x30), FIELD(uint8_t, h, 0x31),
+         kind, res, fxw_ok(res) ? FIELD(uint32_t, res, 0x50) : 0, kids,
+         FIELD(int32_t, MAIN(0x1850a50), 0));           /* GU's live proxy counter, cap 144 (0x41558, C) */
     if (kind != 0 || kids > 2) return;
     for (uint32_t c = 0; c < kids; c++) {
         uint32_t e = FIELD(uint32_t, h, 0x150 + 4 * c);
@@ -884,9 +888,10 @@ static void fxw_dump(int i)
            count +0x1e0 lo16; a null one sets 0x2000000, a failed init 0x4000000), 0x9be320 allocates one work block
            (+0x1f4: distinct slots x 0x130 + the generators' +0x20 sizes; null -> 0x2000000), 0x9be664 inits each
            slot (count +0x1e4; one failing -> 0x2000000), then the ready checks (one failing -> 0x2000000) */
-        logf("msport: fxwatch %u  effect %u %x unit %u %s%s%s res %x (%u entries): gens %u, block %x, slots %u", id,
+        logf("msport: fxwatch %u  effect %u %x unit %u %s%s%s%s res %x (%u entries): gens %u, block %x, slots %u", id,
              c, e, FIELD(uint32_t, e, 0xc) & 7, FIELD(uint32_t, e, 0x118) & 0x1000000 ? "built" : "not built",
              f & 0x2000000 ? ", failed (0x2000000)" : "", f & 0x4000000 ? ", no resource / init (0x4000000)" : "",
+             f & 0x1000000 ? ", no entry kept (0x1000000)" : "",   /* the record mask kept none (0x9be8c4, C) */
              r, fxw_ok(r) ? FIELD(uint16_t, r, 0x74) : 0, FIELD(uint16_t, e, 0x1e0), FIELD(uint32_t, e, 0x1f4),
              FIELD(uint16_t, e, 0x1e4));
         /* generators summed per class (count / scene mode / live particles), any with record flags printed */
@@ -977,6 +982,20 @@ static void fx_queue_tick(uint8_t *p, struct ms_state *s, float tk)
         if (s->fxq_t[j] > 0 && (s->fxq_t[j] -= 2 * tk) <= 0) { s->fxq_t[j] = 0; post_n_w(p, s->fxq_id[j], s->fxq_n[j]); }
 }
 
+/* event 9's i-frame keep (MHF ext+0x284, C 2026-11-11, mechanics.md "Invincibility"): set by event 9 (0x10338320),
+ * cleared by events 7 / 8 (0x10338240 / 0x103382b0) and by 0x10a80050, which every action change runs (the setter
+ * 0x10a80a00, the MS change callback 0x10337c50 -> 0x10337c00 -> 0x10a80a00, the neutral setter 0x10a81af0): it never
+ * outlives the action that set it. Log: one line when it starts (event 9), one when it ends and why */
+static void keep_end(uint8_t *p, struct ms_state *s, const char *why, uint32_t next)
+{
+    if (!s->keep_if) return;
+    s->keep_if = 0;
+    static int s_n;
+    if (s_n++ < 40)
+        logf("msport: event-9 i-frame keep off (%s, next %u) after %d ticks of action %u, GU timer %d/60 s", why, next,
+             (int)s->keep_t, s->keep_no, (int)FIELD(float, p, 0x2b40));
+}
+
 static void tick(uint8_t *p, struct ms_state *s, float tk)
 {
     fx_posts(p, s);
@@ -1039,6 +1058,7 @@ static void tick(uint8_t *p, struct ms_state *s, float tk)
     }
     if (!ms_drawn(p)) { s->mode = 0; s->flags &= ~(1u | 0x8000u); }
     if (FIELD(uint16_t, p, 0x2506) != 0x10) {          /* GU's own action (hit, roll...): no flight, no pin */
+        keep_end(p, s, "GU action", FIELD(uint16_t, p, 0x250a));   /* MHF: that change also runs 0x10a80050 */
         s->air = 0; s->att = 0; s->pin_mon = 0; s->pin_pending = 0;
         s->flags &= ~0x1010u;
     }
@@ -1565,14 +1585,23 @@ static void event(uint8_t *p, struct ms_state *s, const struct ms_event *e, int 
         float n = (float)v;
         if (e->id == 8) { int l = MS_EVASION(p, 0x1f); n += l >= 2 ? 10 : l == 1 ? 5 : 0; }
         MS_IFRAMES(p, 2 * n, 0);
-        s->keep_if = 0; s->if_given = n;
+        keep_end(p, s, "event 7 / 8", s->action); s->if_given = n;
         static int s_if;                                /* the maintainer, after test 14: "R + Y / A / X / B have no
                                                            i-frames, unlike MHF-ZZ": MHF's are 7 ticks (+5 / +10 with
                                                            Evasion +1 / +2: Capcom's chart's 17 = +2) */
         if (s_if++ < 30) logf("msport: i-frames %d ticks in action %u (event %u, GU timer %d/60 s)", (int)n, s->action,
                               e->id, (int)FIELD(float, p, 0x2b40));
         break; }
-    case 9: s->keep_if = 1; break;      /* i-frames >= 2 ticks until 7 / 8 */
+    case 9:                             /* i-frames >= 2 ticks every tick of this action (keep_end: until 7 / 8 or
+                                           the next action change, C) */
+        if (!s->keep_if) {
+            static int s_k;
+            if (s_k++ < 40) logf("msport: event-9 i-frame keep on in action %u (frame %d)", s->action,
+                                 (int)MS_FRAME(p));
+            s->keep_t = 0; s->keep_no = s->action;
+        }
+        s->keep_if = 1;
+        break;
     case 11: MS_STAMINA(p, -150.0f, 0); break;          /* MHF 75 = a roll (GU 150) */
     case 45: MS_STAMINA(p, -60.0f, 0); break;           /* MHF prm80 30 */
     case 12: MS_SHAKE(p, 0xf, 0); break;                /* S: GU preset 0xf for MHF's presets */
@@ -1633,9 +1662,10 @@ static void action_start(uint8_t *p, struct ms_state *s, const struct ms_action 
 {
     uint32_t no = a->no;
     float t[3], *q = pos_of(p);
+    keep_end(p, s, "action change", no);               /* MHF: 0x10a80a00 -> 0x10a80050 clears ext+0x284 (C) */
     s->action = (uint16_t)no; s->fired = s->code_fired = 0;
     s->flags &= 0x1 | 0x10 | 0x40 | 0x1000 | 0x8000;
-    s->end_on_land = 0; s->keep_if = 0;
+    s->end_on_land = 0;
     if (!IN(s_pin_keep, no)) {
         s->gc_hits = 0; s->curve = 0;
         s->fwd = s->vert = s->grav = s->grav_t = s->fall_g = s->hold_v = s->fwd_n = s->vert_n = 0;
@@ -1793,7 +1823,7 @@ void ms_act(uint8_t *p)
     if (s->pin_pending && (no == 94 || no == 97)) { pin_start(p, s); return; }
     if (s->pin_mon && IN(s_pinned, no) && pin_tick(p, s, tk, no)) return;
     if (no == 34 && charge_tick(p, s, tk)) return;
-    if (s->keep_if) MS_IFRAMES(p, 4.0f, 0);
+    if (s->keep_if) { MS_IFRAMES(p, 4.0f, 0); s->keep_t += tk; }   /* MHF 0x1032f880: >= 2 ticks, MS actions only */
     if (s->hold_v > 0) {
         s->hold_v -= tk;
         FIELD(float, p, 0x1010) = FIELD(float, p, 0x1014) = FIELD(float, p, 0x1018) = 0;

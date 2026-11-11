@@ -13,10 +13,10 @@ Bones: MHF hunter bones (0 = floor = the hunter's own frame: no joint; 10 = S up
 GU joints by msmot.BODY_MAP; MHF HP(x, y, z) = bone 0 + R(yaw) (x, y, z) = joint none + offset; a TASK post keeps
 its bone (S: GU's joint-attached record follows it as MHF's re-read matrix does). MHF's single-player view: the
 "not O" branches (other hunters' clients) are left out.
-Carriers posted by the module (EVENT_POSTS 'MARKER' / 'SHOT' / 'TRAIL'): fc5 0xe / 0xb / 0xa. Not posted yet
-(module work): the other carriers that follow the marker / beams / weapon matrix (fc5 0 / 2 / 7 / 0x4d at the marker
-/ 0x4e / 0x28, fc6 0x10 / 0x12 / 0x22 / 0x1e, Magnetise fc5 0x55-0x58), the pin's,
-event 17's hand piece (no effect id: three model meshes)."""
+Carriers posted by the module (EVENT_POSTS): the marker / shot / trail fc5 0xe / 0xb / 0xa, the attraction's fc5 7 /
+0 / 2, the repulsion's fc5 0x4d / 0x4e, Magnetise's fc6 0x10 and fc5 0x55-0x58 (ms_act.c fx_at, magz_look); event
+17's hand piece (no effect id: three model meshes) = msgun.py. Not posted yet: fc5 0x28 (pin slam carrier), fc6 0x12
+(charge aura), 0x22 (special #10), 0x1e and the rest of the pin's."""
 
 ANY = 0xffff
 SHOCK_HIT = [(0, 0xfc6, 0x2d, (-90, 0, 0)), (0, 0xfc6, 0x2d, (-120, 0, 80)), (1, 0xfc6, 0x2d, (-130, 0, 130)),

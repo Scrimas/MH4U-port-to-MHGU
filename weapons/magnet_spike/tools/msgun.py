@@ -75,6 +75,7 @@ def build_efl(gu_read):
     tail = struct.unpack_from('<%dI' % n2, d, 0x30 + 16 * n)
     (te, el), (tu, u), (tm, em), (tv, mv) = mhffx2gu._template(gu_read, t)
     assert tu == 5 and tm == 17, 'template entry is not a one-shot Model'
+    el = mhffx2gu.group_element((te, el), 1)[1]                 # group bit 0 = its one record's mask (build)
     u = bytearray(u[:mhffx2gu.MODEL_SIZE])
     u[3] = mhffx2gu.ALPHA_BLEND                                 # MHF's default blend (alpha)
     struct.pack_into('<f', u, 0x1c, 1.0)

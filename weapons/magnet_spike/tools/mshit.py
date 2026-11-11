@@ -39,7 +39,7 @@ def hdp_bytes(entries):
 
 def hdp_entry(template, mv, dur, kind, shape, ko=None):
     """a GU entry from a template: live now for dur frames, motion value mv, damage type, hit shape set; ko = MHF's
-    KO value into i16[2] (S: GU's KO, Hammer 22..52; the template's otherwise)"""
+    KO value, unused (i16[2] is the live frame, test 7: no GU KO field known, the template's KO stays)"""
     e = list(template)
     e[2], e[3] = 0, dur             # live now (the ATTACK event arms at MHF's frame) for MHF's live frames; ko: no GU
     #                                 field known yet (it was written over the start frame, test 7), the template's

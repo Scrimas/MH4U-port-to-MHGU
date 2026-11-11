@@ -78,6 +78,7 @@ struct ms_state {
     uint8_t tr_n, tr_slot;          /* attack-slot trace (ms_act.c slot_trace): updates left, slot */
     uint16_t tr_hit;
     uint16_t was_no; uint8_t was_st; float was_f, if_given;   /* hit diag: the action before a hit */
+    float keep_t; uint16_t keep_no; /* event 9's keep (keep_if): ticks on, the action that set it (log only) */
     uint8_t shock_on, shock_k;      /* Magnetic Shock 5 x 3 task running, spots spawned */
     float shock_t;                  /* its ticks */
     float mk_blink, aura_t;         /* ticks to the marker's and Magnetise's next flash */
@@ -224,7 +225,7 @@ typedef void (*ms_req_t)(void *req);
                                                          0 = at the world position +0xc0), +0xd0 attach model */
 #define MS_REQ_DTOR FN(ms_req_t, 0x40b50)
 /* MS_EFX_CHARGED / GUARD / MAGNETISE (ms_data.inc, msfx.FLASH_EFX): copies of GS's charge flashes 7 / 9 / 11 in PEL
- * list 2, the list code posts read (S: stand-ins for MHF's effects) */
+ * lists 1 and 2 (ms_post asks list 1, test 5); stand-ins used only with the MHF effects off */
 
 static inline int ms_drawn(uint8_t *p) { return ((int (*)(void *))MS_VT(p, 0x178))(p) == 1; }
 

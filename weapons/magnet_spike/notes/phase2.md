@@ -3,14 +3,14 @@
 Goal: one Magnet Spike (wk400 model), held as GU's real class 5 (box type 12), playable in a quest on the moves
 below. All the technical layers get proven here before Phase 3 brings in the full moveset.
 
-## Decisions (user, 2026-10-29)
+## Decisions (the maintainer, 2026-10-29)
 - Route: the real class 5 from the start (no Great Sword stand-in). The class-5 plumbing (equipment type 12, class
   object, files, class-byte sites) is part of this phase; Phase 4 keeps the menus / category polish.
 - Moves: the slice below, Guild style.
 - Sounds and effects: wanted, but deferred to a later phase.
 - Work happens on branch magnet-spike, in the main checkout.
 
-## Slice (MHF action numbers; buttons: GU on Switch -> the user's Xbox pad, positional Ryujinx mapping)
+## Slice (MHF action numbers; buttons: GU on Switch -> the maintainer's Xbox pad, positional Ryujinx mapping)
 | Mode | Move | MHF input -> action | Xbox |
 |---|---|---|---|
 | Cutting | Vertical 1 -> Upslash -> Vertical 2 | tri: 0 -> 3 -> 4 | Y, Y, Y |
@@ -31,7 +31,8 @@ below. All the technical layers get proven here before Phase 3 brings in the ful
 
 Input map: MHF tri -> GU X (Xbox Y), circle -> A (B), cross -> B (A), R1 -> R (RB), R2 -> ZR (RT), SELECT -> minus
 (Back), L2 aiming -> Phase 3. ZR / minus = GU's virtual bits 0x800 / 0x200 (confirmed in test 1 run 6: Guard Counter
-and the mode switches ran from the user's RT / Back).
+and the mode switches ran from the maintainer's RT / Back). (Superseded in Phase 3: 0x200 = ZL, Minus = 0x4000 (phase3.md
+tests 3 / 4); RT alone = aim, RB + RT = Guard Counter (test 1 row 10); the current map: phase3.md "Status".)
 Cancels to actions outside the slice (R1 combos, aiming, Impact guard 112) are ignored until Phase 3.
 
 ## Work and status (2026-10-29)
@@ -40,7 +41,8 @@ Cancels to actions outside the slice (R1 combos, aiming, Impact guard 112) are i
   table k), MHF's map onto them 1:1 (per step; later steps keep the buffered presses). Inputs: class translator
   slot 139 sets class ids from GU's virtual buttons and press combos.
 - Frames: GU motion frames are 1/60 s like MHF's (GU's run 384 cm / 43 frames = 5.4 m/s, MHF's 4.3 m / 41-49
-  frames at 60 fps; the command windows and the monster clock agree): MHF frame numbers carry over 1:1.
+  frames at 60 fps; the command windows and the monster clock agree): MHF frame numbers carry over 1:1. MHF's logic
+  ticks (30 / s) are 2 frames each: mechanics.md "Time and units".
 - Common actions (drawn idle, walk, rolls, draw, sheathe) are GU's, playing fixed bank-5 slots; slot 215 "second
   mode" picks the second-mode slots (20 idle, 24 walk ...). Class 5's model ids are MH3's `mbgNNN`.
 - Hits: GU shapes sit on player joints only (8 / 12 / 255): MHF's blade shapes are posed into the holding hand.
@@ -54,7 +56,7 @@ gitignored; `gen/report.txt` lists the slot plan, hits and tables).
 2.3 Module: done, MS_SLICE builds only (weapons/magnet_spike/module: ms_class.c, ms_act.c; build.py hooks and
 patches; install.sh switch "Magnet Spike / MS_SLICE"). The test build adds Magnet Spike ID 1 to the item box.
 
-2.4 User tests: next, on the main Ryujinx and the real save (user's choice; backup
+2.4 The maintainer's tests: next, on the main Ryujinx and the real save (the maintainer's choice; backup
 dump/save_backups/2026-10-29_before_magnet_spike; install.sh keeps MS_SLICE on, since a build without it crashes on a
 save that holds a Magnet Spike). Test 1 = model, draw, moves, chains, hits (log); the log also prints every held-button
 change (to identify the Minus / ZR bits) and every motion slot a class-5 hunter asks for (to check the common slots).
@@ -71,11 +73,11 @@ change (to identify the Minus / ZR bits) and every motion slot a class-5 hunter 
 - Test 1, run 3: the model shows. Sheathed it hung in its bind pose (screenshot: parts spread); the drawn weapon did
   not match the motions (to look at, with the state trace); still stuck after the draw. Causes: (1) GU loads the
   class command list as file 27 + class * 6 + style (0x29b514) and names the styles guild / old / airhike / bushi /
-  kizuna / tatsujin; msbuild used English names for 1-5, and the user plays Alchemy (5), so class 5 had no command
+  kizuna / tatsujin; msbuild used English names for 1-5, and the maintainer plays Alchemy (5), so class 5 had no command
   tables after the draw; (2) GU's weapon sync plays weapon index 0 for every sheathed motion and wg05_00 had none;
   (3) vt+0x168 (the sheathed-command picker's "state") is the style, so every draw was the moving draw attack. Fixed:
   GU's style names (every style gets the Guild moveset until styles are decided), index 0 = the Cutting form (S),
-  moving = a locomotion action (act_st 2). (The user played Valor, not Alchemy: GU's style 5 is Valor.)
+  moving = a locomotion action (act_st 2). (The maintainer played Valor, not Alchemy: GU's style 5 is Valor.)
 - Test 1, run 4 (Guild and Valor): sheathed form better. The new state trace showed the draw attack and the drawn
   idle running right (motion 5001, weapon motion 1, table 2000) but no command ever fired from a class table:
   GU resolves a command list's CmdBase references while the list loads and msbuild put the list first in its arc,
@@ -98,7 +100,7 @@ change (to identify the Minus / ZR bits) and every motion slot a class-5 hunter 
   byte. The offline FK check confirmed joint 8 = bone 14 (place and orientation), so no offset is right. (2) GU's
   common idle / walk name their second-mode slots only for SA / CB: after the switch to Impact the hunter went back
   to the Cutting idle 5001 (and its weapon motion); the unit setter now maps 5001 / 5004 to 5020 / 5024 in Impact.
-- Test 1, run 7 (log 22-34-47): the user confirmed the model ("Done, all good to go"): the weapon in hand on joint 8,
+- Test 1, run 7 (log 22-34-47): the maintainer confirmed the model ("Done, all good to go"): the weapon in hand on joint 8,
   the Impact idle / walk with the Impact form (5020 / weapon 0x14), every slice chain of both modes (0 -> 3 -> 4,
   1, 6 -> 9 -> 10, 14, 18, 32 -> 33 -> 34 -> 36, 90 / 91), no crash, the save unchanged (all 4 hashes OK).
 
@@ -130,7 +132,7 @@ Everything else GS overrides is a Magnet Spike function or the common default (m
 - Hit data: KO / exhaust and the other fields from a GU template entry (GS cut / Hammer impact); i16[4] capped at
   250 (Charged Strike 338 kept in i16[26]).
 - Weapon record: Great Sword 1's level row (sharpness), raw 200 (MHF stats -> GU scale is Phase 5).
-- Styles: every style's command list is the Guild set (the user decided Guild only; other styles later).
+- Styles: every style's command list is the Guild set (the maintainer decided Guild only; other styles later).
 - Sheathed weapon form: the Cutting form (the drawn idle's first frame; MHF keys no sheathed weapon motion, S), on
   the Great Sword's carry placement.
 - Icon: GU's own type-12 icon, a bowgun (the leftover MH3 bowgun slot); MHF's Magnet Spike icon is Phase 4
