@@ -51,22 +51,24 @@ monster's MH4U rank falls among MHGU's quests of the same species.
 
 ## Install
 
-**With the installer** (Windows, Linux): download the latest *MHGU Definitive Edition Installer* from the
-[Releases](../../releases/latest) page (`.exe` for Windows, `.AppImage` for Linux) and run it. Tick where to
+**With the installer** (Windows, Linux; PC or ARM): download the latest *MHGU Definitive Edition Installer* from
+the [Releases](../../releases/latest) page (`.exe` for Windows, `.AppImage` for Linux; `x86_64` for a PC, `arm64`
+for ARM such as Windows on Snapdragon or a Linux handheld) and run it. Tick where to
 install (Ryujinx, yuzu / Eden and their forks, an Atmosphère SD card, any folder) and the monsters you want: it
 downloads them with the arenas they need, updates them to new releases, removes them, and keeps your saves in step
 (a backup of every save first).
 
 **By hand:**
 
-1. Download every zip you want from **one** release of
-   [MHGU-Definitive-Edition-Packages](https://github.com/Scrimas/MHGU-Definitive-Edition-Packages/releases/latest):
-   `core`, the monsters, and the maps (`map-...`) they need (the release text lists them).
+1. Download from **one** release of
+   [MHGU-Definitive-Edition-Packages](https://github.com/Scrimas/MHGU-Definitive-Edition-Packages/releases/latest)
+   either `MHGU-Definitive-Edition-<version>-all-in-one.zip` (everything: core, every monster and every map), or the
+   zips you want: `core`, the monsters, and the maps (`map-...`) they need (the release text lists them).
 2. Open the game's mod folder:
    - Ryujinx: right-click MHGU > *Open Mods Directory*
    - Yuzu / Eden: right-click MHGU > *Open Mod Data Location*
-3. Extract `core` (always needed), then the monsters and their maps. They all merge into one single
-   `MHGU Definitive Edition` folder.
+3. Extract the all-in-one zip there, or `core` (always needed), then the monsters and their maps. They all merge
+   into one single `MHGU Definitive Edition` folder.
 
 > [!WARNING]
 > - **Never mix zips from different releases.** A release is one matched set. To update, delete

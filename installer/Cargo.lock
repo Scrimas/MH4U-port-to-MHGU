@@ -2560,6 +2560,7 @@ name = "mhgu-de-installer"
 version = "2.1.0"
 dependencies = [
  "dirs",
+ "fontique",
  "image",
  "mhgu-de-core",
  "rfd",
@@ -2570,6 +2571,7 @@ dependencies = [
  "sys-locale",
  "windows 0.61.3",
  "winresource",
+ "yeslogic-fontconfig-sys",
 ]
 
 [[package]]

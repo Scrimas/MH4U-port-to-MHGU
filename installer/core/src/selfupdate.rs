@@ -11,10 +11,16 @@ use crate::version::Version;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 
-#[cfg(windows)]
+/// The end of this platform's file name (installer/packaging/build.py): an installer updates to the file of its own
+/// system and processor (an x86_64 .exe run by Windows on ARM's emulation stays x86_64).
+#[cfg(all(windows, not(target_arch = "aarch64")))]
 pub const SUFFIX: &str = "-x86_64.exe";
-#[cfg(not(windows))]
+#[cfg(all(windows, target_arch = "aarch64"))]
+pub const SUFFIX: &str = "-arm64.exe";
+#[cfg(all(not(windows), not(target_arch = "aarch64")))]
 pub const SUFFIX: &str = "-x86_64.AppImage";
+#[cfg(all(not(windows), target_arch = "aarch64"))]
+pub const SUFFIX: &str = "-arm64.AppImage";
 
 /// An installer release newer than this one, with this platform's file and its checksums.
 #[derive(Clone, Debug)]
@@ -163,6 +169,18 @@ mod tests {
         let u = available(&all, "2.0.0").unwrap();
         assert_eq!(u.version.to_string(), "2.1.0", "2.2.0 has no checksums, the mod's v9 is not an installer");
         assert!(available(&all, "2.1.0").is_none());
+    }
+
+    #[test]
+    fn only_the_file_of_this_system_and_processor() {
+        let names = ["-x86_64.exe", "-arm64.exe", "-x86_64.AppImage", "-arm64.AppImage"]
+            .map(|s| format!("MHGU-Definitive-Edition-Installer-2.1.0{s}"));
+        let mut all: Vec<&str> = names.iter().map(String::as_str).collect();
+        all.push("SHA256SUMS-2.1.0");
+        let u = available(&[rel("v2.1.0", &all)], "2.0.0").unwrap();
+        assert_eq!(u.file.name, format!("MHGU-Definitive-Edition-Installer-2.1.0{SUFFIX}"));
+        let others: Vec<&str> = all.iter().copied().filter(|n| !n.ends_with(SUFFIX)).collect();
+        assert!(available(&[rel("v2.1.0", &others)], "2.0.0").is_none(), "never another platform's file");
     }
 
     #[test]

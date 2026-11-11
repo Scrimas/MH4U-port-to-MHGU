@@ -5,8 +5,9 @@ main).
   release.py build           every monster's build.py (all steps), then the module, both without test switches
   release.py check           release checks on the current outputs (exit 1 on any failure)
   release.py package [DIR] [--pre N]
-                             check, then the zips, icons-<release>.zip, manifest.json, NOTES.md and NOTES-main.md
-                             into DIR (default dump/release/v<release>); --pre N: pre-release <core version>-pre.N
+                             check, then the zips, the all-in-one zip, icons-<release>.zip, manifest.json, NOTES.md
+                             and NOTES-main.md into DIR (default dump/release/v<release>); --pre N: pre-release <core
+                             version>-pre.N
   release.py all [DIR] [--pre N]   build + package
   release.py publish DIR [--repo OWNER/NAME] [--yes] [--draft]
                              create the GitHub release v<release> on PACKAGES_REPO (default; manifest.json: a
@@ -23,11 +24,14 @@ Edition/romfs/nativeNX/mhgu_de/<every monster>.bin (always installed together: g
 icon atlases micon_sd/hd.tex and hudicon_sd/hd.tex; <monster>-<v>.zip = MHGU Definitive Edition/romfs/... (that
 monster's assets, optional); map-<map>-<v>.zip = a map package's RomFS (maps/<map>: a ported arena, installed with the
 monsters that require it). Every zip extracts into the game's mod directory ('<mods>/contents/<title>/' for Ryujinx,
-'<load>/<TITLE>/' for the yuzu family) and they merge into the one 'MHGU Definitive Edition' folder. NOTES.md (the
-release text on PACKAGES_REPO): What's new (notes/release-news.md, one section per core version: write it before
-packaging), then how to install: the installer, or by hand (the maps each monster needs). NOTES-main.md (the text of
-REPO's release, the page players land on): what the mod is, What's new, the monsters and their quests (read from the
-quest files), how to install (the installer's files, or the zips on PACKAGES_REPO), online play and removals.
+'<load>/<TITLE>/' for the yuzu family) and they merge into the one 'MHGU Definitive Edition' folder.
+MHGU-Definitive-Edition-<release>-all-in-one.zip = all of them merged (core, every monster, every map) for players who
+install by hand: one download, one extract (issue #34); not in manifest.json (the installer takes the packages), and
+refused at GitHub's 2 GiB limit per release file. NOTES.md (the release text on PACKAGES_REPO): What's new
+(notes/release-news.md, one section per core version: write it before packaging), then how to install: the installer,
+or by hand (the all-in-one zip, or the zips and the maps each monster needs). NOTES-main.md (the text of REPO's release,
+the page players land on): what the mod is, What's new, the monsters and their quests (read from the quest files), how
+to install (the installer's four files, or the zips on PACKAGES_REPO), online play and removals.
 manifest.json (schema 2) is what the MHGU Definitive Edition Installer reads (installer/core/src/manifest.rs,
 notes/installer.md): the release, every package with its zip, size, sha256, requires and every file (path below 'MHGU
 Definitive Edition/', size, sha256), its name in each installer language as the game shows it (titles; class and with:
@@ -52,6 +56,9 @@ LEGACY_NAME = 'MH4U Port'  # the mod's folder before 2.0.0 (installer/core/src/p
 REPO = 'Scrimas/MHGU-Definitive-Edition'                    # the code and the installer's releases
 PACKAGES_REPO = 'Scrimas/MHGU-Definitive-Edition-Packages'  # the mod's releases (installer/core/src/lib.rs)
 MODULE_OUT = os.path.join(ROOT, 'module', 'out')
+ASSET_MAX = 2 << 30        # GitHub: a release file is under 2 GiB
+INSTALLER_FILES = (('x86_64', '.exe', 'Windows 10 / 11'), ('arm64', '.exe', 'Windows 11 on ARM'),
+                   ('x86_64', '.AppImage', 'Linux'), ('arm64', '.AppImage', 'Linux on ARM'))   # packaging/build.py
 
 
 def toml(path):
@@ -263,6 +270,24 @@ def write_zip(path, members):
                 z.writestr(zi, f.read(), compresslevel=9)
 
 
+def all_in_one_name(rel):
+    return '%s-%s-all-in-one.zip' % (MOD_NAME.replace(' ', '-'), rel)
+
+
+def write_all_in_one(out, rel, members):
+    """the all-in-one zip of release rel from every package zip's members (core, every monster, every map: their paths
+    never overlap, check()); exits when it reaches GitHub's limit (split it then)"""
+    seen = set()
+    dup = sorted({a for a, _ in members if a in seen or seen.add(a)})
+    assert not dup, 'shipped by two packages: %s' % dup
+    path = os.path.join(out, all_in_one_name(rel))
+    write_zip(path, members)
+    if os.path.getsize(path) >= ASSET_MAX:
+        size = os.path.getsize(path)
+        os.remove(path)
+        sys.exit('%s: %d bytes, GitHub takes release files under %d: split it' % (all_in_one_name(rel), size, ASSET_MAX))
+
+
 def release_id(pre=None):
     """the release (= tag without 'v'): the core version, '<core>-pre.N' for a pre-release"""
     return core()['version'] + ('-pre.%d' % pre if pre else '')
@@ -416,12 +441,15 @@ def package(out, pre=None):
                 for p in pk for m in p['entries']]
     members += [('romfs/nativeNX/mhgu_de/' + name, os.path.join(MODULE_OUT, name)) for name in ui_icons.FILES]
     core_zip = 'core-%s.zip' % c['version']
-    write_zip(os.path.join(out, core_zip), [(MOD_NAME + '/' + a, s) for a, s in members])
+    every = [(MOD_NAME + '/' + a, s) for a, s in members]
+    write_zip(os.path.join(out, core_zip), every)
     for p in pk:
         rf = p['romfs']                     # None: a bundle, an empty zip
         mem = [(MOD_NAME + '/romfs/' + os.path.relpath(os.path.join(d, f), rf).replace(os.sep, '/'), os.path.join(d, f))
                for d, _, fs in (os.walk(rf) if rf else []) for f in fs]
         write_zip(os.path.join(out, zip_name(p)), mem)
+        every += mem
+    write_all_in_one(out, rel, every)
     icons = write_icons(os.path.join(out, 'icons-%s.zip' % rel))
     with open(os.path.join(out, 'manifest.json'), 'w', encoding='utf-8') as f:
         json.dump(manifest(rel, pre, c, pk, out, icons), f, indent=1, ensure_ascii=False)
@@ -483,17 +511,19 @@ def notes(c, pk, pre=None):
               'offers it only when pre-releases are switched on in its Settings).', ''] if pre else []) + \
             ["## What's new"] + '\n'.join(news(v)).strip().split('\n')
     lines += ['', '## Install',
-              '**With the installer** (Windows, Linux): download the [MHGU Definitive Edition Installer]'
+              '**With the installer** (Windows, Linux; PC or ARM): download the [MHGU Definitive Edition Installer]'
               '(https://github.com/%s/releases/latest) and run it. Tick where to install (Ryujinx, the yuzu '
               'family, an SD card...) and the monsters you want: it downloads them with the maps they need, and '
               'updates or removes them later.' % REPO, '',
               '**By hand**:',
-              '1. Download the zips you want from this release only (never mix zips from different releases).',
+              '1. Download from this release only (never mix zips from different releases): `%s` (everything: core, '
+              'every monster and every map, nothing else to download), or the zips you want.' % all_in_one_name(
+                  release_id(pre)),
               '2. Open the mod folder: Ryujinx: right-click MHGU > Open Mods Directory. yuzu / Eden and others: '
               'right-click MHGU > Open Mod Data Location.',
-              '3. Extract **core** (always), then the monsters you want and the maps they need (%s). They all merge '
-              'into one `%s` folder.' % (need, MOD_NAME),
-              '4. To update: delete `%s` (and `%s`, its name before 2.0.0), then extract the new zips.'
+              '3. Extract the all-in-one zip there, or **core** (always), then the monsters you want and the maps they '
+              'need (%s). They all merge into one `%s` folder.' % (need, MOD_NAME),
+              '4. To update: delete `%s` (and `%s`, its name before 2.0.0), then extract the new zip(s).'
               % (MOD_NAME, LEGACY_NAME)]
     return '\n'.join(lines) + '\n'
 
@@ -505,7 +535,7 @@ def installer_version():
 def notes_main(c, pk, rel, pre=None):
     """the text of REPO's release (the installer's: the page players land on): what the mod is, What's new, the
     monsters and their quests, how to install (the installer's files, or this release's zips by hand), the tips"""
-    v, f = c['version'], 'MHGU-Definitive-Edition-Installer-%s-x86_64' % installer_version()
+    v, f = c['version'], 'MHGU-Definitive-Edition-Installer-%s' % installer_version()
     lines = (['> **Pre-release**: a test build that may contain bugs; use it at your own discretion.', '']
              if pre else []) + \
             ['MH4U monsters in MHGU (Switch 1.4): the monsters, their arenas, music, quests and gear.', '',
@@ -518,12 +548,13 @@ def notes_main(c, pk, rel, pre=None):
             lines.append('- **%s**: %s' % (t, ' · '.join('%s: %s' % (r, ', '.join('*%s*' % q for rr, q in mine if rr == r))
                                                           for r in dict.fromkeys(r for r, _ in mine))))
     lines += ['', '## Install',
-              '**With the installer**: download `%s.exe` (Windows 10 / 11) or `%s.AppImage` (Linux: make it '
-              'executable) below and run it. Tick where to install (Ryujinx, the yuzu family, an SD card...) and the '
-              'monsters you want: it downloads them with the maps they need, and updates or removes them later.'
-              % (f, f), '',
+              '**With the installer**: download yours below and run it (an AppImage: make it executable first): %s. '
+              'Tick where to install (Ryujinx, the yuzu family, an SD card...) and the monsters you want: it downloads '
+              'them with the maps they need, and updates or removes them later.'
+              % ', '.join('`%s-%s%s` (%s)' % (f, a, ext, what) for a, ext, what in INSTALLER_FILES), '',
               '**By hand**: the zips of this release are on [MHGU-Definitive-Edition-Packages v%s]'
-              '(https://github.com/%s/releases/tag/v%s): follow the instructions there.' % (rel, PACKAGES_REPO, rel), '',
+              '(https://github.com/%s/releases/tag/v%s), `%s` holding everything: follow the instructions there.'
+              % (rel, PACKAGES_REPO, rel, all_in_one_name(rel)), '',
               '- **Online**: everyone needs the same release and the same monsters.',
               '- **Removing a monster**: unequip its armor and weapons first (their models leave with it).']
     return '\n'.join(lines) + '\n'
@@ -559,6 +590,7 @@ def publish(out, repo, yes, draft):
     tag, pre = 'v%s' % m['release'], m['prerelease']
     files = [os.path.join(out, f) for f in sorted(os.listdir(out)) if f.endswith('.zip')] + [mf]
     assert any(os.path.basename(f).startswith('core-') for f in files), 'package %s first' % out
+    assert os.path.exists(os.path.join(out, all_in_one_name(m['release']))), 'no all-in-one zip: package %s again' % out
     print('%s%s %s on %s with %d files:' % ('draft ' if draft else '', 'pre-release' if pre else 'release', tag, repo,
                                           len(files)))
     for f in files: print('  ', os.path.basename(f))
