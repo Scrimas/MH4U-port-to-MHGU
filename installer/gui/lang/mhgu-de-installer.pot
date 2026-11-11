@@ -181,6 +181,11 @@ msgstr ""
 
 #: core/src/manifest.rs
 #. placeholders: {} in order, {0} {1} by position
+msgid "{}, with {}"
+msgstr ""
+
+#: core/src/manifest.rs
+#. placeholders: {} in order, {0} {1} by position
 msgid "Unreadable manifest ({})"
 msgstr ""
 
@@ -191,6 +196,38 @@ msgstr ""
 #: core/src/manifest.rs core/src/saves.rs
 #. placeholders: {} in order, {0} {1} by position
 msgid "Invalid manifest: {}"
+msgstr ""
+
+#: core/src/manifest.rs
+msgid "one core package"
+msgstr ""
+
+#: core/src/manifest.rs
+msgid "mod folder or title ID"
+msgstr ""
+
+#: core/src/manifest.rs
+msgid "two packages with one name"
+msgstr ""
+
+#: core/src/manifest.rs
+#. placeholders: {} in order, {0} {1} by position
+msgid "package name {}"
+msgstr ""
+
+#: core/src/manifest.rs
+#. placeholders: {} in order, {0} {1} by position
+msgid "{} requires {}"
+msgstr ""
+
+#: core/src/manifest.rs
+#. placeholders: {} in order, {0} {1} by position
+msgid "unsafe path {} in {}"
+msgstr ""
+
+#: core/src/manifest.rs
+#. placeholders: {} in order, {0} {1} by position
+msgid "{} in both {} and {}"
 msgstr ""
 
 #: core/src/places.rs
@@ -299,6 +336,20 @@ msgstr ""
 #: core/src/zipread.rs
 #. placeholders: {} in order, {0} {1} by position
 msgid "Damaged zip file ({})"
+msgstr ""
+
+#: gui/src/main.rs
+msgid "."
+msgstr ""
+
+#: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
+msgid "{} MB"
+msgstr ""
+
+#: gui/src/main.rs
+#. placeholders: {} in order, {0} {1} by position
+msgid "{} KB"
 msgstr ""
 
 #: gui/src/main.rs

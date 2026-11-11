@@ -1,0 +1,7 @@
+# Spanish: the maps' full names (unused for now: the installer and the game show 4U's quest-board names, which
+# the build reads from 4U). Every other Spanish text of the mod comes from 4U itself (tools/translate.py).
+
+[maps]                     # full names: 4U's own text (= its board names; kiranico.com/es/mh4u/mapa)
+battlequarters = { full = "Caserna" }
+heavens_mount = { full = "Monte Cielo" }
+speartip_crag = { full = "Risco Afilado" }

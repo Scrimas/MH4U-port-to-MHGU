@@ -2,8 +2,9 @@
 name = "gogmazios"
 kind = "monster"
 title = "Gogmazios"
-subtitle = "Elder Dragon"
-version = "1.1.7"       # bump on every published change of this monster's files (data, assets or code)
+class = "Elder Dragon"     # its class, GU's name (monsterName 253..267): the installer's subtitle in every language
+version = "1.1.8"       # bump on every published change of this monster's files (data, assets or code); 1.1.8:
+                        # its Chinese text (lang/zh_TW.toml, zh_CN.toml; core 2.1.0)
 requires_core = "1.7.3"    # oldest core module (exefs) that runs this version: the eyelid states (field-3 XFS
                            # states 1 / 6) need the module that opens the eyes at spawn (issue #11)
 requires = ["battlequarters"]  # packages it needs besides the core (maps/<name>; later shared utilities)

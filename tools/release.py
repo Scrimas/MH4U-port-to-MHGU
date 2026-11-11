@@ -30,11 +30,12 @@ REPO's release, the page players land on): what the mod is, What's new, the mons
 quest files), how to install (the installer's files, or the zips on PACKAGES_REPO), online play and removals.
 manifest.json (schema 1) is what the MHGU Definitive Edition Installer reads (installer/core/src/manifest.rs,
 notes/installer.md): the release, every package with its zip, size, sha256, requires and every file (path below 'MHGU
-Definitive Edition/', size, sha256), the save migrations and cleaning data (empty until the installer migrates saves)
+Definitive Edition/', size, sha256), its name in each installer language as the game shows it (titles; class and with:
+GU's class name and the package's other monsters, the subtitle; English subtitle for older installers), the save migrations and cleaning data (empty until the installer migrates saves)
 and extra warnings. The releases before 2.0.0 (MH4U Port v1.x, on REPO) have none: the installer supports 2.0.0 and
 later.
 """
-import hashlib, io, json, os, re, struct, subprocess, sys, tomllib, zipfile
+import glob, hashlib, io, json, os, re, struct, subprocess, sys, tomllib, zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -54,6 +55,57 @@ MODULE_OUT = os.path.join(ROOT, 'module', 'out')
 def toml(path):
     with open(path, 'rb') as f:
         return tomllib.load(f)
+
+
+# the installer's languages (installer/gui/src/i18n.rs LANGS) in the order of a data file's NAME (portdata LANGS + ZH)
+SHOWN = (('en', 'eng'), ('fr', 'fre'), ('de', 'ger'), ('it', 'ita'), ('es', 'spa'), ('zh_TW', 'chT'), ('zh_CN', 'chS'))
+GU_CLASSES = range(253, 268)   # monsterName entries: GU's monster classes (package.toml class = the English one)
+_CLASSES = []
+
+
+def gu_classes():
+    """{English class: {installer language: GU's own name}} of monsterName 253..267"""
+    if not _CLASSES:
+        sys.path.insert(0, paths.GU_PY)
+        from romfs import RomFS
+        import gmd
+        rom = RomFS(paths.GU_ROMFS)
+        s = [(code, portdata.zh_text(rom, lang)[0] if lang in portdata.ZH else gmd.gmd_strings(
+            rom.read('/nativeNX/%s/GUI/06_msg/monsterName_%s.gmd' % (lang, lang)))) for code, lang in SHOWN]
+        _CLASSES.append({s[0][1][i]: {code: x[i] for code, x in s} for i in GU_CLASSES})
+    return _CLASSES[0]
+
+
+def entry_names(e):
+    """{installer language: name} of entry e as the game shows it (its data file's NAME), None without one; a
+    format-1 data file gives English for Chinese, as the game did"""
+    hdr, secs = portdata.read(os.path.join(paths.gen(e), e + '.bin'))
+    n = [portdata.decode(t, b, portdata.nlangs(hdr))['name'] for t, b in secs if t == 'NAME']
+    if not n:
+        return None
+    n = n[0] + [n[0][0]] * (len(SHOWN) - len(n[0]))
+    return {code: x for (code, _), x in zip(SHOWN, n)}
+
+
+def map_titles(p):
+    """{installer language: the map's quest-board name}: 4U's mapName[stage_4u] in its five languages, the Chinese
+    from lang/zh_*.toml [maps] board (English without one)"""
+    from items4u import msg4u, gu_text
+    out = {code: gu_text(msg4u(lang)['mapName'][p['stage_4u']]) for code, lang in SHOWN if lang in portdata.LANGS}
+    import translate
+    for code in translate.GAME:
+        b = translate.load(code).get('maps', {}).get(p['name'], {}).get('board')
+        out[code] = b or out['en']
+    return out
+
+
+def shown_names(p):
+    """(titles, class, with) of a package for the manifest: its name, class (GU's) and the other named entries
+    (Shah Dalamadur), each {installer language: text}; a map has its quest-board names (map_titles)"""
+    if p.get('kind') == 'map':
+        return map_titles(p), {}, []
+    names = [n for n in (entry_names(m['name']) for m in p['entries']) if n]
+    return names[0], gu_classes()[p['class']], names[1:]
 
 
 def vtuple(v):
@@ -131,6 +183,20 @@ def check():
                 bad.append('%s: data file version %x != package.toml %s' % (e, hdr['version'], p['version']))
             if os.path.getmtime(data) < os.path.getmtime(os.path.join(paths.monster(e), 'package.toml')):
                 bad.append('%s: data file older than package.toml (repack)' % e)
+        if p.get('kind') != 'map' and all(os.path.exists(os.path.join(paths.gen(m['name']), m['name'] + '.bin'))
+                                          for m in p['entries']):
+            if p.get('class') not in gu_classes():
+                bad.append('%s: class %r is not one of GU\'s (%s)' % (name, p.get('class'), ', '.join(gu_classes())))
+            else:
+                titles = shown_names(p)[0]
+                if titles['en'] != p['title']:
+                    bad.append('%s: package.toml title %r, the game shows %r' % (name, p['title'], titles['en']))
+                if p.get('zh') and titles['zh_CN'] != p['zh'][p['entries'][0]['name']][1]:
+                    bad.append('%s: data file has no Chinese name (rebuild its name step)' % name)
+        if p.get('kind') == 'map':
+            zh = [z for z in ('chT', 'chS') if not os.path.isdir(os.path.join(p['romfs'], 'nativeNX', z, 'arc', 'stage'))]
+            if zh:
+                bad.append('%s: no %s map UI (its builder copies the English, as GU does)' % (name, ' / '.join(zh)))
         rf = p['romfs']
         files = [os.path.relpath(os.path.join(d, f), rf) for d, _, fs in os.walk(rf) for f in fs]
         if not files:
@@ -147,6 +213,16 @@ def check():
                     bad.append('%s: quest %d is not in its allocations' % (name, qid))
                 if qd[0x69] < 10:
                     bad.append('%s: quest %d has HP row %d (a test build?)' % (name, qid, qd[0x69]))
+    import translate
+    for code, r in translate.check().items():
+        if r['missing'] or r['stale']:
+            bad.append('lang/%s.toml: %d missing, %d stale translations (tools/translate.py check %s)' % (
+                code, len(r['missing']), len(r['stale']), code))
+    for e in (m['name'] for p in packages() for m in p['entries']):
+        data = os.path.join(paths.gen(e), e + '.bin')
+        lt = max([os.path.getmtime(f) for f in glob.glob(os.path.join(translate.LANG_DIR, '*.toml'))] or [0])
+        if os.path.exists(data) and os.path.getmtime(data) < lt:
+            bad.append('%s: data file older than lang/ (repack: tools/portdata.py pack %s)' % (e, e))
     return bad
 
 
@@ -281,7 +357,10 @@ def manifest(rel, pre, c, pk, out, icons):
     ps = [pkg('core', 'core', 'Core', c['version'], 'core-%s.zip' % c['version'], subtitle='Needed by every monster',
               requires=[])]
     for p in pk:
-        more = dict(subtitle=p.get('subtitle', ''), requires=p.get('requires', []), requires_core=p['requires_core'])
+        titles, cls, also = shown_names(p)
+        sub = cls.get('en', '') + ''.join(', with ' + o['en'] for o in also)   # older installers show it as is
+        more = dict(subtitle=sub, titles=titles, requires=p.get('requires', []), requires_core=p['requires_core'])
+        if cls: more.update({'class': cls, 'with': also})
         if p.get('kind') == 'map':
             more['folder'] = p['folder']
         else:
@@ -291,7 +370,8 @@ def manifest(rel, pre, c, pk, out, icons):
     return dict(schema=MANIFEST_SCHEMA, release=rel, prerelease=bool(pre), installer_min=INSTALLER_MIN,
                 title_id=TITLE_ID, mod_folder=MOD_NAME, icons='icons-%s.zip' % rel, packages=ps,
                 migrations=migrations(rel), cleaning={p['name']: cleaning(p) for p in pk if p.get('kind') != 'map'},
-                warnings=c.get('warnings', []))
+                warnings=[w if isinstance(w, str) else w['en'] for w in c.get('warnings', [])],
+                warnings_i18n=[{'en': w} if isinstance(w, str) else w for w in c.get('warnings', [])])
 
 
 def package(out, pre=None):

@@ -32,7 +32,8 @@ sys.path.insert(0, paths.GU_PY)
 import arcpack
 
 LANGS = ['eng', 'fre', 'ger', 'ita', 'spa']
-QLANGS = LANGS + ['chT', 'chS']     # quest text languages of v1.4 (questData refs + arc GMDs); 4U has no Chinese: English
+QLANGS = LANGS + ['chT', 'chS']     # quest text languages of v1.4 (questData refs + arc GMDs); 4U has no Chinese:
+                                    # lang/zh_TW.toml / zh_CN.toml [quests] (tools/translate.py), else English
 QD_SIZE = 369                      # v1.4 questData (the templates come from the v1.4 RomFS)
 LANG4U = {'eng': 0, 'fre': 1, 'spa': 2, 'ger': 3, 'ita': 4}    # order of a 4U quest's language tables (+0xBC)
 T_SET, T_ESL, T_REM, T_SUPP, T_PLUS, T_LINK, T_GMD, T_QD = (
@@ -200,11 +201,17 @@ def quest_gmds(tpl, tpl_id, sid, t4):
         d = tpl['%s\\quest\\questData\\questData_%07d_%s' % (lang, tpl_id, lang)][1]
         name, strs, unk = gmd_unpack(d)
         assert gmd(name, [s.decode('utf-8') for s in strs], unk) == d, lang
-    gmds = {}
+    import translate
+    gmds, missing = {}, []
     for lang in QLANGS:
         title, obj, fail, desc, other, client, sub = t4[lang if lang in LANGS else 'eng']
+        strs = [title, client, desc, other, obj, fail, sub]       # translate.QUEST_FIELDS order
+        if lang not in LANGS:
+            strs = [translate.game_text(lang, 'quests', '%d.%s' % (int(sid), f), s, missing) if s else s
+                    for f, s in zip(translate.QUEST_FIELDS, strs)]
         unk = gmd_unpack(tpl['%s\\quest\\questData\\questData_%07d_%s' % (lang, tpl_id, lang)][1])[2]
-        gmds[lang] = gmd('questData_' + sid, [title, client, desc, other, obj, fail, sub], unk)
+        gmds[lang] = gmd('questData_' + sid, strs, unk)
+    if missing: print('quest %s: %d strings without a translation (English shown; tools/translate.py check)' % (sid, len(missing)))
     return gmds
 
 
@@ -212,8 +219,9 @@ def assemble(res, link, gmds, qd, sid):
     """quest arc + loose files -> {RomFS path under nativeNX: bytes}. res = [(path, type, data)] of the resources
     questLink names. v1.4 positional layout: questData = arc entry [count-1] (0x3ba6dc), questLink = [count-9]
     (0x3ba840, path must contain "Link"; v1.0 used [count-7]): questLink, the 7 QLANGS GMDs, questData, as GU's own
-    v1.4 quests (without the 9 entries questLink is null and 0x3ade34 skips the whole quest setup). Loose GMDs: the 5
-    LANGS only (v1.4 has no loose chT / chS quest text)."""
+    v1.4 quests (without the 9 entries questLink is null and 0x3ade34 skips the whole quest setup). Loose GMDs: all 7
+    QLANGS: the boards load each quest's text as loose <lang>\\quest\\questData\\questData_<ID>_<lang> in every language
+    (C, test 2026-11-10 log); without the chT / chS files a Chinese game showed the ported quests in English."""
     ents = res + [('loc\\quest\\questLink\\questLink_' + sid, T_LINK, link)]
     ents += [('%s\\quest\\questData\\questData_%s_%s' % (l, sid, l), T_GMD, gmds[l]) for l in QLANGS]
     assert len(qd) == QD_SIZE
@@ -224,7 +232,7 @@ def assemble(res, link, gmds, qd, sid):
     files = {'loc/arc/quest/q%s.arc' % sid: arc,
              'loc/quest/questData/questData_%s.ext' % sid: qd,
              'loc/quest/questLink/questLink_%s.qdl' % sid: link}
-    files.update({'%s/quest/questData/questData_%s_%s.gmd' % (l, sid, l): gmds[l] for l in LANGS})
+    files.update({'%s/quest/questData/questData_%s_%s.gmd' % (l, sid, l): gmds[l] for l in QLANGS})
     return files
 
 

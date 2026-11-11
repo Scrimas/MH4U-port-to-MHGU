@@ -279,6 +279,7 @@ def main():
         open(dst, 'wb').write(arcpack.build(out))
     print('wrote <lang>/arc/stage/mapUI/m%02dd/aNN_ui_<lang>.arc and map_com/m%02d_<lang>.arc for %s' % (
         FOLDER, FOLDER, ' '.join(LANGS)))
+    mu.zh_copies(a.out, FOLDER)
 
 
 if __name__ == '__main__':

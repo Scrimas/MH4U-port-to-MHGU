@@ -1,7 +1,9 @@
 # Shrouded Nerscylla package: what the installer shows and installs, and the version written into its data file.
 name = "shrouded_nerscylla"
 title = "Shrouded Nerscylla"
-version = "0.1.15"      # bump on every published change of this monster's files (data, assets or code); 0.1.15: her
+class = "Temnoceran"       # its class, GU's name (monsterName 253..267): the installer's subtitle in every language
+version = "0.1.16"      # bump on every published change of this monster's files (data, assets or code); 0.1.16:
+                        # its Chinese text (lang/zh_TW.toml, zh_CN.toml; core 2.1.0); 0.1.15: her
                         # chest and arm armor take the armor colour as in 4U (FTransparency on their tinted material,
                         # tools/armor4u2gu.py --opaque-tint; they stayed cream, tests 2026-11-09); 0.1.14: the
                         # grey rock chunks of her dig-in and burst hidden (GU drew them near white, maintainer's

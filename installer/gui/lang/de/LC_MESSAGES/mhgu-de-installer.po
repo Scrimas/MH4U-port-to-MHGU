@@ -187,6 +187,11 @@ msgstr "..."
 
 #. placeholders: {} in order, {0} {1} by position
 #: core/src/manifest.rs
+msgid "{}, with {}"
+msgstr "{}, mit {}"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/manifest.rs
 msgid "Unreadable manifest ({})"
 msgstr "Unlesbares Manifest ({})"
 
@@ -198,6 +203,38 @@ msgstr "Dieses Release braucht einen neueren Installer: zuerst den Installer akt
 #: core/src/manifest.rs core/src/saves.rs
 msgid "Invalid manifest: {}"
 msgstr "Ungültiges Manifest: {}"
+
+#: core/src/manifest.rs
+msgid "one core package"
+msgstr "genau ein Basis-Paket"
+
+#: core/src/manifest.rs
+msgid "mod folder or title ID"
+msgstr "Mod-Ordner oder Titel-ID"
+
+#: core/src/manifest.rs
+msgid "two packages with one name"
+msgstr "zwei Pakete mit demselben Namen"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/manifest.rs
+msgid "package name {}"
+msgstr "Paketname {}"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/manifest.rs
+msgid "{} requires {}"
+msgstr "{} benötigt {}"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/manifest.rs
+msgid "unsafe path {} in {}"
+msgstr "unsicherer Pfad {} in {}"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/manifest.rs
+msgid "{} in both {} and {}"
+msgstr "{} sowohl in {} als auch in {}"
 
 #. placeholders: {} in order, {0} {1} by position
 #: core/src/places.rs
@@ -306,6 +343,20 @@ msgstr "Download fehlgeschlagen ({})"
 #: core/src/zipread.rs
 msgid "Damaged zip file ({})"
 msgstr "Beschädigte ZIP-Datei ({})"
+
+#: gui/src/main.rs
+msgid "."
+msgstr ","
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{} MB"
+msgstr "{} MB"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{} KB"
+msgstr "{} KB"
 
 #: gui/src/main.rs
 msgid "Core"

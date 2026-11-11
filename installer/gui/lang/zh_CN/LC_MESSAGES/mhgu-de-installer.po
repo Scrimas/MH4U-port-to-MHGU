@@ -187,6 +187,11 @@ msgstr "..."
 
 #. placeholders: {} in order, {0} {1} by position
 #: core/src/manifest.rs
+msgid "{}, with {}"
+msgstr "{}，含{}"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/manifest.rs
 msgid "Unreadable manifest ({})"
 msgstr "无法读取的清单（{}）"
 
@@ -198,6 +203,38 @@ msgstr "此版本需要较新的安装程序：请先更新安装程序"
 #: core/src/manifest.rs core/src/saves.rs
 msgid "Invalid manifest: {}"
 msgstr "无效的清单：{}"
+
+#: core/src/manifest.rs
+msgid "one core package"
+msgstr "只能有一个核心包"
+
+#: core/src/manifest.rs
+msgid "mod folder or title ID"
+msgstr "模组文件夹或游戏 ID"
+
+#: core/src/manifest.rs
+msgid "two packages with one name"
+msgstr "两个包同名"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/manifest.rs
+msgid "package name {}"
+msgstr "包名称 {}"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/manifest.rs
+msgid "{} requires {}"
+msgstr "{} 需要 {}"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/manifest.rs
+msgid "unsafe path {} in {}"
+msgstr "{1} 中有不安全的路径 {0}"
+
+#. placeholders: {} in order, {0} {1} by position
+#: core/src/manifest.rs
+msgid "{} in both {} and {}"
+msgstr "{0} 同时在 {1} 和 {2} 中"
 
 #. placeholders: {} in order, {0} {1} by position
 #: core/src/places.rs
@@ -306,6 +343,20 @@ msgstr "下载失败（{}）"
 #: core/src/zipread.rs
 msgid "Damaged zip file ({})"
 msgstr "损坏的 zip 文件（{}）"
+
+#: gui/src/main.rs
+msgid "."
+msgstr "."
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{} MB"
+msgstr "{} MB"
+
+#. placeholders: {} in order, {0} {1} by position
+#: gui/src/main.rs
+msgid "{} KB"
+msgstr "{} KB"
 
 #: gui/src/main.rs
 msgid "Core"

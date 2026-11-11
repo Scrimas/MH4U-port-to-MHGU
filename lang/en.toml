@@ -1,0 +1,7 @@
+# English: the maps' full names (unused for now: the installer and the game show 4U's quest-board names, which
+# the build reads from 4U). Every other English text of the mod comes from 4U itself (tools/translate.py).
+
+[maps]                     # full names: 4U's own (the board abbreviates two: H. Mount, S. Crag)
+battlequarters = { full = "Battlequarters" }
+heavens_mount = { full = "Heaven's Mount" }
+speartip_crag = { full = "Speartip Crag" }

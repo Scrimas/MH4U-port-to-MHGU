@@ -14,14 +14,14 @@ whether a monster is installed is decided by its assets (module/port.c). Format 
 Sections (written by the monster tools, consumed by module/*.c):
   FILE  u32 first_id, u32 count, s32 manifest[51], {u32 path hash, u32 type hash}[count]          (file_id, registry)
   ITEM  u32 n, n x {u16 id, u8 rarity, icon, colour, category, dummy_icon, 0, u32 dummy_sell, sell, buy},
-        u32 text[5][n][2] (name, description per language)                                            (items.c)
+        u32 text[L][n][2] (name, description per language)                                            (items.c)
   BUI   u32 groups, u32 entries, u8 cond[groups], u8 count[groups] (4-aligned), {u8 chance, count, u16 item}[entries]
   BUIr  the same for GU rank file r = '1' Low, '2' High, '4' G (quest\bui\bui_s<r>): preferred over BUI     (items.c)
   TBLA  u32 n, n x {u32 path suffix, u32 flags, u32 alloc, free, ctor, parse, u16 mem size, u16 file record size,
         u32 base, u32 count, u32 records}: records appended to a GU table when it holds exactly `base`   (gear.c)
-  TXTA  u32 n, n x {u32 GMD name, u32 base, u32 count, u32 strings}: u32 strings[5][count] appended (gear.c)
+  TXTA  u32 n, n x {u32 GMD name, u32 base, u32 count, u32 strings}: u32 strings[L][count] appended (gear.c)
   NOTE  u8 list record[16], u8 unlock record[8], u32 after (entry it is listed after)               (notes.c)
-  NAME  u32 monsterName entry, u32 name[5]                                                           (items.c)
+  NAME  u32 monsterName entry, u32 name[L]                                                           (items.c)
   SKIL  u32 n, n x {u32 skill, u32 grants[3]}: having `skill` also answers yes for the granted GU skills (gear.c)
   PWLF  u32 n, n x {u32 path suffix, u16 model, u8 from, u8 to}: weapon motion-set fixes             (gear.c)
   KIRX  u32 n, n x {u8 class NN, u8 weapon ID (mNo), u8 mLevel, u8 mKireType (the GU row its record holds), u16
@@ -31,15 +31,20 @@ Sections (written by the monster tools, consumed by module/*.c):
   WALK  u32 n, n x {u16 joint, u16 triangles, u32 offset}, triangles x 9 f32 bone-local vertices: 4U walk strips
         for the module's copy of 4U's ground query (monsters/dalamadur/module/dala_walk.c, tools/walk_em090.py)
 TBLA flags: 1 = the sharpness table, 2 = needs that monster's sharpness rows (skipped when they were refused).
+L = the languages: the section files (gen/*.sec) the tools write carry LANGS (4U's five); pack writes format 2 with
+TEXT_LANGS, the chT / chS strings from lang/zh_TW.toml / zh_CN.toml (tools/translate.py; English where a key is
+missing). Format 1 (core before 2.1.0) had LANGS only.
 """
-import json, os, struct, sys, tomllib
+import json, os, re, struct, sys, tomllib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import paths
 
-MAGIC, FORMAT = b'MH4P', 1
+MAGIC, FORMAT = b'MH4P', 2
 LANGS = ('eng', 'fre', 'ger', 'ita', 'spa')       # text order in every section (items.c language index)
+ZH = ('chT', 'chS')                               # GU's Chinese text languages, which 4U lacks (lang/zh_*.toml)
+TEXT_LANGS = LANGS + ZH                           # a format-2 data file's text order (items.c language index)
 TBL_KIREAJI, TBL_NEEDS_KIREAJI = 1, 2
 
 
@@ -93,20 +98,55 @@ def tbla(tables):
     return s
 
 
-def txta(texts):
-    """TXTA from [(GMD name, base, strings[5][n])]"""
+def txta(texts, langs=LANGS):
+    """TXTA from [(GMD name, base, strings[len(langs)][n])]"""
     s = Section('TXTA')
     off = 4 + 16 * len(texts)
     s.u32(len(texts))
     for name, base, strs in texts:
-        assert len(strs) == len(LANGS) and len({len(x) for x in strs}) == 1, name
+        assert len(strs) == len(langs) and len({len(x) for x in strs}) == 1, name
         s.str(name)
         s.u32(base, len(strs[0]), off)
-        off += 4 * len(LANGS) * len(strs[0])
+        off += 4 * len(langs) * len(strs[0])
     for _, _, strs in texts:
         for lang in strs:
             for x in lang: s.str(x)
     return s
+
+
+_ZH_TEXT = {}
+
+
+def zh_text(rom, lang):
+    """GU's resident_<lang>.arc text of a Chinese language: (monsterName strings, every character its GMDs use)"""
+    if lang not in _ZH_TEXT:
+        sys.path.insert(0, paths.GU_PY)
+        from arc import arc_entries, arc_read
+        import gmd
+        d = rom.read('/nativeNX/%s/arc/resident_%s.arc' % (lang, lang))
+        names, chars = None, set()
+        for e in arc_entries(d):
+            b = arc_read(d, e)
+            if b[:4] != b'GMD\0': continue
+            s = gmd.gmd_strings(b)
+            for x in s: chars.update(x)
+            if e[0].endswith('\\monsterName_' + lang): names = s
+        assert names, lang
+        _ZH_TEXT[lang] = names, chars
+    return _ZH_TEXT[lang]
+
+
+def name_section(name, entry, names, rom):
+    """NAME of entry `name`: its monsterName entry and names in LANGS order (pack adds the Chinese pair). The entry
+    must hold a GU dummy in the Chinese monsterName too, as items.c renames it there as well."""
+    assert len(names) == len(LANGS) and all(n and '\0' not in n and '\n' not in n for n in names), (name, names)
+    for lang in ZH:
+        gm = zh_text(rom, lang)[0]
+        assert re.fullmatch(r'dummy[1-9]', gm[entry]), (lang, entry, gm[entry])
+    sec = Section('NAME')
+    sec.u32(entry)
+    for n in names: sec.str(n)
+    return sec
 
 
 def sec_dir(name):
@@ -135,10 +175,13 @@ def pack(name):
     m = alloc.monster(name)
     d = sec_dir(name)
     secs = []
+    missing = []
     for f in sorted(os.listdir(d)):
         if f.endswith('.sec'):
             b = open(os.path.join(d, f), 'rb').read()
-            secs.append((b[:4], b[4:]))
+            secs.append((b[:4], with_zh(name, b[:4].decode(), b[4:], missing)))
+    for x in missing[:10]: print('no translation (English shown):', x)
+    if missing: print('%d strings without a translation (tools/translate.py check)' % len(missing))
     vs, v = version(name)
     head = MAGIC + struct.pack('<HH16sII', FORMAT, len(secs), name.encode(), v, m['em_id'])
     off = len(head) + 12 * len(secs)
@@ -152,6 +195,36 @@ def pack(name):
                                                                 ' '.join(t.decode() for t, _ in secs),
                                                                 len(head + dir_ + body)))
     return out
+
+
+def with_zh(name, tag, b, missing):
+    """a section file (LANGS) -> its format-2 body (TEXT_LANGS): the chT / chS strings appended from lang/"""
+    import translate
+    if tag == 'TXTA':
+        ts = decode(tag, b)
+        return txta([(t['gmd'], t['base'], t['text'] + [
+            [translate.game_text(z, 'text', '%s.%d' % (t['gmd'], t['base'] + i), en, missing) if en else en
+             for i, en in enumerate(t['text'][0])] for z in ZH]) for t in ts], TEXT_LANGS).bytes()
+    if tag == 'NAME':
+        d = decode(tag, b)
+        en = d['name'][0]
+        s = Section('NAME')
+        s.u32(d['entry'])
+        for n in d['name'] + [translate.game_text(z, 'monsters', name, en, missing) for z in ZH]: s.str(n)
+        return s.bytes()
+    if tag == 'ITEM':
+        n = struct.unpack_from('<I', b, 0)[0]
+        s = Section('ITEM')
+        s.u32(n)
+        s.raw(b[4:4 + 20 * n])
+        for l in range(len(LANGS)):
+            for _, nm, ds in translate.item_texts(b, l): s.str(nm); s.str(ds)
+        for z in ZH:
+            for gu, nm, ds in translate.item_texts(b, 0):
+                s.str(translate.game_text(z, 'items', '%d.name' % gu, nm, missing))
+                s.str(translate.game_text(z, 'items', '%d.desc' % gu, ds, missing))
+        return s.bytes()
+    return b
 
 
 # ---- reader (checks, tools/datacheck) ----
@@ -171,7 +244,13 @@ def read(path):
     return dict(format=fmt, name=nm.rstrip(b'\0').decode(), version=ver, em_id=em), secs
 
 
-def decode(tag, b):
+def nlangs(hdr):
+    """the text languages of a data file read() returned: TEXT_LANGS from format 2, LANGS before"""
+    return len(TEXT_LANGS) if hdr['format'] >= 2 else len(LANGS)
+
+
+def decode(tag, b, nl=len(LANGS)):
+    """section `tag` as data; nl = its text languages (a section file: LANGS; a data file: nlangs(header))"""
     u = lambda o, n=1: struct.unpack_from('<%dI' % n, b, o)
     if tag == 'FILE':
         first, count = u(0, 2)
@@ -183,7 +262,7 @@ def decode(tag, b):
         recs = [struct.unpack_from('<HBBBBBxIII', b, 4 + 20 * k) for k in range(n)]
         t = 4 + 20 * n
         text = [[[cstr(b, u(t + 4 * (2 * (len(recs) * l + i) + j))[0]) for j in range(2)] for i in range(n)]
-                for l in range(len(LANGS))]
+                for l in range(nl)]
         return dict(items=recs, text=text)
     if tag[:3] == 'BUI':
         g, e = u(0, 2)
@@ -204,12 +283,12 @@ def decode(tag, b):
         for k in range(n):
             nm, base, cnt, so = u(4 + 16 * k, 4)
             out.append(dict(gmd=cstr(b, nm), base=base,
-                            text=[[cstr(b, u(so + 4 * (cnt * l + i))[0]) for i in range(cnt)] for l in range(len(LANGS))]))
+                            text=[[cstr(b, u(so + 4 * (cnt * l + i))[0]) for i in range(cnt)] for l in range(nl)]))
         return out
     if tag == 'NOTE':
         return dict(list=b[:16].hex(), unlock=b[16:24].hex(), after=u(24)[0])
     if tag == 'NAME':
-        return dict(entry=u(0)[0], name=[cstr(b, u(4 + 4 * l)[0]) for l in range(len(LANGS))])
+        return dict(entry=u(0)[0], name=[cstr(b, u(4 + 4 * l)[0]) for l in range(nl)])
     if tag == 'SKIL':
         return [u(4 + 16 * k, 4) for k in range(u(0)[0])]
     if tag == 'PWLF':
@@ -227,7 +306,7 @@ if __name__ == '__main__':
         h, secs = read(a[1])
         print(json.dumps(h))
         for t, b in secs:
-            print(t, json.dumps(decode(t, b), ensure_ascii=False)[:2000])
+            print(t, json.dumps(decode(t, b, nlangs(h)), ensure_ascii=False)[:2000])
     else:
         print(__doc__)
         sys.exit(2)

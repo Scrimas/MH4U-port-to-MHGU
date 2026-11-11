@@ -4,6 +4,12 @@ tools/release.py puts the section of the core version being packaged into the re
 groups, **New** (something added) and **Fixed** (what works now, not what was broken), one short plain line each,
 written for players; write the section before `release.py package`.
 
+## v2.1.0
+**New**
+- The ported monsters have Chinese names in MHGU's two Chinese languages (Traditional and Simplified). They were in
+  English, since MH4U was never released in Chinese.
+- The installer shows each monster's name and class in your language, the same names as in the game.
+
 ## v2.0.0
 **New**
 - MH4U Port is now **MHGU Definitive Edition**, and so is its mod folder. The installer removes the old `MH4U Port`

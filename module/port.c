@@ -27,7 +27,7 @@ typedef void (*fs_close_t)(fs_file f);
 #define POOL_SIZE PORT_DATA_POOL       /* every monster's data file, each rounded up to 16 B (tools/alloc.py DATA_POOL; module/build.py
                                           refuses a build that does not fit: a file that doesn't is not loaded here, and its monster
                                           then runs on its donor's manifest) */
-#define FORMAT 1u
+#define FORMAT 2u          /* 2: every text in the 7 languages of items.c LANGS (core 2.1.0) */
 static uint8_t s_pool[POOL_SIZE] __attribute__((aligned(16)));
 static uint32_t s_pool_used;
 static const uint8_t *s_data[PORT_N];

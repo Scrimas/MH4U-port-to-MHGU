@@ -3,7 +3,7 @@
 
 use crate::i18n::{tr, trf};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 /// The newest manifest schema this installer reads; a newer one asks for an installer update.
 pub const SCHEMA: u32 = 1;
@@ -37,6 +37,15 @@ pub struct Package {
     pub title: String,
     #[serde(default)]
     pub subtitle: String,
+    /// Its name per installer language as the game shows it (release 2.1.0 on; `title` without one).
+    #[serde(default)]
+    pub titles: BTreeMap<String, String>,
+    /// A monster's class per installer language, GU's own name: its subtitle (`subtitle` without one).
+    #[serde(default)]
+    pub class: BTreeMap<String, String>,
+    /// The package's other monsters (Dalamadur's Shah Dalamadur), each per installer language.
+    #[serde(default)]
+    pub with: Vec<BTreeMap<String, String>>,
     pub version: String,
     pub zip: String,
     pub size: u64,
@@ -57,6 +66,38 @@ pub struct Package {
     pub files: Vec<FileEntry>,
 }
 
+/// The text of `names` in the window's language, else its English one, else `fallback`.
+fn in_lang(names: &BTreeMap<String, String>, fallback: &str) -> String {
+    let get = |l: &str| names.get(l).filter(|s| !s.is_empty());
+    get(&crate::i18n::lang()).or_else(|| get("en")).map_or_else(|| fallback.to_string(), |s| s.clone())
+}
+
+impl Manifest {
+    /// The release's warnings in the window's language.
+    pub fn shown_warnings(&self) -> Vec<String> {
+        if self.warnings_i18n.is_empty() {
+            self.warnings.clone()
+        } else {
+            self.warnings_i18n.iter().map(|w| in_lang(w, "")).collect()
+        }
+    }
+}
+
+impl Package {
+    /// Its name on screen, in the window's language.
+    pub fn shown_title(&self) -> String {
+        in_lang(&self.titles, &self.title)
+    }
+
+    /// Its subtitle on screen: a monster's class, with the package's other monsters, in the window's language.
+    pub fn shown_subtitle(&self) -> String {
+        if self.class.is_empty() {
+            return self.subtitle.clone();
+        }
+        self.with.iter().fold(in_lang(&self.class, ""), |s, w| trf("{}, with {}", &[&s, &in_lang(w, "")]))
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Manifest {
     pub schema: u32,
@@ -75,9 +116,12 @@ pub struct Manifest {
     /// Per package: its item / gear IDs, for the save cleaning on removal.
     #[serde(default)]
     pub cleaning: serde_json::Map<String, serde_json::Value>,
-    /// Release-specific warnings, shown in the review popup.
+    /// Release-specific warnings, shown in the review popup (English; `warnings_i18n` from release 2.1.0).
     #[serde(default)]
     pub warnings: Vec<String>,
+    /// The same warnings per installer language.
+    #[serde(default)]
+    pub warnings_i18n: Vec<BTreeMap<String, String>>,
 }
 
 /// A path the installer may write: relative, below `exefs/` or `romfs/`, plain components only.
@@ -113,35 +157,35 @@ impl Manifest {
     pub fn validate(&self) -> Result<(), String> {
         let err = |what: String| Err(trf("Invalid manifest: {}", &[&what]));
         if self.packages.iter().filter(|p| p.kind == Kind::Core).count() != 1 {
-            return err("one core package".into());
+            return err(tr("one core package"));
         }
         if !safe_name(&self.mod_folder)
             || self.title_id.len() != 16
             || !self.title_id.chars().all(|c| c.is_ascii_hexdigit())
         {
-            return err("mod folder or title ID".into());
+            return err(tr("mod folder or title ID"));
         }
         let names: BTreeSet<&str> = self.packages.iter().map(|p| p.name.as_str()).collect();
         if names.len() != self.packages.len() {
-            return err("two packages with one name".into());
+            return err(tr("two packages with one name"));
         }
         let mut owner: HashMap<&str, &str> = HashMap::new();
         for p in &self.packages {
             if !safe_name(&p.name) || !safe_name(&p.zip) {
-                return err(format!("package name {:?}", p.name));
+                return err(trf("package name {}", &[&format!("{:?}", p.name)]));
             }
             for r in &p.requires {
                 match self.package(r) {
                     Some(q) if q.kind != Kind::Core && q.kind != Kind::Monster => {}
-                    _ => return err(format!("{} requires {r}", p.name)),
+                    _ => return err(trf("{} requires {}", &[&p.name, r])),
                 }
             }
             for f in &p.files {
                 if !safe_path(&f.path) {
-                    return err(format!("unsafe path {:?} in {}", f.path, p.name));
+                    return err(trf("unsafe path {} in {}", &[&format!("{:?}", f.path), &p.name]));
                 }
                 if let Some(o) = owner.insert(f.path.as_str(), p.name.as_str()) {
-                    return err(format!("{} in both {o} and {}", f.path, p.name));
+                    return err(trf("{} in both {} and {}", &[&f.path, &o, &p.name]));
                 }
             }
         }
@@ -200,6 +244,9 @@ pub(crate) mod tests {
             kind,
             title: name.into(),
             subtitle: String::new(),
+            titles: BTreeMap::new(),
+            class: BTreeMap::new(),
+            with: vec![],
             version: "1.0.0".into(),
             zip: format!("{name}-1.0.0.zip"),
             size: 1,
@@ -234,6 +281,7 @@ pub(crate) mod tests {
             migrations: vec![],
             cleaning: Default::default(),
             warnings: vec![],
+            warnings_i18n: vec![],
         }
     }
 
@@ -247,6 +295,40 @@ pub(crate) mod tests {
         let j = String::from_utf8(json).unwrap().replace("\"kind\":\"map\"", "\"kind\":\"shared\"");
         let m = Manifest::parse(j.as_bytes()).unwrap();
         assert_eq!(m.package("battlequarters").unwrap().kind, Kind::Utility);
+    }
+
+    #[test]
+    fn names_follow_the_window_language_with_english_behind() {
+        // a 2.0.0 manifest has none of titles / class / with: the English title and subtitle
+        let mut v = serde_json::to_value(sample()).unwrap();
+        for p in v["packages"].as_array_mut().unwrap() {
+            for k in ["titles", "class", "with"] {
+                p.as_object_mut().unwrap().remove(k);
+            }
+        }
+        v["packages"][2]["subtitle"] = "Elder Dragon, with Shah Dalamadur".into();
+        let old = Manifest::parse(v.to_string().as_bytes()).unwrap();
+        let d = old.package("dalamadur").unwrap();
+        assert_eq!(
+            (d.shown_title(), d.shown_subtitle()),
+            ("dalamadur".into(), "Elder Dragon, with Shah Dalamadur".into())
+        );
+        // 2.1.0 on: the names per language; a language the manifest lacks shows English
+        let names = |en: &str, fr: &str| [("en", en), ("fr", fr)].map(|(l, s)| (l.to_string(), s.to_string())).into();
+        v["packages"][2]["titles"] = serde_json::to_value::<BTreeMap<_, _>>(names("Dalamadur", "Dalamadur")).unwrap();
+        v["packages"][2]["class"] =
+            serde_json::to_value::<BTreeMap<_, _>>(names("Elder Dragon", "Dragon ancien")).unwrap();
+        v["packages"][2]["with"] = serde_json::to_value(vec![names("Shah Dalamadur", "Shah Dalamadur F")]).unwrap();
+        let m = Manifest::parse(v.to_string().as_bytes()).unwrap();
+        let d = m.package("dalamadur").unwrap();
+        crate::i18n::set_lang("fr");
+        assert_eq!(d.shown_subtitle(), "Dragon ancien, with Shah Dalamadur F");
+        crate::i18n::set_lang("zh_CN");
+        assert_eq!(
+            (d.shown_title(), d.shown_subtitle()),
+            ("Dalamadur".into(), "Elder Dragon, with Shah Dalamadur".into())
+        );
+        crate::i18n::set_lang("");
     }
 
     #[test]

@@ -13,6 +13,7 @@ Mark every fact you write down as C (confirmed in code or data), S (strong) or G
 | `notes/` | core notes (this guide, registry, enemy-class, port, api-map, assets, data, gear-weapons, installer) |
 | `monsters/<name>/` | one monster: `module/` (its C code, compiled into the core module), `tools/`, `notes/`, `package.toml` (version, C prefix), `build.py` (every generator, in order) |
 | `monsters/<name>/gen/`, `romfs/` | gitignored game data: its data file `<name>.bin` (+ the `.sec` sections) and its converted RomFS (= its assets) |
+| `lang/` | the mod's own translations, one file per installer language (`zh_TW.toml`, `zh_CN.toml`: every text in GU's two Chinese languages, which 4U lacks; the others: the maps' full names), keyed by stable IDs, never the English; `tools/translate.py` (worksheet, apply, check) |
 | `maps/<map>/` | one map package (since 2026-11, core 2.0.0): a ported 4U arena (stage arcs, map UI, map_com, area streams) with its `package.toml` (`kind = "map"`, `folder`, `[stage]`), `build.py`, `tools/`, `notes/`; `romfs/` is gitignored. Monsters name it in their `package.toml` `requires` |
 | `dump/scratch/<monster>-session/` | gitignored local archive of a session scratchpad (the one-off RE / check scripts and outputs notes call "scratchpad"); copy yours there before a reboot wipes /tmp |
 
@@ -99,7 +100,12 @@ pairs where possible (tools/dt_vote.py, dt_map.py, snd4u2gu.py selftest), then a
    (build_gog_quest.py) and the gear models (tools/armor4u2gu.py, tools/weapon4u2gu.py); a ported 4U arena is its
    own map package (`maps/<map>/romfs/`, Phase 5). Never a copy of a GU
    file: another monster would ship the same path (build.py install refuses it); patch the loaded resource instead
-   (the monster name is a NAME section applied to the loaded monsterName GMD).
+   (the monster name is a NAME section applied to the loaded monsterName GMD). Every text ships in GU's 7
+   languages: 4U's five, then chT / chS from `lang/zh_TW.toml` / `zh_CN.toml`, which `portdata.py pack` and
+   `quest4u.quest_gmds` add (4U has no Chinese). A new port: `python3 tools/translate.py worksheet zh_TW` (and
+   zh_CN), fill the new strings with GU's own Chinese terms, `translate.py apply`, repack; monster names go in
+   `[monsters]` by hand, official ones first (a Capcom Chinese release), a community one marked as such.
+   `release.py check` refuses a missing or stale translation.
 4. **Content** (Phase 5b): the monster's save slot, materials, carves / rewards, armor, weapons, skill and
    decorations, Hunter's Notes entry and quests. The tools write them into the data file
    (`nativeNX/mhgu_de/<name>.bin`, tools/portdata.py: sections ITEM, BUI, TBLA, TXTA, NOTE, NAME, SKIL, PWLF, FILE);
@@ -147,7 +153,8 @@ pairs where possible (tools/dt_vote.py, dt_map.py, snd4u2gu.py selftest), then a
 
 ### Phase 3: register the class
 - Add the monster to allocations.toml (next registry index, its pools' next free values; `tools/alloc.py` checks)
-  and give it `monsters/<name>/package.toml` with `code` = its C prefix (`<code>_register_class`, `g_<code>_dti`).
+  and give it `monsters/<name>/package.toml` with `code` = its C prefix (`<code>_register_class`, `g_<code>_dti`)
+  and `class` = its class as GU's English monsterName calls it (entries 253..267: the installer's subtitle).
   build.py then grows every registry copy (REG_TABLES, one entry per monster, sentinel pair after the last,
   reg_u16 read at [index + 1], reg_mapicon by em NUMBER for a new number), patches the id <-> index bounds
   (`cmp #137` -> 137 + monsters, WORD_PATCHES 0x50B94 / 0x50C10) and the Notes bounds, and generates the descriptor

@@ -6,6 +6,7 @@ head entries, tools/portdata.py; as tools of Tigerstripe: name_em067_01.py).
 monsterName_<lang>.gmd entry k = registry index k, but entry 137 already starts the GMD's second list, so ported
 indexes take an unused 'dummyN' entry (allocations.toml name_entry), which module/items.c renames in the loaded GMD.
 The tail halves share their head's entry (companions). Names = 4U emName[24] / [110] per language (C).
+Chinese (chT, chS): lang/zh_TW.toml / zh_CN.toml [monsters], added by portdata.pack (4U has none).
 """
 import os, sys
 
@@ -34,9 +35,7 @@ def main():
             n = msg4u(lang)['emName'][em4]
             assert n and '\0' not in n and '\n' not in n, (lang, n)
             names.append(n)
-        sec = portdata.Section('NAME')
-        sec.u32(entry)
-        for n in names: sec.str(n)
+        sec = portdata.name_section(name, entry, names, rom)
         print('wrote', portdata.write_section(name, sec, 'ui'), '(name entry %d = %s)' % (entry, ' / '.join(names)))
 
 

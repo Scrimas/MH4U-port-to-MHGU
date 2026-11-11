@@ -24,7 +24,8 @@ enum { R0, R1, R2, R3, R4, R5, R12, LR };
                                u32 dummy sell, sell, buy */
 void gmd_text_loaded(uint8_t *m, const char *name, uint32_t lang);   /* gear.c: every TXTA append */
 void gear_tables_loaded(void *res);                                 /* gear.c: every TBLA append */
-static const char *const LANGS[] = { "eng", "fre", "ger", "ita", "spa" };   /* data file text order */
+/* data file text order (format 2, portdata.py TEXT_LANGS): 4U's five, then GU's Chinese from lang/zh_*.toml */
+static const char *const LANGS[] = { "eng", "fre", "ger", "ita", "spa", "chT", "chS" };
 
 static int str_eq(const char *a, const char *b)
 {
@@ -232,7 +233,7 @@ int item_text_loaded_c(uint32_t *regs)
     for (const char *p = path; p < path + 64 && *p; p++)
         if (*p == '_') suffix = p + 1;
     for (uint32_t k = 0; suffix && k < sizeof(LANGS) / sizeof(LANGS[0]); k++)
-        if (str_eq(suffix, LANGS[k])) lang = k;          /* chS / chT / others: English */
+        if (str_eq(suffix, LANGS[k])) lang = k;          /* others: English */
     gmd_text_loaded(msg, name, lang);                    /* gear, skill, weapon, Notes texts (gear.c) */
     /* read the string table only now: a TXTA append (appended items' itemData) replaces it with a grown copy, and
      * names written into the old one were lost (test 2026-10-21: every DUMMY material named DUMMY) */

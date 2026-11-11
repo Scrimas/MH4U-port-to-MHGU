@@ -2,8 +2,9 @@
 name = "black_gravios"
 kind = "monster"
 title = "Black Gravios"
-subtitle = "Flying Wyvern"
-version = "1.0.1"       # bump on every published change of this monster's files (data, assets or code); 1.0.1:
+class = "Flying Wyvern"    # its class, GU's name (monsterName 253..267): the installer's subtitle in every language
+version = "1.0.2"       # bump on every published change of this monster's files (data, assets or code); 1.0.2:
+                        # its Chinese text (lang/zh_TW.toml, zh_CN.toml; core 2.1.0); 1.0.1:
                         # Hunter's Notes entry 128 (4U description; the core must have the entries past the save
                         # map, module/notes.c); the laser handle guard has no address range (em005_01_laser.c ptr_ok,
                         # the maintainer, PR #17); 1.0.0:

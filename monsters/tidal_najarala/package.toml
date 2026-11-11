@@ -1,7 +1,9 @@
 # Tidal Najarala package: what the installer shows and installs, and the version written into its data file.
 name = "tidal_najarala"
 title = "Tidal Najarala"
-version = "0.2.11"      # bump on every published change of this monster's files (data, assets or code); 0.2.11: each
+class = "Snake Wyvern"     # its class, GU's name (monsterName 253..267): the installer's subtitle in every language
+version = "0.2.12"      # bump on every published change of this monster's files (data, assets or code); 0.2.12:
+                        # its Chinese text (lang/zh_TW.toml, zh_CN.toml; core 2.1.0); 0.2.11: each
                         # water jet gets its own hit group, as 4U (one hit no longer let the next jets pass through
                         # the hunter, maintainer's test 2026-11-09); 0.2.10: her
                         # weapons' own 4U sharpness where the table had no row left (KIRX), the dead Arena quest

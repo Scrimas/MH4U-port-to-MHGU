@@ -9,6 +9,7 @@ requires_core = "2.0.0"    # oldest core that knows map packages (module/port.c 
                            # map is missing counts as not installed)
 folder = 28                # its RomFS stage folder m28 = allocations.toml stage_alias[1] of every monster
                            # requiring it (tools/alloc.py checks it)
+stage_4u = 19              # 4U stage m19: its quest-board name per language is 4U's mapName[19] (the installer's title)
 
 [stage]                    # the Battlequarters alias (allocations.toml stage_alias, module/stage_alias.c)
 kinds = [49, 54, 55, 56, 58]   # arc paths -> m28: mapUI, map_com, language map_com, stage, area (no night version)
