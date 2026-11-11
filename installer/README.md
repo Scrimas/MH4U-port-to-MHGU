@@ -9,11 +9,11 @@ releases on MHGU-Definitive-Edition. Rust + Slint (Fluent), like MHGU_Editor.
 | Path | What |
 |---|---|
 | `core/` | everything without a window: `manifest.rs` (schema 1), `source.rs` (GitHub or a local folder), `places.rs`, `record.rs` (`mhgu-de-install.json`), `plan.rs`, `apply.rs` (download, check, extract, swap), `selfupdate.rs`, `settings.rs`; `src/bin/cli.rs` = `mhgu-de-cli` |
-| `gui/` | the window: `ui/app.slint`, `src/main.rs`, `src/i18n.rs`, `src/desktop.rs` (the menu entry / Start Menu shortcut), `src/fonts.rs` (the AppImage's own fonts when the system has none), `lang/` (gettext catalogs), `assets/fonts/` |
+| `gui/` | the window: `ui/app.slint`, `src/main.rs`, `src/i18n.rs`, `src/desktop.rs` (the menu entry / Start Menu shortcut), `src/fonts.rs` (the AppImage's own fonts when the system has none), `lang/` (gettext catalogs) |
 | `tools/i18n.py` | keeps `gui/lang/` in step with the strings (`@tr` in .slint, `tr` / `trf` / `trn` in Rust) |
 | `tests/cli_test.py` | end to end: a fake release of dummy files installed into every kind of place by `mhgu-de-cli` |
-| `packaging/build.py` | the release files, each for x86_64 and arm64: `.exe` (mingw-w64; llvm-mingw for arm64), `.AppImage` (zig, glibc 2.28, with `gui/assets/fonts/`), `SHA256SUMS-<v>` |
-| `packaging/fonts.py` | `gui/assets/fonts/`: Inter, Noto Sans Symbols, Noto Sans SC and TC, cut to the characters the installer shows (run it again when the test `fonts::tests::every_character` fails) |
+| `packaging/build.py` | the release files, each for x86_64 and arm64: `.exe` (mingw-w64; llvm-mingw for arm64), `.AppImage` (zig, glibc 2.28, with its fallback fonts), `SHA256SUMS-<v>` |
+| `packaging/fonts.py` | the AppImages' fallback fonts, cut at each build to the characters the installer shows: Inter, Noto Sans Symbols, Noto Sans SC and TC (`build.py` runs it; needs fontTools) |
 
 ```sh
 cargo test --manifest-path installer/Cargo.toml --workspace

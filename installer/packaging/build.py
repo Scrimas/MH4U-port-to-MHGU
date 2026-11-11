@@ -17,12 +17,15 @@ Needs:
                     (squashfs-tools), APPIMAGE_RUNTIME=<the type 2 runtime-x86_64 file>
   arm64 AppImage    rustup target aarch64-unknown-linux-gnu + cargo-zigbuild + zig (zig needed unless this machine is
                     aarch64), mksquashfs, APPIMAGE_RUNTIME_ARM64=<the type 2 runtime-aarch64 file>
+  both AppImages    fontTools (Arch: python-fonttools), the network the first time: packaging/fonts.py cuts their
+                    fallback fonts
 Both AppImages load fontconfig at start, as Wayland and xkbcommon (gui/Cargo.toml: fontique fontconfig-dlopen), and
-carry fallback fonts (gui/assets/fonts, packaging/fonts.py) in usr/share/mhgu-de-installer/fonts: on a system without
-fontconfig, or whose fontconfig has no font, the window takes them (gui/src/fonts.rs).
+carry fallback fonts in usr/share/mhgu-de-installer/fonts, cut at each build to the characters the installer shows
+(packaging/fonts.py): on a system without fontconfig, or whose fontconfig has no font, the window takes them
+(gui/src/fonts.rs).
 CI: .github/workflows/installer.yml, in an Arch Linux container like the editor's.
 """
-import hashlib, os, platform, shutil, subprocess, sys, tempfile, tomllib
+import functools, hashlib, os, platform, shutil, subprocess, sys, tempfile, tomllib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 INST = os.path.dirname(HERE)
@@ -45,6 +48,13 @@ def has(cmd):
 
 def host_arch():
     return {'x86_64': 'x86_64', 'amd64': 'x86_64', 'aarch64': 'arm64', 'arm64': 'arm64'}.get(platform.machine().lower())
+
+
+@functools.cache
+def fonts_dir():
+    """The AppImages' fallback fonts, cut once per run (packaging/fonts.py, beside this file)."""
+    import fonts
+    return fonts.make()
 
 
 def exe(ver, arch):
@@ -72,7 +82,7 @@ def exe(ver, arch):
 
 
 def appimage(ver, arch):
-    target = LINUX_TARGET[arch]
+    target, fonts = LINUX_TARGET[arch], fonts_dir()
     if has('zig') and subprocess.run(['cargo', 'zigbuild', '--help'], capture_output=True).returncode == 0:
         run('cargo', 'zigbuild', '--release', '--locked', '-p', 'mhgu-de-installer', '--target', target + '.2.28')
         binary = os.path.join(INST, 'target', target, 'release', 'mhgu-de-installer')
@@ -91,7 +101,7 @@ def appimage(ver, arch):
             os.makedirs(os.path.join(app, d))
         shutil.copy(binary, os.path.join(app, 'usr/bin/mhgu-de-installer'))
         # the fallback fonts, their licences and fonts.conf (gui/src/fonts.rs finds them from usr/bin)
-        shutil.copytree(os.path.join(INST, 'gui/assets/fonts'), os.path.join(app, 'usr/share/mhgu-de-installer/fonts'))
+        shutil.copytree(fonts, os.path.join(app, 'usr/share/mhgu-de-installer/fonts'))
         desktop = os.path.join(HERE, 'mhgu-de-installer.desktop')
         icon = os.path.join(INST, 'gui/assets/icon-256.png')
         shutil.copy(desktop, os.path.join(app, 'usr/share/applications'))

@@ -1,24 +1,27 @@
-"""fonts.py : the installer's fallback fonts into installer/gui/assets/fonts/. On a Linux system without fontconfig, or
-whose fontconfig has no font, the window takes them (gui/src/fonts.rs; packaging/build.py puts them in the AppImage):
+"""fonts.py : the AppImages' fallback fonts, cut to the characters the installer shows. packaging/build.py runs it for
+each AppImage build and puts the folder in usr/share/mhgu-de-installer/fonts; on a Linux system without fontconfig, or
+whose fontconfig has no font, the window takes them (gui/src/fonts.rs):
   Inter.ttf             Latin, Greek, Cyrillic, punctuation, arrows, and the installer's characters it has
                         (Inter 4.1, optical size pinned at 14 as Slint's own copy)
   NotoSansSymbols.ttf   the installer's symbols that Inter lacks (the gear)
   NotoSansSC.ttf        the zh_CN catalog's characters that Inter lacks, and the sources' (the language list's names)
   NotoSansTC.ttf        the same for zh_TW
   Inter-OFL.txt, NotoSansSymbols-OFL.txt, NotoSansCJK-OFL.txt   their licences (SIL Open Font License 1.1)
-Each font is cut to what the installer shows (fontTools' subsetter, weights kept): a few hundred KB in all. Run it
-again when a translation or the window gains a character they lack (gui's test fonts::tests::every_character says
-which); gui/assets/fonts/fonts.conf is not made here.
+  fonts.conf            packaging/fonts.conf: the fontconfig of a system whose own has no font
+Cut from the catalogs and sources being built (weights 400 to 700 kept), so a few hundred KB, and a new character
+needs nothing; one that no font has stops the build (it then needs another source font here).
 
-  python3 installer/packaging/fonts.py
+  python3 installer/packaging/fonts.py [<folder>]          (default installer/target/fonts)
 
-Needs: fontTools (pip install fonttools), the network (the sources below, pinned by checksum).
+Needs: fontTools (pip install fonttools; Arch: python-fonttools), the network the first time: the sources below,
+pinned by checksum, are kept in installer/target/fonts-src.
 """
-import hashlib, io, os, sys, urllib.request, zipfile
+import hashlib, io, os, shutil, sys, urllib.request, zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 INST = os.path.dirname(HERE)
-OUT = os.path.join(INST, 'gui', 'assets', 'fonts')
+OUT = os.path.join(INST, 'target', 'fonts')
+SRC = os.path.join(INST, 'target', 'fonts-src')
 GF = 'https://raw.githubusercontent.com/google/fonts/'
 SOURCES = {
     'inter': ('https://github.com/rsms/inter/releases/download/v4.1/Inter-4.1.zip',
@@ -34,14 +37,16 @@ SOURCES = {
     'cjk-ofl': (GF + 'a85815a42757630ce188fdad368c2dfc444d4773/ofl/notosanssc/OFL.txt',
                 '1c05c68c34f9708415aada51f17e1b0092d2cea709bf4a94cd38114f9e73d7d9'),
 }
+# the files, as gui/src/fonts.rs FILES names them
+NAMES = {'inter': 'Inter.ttf', 'symbols': 'NotoSansSymbols.ttf', 'sc': 'NotoSansSC.ttf', 'tc': 'NotoSansTC.ttf'}
 # Inter keeps what it has of these whole: text the installer does not write (folder and file names) shows too
 RANGES = ((0x20, 0x7e), (0xa0, 0x24f), (0x370, 0x3ff), (0x400, 0x4ff), (0x1e00, 0x1eff), (0x2000, 0x206f),
           (0x20a0, 0x20cf), (0x2190, 0x21ff), (0x2200, 0x22ff))
 
 
 def chars(path):
-    """The characters a file can put in the window (gui/src/fonts.rs's test reads them the same way): a catalog's
-    lines but its # comments, a source file whole; no control characters."""
+    """The characters a file can put in the window: a catalog's lines but its # comments, a source file whole; no
+    control characters."""
     text = open(path, encoding='utf-8').read()
     if path.endswith('.po'):
         text = '\n'.join(l for l in text.splitlines() if not l.startswith('#'))
@@ -66,41 +71,42 @@ def catalogs():
 
 
 def fetch(key):
+    """A source, from installer/target/fonts-src once downloaded."""
     url, sha = SOURCES[key]
+    kept = os.path.join(SRC, sha)
+    if os.path.isfile(kept):
+        data = open(kept, 'rb').read()
+        if hashlib.sha256(data).hexdigest() == sha:
+            return data
     print('   ', url, flush=True)
     data = urllib.request.urlopen(url).read()
     if hashlib.sha256(data).hexdigest() != sha:
         sys.exit('%s: sha256 %s, not the pinned %s' % (url, hashlib.sha256(data).hexdigest(), sha))
+    os.makedirs(SRC, exist_ok=True)
+    with open(kept, 'wb') as f:
+        f.write(data)
     return data
 
 
-def main():
+def make(out=OUT):
+    """The fonts into `out` (emptied first); returns it."""
     try:
         from fontTools import subset
         from fontTools.ttLib import TTFont
         from fontTools.varLib import instancer
     except ImportError:
-        sys.exit('fonts.py needs fontTools (pip install fonttools)')
-    def load(data, **axes):
-        """The font, its weights cut to the window's (400 to 700, 400 the default: Noto Sans SC and TC start at Thin,
-        their names follow) and its other axes pinned; recalcTimestamp off: the same sources and characters give the
-        same files."""
-        out = io.BytesIO()
-        font = TTFont(io.BytesIO(data), recalcTimestamp=False)
-        instancer.instantiateVariableFont(font, dict(axes, wght=(400, 400, 700)), updateFontNames=True).save(out)
-        # saved and read back: the subsetter needs the tables as a file has them
-        return TTFont(io.BytesIO(out.getvalue()), recalcTimestamp=False)
-
+        sys.exit('the AppImage fonts need fontTools (pip install fonttools; Arch: python-fonttools)')
     inter_zip = zipfile.ZipFile(io.BytesIO(fetch('inter')))
-    fonts = {'inter': load(inter_zip.read('InterVariable.ttf'), opsz=14), 'symbols': load(fetch('symbols')),
-             'sc': load(fetch('sc')), 'tc': load(fetch('tc'))}
+    data = {'inter': inter_zip.read('InterVariable.ttf'), 'symbols': fetch('symbols'), 'sc': fetch('sc'),
+            'tc': fetch('tc')}
+    # recalcTimestamp off: the same sources and characters give the same files
+    fonts = {k: TTFont(io.BytesIO(d), recalcTimestamp=False) for k, d in data.items()}
     cmap = {k: set(f.getBestCmap()) for k, f in fonts.items()}
 
     src, cats = sources(), catalogs()
     every = src.union(*cats.values())
-    take = {'inter': {c for lo, hi in RANGES for c in range(lo, hi + 1)} | every, 'symbols': set(), 'sc': set(),
+    take = {'inter': ({c for lo, hi in RANGES for c in range(lo, hi + 1)} | every) & cmap['inter'], 'sc': set(),
             'tc': set()}
-    take['inter'] &= cmap['inter']
     rest = every - take['inter']
     # Noto Sans Symbols: what neither Chinese font has (they draw their own punctuation)
     take['symbols'] = {c for c in rest if c in cmap['symbols'] and c not in cmap['sc'] | cmap['tc']}
@@ -114,17 +120,17 @@ def main():
             left -= cmap[font]
         missing += ['%s U+%04X %s' % (code, c, chr(c)) for c in sorted(left)]
     # the sources' own (the language list's 简体中文, 繁體中文): from whichever Chinese font has them, both if both
-    for c in src & rest:
+    for c in sorted(src & rest):
         if c not in cmap['sc'] | cmap['tc']:
             missing.append('sources U+%04X %s' % (c, chr(c)))
-        take['sc' if c in cmap['sc'] else 'tc'].add(c)
-        if c in cmap['sc'] and c in cmap['tc']:
-            take['tc'].add(c)
+        for k in ('sc', 'tc'):
+            if c in cmap[k]:
+                take[k].add(c)
     if missing:
-        sys.exit('no font has:\n  ' + '\n  '.join(missing))
+        sys.exit('no font in installer/packaging/fonts.py has:\n  ' + '\n  '.join(missing))
 
-    os.makedirs(OUT, exist_ok=True)
-    names = {'inter': 'Inter.ttf', 'symbols': 'NotoSansSymbols.ttf', 'sc': 'NotoSansSC.ttf', 'tc': 'NotoSansTC.ttf'}
+    shutil.rmtree(out, ignore_errors=True)
+    os.makedirs(out)
     for k, font in fonts.items():
         opts = subset.Options()
         opts.hinting = False          # Slint's renderers do not use TrueType hinting
@@ -133,14 +139,21 @@ def main():
         sub = subset.Subsetter(opts)
         sub.populate(unicodes=sorted(take[k]))
         sub.subset(font)
-        out = os.path.join(OUT, names[k])
-        font.save(out)
-        print('%9d %s (%d characters)' % (os.path.getsize(out), os.path.relpath(out, INST), len(take[k])))
-    for name, data in (('Inter-OFL.txt', inter_zip.read('LICENSE.txt')),
+        # the window's weights, 400 the default (Noto Sans SC and TC start at Thin; their names follow); Inter's
+        # optical size pinned
+        axes = {'wght': (400, 400, 700), **({'opsz': 14} if k == 'inter' else {})}
+        font = instancer.instantiateVariableFont(font, axes, updateFontNames=True)
+        font.save(os.path.join(out, NAMES[k]))
+    for name, text in (('Inter-OFL.txt', inter_zip.read('LICENSE.txt')),
                        ('NotoSansSymbols-OFL.txt', fetch('symbols-ofl')), ('NotoSansCJK-OFL.txt', fetch('cjk-ofl'))):
-        with open(os.path.join(OUT, name), 'wb') as f:
-            f.write(data.replace(b'\r\n', b'\n'))
+        with open(os.path.join(out, name), 'wb') as f:
+            f.write(text.replace(b'\r\n', b'\n'))
+    shutil.copy(os.path.join(HERE, 'fonts.conf'), out)
+    print('   fonts: %d KB in %s (%s)' % (sum(os.path.getsize(os.path.join(out, n)) for n in NAMES.values()) // 1024,
+                                        os.path.relpath(out, INST),
+                                        ', '.join('%s %d' % (NAMES[k], len(take[k])) for k in NAMES)), flush=True)
+    return out
 
 
 if __name__ == '__main__':
-    main()
+    make(os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else OUT)

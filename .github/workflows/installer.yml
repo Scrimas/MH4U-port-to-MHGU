@@ -85,7 +85,7 @@ jobs:
       - name: Toolchain
         run: |
           pacman -Syu --noconfirm --needed git github-cli rustup mingw-w64-gcc zig cargo-zigbuild squashfs-tools \
-            python
+            python python-fonttools
           rustup default stable
           rustup target add x86_64-pc-windows-gnu aarch64-pc-windows-gnullvm aarch64-unknown-linux-gnu
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
