@@ -24,7 +24,7 @@ notes_entry = [123, 159]                # Hunter's Notes: 123..127 = free bits o
 quests = [11491, 11492, 11493, 11494, 10790, 10791, 10792, 11495, 11496,   # checked free (no file, no list
           10775, 10776, 10777, 10778, 10779, 11426, 11427, 11428, 11429, 1023, 1024, 10780, 11430, 10781, 1025,
           1056, 10782, 10783, 11451, 1057, 1058, 1059, 10784, 10785, 11452, 11368, 11453,
-          1062, 11370, 11371, 841, 10547, 11372]
+          1062, 11370, 11371, 841, 10547, 11372, 1068, 11138, 11139, 11140, 11374, 11373]
                                         # entry; v1.0 RomFS); 107NN = Hub HR 7, 114NN = Hub G4 (the ID's digits decide
                                         # which hub loads it, the questData bytes the rank: plan.md Dalamadur 6.),
                                         # 10NN = village ★10 (Stygian Zinogre, 2026-10-28); 10780 / 11430 / 10781 /
@@ -40,7 +40,11 @@ quests = [11491, 11492, 11493, 11494, 10790, 10791, 10792, 11495, 11496,   # che
                                         # 2026-11-08; Monoblos' hub copies were the exception: 4U has no multiplayer quest
                                         # of his), and no Arena quests (the user, 2026-11-08: Tidal's 11497 = 4U m11016 gone).
                                         # 841 / 10547 / 11372 (Heaven's Mount's Harvest Tours, 2026-11-10: no
-                                        # q%07d.arc, no loose questData, no quest_group entry in the v1.4 RomFS, C)
+                                        # q%07d.arc, no loose questData, no quest_group entry in the v1.4 RomFS, C).
+                                        # 1068 / 11138 / 11139 / 11140 / 11374 / 11373 (Desert Seltas' and the Queen's,
+                                        # 2026-11-09 / 11374 on 2026-11-11 when the tours took 11372: the same check, and
+                                        # none is in the event download catalog 0x1595e98; 111NN = Hub G1, 113NN = Hub G3;
+                                        # IDs earlier local test builds used are left out)
 quest_slots = [1011009, 1011003, 1011048, 1011049, 1010007, 1010177, 1110009, 1110114, 1110115]
                                         # quest_group group-127 entries renamed in memory. 1010007 / 1010177 / 1110009 /
                                         # 1110114 / 1110115 (indexes 1307 / 1329 / 1314 / 1393 / 1394, 2026-10-21):
@@ -591,6 +595,93 @@ w09 = 2
 w10 = 2
 w13 = 3
 w14 = 3
+
+# Package monsters/desert_seltas: Desert Seltas (4U em094) and Desert Seltas Queen (em095) in one package (Dalamadur's
+# way): her quests always bring her Desert Seltas (guest_in), and GU's own classes run both as variant 1.
+[[monster]]
+name = "desert_seltas"                  # 4U em094, run by 4U's uEm025 with Seltas (monsters/desert_seltas/notes/plan.md)
+package = "desert_seltas"
+title = "Desert Seltas"
+em_id = 0x14c                           # Seltas (em 76) variant 1: GU's own class uEm076_00 runs it (package.toml
+                                        # gu_classes); GU ships em076_00 only, its class keeps 4U's tests of em 94
+registry_index = 148
+donor_index = 61                        # Seltas em076_00 (GU pair 0x4c -> 61)
+standin_id = 0x4c                       # his quests name Seltas (loader-visible), swapped to 0x14c at spawn
+file_ids = [0x10a00, 0x10a3f]
+save = "lease"                          # no free save slot: he borrows one per quest (module/save.c)
+name_entry = 225                        # 'dummy5' of monsterName's second list (Shrouded Nerscylla took 226)
+ui_icon = 208
+icon_4u = 103                           # his quests' board icon: 4U m01030 / m10805 / m10924 +0xE8 list 104 = index + 1
+                                        # (right block; m10924 lists 105 for the Queen next to it)
+notes_entry = 132                       # past the save map: no save bit (module/notes.c)
+quests = [1068, 11138, 11139, 11140]    # 4U m01030 caravan -> village; m10805 / m10815 / m10818 guild -> hub (the user,
+                                        # 2026-11-08): m01030 (caravan ★10 G, Dunes) -> village ★10 G 1068; m10805 (G1,
+                                        # Anc. Steppe), m10815 (G1, Dunes: slay 30 Bnahabra, he comes at 100 %), m10818
+                                        # (G1, Anc. Steppe, with a Seltas) -> hub G1 11138 / 11139 / 11140, the rank of
+                                        # GU's Seltas hunt q11103. Not ported: m10812 (Purple Gypceros on the Sunken
+                                        # Hollow, he is its 50 % intruder; GU has neither)
+quest_append = true                     # new quest list entries after GU's (module/quest.c), no quest_slots
+standin_alt = [0x45, 11140]             # m10818 has a real Seltas next to him: that quest names him by Seltas Queen
+                                        # (none in it), swapped like standin_id (module/port.c port_standin)
+guest_in = [11374, 11373]               # the Queen's quests, where he is the second boss under his standin_id
+                                        # (module/port.c port_guest; same package: installed with her)
+items = [3055, 3057]                    # appended after Shrouded Nerscylla's: his 3 materials, 4U 1388..1390
+                                        # (monsters/desert_seltas/tools/items_seltas.py)
+
+[monster.weapon_models]                 # per weapon class (GU model numbers = 4U's, unused in GU, checked by
+w01 = 101                               # monsters/desert_seltas/tools/gear_weapons_seltas.py); his GL Monsieur Gore+ is on
+w11 = 93                                # GU's own model 80 (GU's Monsieur Gore)
+
+[monster.append]
+items = 3
+notes_text = 1                          # description only (4U emExp[94]; monsters/desert_seltas/tools/notes_seltas.py)
+
+[monster.append.weapons]                # BaseData / MsgData / LevelData rows per class: one line each
+w01 = 3                                 # (monsters/desert_seltas/tools/gear_weapons_seltas.py); no sharpness row of his own
+w09 = 1                                 # (the table is full): mKireType GU's nearest rows, his bars the 4U rows (KIRX)
+w11 = 3
+
+[[monster]]
+name = "desert_seltas_queen"            # 4U em095, run by 4U's uEm026 with Seltas Queen (monsters/desert_seltas/notes/plan.md)
+package = "desert_seltas"
+title = "Desert Seltas Queen"
+em_id = 0x145                           # Seltas Queen (em 69) variant 1: GU's own class uEm069_00 runs her (package.toml
+                                        # gu_classes); GU ships em069_00 only, its class keeps 4U's tests of em 95
+registry_index = 149
+donor_index = 58                        # Seltas Queen em069_00 (GU pair 0x45 -> 58)
+standin_id = 0x45                       # her quests name Seltas Queen (loader-visible), swapped to 0x145 at spawn
+file_ids = [0x10a40, 0x10a7f]
+save = "lease"                          # no free save slot: she borrows one per quest (module/save.c)
+name_entry = 224                        # 'dummy4' of monsterName's second list
+ui_icon = 209
+icon_4u = 104                           # her quests' board icon: 4U m10924 / m10928 +0xE8 list 105 = index + 1 (right block)
+notes_entry = 133                       # past the save map: no save bit (module/notes.c)
+quests = [11374, 11373]                 # 4U m10924 (G2, night Dunes) and m10928 (G2, Dunes: a Cephadrome first, then her
+                                        # with her Desert Seltas) -> hub G3, GU's lowest G rank of its Seltas Queen (q11305
+                                        # / q11346). Guild quests only, so she has no village quest (the user's rule).
+                                        # m10924 was 11372 until Heaven's Mount's G3 tour took it (not shipped)
+quest_append = true                     # new quest list entries after GU's (module/quest.c), no quest_slots
+items = [3058, 3062]                    # her 5 materials, 4U 1397..1401 (4U 1396 D.S.QueenConcentrate is GU's item 1032:
+                                        # GU's Seltas Queen gives it; monsters/desert_seltas/tools/items_seltas.py)
+armor_models = [430, 431]               # 4U Seltas Z, Blademaster / Gunner (unused in GU, C); made of her and his materials,
+                                        # most of them hers (monsters/desert_seltas/tools/gear_seltas.py)
+
+[monster.weapon_models]                 # per weapon class (GU model numbers = 4U's, unused in GU, checked by
+w02 = 105                               # monsters/desert_seltas/tools/gear_weapons_seltas.py); her LBG Battalion Strafer and
+w10 = 82                                # GL Seltas Fortitude are on GU's own models 50 / 84 (Machine Strafer, Madame Butcher)
+
+[monster.append]
+items = 5
+armor_series = 2                        # Seltas Z (Blademaster + Gunner)
+armor_create = 1                        # past the save's 576 "listed" head bits: its bit lives in the mod's store (module/gear.c)
+armor_process = 5                       # the template's level rows (GU Seltas X's; monsters/desert_seltas/tools/gear_seltas.py)
+notes_text = 1                          # description only (4U emExp[95]; monsters/desert_seltas/tools/notes_seltas.py)
+
+[monster.append.weapons]                # BaseData / MsgData / LevelData rows per class: one line each
+w02 = 1                                 # (monsters/desert_seltas/tools/gear_weapons_seltas.py); no sharpness row of her own
+w06 = 1                                 # (the table is full): mKireType GU's nearest rows, her bars the 4U rows (KIRX)
+w09 = 1
+w10 = 2
 
 # ---- maps (maps/<name>): the IDs a map package owns, never a registry index ---------------------------------------
 # A map's Harvest Tours (maps/<map>/package.toml [[tour]]) ship in its package: a monster requiring the map brings them,
