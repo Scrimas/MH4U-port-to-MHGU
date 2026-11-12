@@ -87,6 +87,8 @@ static uint32_t gu_set(uint32_t flags)
     return flags == SET_PLAIN ? SET_SNOW : flags;
 }
 
+int seltas_pslc(uint32_t *regs);         /* monsters/desert_seltas/module/seltas_fx.c: a site has one hook */
+
 /* 0x70068 (movw r0, #0x73e0; add r1, r2, r3, lsl #1): the same post, kind 3 = PEL c, GU's common effects */
 int em068_01_pslc_c(uint32_t *regs)
 {
@@ -95,6 +97,7 @@ int em068_01_pslc_c(uint32_t *regs)
     uint8_t *req = (uint8_t *)regs[ARG5_AT_SITE], *rec;
     const uint8_t *data = (const uint8_t *)regs[R2];
     uint32_t slot = regs[R3];
+    if (seltas_pslc(regs)) return 0;
     if (!IS_HER(self) || !req || !data || slot >= 32) return 0;
     rec = FIELD(uint8_t *, self, EN_RECORD);
     if (!rec) return 0;
@@ -106,6 +109,7 @@ int em068_01_pslc_c(uint32_t *regs)
 }
 
 int em070_01_psl(uint32_t *regs);        /* monsters/shrouded_nerscylla/module/em070_01_fx.c: a site has one hook */
+int seltas_psl(uint32_t *regs);          /* monsters/desert_seltas/module/seltas_fx.c, the same */
 
 int em068_01_psl_c(uint32_t *regs)
 {
@@ -114,7 +118,7 @@ int em068_01_psl_c(uint32_t *regs)
     uint8_t *req = (uint8_t *)regs[ARG5_AT_SITE], *rec;
     const uint8_t *data = (const uint8_t *)regs[R2];
     uint32_t slot = regs[R3], id;
-    if (em070_01_psl(regs)) return 0;
+    if (em070_01_psl(regs) || seltas_psl(regs)) return 0;
     if (!IS_HER(self) || !req || !data || slot >= 32) return 0;
     rec = FIELD(uint8_t *, self, EN_RECORD);
     if (!rec) return 0;
