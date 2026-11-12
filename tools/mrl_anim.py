@@ -119,6 +119,15 @@ TRACK_MAP = {
                                                (('CBMaterial', 'fTransparency'), lambda v, a: (v[3] * a,), 0)],
     ('CBMaterialStd', 'fMaterialStdEmission'): [(('$Globals', 'fEmissionColor'), lambda v, a: v, None)],
 }
+# 4U constant-colour materials (CBMaterialConstant, no Std block) -> $Globals.fConstantColor, as Capcom converted them:
+# 4U em026 mat 2431ac96 'XfB__m03_add' (the Seltas Queen's underside glow) = GU em069_00 mat 2431ac96, its four entries
+# 'Normal' (alpha 0), 'Angry_Start', 'Angry_Repeat', 'Angry_End' with names, frames, flags and keys 1:1, kind 0x11 in
+# both (C, 2026-11-11). Opt-in (gu_entries extra=), for a material on GU's constant template (FAlbedoMapConstant,
+# FTransparencyAlphaConstant: Desert Seltas' 'add_const'): without it these tracks are dropped as before, so no other
+# monster's output changes (4U em024, em040, em041, em042, em110 have such tracks too).
+CONSTANT_MAP = {
+    ('CBMaterialConstant', 'fMaterialConstantBase'): [(('$Globals', 'fConstantColor'), lambda v, a: v, None)],
+}
 
 
 def animated_targets(entries4):
@@ -167,17 +176,20 @@ def solid_constants(entry, alpha=1.0):
     return out
 
 
-def gu_entries(entries4, cb_words, autoplay=(), alpha=1.0):
+def gu_entries(entries4, cb_words, autoplay=(), alpha=1.0, extra=None):
     """4U entries -> GU entries (same order, names, frames, keys). cb_words = {GU cb name: the material's state word
     of that constant buffer (its descriptor word)}; autoplay = names given the autoplay flag; alpha = scale of the
-    4U diffuse w (material alpha), see TRACK_MAP."""
+    4U diffuse w (material alpha), see TRACK_MAP; extra = more mappings in TRACK_MAP's form for this call only
+    (CONSTANT_MAP)."""
+    tmap = dict(TRACK_MAP)
+    tmap.update(extra or {})
     out = []
     for e in entries4:
         tracks = []
         for t in e['tracks']:
             cb, var = var_name(0x20, t['cb'], t['var'])
-            for k, ((gcb, gvar), f, kind) in enumerate(TRACK_MAP.get((cb, var), ())):
-                keys = [(key[0],) + map_values(cb, var, key[1:], alpha)[k][1] for key in t['keys']]
+            for (gcb, gvar), f, kind in tmap.get((cb, var), ()):
+                keys = [(key[0],) + tuple(f(key[1:], alpha)) for key in t['keys']]
                 tracks.append(dict(cb=cb_words[gcb], kind=t['kind'] if kind is None else (t['kind'] & 0xF0) | kind,
                                    var=gu_var_word(gcb, gvar, cb_words[gcb]), keys=keys))
         flags = (len(tracks) << 2) | (e['flags'] & FLAG_LOOP) | \

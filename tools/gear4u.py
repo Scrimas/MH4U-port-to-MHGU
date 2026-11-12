@@ -9,7 +9,9 @@ spec = dict(name=allocations.toml name, materials=[items4u.Materials], template=
 model=(Blademaster, Gunner model), parts=[4U Blademaster ID of head, body, arms, waist, legs] (Gunner = ID + 1),
 defense={4U defense: GU defense}, tree=f(4U tree ID, 4U tree name) -> GU tree (None: dropped),
 recipes=[[(item name, count)] x 4] per part, scrap=GU item given back (None: the template's), level_swap={template
-level-row material: ours}, template_word=a word no level-row material may keep (the template monster's name)).
+level-row material: ours}, template_word=a word no level-row material may keep (the template monster's name),
+res_majority=True when one 4U part's resists differ: the series takes the other four parts' (GU's series holds one set;
+optional, default: all five equal, asserted)).
 
 GU tables (file formats, MHGU_Editor docs/07 + this tool's checks; every new record starts from a GU record):
   armorSeriesData (resident.arc, 127 B): +0 u32 ID, +4 u16 sort, +6 5 x enabled part, +11 u16 model, +13 male,
@@ -127,15 +129,20 @@ def armors(name, materials, specs, R=None, exe=None):
         tpl_ids = spec['template']
         r = bytearray(series[8 + 127 * tpl_ids[g]: 8 + 127 * (tpl_ids[g] + 1)])
         p = [armor_4u(exe, pt, k0 + g) for (_, pt), k0 in zip(PARTS, spec['parts'])]
-        assert all(x['rare'] == p[0]['rare'] and x['price'] == p[0]['price'] and x['res'] == p[0]['res'] and
-                   x['defense'] == p[0]['defense'] and x['colour'] == p[0]['colour'] for x in p), p
+        assert all(x['rare'] == p[0]['rare'] and x['price'] == p[0]['price'] and x['defense'] == p[0]['defense'] and
+                   x['colour'] == p[0]['colour'] for x in p), p
+        res = p[0]['res']
+        if spec.get('res_majority'):    # one 4U part's resists differ (Seltas Z's Faulds): the other parts' set, GU's series
+            res = max((x['res'] for x in p), key=lambda v: sum(y['res'] == v for y in p))   # holds one (a listed deviation)
+            assert sum(x['res'] == res for x in p) >= 4, p
+        assert spec.get('res_majority') or all(x['res'] == res for x in p), p
         struct.pack_into('<I', r, 0, f + g)
         struct.pack_into('<H', r, 4, f + g)                          # sort after every GU series
         struct.pack_into('<H', r, 11, spec['model'][g])
         r[13:17] = bytes([1, 1, 1 - g, g])
         struct.pack_into('<I', r, 17, p[0]['price'])
         r[21] = r[22] = 0
-        struct.pack_into('5b', r, 23, *p[0]['res'])
+        struct.pack_into('5b', r, 23, *res)
         r[28:103] = bytes(75)
         for part, x in enumerate(p):
             kept = [(spec['tree'](tree4, st4[tree4]), pts) for tree4, pts in x['skills']]

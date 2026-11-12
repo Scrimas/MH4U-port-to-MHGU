@@ -316,6 +316,13 @@ uint16_t port_standin(int m, int k)
     return p->standin_id;
 }
 
+int port_guest(int m, uint32_t quest_id)
+{
+    for (int k = 0; quest_id && k < PORT_QUESTS; k++)
+        if (port_monsters[m].guest_in[k] == quest_id) return 1;
+    return 0;
+}
+
 /* hook 0x152960(_, fileId) -> resource. The game indexes its (path hash, type) table with IDs up to 0x106d0,
  * then tail-calls mgr->vt[0x38/4](mgr, <that function>, hash, type); IDs from PORT_FILE_ID_MIN are the ported
  * monsters' (data file section FILE: first ID, count, manifest[51], {hash, type}[count]). */

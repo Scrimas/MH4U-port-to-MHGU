@@ -560,3 +560,110 @@ Notes: monsters/tigerstripe_zamtrios/notes/ (plan, phase1-variant-map, missing-a
   dyed near white); then the colour nearly vanishes, and her chest and arms stayed the cream of the texture while
   helm, waist and legs were dark. New ports with a dark or strong 4U colour: build the armor with
   armor(ROMFS, ARMOR, '--opaque-tint') (tools/steps.py) and compare every piece in the smithy against 4U.
+
+## Lessons from Desert Seltas and Desert Seltas Queen (2026-11-09)
+- Two 4U subspecies of two GU classes in one package: each entry names its own GU class (package.toml
+  `[gu_classes]`, module/build.py). A monster that is the second boss of the other entry's quests is a guest there
+  (allocations.toml `guest_in`: the stand-in swap, the arc request, the break rewards and the Notes unlock take it;
+  tools/alloc.py checks that each such quest belongs to exactly one other entry of the package).
+- Read the action closure of the 4U AI table against GU's handlers before anything else, and resolve GU's dispatch
+  exactly: case blocks share tails (`mov r1, #0; b <the next case's tail>`), some categories switch inline in slot 125,
+  and GU starts motions through more calls than one (0xb058c picks one of three by angle). A first reading that missed
+  these took six of the Queen's actions for GU stubs; GU runs all of them (monsters/desert_seltas/notes/plan.md).
+- The closure of the AI table is not all: the engine requests categories 10 / 11 (reactions, death) itself. GU's Seltas
+  Queen keeps the normal Queen's reaction switch and returns at once for any variant (`ldrb [this+0xb5f5]; cmp #0;
+  popne`), so the Desert Queen froze in her first flinch until her death (test 2026-11-09). Scan the GU class for every
+  variant read followed by a return, and compare each 4U species switch in categories 10 / 11 case by case (4U 0x79463c:
+  em 95's 46 numbers with her own motions; module seltas_react.c, tools/react_seltas.py).
+- A kept variant test can stand right before a shell post and skip it: GU's Seltas class posts nothing for variant 1 at
+  five shot sites where 4U posts the Desert Seltas' own subtypes (uShell012 56..59 for the Seltas' 6 / 7 / 13 / 24,
+  uShell001 117 / 118 for 36 / 74), the Queen's class at one (7/56, her uShell001 92). An
+  attack that plays without its projectile is the sign (the user: "spit attacks without spit effects"). List every 4U
+  shell post with the species test before it and look at GU's twin of each, not only at its attack indexes.
+- A subspecies' own shot when its parent can share the quest: GU caches a shell family's def per shell id for every
+  monster (0x48c388; all 412 ids are taken), so new kinds or a changed def under GU's path would reach the parent too
+  (Desert Seltas' 11140 has a normal Seltas). Desert Seltas 0.1.3's way: copies of GU's defs under its own paths, on its
+  own PELs (GU's list-2 records of the ids the kinds post, on its 4U EFLs) and hit data, found by file ID (FILE IDs after
+  the manifest's), and swapped into the shell request's cache read for its own posts only (0x48c5e4, back at the exit
+  0x48c54c: module/seltas_shots.c, tools/shots_seltas.py). A hook pair whose second instruction is conditional (movne)
+  cannot be displaced: the trampoline's own cmp changes the flags first.
+- GU may renumber a subspecies' attack records: GU's Seltas Queen records 47 / 51 are 4U's Desert Seltas Queen 69 / 70
+  (up to GU's retune bytes) and GU posts them for her. Compare record bytes, not indexes, before calling a post missing.
+- A pair of monsters may find each other by the full 16-bit ID (`ldrh [+0xb5f0]`, variant byte included) where 4U went by
+  species: GU's Seltas Queen calls ID 0x4c to her area (0xbe5ec, from her slot 9 and her call) and the Seltas stays with
+  ID 0x45 (slot 152), so the Desert pair (0x145 / 0x14c) lived apart (test: same area 210 of 720 s). Search both classes
+  for ID compares and ID arguments, not only for variant reads (module seltas_pair.c).
+- Code that only a variant runs was never played in GU and can hold GU's own slip: the buried Desert Seltas waits for
+  his Queen's motion 0x465 past frame 328, and GU asks the frame of his own motion (301 frames: never), 4U his partner's.
+  Compare such handlers register by register with 4U, even where both call the same functions.
+- Find the actions only the subspecies' 4U table starts (`00 cat num` in each table, the parent's and GU's too) and
+  test those first: GU kept their code but no GU table reaches it. The Desert Queen's launch (16/4, only em095_cmd)
+  sends her male into 7/67, a flight whose handler ends no action in either game; in the 0.1.4 test he hung in it until
+  the quest ended, and GU had also dropped its crash blast and launch effect (4U posts there that GU calls around).
+  A log of the handler's step byte, its timers and the action that follows (seltas.c flight_log) for the parent species
+  too shows what ends it in GU's own play. A handler that ends no action can mean the monster is meant to die there:
+  the launched Desert Seltas shatters in 4U (wiki), and both games zero his corpse time after the flight; read the
+  monster's wiki entry for the move before searching the code for an ending.
+- A copied GU effect record carries GU's colour for the species: GU keeps 4U's code colours (the species' EFLs with
+  a colour block) as RGB lerps in its PEL list-2 records (Seltas shots: sand aa9650 / green 788c46 at factor 1.0). On
+  a subspecies' own 4U EFL without a colour block that tint is wrong (the Desert Seltas' spit on her back came out
+  green): check efl_colour_block of both 4U EFLs and neutralise the copied record (white at factor 0) where 4U has none.
+- A GU shell can post a second shell of its own: GU's Seltas shell class posts a ground splash (0x13a) at each ground
+  hit, where 4U's uShell001 draws its ground effect itself. A swap of the shot's family misses it (Desert Seltas 0.1.6:
+  the shots' own colours fixed, the green puddle stayed). List every shell id the parent's class AND its shell classes
+  post (`movw rN, #id` near the request 0x48c4f0) and check each family's PEL ids against the picture of the bug.
+- A copied GU hit entry with no 4U record behind it still carries the parent's status bytes (+0x10 / +0x11 / +0x13
+  flags, +0x14 value): give it the subspecies' (the Desert Seltas' shots paralyse, the Seltas' do not).
+- Their own 4U sand and dust: every own EFL whose units 4U multiplies by the area colour (soil), not only the ones MEF
+  ground-flag records name, has the same Intensity bake as 4U's common dust: at 1x it is GU's Dunes brown, baked x2 it
+  is bright yellow-white (Desert Seltas Queen's pull of him out of the sand, 0.1.8). And where GU's motion has its own
+  dust (cm202_*), their own sand goes for it too (the rule on environment effects), not only 4U's common qe*
+  (build_seltas_arc.py own_sand(), soil_units(), gu_common_effects).
+- An AI group the parent's table leaves empty may hold a script in the subspecies' 4U table (the Queen's g14 s0): carry
+  4U's scripts past GU's count when GU's class asks for that group where 4U's does.
+- GU quests: boss slots 0 / 1 are the main bosses, 2..4 more bosses or intruders. An intruder = a slot-2 record +
+  +0xCC..+0xD3 (GU's one-intruder quests: 64 00 64 00 00 00 64 00) + +0x16F bit 3 (set on exactly the quests with
+  +0xCC). 4U's intruder list (+0x30) is {u32 chance, spawn record} closed by 0xffff + 0xffffffff, its stats in block 2.
+- 4U spawn count 99 = a boss that comes back (the Queen's Desert Seltas): GU's form is the record's restore count
+  (q11305: 5). A 4U "hunt all" quest (+0xA0 8) with such a boss: GU hunt objectives on the others, rule 1 (4U's text
+  names those).
+- When an objective needs the quest's own small monsters (4U m10815: 30 Bnahabra), take 4U's set (GU emSetList format
+  in monsters/desert_seltas/tools/build_seltas_quest.py); GU's sets of the map may hold few of them.
+- GU's village G quests have no subquest (C); a template without one carries no sub money. A template whose subquest
+  is of another kind: take the sub money of a GU quest of the rank with that kind of subquest.
+- A 4U quest text may name another monster than its file spawns (m10928): follow the file, fix the name per language
+  (German declines it).
+- Armor: GU's series holds one resist set; a 4U set whose parts differ takes the other parts' (gear4u res_majority,
+  a listed deviation). Weapons: one line per class and entry (weapons4u); lines on a model GU already ships (GU kept
+  4U's numbers) need no arc, their stand-in is GU's own parent; recipes with the other entry's materials pass both
+  Materials (weapons4u spec materials as a list). Another port's appended material in a recipe: the base species' GU
+  item (Tigerstripe's rule).
+- A subspecies can die another way than GU lets it: 4U's em message dispatcher (0x687998) has the down decision (type
+  5, 0x92c0a4 = GU 0x9b2bc, a plain death by movement state) and the death by impact (type 6, 0x948614 = GU 0x9c2b4:
+  11/8 with its own script). The launched Desert Seltas bursts through the latter (the Desert-only motion 0x350 with its
+  burst effect), which GU kept but never sends (module seltas.c launch_end). Read the dispatcher for every death.
+- How it enters: 4U's Seltas entry slot 54 (0x7890a8) gives the Desert Seltas 12/1 (he enters buried and waits for his
+  Queen's pull), GU's slot 137 every variant 12/0 (it flies in). A buried partner digs himself out when the pair's
+  timer runs out, which only his dig-in fills: set it at the buried entry too (module seltas.c buried_entry).
+- GU's sSoundControl announces each unit once per life: its scan clears a unit's announce mark when the unit's alert
+  drops to 0 (0x4e4b18), so a monster restored after its death is discovered again (the sting at 0x4e5240, and the
+  hunter's startle). A partner that comes back keeps the mark while its owner fights (seltas_mark, seltas_sting).
+- Issue #6's rule on grey 4U rock units goes by effect model: a subspecies' own effect model with grey chunks
+  (ef_em095 in her ground EFLs) needs the same rule (hide_grey_models with its model); GU drew them black.
+- 4U constant-colour material animations (CBMaterialConstant: the Seltas Queens' underside glow 'XfB__m03_add', its
+  entries 'Normal' = off, 'Angry_Start' / 'Angry_Repeat' / 'Angry_End') have no TRACK_MAP entry, so the converter
+  dropped every track and the overlay stayed on, lit. Capcom's conversion: $Globals.fConstantColor on its constant
+  shader (GU em069_00 m03_add, the same block as em076_00 m02_add); mrl_anim.CONSTANT_MAP, opt-in through
+  gu_entries(extra=) with that template (build_seltas_arc.py ADD_CONST). Other ports' 4U files have such tracks too
+  (em024, em040, em041, em042, em110): check them before opting in, it changes their output.
+- Capcom rebuilt some shot effects for GU: em076_00_001 has a second set (element mask 2) for the shots the Seltas
+  fires from the Queen's back (shell37 kinds 6-8), whose trail unit has node +0x70 = 150, where 4U uses one set for both
+  (its subtypes 6 and 13 share mask 1). When one kind of a subspecies' shot looks wrong, compare the parent's GU EFL
+  with its 4U source first (the Desert Seltas' trail from her back: open, plan.md).
+- Compare names against every GU string of the table, not only the records a check reads: GU's own "Battalion
+  Strafer" (Machine Strafer's final form) and "Seltas Fortitude" carry 4U's names in all five languages, so her two
+  lines take Monoblos' " (4U)" label (gear_weapons_seltas.py LABEL_4U).
+- Moving a port onto a new core: an ID the maintainer claims meanwhile (Heaven's Mount's tours took 11372) moves to a
+  free one before anything ships; the early draft PR with the IDs (CONTRIBUTING) prevents it. Core 3.0.0 also wants
+  package.toml `class` and the Chinese text: `translate.py apply` rewrites the generated tables from what the checkout
+  has built, so where not every monster is built, add the keys by hand and check with `translate.py check`.

@@ -14,8 +14,10 @@
  *    slot they work on the lessee's store record, so the owner's GU record is never written. While leased, the slot
  *    shows the lessee in the quest result: name (main.c name_index_c), icon (reg_icon), size and crowns (its
  *    em_size_scale_data element, main.c size_slot_dress) and break rewards (items.c bui_record_c). A ported monster
- *    only spawns in its own quests (main.c standin_swap), so an owner and a lessee of the same slot never meet in
- *    one quest; the owner's next tally takes the slot back (and moves a lessee counted there in the same quest).
+ *    only spawns in its own quests and those it is a guest in (main.c standin_swap; a guest is always a lessee,
+ *    tools/alloc.py), so an owner and a lessee of the same slot never meet in one quest; the owner's next tally
+ *    takes the slot back (and moves a lessee counted there in the same quest). Two lessees of one quest (a guest's
+ *    quest) each take their own slot (slot_free).
  *
  * The store lives in the reserved block of sUserInfo (+0x3684..+0x43f7, 0xd74 bytes): zeroed by GU's initialisers
  * 0x51c91c / 0x51cbe4, written and read raw by the character save / load (0x51daa8 in 0x51d12c, 0x51e5c0 in 0x51dc40)

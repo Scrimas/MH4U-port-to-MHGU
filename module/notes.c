@@ -96,8 +96,9 @@ int notes_unlock_check_c(uint32_t *regs)
  *   0x5b0ad4 (below, the write is skipped).
  * - 0x524728(S, em ID), one caller 0x161e28: below. 0x524660 stops at em IDs above 56, ours are higher. The other
  *   readers (0x5565xx, 0x55686c) take fixed GU entries.
- * Unlocked = any quest of the monster cleared (the cleared map S+0x42c, written by GU for every quest), as the entry
- * would be after talking to the NPC; no NEW mark. Nothing here writes. */
+ * Unlocked = any quest of the monster cleared (the cleared map S+0x42c, written by GU for every quest), its guest_in
+ * quests too (another monster's quests it is a boss of), as the entry would be after talking to the NPC; no NEW mark.
+ * Nothing here writes. */
 #define NOTES_SAVE_BITS 128u
 #define NOTES_ZERO_WORD 79u                /* (S+0x36fc - S+0x35c0) / 4: a word of the reserved block's free part
                                             * (+0x3694..+0x36ff: past the save link record, modsave.h MS_LINK_N, and
@@ -111,7 +112,8 @@ static int notes_live(uint32_t e)
     for (int m = 0; m < PORT_N; m++) {
         if (port_monsters[m].notes_entry != e) continue;
         for (int k = 0; k < PORT_QUESTS; k++)
-            if (port_monsters[m].quests[k] && questCleared(save + 0x42c, port_monsters[m].quests[k])) return 1;
+            if ((port_monsters[m].quests[k] && questCleared(save + 0x42c, port_monsters[m].quests[k])) ||
+                (port_monsters[m].guest_in[k] && questCleared(save + 0x42c, port_monsters[m].guest_in[k]))) return 1;
     }
     return 0;
 }

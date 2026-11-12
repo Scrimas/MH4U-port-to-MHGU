@@ -72,6 +72,8 @@ struct port_monster {
     uint8_t lease;                        /* allocations.toml save = "lease": no fixed save slot (save_index /
                                              save_id 0), it borrows one per quest and its numbers go to the store
                                              (module/save.c) */
+    uint32_t guest_in[PORT_QUESTS];       /* allocations.toml guest_in: quests of another entry of its package in
+                                             which it is a further boss under its standin_id; 0 = none */
 };
 #define PORT_OWNER(m) (port_monsters[m].owner >= 0 ? port_monsters[m].owner : (m))
 extern const struct port_monster port_monsters[];   /* out/port_monsters.c */
@@ -104,6 +106,8 @@ const struct port_stage *port_running_stage(void);
 int port_stage_installed(const struct port_stage *s);
 /* the stand-in ID monster m's quests[k] name (standin_alt where its mask has bit k, else standin_id; 0 = none) */
 uint16_t port_standin(int m, int k);
+/* 1 = monster m is a guest boss of quest_id (allocations.toml guest_in) */
+int port_guest(int m, uint32_t quest_id);
 
 void notes_data_loaded(int m);            /* notes.c: the monster's Notes entry, after its data loaded */
 

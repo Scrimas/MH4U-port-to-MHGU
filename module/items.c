@@ -292,7 +292,8 @@ int bui_record_c(uint32_t *regs)
     int rank = info ? (int8_t)info[44] : -1;      /* GU returns no record without it */
     for (int m = 0; m < PORT_N; m++) {
         const struct port_monster *p = &port_monsters[m];
-        if (id != p->em_id && slot_user != m && !(q == m && port_standin(m, k) && id == port_standin(m, k)))
+        if (id != p->em_id && slot_user != m && !(q == m && port_standin(m, k) && id == port_standin(m, k)) &&
+            !(q >= 0 && p->standin_id && id == p->standin_id && port_guest(m, port_quest_id())))
             continue;
         if ((!FIELD(uint16_t, s_bui[m], 4) || s_bui_rank[m] != rank + 1) && !bui_build(m, rank)) return 0;
         regs[R0] = (uint32_t)s_bui[m];

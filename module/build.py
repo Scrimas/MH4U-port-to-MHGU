@@ -22,10 +22,12 @@ QUESTS_PER_ENTRY = alloc.QUESTS_PER_ENTRY   # port.h PORT_QUESTS
 def package(m):
     """monsters/<package>/package.toml: version, code = C prefix (<code>_register_class, g_<code>_dti), gu_class =
     name of the GU class that runs the monster instead (its donor's: a GU variant, e.g. uEm067_00 for em067_01); a
-    package of several entries names each entry's class in [classes] (entry name = code; entries may share one)"""
+    package of several entries names each entry's class in [classes] (entry name = code; entries may share one), and
+    the GU class of each in [gu_classes] when they run on different ones (Desert Seltas and the Queen)"""
     with open(os.path.join(paths.monster(m['name']), 'package.toml'), 'rb') as f:
         p = tomllib.load(f)
     if m['name'] in p.get('classes', {}): p['code'] = p['classes'][m['name']]
+    if m['name'] in p.get('gu_classes', {}): p['gu_class'] = p['gu_classes'][m['name']]
     return p
 
 
@@ -203,6 +205,29 @@ HOOKS = [
     ('em070_01_act', 0xFAE550),    # uEm070_00 slot 125: Shrouded Nerscylla (variant 1) log (monsters/shrouded_nerscylla/module/em070_01.c)
     ('em070_01_line', 0xF9F3EC),   # uEm070_00 slot 130's web line sound, GU's variant test: GU's variant-0 path for her (mid hooks, return 0)
     ('em070_01_line2', 0xF9F534),
+    ('seltas_ds_act', 0xFDC074),   # uEm076_00 slot 125: Desert Seltas (variant 1): his 4U entry and death (monsters/desert_seltas/module/seltas.c)
+    ('seltas_dsq_react', 0xF9BE10),  # uEm069_00 category 10, which GU ends at once for a variant: her 4U reactions (seltas_react.c)
+    # their own 4U shots (monsters/desert_seltas/module/seltas_shots.c): GU's variant skips before a post (MID_EXIT: on to
+    # the post), the marks, and the shell request's def read (0x48c5e4) and exit (0x48c54c)
+    ('seltas_shot_a', 0xFD531C), ('seltas_shot_b', 0xFD6130), ('seltas_shot_c0', 0xFD7C78), ('seltas_shot_c', 0xFD7F30),
+    ('seltas_shot_d', 0xFD8240), ('seltas_shot_e', 0xFD86E4), ('seltas_shot_q', 0xF987D0),
+    ('seltas_shot_q1', 0xF96BC4), ('seltas_shot_q2', 0xF96C74), ('seltas_shot_q3', 0xF96D24),
+    ('seltas_shot_req', 0x48C5E4), ('seltas_shot_end', 0x48C54C),
+    ('seltas_shot_g', 0xFDCBE4),   # GU's Seltas shell class 0xfdca90, before its ground-splash post 0x13a: his own splash
+                                   # (seltas_shots.c, 0.1.8)
+    ('seltas_shot_g2', 0xFC6C00), ('seltas_shot_g3', 0xFC6DE0),  # GU's Seltas shell callback 0xfc6a30, before its two
+                                   # posts of the unit's 0x13a; GU's Queen shell class 0xf9dc80, before its 0x128 post:
+    ('seltas_shot_qg', 0xF9DD9C),  # their own ground splashes (seltas_shots.c, 0.1.10)
+    ('seltas_shot_any', 0x48C4F8),  # GU's shell request after its entry (Tigerstripe's hook): every 0x13a the Desert
+                                    # Seltas owns takes his own splash, whoever posts it (seltas_shots.c, 0.1.12)
+    ('seltas_sting', 0x4E5240),     # sSoundControl 0x4e51c8 before its discovery sting: none for her dug-out male
+                                    # (seltas.c, 0.1.15)
+    ('seltas_mark', 0x4E4B18),      # sSoundControl's scan, its clear of a unit's announce mark: kept for her Desert
+                                    # Seltas while she fights (seltas.c, 0.1.16)
+    # the pair (seltas_pair.c): the Queen's call of a Seltas by its full ID (0xbe5ec; her calls at lr 0xf8c17c /
+    # 0xf962dc: ID 0x14c for a Desert Queen), uEm076_00 slot 152 (stay with the Queen: hers found by em number) and
+    # his 6/3 jump out of the sand at her call (0xfd4594: her frame, not his own, as 4U's)
+    ('seltas_dsq_call', 0xBE5EC), ('seltas_ds_stay', 0xFC768C), ('seltas_ds_popout', 0xFD4594),
     ('gear_listed_set', 0x524980), ('gear_listed_get', 0x5249F4),  # the smithy's armor "listed" save bits: a record past their 576 is kept in the mod's store (gear.c)
     ('enemy_drop_log', 0xAC0EC),   # the item drop (shiny), entry: log only, ported monsters (port.c)
     ('dala_dmg_end', 0x98E44),     # enemy damage update 0x97ddc, after the rage add, before the reaction dispatcher
@@ -247,6 +272,10 @@ MID_EXIT = {
     'em005_01_pslgate': 0x7016C, # mov r0, #0; return: the PSL slot posts nothing (GU's own no-post path)
     'em005_01_laser': 0xD2DFE8,  # b 0xd2e03c: GU's laser shell not posted (4U's capsule instead, em005_01_shell016.c)
     'intruder_came': 0x3A1814,   # ldrb r0, [r8, #0x55]: GU's intruder count skipped, the second intruder armed
+    # seltas_shots.c: past GU's variant test (`cmp r0, #0; bne` skip) to its post, for the Desert Seltas / Queen
+    'seltas_shot_a': 0xFD5328, 'seltas_shot_b': 0xFD613C, 'seltas_shot_c': 0xFD7F40, 'seltas_shot_d': 0xFD824C,
+    'seltas_shot_e': 0xFD86F0, 'seltas_shot_q': 0xF987E0,
+    'seltas_mark': 0x4E4B20,     # seltas.c: past sSoundControl's clear of the unit's announce mark (it stays set)
 }
 # GU code that third-party Forge plugins check against v1.4 before hooking it (each plugin's table of main address +
 # v1.4 bytes, read with tools/plugin_sigs.py); a plugin whose check fails installs nothing. main() refuses a hook
@@ -483,14 +512,15 @@ def monsters_c(stub=False):
         sn = m.get('append', {}).get('stage_name', 0)   # the alias's board name (its stage's board_name)
         assert sn in (0, 1) and (not sn or 'stage_alias' in m), (m['name'], sn)
         si = m.get('save_index', 0)             # 0: save = "lease" (module/save.c)
+        gq = (m.get('guest_in', []) + [0] * QUESTS_PER_ENTRY)[:QUESTS_PER_ENTRY]   # port.h guest_in
         out.append('    {"%s", 0x%x, %d, %d, 0x%x, %d, 0x%x, %d, %d, {%s}, {%s}, %s, %d, '
-                   '%d, {%s}, %d, 0x%x, 0x%x, %d},' % (
+                   '%d, {%s}, %d, 0x%x, 0x%x, %d, {%s}},' % (
             m['name'], m['em_id'], m['registry_index'], m['donor_index'], m.get('standin_id', 0), si,
             0x1064 + si - 105 if si else 0, m['name_entry'], m.get('notes_entry', 0),
             ', '.join('%d' % v for v in q), ', '.join('%d' % v for v in s),
             '%s_register_class' % package(m)['code'] if m in own else '0', port.get(m.get('companion_of'), -1),
             stage, ', '.join('%rf' % float(v) for v in sz), int(m.get('quest_append', False)), alt[0], alt_mask,
-            int(m.get('save') == 'lease')))
+            int(m.get('save') == 'lease'), ', '.join('%d' % v for v in gq)))
     return '\n'.join(out + ['};']) + '\n'
 
 

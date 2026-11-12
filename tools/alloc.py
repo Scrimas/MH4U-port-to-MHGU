@@ -16,7 +16,9 @@ are new quest list entries after GU's, module/quest.c quest_group_append, instea
 `notes = false` (no Hunter's Notes entry, as a companion: module/notes.c skips notes_entry 0; a forgotten notes_entry
 still fails; entries from 128 have no save bit, module/notes.c), `save = "lease"` (no save_index: the monster borrows a free
 save slot for each quest and its hunts, captures and size records go to the mod's store, module/save.c; every
-save_index is taken since Black Gravios, and a monster that has one keeps it).
+save_index is taken since Black Gravios, and a monster that has one keeps it), `guest_in = [quest, ...]` (quests of
+another entry of the same package in which this monster is a further boss under its standin_id, e.g. Desert Seltas in
+the Queen's: module/port.c port_guest).
 [[map]] entries: a map package (maps/<name>) that owns quest IDs, never a registry index: its Harvest Tours (`quests`,
 described by the map's package.toml [[tour]] tables: tours()), appended to the quest list right after the quests of
 the monster `append_after` (module/quest.c).
@@ -227,6 +229,17 @@ def check(reg=None, gu_main=paths.GU_MAIN):
             if m.get('items') != [first, first + n_app - 1]:
                 errs.append('%s: items %s, expected [%d, %d] (append items = %d)' % (m['name'], m.get('items'),
                                                                                     first, first + n_app - 1, n_app))
+    for m in ms:                                    # guest_in: quests of another entry of its own package
+        gq = m.get('guest_in', [])
+        if gq and ('companion_of' in m or 'standin_id' not in m or m.get('save') != 'lease'):
+            # save.c's slot_free keeps only the owner's and companions' fixed slots out of a quest's leases
+            errs.append('%s: a guest is a monster entry with a standin_id and save = "lease"' % m['name'])
+        if len(gq) > QUESTS_PER_ENTRY:
+            errs.append('%s: more than %d guest_in quests' % (m['name'], QUESTS_PER_ENTRY))
+        for q in gq:
+            owners = [o for o in ms if q in o.get('quests', [])]
+            if len(owners) != 1 or owners[0] is m or package(owners[0]) != package(m):
+                errs.append('%s: guest_in %d is no quest of another entry of its package' % (m['name'], q))
     errs += check_maps(reg, seen)
     errs += check_packages(reg)
     if gu_main and os.path.exists(gu_main):        # the em IDs must be free in GU's own registry
