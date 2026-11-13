@@ -592,6 +592,18 @@ w10 = 2
 w13 = 3
 w14 = 3
 
+[[monster]]
+name = "pink_rathian"
+title = "Pink Rathian"
+em_id = 0x101
+registry_index = 148
+donor_index = 0
+standin_id = 0x1
+save = "lease"
+name_entry = 109
+notes_entry = 132
+file_ids = [0x10a00, 0x10a3f]
+
 # ---- maps (maps/<name>): the IDs a map package owns, never a registry index ---------------------------------------
 # A map's Harvest Tours (maps/<map>/package.toml [[tour]]) ship in its package: a monster requiring the map brings them,
 # and so does the Harvest Tours bundle (bundles/harvest_tours). Appended to the quest list (module/quest.c) right after
