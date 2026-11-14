@@ -9,7 +9,8 @@ PWLF, tools/portdata.py; read by module/gear.c) and module/gear_hooks.txt, share
   # or, the 4U rows of the kire_near weapons as their own sharpness (section KIRX, module/gear.c gear_kire_slash):
   exact = []; ... = weapons4u.build(spec, exact); ... = weapons4u.sections(tables, texts, hooks, spec['pwl_fix'], exact)
 
-spec = dict(name=allocations.toml name, materials=items4u.Materials, classes=[class spec], status={4U status: GU
+spec = dict(name=allocations.toml name, materials=items4u.Materials (or a list of them: the other entries of a
+package whose materials the recipes name too, Desert Seltas'), classes=[class spec], status={4U status: GU
 mElement}, kire_4u=[4U sharpness entries, in append order], pwl_fix=[(path suffix, model, GU value, ours)],
 substitutes={4U item name: GU item name}); class spec = dict(nn=GU class, ids4u=(create weapon, then each upgrade of
 the previous one), standin=GU weapon ID whose records are copied, recipes=optional expected [{item name: count}],
@@ -368,7 +369,8 @@ def build(spec, exact=None):
     lres = {lang: gu_arc(R.read('/nativeNX/%s/arc/resident_%s.arc' % (lang, lang))) for lang in LANGS}
     t4 = {lang: text4u(lang) for lang in LANGS}
     it_gu = gmd(lres['eng']['eng\\table\\itemData_eng'])
-    our = gu_item_names(R, [spec['materials']])
+    mats = spec['materials']
+    our = gu_item_names(R, list(mats) if isinstance(mats, (list, tuple)) else [mats])
     misses, tables, texts, hooks, summary, log = [], [], [], [], [], []
 
     def gu_item(nm):
