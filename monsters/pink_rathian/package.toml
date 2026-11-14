@@ -1,0 +1,14 @@
+# Pink Rathian package: what the installer shows and installs (goal 3), and the version written into its data file.
+name = "pink_rathian"
+kind = "monster"
+title = "Pink Rathian"
+class = "Flying Wyvern"
+version = "0.1.0"
+requires_core = "1.6.0"
+requires = []
+code = "em003_01"
+gu_class = "uEm001_00"
+
+[size]                     # quest-result size record (module/main.c size_data): 4U table 0xf32008 + 16 x em {f32 base
+                           # cm, mini, silver, gold}
+pink_rathian = [1654.3, 0.97, 1.17, 1.23]
