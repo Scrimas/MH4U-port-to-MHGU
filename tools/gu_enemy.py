@@ -3,7 +3,7 @@
   gu_enemy.py classes      DTI, size, newInstance, ctor, object vtable of every uEmXXX_YY / uEnemy
   gu_enemy.py slots [N]    uEnemy vtable slots vs overrides in the monster classes (first N slots)
 """
-import collections, pickle, re, sys
+import collections, re, sys
 
 import paths  # noqa: E402
 sys.path.insert(0, paths.GU_PY)
@@ -55,7 +55,6 @@ def movw_r3(site):
 
 
 def classes():
-    names = pickle.load(open(asm.ROOT + 'dti.pkl', 'rb'))
     out = {}
     calls = asm.callers()
     for site in calls.get(DTI_CTOR, []):

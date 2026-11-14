@@ -135,6 +135,38 @@ def s_gu_code():
     objdump('main32.elf', os.path.join(out, 'main.asm'), '--triple=armv7', cwd=out)
 
 
+def s_gu_reloc():
+    """gu_main/img_reloc.pkl (image, {stub address: imported symbol}) for tools/gulib/vt.py and asm.starts(): mem.bin
+    loaded at 0x10000000 (bss included) with the dynamic relocations applied (R_ARM_RELATIVE, ABS32, GLOB_DAT,
+    JUMP_SLOT); an imported symbol points at a stub address from 0x0e000000 up, 8 bytes apart"""
+    m = open(paths.GU_MAIN, 'rb').read()
+    B, END, STUB = 0x10000000, 0x2147000, 0x0E000000   # END: bss end 0x2146788, page-rounded
+    u32 = lambda b, a: struct.unpack_from('<I', b, a)[0]
+    mod0 = u32(m, 4)
+    dyn, tags = mod0 + struct.unpack_from('<i', m, mod0 + 4)[0], {}
+    while u32(m, dyn): tags[u32(m, dyn)] = u32(m, dyn + 4); dyn += 8
+    img, stubs, by_name = bytearray(END), {}, {}
+    img[:len(m)] = m
+
+    def sym(i):
+        n, v, _, _, _, shn = struct.unpack_from('<IIIBBH', m, tags[6] + 16 * i)
+        return m[tags[5] + n:m.index(b'\0', tags[5] + n)].decode(), v, shn
+    for tab, size in ((tags[17], tags[18]), (tags[23], tags[2])):   # DT_REL / DT_RELSZ, DT_JMPREL / DT_PLTRELSZ
+        for i in range(0, size, 8):
+            off, info = struct.unpack_from('<II', m, tab + i)
+            t = info & 0xFF
+            if t == 23:   # R_ARM_RELATIVE: base + the addend in place
+                struct.pack_into('<I', img, off, (u32(img, off) + B) & 0xFFFFFFFF)
+            elif t in (2, 21, 22):   # R_ARM_ABS32 (addend in place), GLOB_DAT, JUMP_SLOT
+                name, v, shn = sym(info >> 8)
+                if shn: tgt = B + v
+                else:
+                    if name not in by_name: by_name[name] = STUB + 8 * len(stubs); stubs[by_name[name]] = name
+                    tgt = by_name[name]
+                struct.pack_into('<I', img, off, ((u32(img, off) if t == 2 else 0) + tgt) & 0xFFFFFFFF)
+    pickle.dump((bytes(img), stubs), open(os.path.join(paths.GU_CODE, 'img_reloc.pkl'), 'wb'))
+
+
 def s_gu_plt():
     """dump/gu_plt.json {PLT stub address: imported symbol} for tools/guemu.py: each ARM PLT stub (add ip, pc / add
     ip, ip / ldr pc, [ip, #n]!) jumps through a GOT slot whose R_ARM_JUMP_SLOT relocation names the symbol"""
@@ -186,6 +218,7 @@ STEPS = [
     ('gu_code', [('dump/gu_main/mem.bin', '24c208c395c65727b21b5fa91af8381396e70cf421b0fcfee0345d8743298110',
                   'MHGU v1.4 main, flat'), ('dump/gu_main/main32.elf', None, 'MHGU main ELF'),
                  ('dump/gu_main/main.asm', None, 'MHGU main disassembly')], s_gu_code),
+    ('gu_reloc', [('dump/gu_main/img_reloc.pkl', None, 'MHGU main, relocated')], s_gu_reloc),
     ('gu_plt', [('dump/gu_plt.json', None, 'MHGU PLT symbols')], s_gu_plt),
     ('gu_pcrefs', [('dump/gu_pcrefs.pkl', None, 'MHGU pc-relative references')], s_gu_pcrefs),
     ('gu_shader', [('dump/gu/AppShaderPackage.mfx', None, 'MHGU shader package')], s_gu_shader),

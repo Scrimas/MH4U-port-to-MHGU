@@ -147,6 +147,7 @@ Made by tools/setup.py (also needed by a build)
   m19_unpacked/         4U Battlequarters arcs unpacked (arcpack layout)       [setup 4u_m19]
   gu_main/              GU main: mem.bin (flat), main32.elf, main.asm, asm caches; dti.pkl (maintainer's, optional:
                         the gu_class donor check of module/build.py)          [setup gu_code]
+                        img_reloc.pkl: main relocated at 0x10000000 (vt.py, asm.starts())  [setup gu_reloc]
   gu_plt.json gu_pcrefs.pkl  GU PLT symbols (guemu.py), pc-relative refs (weapons4u.py)  [setup gu_plt, gu_pcrefs]
   gu/AppShaderPackage.mfx    GU shader package (material records)              [setup gu_shader]
   gu_stage/             GU stage files (tools/gu_stage_files.txt) + unpacked arcs   [setup gu_stage]
